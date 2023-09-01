@@ -36,7 +36,7 @@ steps:
       - repo=$REPO_NAME
       - --tla-str
       - buildId=$BUILD_ID
-      - ./skiff/webapp.jsonnet
+      - .skiff/webapp.jsonnet
   - id: deploy
     name: gcr.io/ai2-reviz/rudder
     args: [ deploy, -f, /tmp/webapp.yaml ]

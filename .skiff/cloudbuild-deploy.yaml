@@ -43,13 +43,13 @@ steps:
 substitutions:
   _ENV: prod
 images:
-  - gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA,
-  - gcr.io/$PROJECT_ID/$REPO_NAME:latest,
+  - gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA
+  - gcr.io/$PROJECT_ID/$REPO_NAME:latest
 artifacts:
   objects:
     location: gs://skiff-archive/$REPO_NAME/$_ENV/$BUILD_ID/$COMMIT_SHA
-    paths: [/tmp/webapp.yaml]
+    paths: [ /tmp/webapp.yaml ]
 options:
   env:
-    - "DOCKER_BUILDKIT=1"
+    - DOCKER_BUILDKIT=1
 timeout: 20m

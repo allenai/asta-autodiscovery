@@ -1,0 +1,14 @@
+version: '3'
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: dev.Dockerfile
+    volumes:
+      - ./app/src:/app/src
+      - ./app/public:/app/public
+    environment:
+      - NODE_ENV=development
+    ports:
+      - 3000:3000
+      - 8080:3000

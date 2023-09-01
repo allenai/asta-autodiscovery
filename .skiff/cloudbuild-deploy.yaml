@@ -18,8 +18,8 @@ steps:
   - id: config
     name: gcr.io/ai2-reviz/jsonnet
     args:
-      - eval,
-      - -y,
+      - eval
+      - -y
       - --output-file
       - /tmp/webapp.yaml
       - --tla-str

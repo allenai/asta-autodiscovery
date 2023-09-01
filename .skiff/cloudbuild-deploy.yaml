@@ -39,7 +39,7 @@ steps:
       - .skiff/webapp.jsonnet
   - id: deploy
     name: gcr.io/ai2-reviz/rudder
-    args: [ deploy, -f, .skiff/webapp.yaml ]
+    args: [ deploy, -f, webapp.yaml ]
 substitutions:
   _ENV: prod
 images:
@@ -48,7 +48,7 @@ images:
 artifacts:
   objects:
     location: gs://skiff-archive/$REPO_NAME/$_ENV/$BUILD_ID/$COMMIT_SHA
-    paths: [ .skiff/webapp.yaml ]
+    paths: [ webapp.yaml ]
 options:
   env:
     - DOCKER_BUILDKIT=1

@@ -14,6 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>{children}</body>
+      <script src="https://stats.allenai.org/init.min.js" async></script>
     </html>
   )
 }

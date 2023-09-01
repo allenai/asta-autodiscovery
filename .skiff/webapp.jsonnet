@@ -50,31 +50,6 @@ function(image, cause, sha, env="prod", branch="", repo="", buildId="")
 		"apps.allenai.org/build": buildId
 	};
 
-	local gpuInConfig = std.count(std.objectFields(config), "gpu") > 0;
-
-	local gpuLimits = if gpuInConfig then
-		if config.gpu == "k80x2" || config.gpu == "a100-40gbx2" then
-			{ "nvidia.com/gpu": 2 }
-		else if config.gpu == "t4x4" then
-			{ "nvidia.com/gpu": 4 }
-		else
-			{ "nvidia.com/gpu": 1 }
-	else {};
-
-	local nodeSelector = if gpuInConfig then
-		if config.gpu == "k80" || config.gpu == "k80x2" then
-			{ "cloud.google.com/gke-accelerator": "nvidia-tesla-k80" }
-		else if config.gpu == "p100" then
-			{ "cloud.google.com/gke-accelerator": "nvidia-tesla-p100" }
-		else if config.gpu == "t4x4" then
-			{ "cloud.google.com/gke-accelerator": "nvidia-tesla-t4" }
-		else if config.gpu == "a100-40gb" || config.gpu == "a100-40gbx2" then
-			{ "cloud.google.com/gke-accelerator": "nvidia-tesla-a100" }
-		else
-			error "invalid GPU specification; expected 'k80', 'k80x2', 'p100', 't4x4', 'a100-40gb', or 'a100-40gbx2' but got: " + config.gpu
-	else
-		 { };
-
 	local port = 3000;
 
 	local namespace = {
@@ -249,7 +224,6 @@ function(image, cause, sha, env="prod", branch="", repo="", buildId="")
 							]
 						},
 					},
-					nodeSelector: nodeSelector,
 					containers: [
 						{
 							name: fullyQualifiedName,
@@ -267,8 +241,7 @@ function(image, cause, sha, env="prod", branch="", repo="", buildId="")
 								requests: {
 									cpu: 0.1,
 									memory: "500M"
-								},
-								limits: { } + gpuLimits
+								}
 							},
 							env: [
 								{

@@ -1,0 +1,8 @@
+.footer {
+  padding: 0 var(--spacing-3) var(--spacing-3);
+}
+
+.footer > a[href] {
+  text-decoration: none;
+  color: var(--color2-B3);
+}

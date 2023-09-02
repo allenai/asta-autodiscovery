@@ -30,7 +30,6 @@ steps:
   name: 'gcr.io/cloud-builders/docker'
   args: [
     'build',
-    '-f', 'prod.Dockerfile',
     '-t', 'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:latest',
     '-t', 'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:$COMMIT_SHA',
     '--cache-from', 'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:latest',

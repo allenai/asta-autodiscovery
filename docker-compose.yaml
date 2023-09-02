@@ -1,14 +1,33 @@
 version: '3'
 services:
-  app:
+  sonar:
+    build: ./sonar
+    depends_on:
+      - api
+      - ui
+      - proxy
+  api:
+    build: ./api
+    volumes:
+      - ./api:/api
+    environment:
+      # This ensures that errors are printed as they occur, which
+      # makes debugging easier.
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+  ui:
     build:
-      context: ./app
+      context: ./ui
       dockerfile: dev.Dockerfile
     volumes:
-      - ./app/src:/app/src
-      - ./app/public:/app/public
+      - ./ui/src:/ui/src
+      - ./ui/public:/ui/public
     environment:
       - NODE_ENV=development
+  proxy:
+    build: ./proxy
     ports:
-      - 3000:3000
-      - 8080:3000
+      - 8080:8080
+    depends_on:
+      - ui
+      - api

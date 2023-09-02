@@ -78,5 +78,5 @@ export default async function Home({ searchParams }: Props) {
       </Main>
       <Footer />
     </>
-  )
+  );
 }

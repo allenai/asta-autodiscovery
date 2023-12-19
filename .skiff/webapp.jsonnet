@@ -458,7 +458,7 @@ function(apiImage, uiImage, proxyImage, cause, sha, env='prod', branch='', repo=
     };
 
     local pdb = {
-        apiVersion: 'policy/v1beta1',
+        apiVersion: 'policy/v1',
         kind: 'PodDisruptionBudget',
         metadata: {
             name: fullyQualifiedName,

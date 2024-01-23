@@ -3,7 +3,7 @@
 This is a template [Skiff](https://github.com/allenai/skiff) application with:
 
 * A [TypeScript](https://www.typescriptlang.org/), [React](https://reactjs.org/)
-  and [Varnish](http://github.com/allenai/varnish-mui) based user interface.
+  and [Shellac](https://***REMOVED***/material-ui/varnish/shellac/) based user interface (uses only HTML and CSS).
 * A [NextJS](https://nextjs.org/) HTTP server, that provides capabilities like server rendering.
 
 You can use this template to start a new Skiff application.

@@ -24,10 +24,17 @@ services:
       - ./ui/public:/ui/public
     environment:
       - NODE_ENV=development
+    healthcheck:
+      test: ["CMD", "wget", "-q", "localhost:3000"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
   proxy:
     build: ./proxy
     ports:
-      - 8080:8080
+      - "8080:8080"
     depends_on:
-      - ui
-      - api
+      ui:
+        condition: service_healthy
+      api:
+        condition: service_started

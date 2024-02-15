@@ -24,6 +24,8 @@ services:
       - ./ui/public:/ui/public
     environment:
       - NODE_ENV=development
+    ports:
+      - "3000:3000"
     healthcheck:
       test: ["CMD", "wget", "-q", "localhost:3000"]
       interval: 3s

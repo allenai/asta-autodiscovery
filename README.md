@@ -19,7 +19,7 @@ start local environment by running:
 docker compose up --build
 ```
 
-The site should be accessible at both https://localhost:3000 and https://localhost:8080. 
+The site should be accessible at both http://localhost:3000 and http://localhost:8080. 
 As you make edits, the page should automatically refresh with changes.
 
 ### Local Development

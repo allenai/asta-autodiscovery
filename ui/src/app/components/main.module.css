@@ -1,7 +1,0 @@
-.main {
-  padding: var(--spacing-3);
-}
-
-.main > *:last-child {
-  margin-bottom: 0;
-}

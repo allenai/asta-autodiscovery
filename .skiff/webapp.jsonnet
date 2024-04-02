@@ -112,7 +112,7 @@ function(apiImage, uiImage, proxyImage, cause, sha, env='prod', branch='', repo=
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-k80' }
         else if config.gpu == "p100" then
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-p100' }
-        else if config.gpu == "t4" | config.gpu == "t4x4" then
+        else if config.gpu == "t4" || config.gpu == "t4x4" then
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-t4' }
         else if config.gpu == "a100-40gb" || config.gpu == "a100-40gbx2" then
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-a100' }

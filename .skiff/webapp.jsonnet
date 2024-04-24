@@ -99,7 +99,7 @@ function(apiImage, uiImage, proxyImage, cause, sha, env='prod', branch='', repo=
 
     // determine number of gpus
     local gpuLimits = if gpuInConfig then
-        if config.gpu == "k80x2" || config.gpu == "a100-40gbx2" then
+        if config.gpu == "a100-40gbx2" then
             { 'nvidia.com/gpu': 2 }
         else if config.gpu == "t4x4" then
             { 'nvidia.com/gpu': 4 }
@@ -108,16 +108,14 @@ function(apiImage, uiImage, proxyImage, cause, sha, env='prod', branch='', repo=
     else {};
 
     local nodeSelector = if gpuInConfig then
-        if config.gpu == "k80" || config.gpu == "k80x2" then
-            { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-k80' }
-        else if config.gpu == "p100" then
+        if config.gpu == "p100" then
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-p100' }
         else if config.gpu == "t4" || config.gpu == "t4x4" then
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-t4' }
         else if config.gpu == "a100-40gb" || config.gpu == "a100-40gbx2" then
             { 'cloud.google.com/gke-accelerator': 'nvidia-tesla-a100' }
         else
-            error "invalid GPU specification; expected 'k80', 'k80x2', 'p100', 't4', 't4x4', 'a100-40gb', or 'a100-40gbx2' but got: " + config.gpu
+            error "invalid GPU specification; expected 'p100', 't4', 't4x4', 'a100-40gb', or 'a100-40gbx2' but got: " + config.gpu
     else
          { };
 

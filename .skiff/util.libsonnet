@@ -88,13 +88,13 @@
         else if config.login == "ai2" then
             {
                 'nginx.ingress.kubernetes.io/auth-url': 'https://ai2.login' + tld + $.authPath(config),
-                'nginx.ingress.kubernetes.io/auth-signin': 'https://ai2.login' + tld + '/oauth2/start?rd=https://$host$request_uri',
+                'nginx.ingress.kubernetes.io/auth-signin': 'https://ai2.login' + tld + '/oauth2/start?rd=https://$host$escaped_request_uri',
                 'nginx.ingress.kubernetes.io/auth-response-headers': 'X-Auth-Request-User, X-Auth-Request-Email'
             }
         else if config.login == "google" then
             {
                 'nginx.ingress.kubernetes.io/auth-url': 'https://google.login' + tld + $.authPath(config),
-                'nginx.ingress.kubernetes.io/auth-signin': 'https://google.login' + tld + '/oauth2/start?rd=https://$host$request_uri',
+                'nginx.ingress.kubernetes.io/auth-signin': 'https://google.login' + tld + '/oauth2/start?rd=https://$host$escaped_request_uri',
                 'nginx.ingress.kubernetes.io/auth-response-headers': 'X-Auth-Request-User, X-Auth-Request-Email'
             }
         else

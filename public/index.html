@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCTS Tree Explorer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #7dd3fc;
+      --danger: #fca5a5;
+      --success: #a7f3d0;
+      --border: #1f2937;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --radius: 12px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(125, 211, 252, 0.08), transparent 30%),
+                  radial-gradient(circle at 80% 10%, rgba(167, 243, 208, 0.05), transparent 25%),
+                  var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: auto 1fr;
+      grid-template-areas:
+        "top top"
+        "canvas sidebar";
+      gap: 10px;
+      padding: 10px;
+    }
+    header {
+      grid-area: top;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--panel);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header .pill {
+      background: rgba(125, 211, 252, 0.15);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(125, 211, 252, 0.35);
+    }
+    #canvas-container {
+      grid-area: canvas;
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    #sidebar {
+      grid-area: sidebar;
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      overflow: auto;
+    }
+    .section { margin-bottom: 12px; }
+    .section h3 { margin: 0 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 12px; }
+    .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); font-size: 12px; color: var(--muted); border: 1px solid var(--border); }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    button {
+      background: var(--accent);
+      color: #0b1021;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 10px 25px rgba(125, 211, 252, 0.25);
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(125, 211, 252, 0.35); }
+    #status { font-size: 12px; color: var(--muted); }
+    #betaCanvas { width: 100%; height: 180px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); }
+    .legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .empty { color: var(--muted); font-style: italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Exploration Tree <span class="pill">Live</span></h1>
+    <div class="row">
+      <span id="status">Connecting…</span>
+      <button id="resetView">Reset View</button>
+    </div>
+  </header>
+  <div id="canvas-container">
+    <canvas id="treeCanvas"></canvas>
+  </div>
+  <aside id="sidebar">
+    <div class="section">
+      <h3>Selected Node</h3>
+      <div class="card" id="selectedCard">
+        <div id="nodeTitle" class="row" style="margin-bottom:6px;">
+          <strong>-</strong>
+          <span class="badge" id="nodeValue">value: -</span>
+        </div>
+        <div class="grid-two" style="margin-bottom:8px;">
+          <div class="badge" id="nodeVisits">visits: -</div>
+          <div class="badge" id="nodeTime">time: -</div>
+        </div>
+        <div class="section">
+          <h3 style="margin-bottom:4px;">Hypothesis</h3>
+          <div class="card" id="nodeHypothesis" style="background:transparent;border:none;padding:0;box-shadow:none;color:var(--text);"></div>
+        </div>
+        <div class="section">
+          <h3>Experiment Plan</h3>
+          <pre id="nodePlan" class="card"></pre>
+        </div>
+        <div class="section">
+          <h3>Code</h3>
+          <pre id="nodeCode" class="card"></pre>
+        </div>
+        <div class="section">
+          <h3>Code Output</h3>
+          <pre id="nodeOutput" class="card"></pre>
+        </div>
+        <div class="section">
+          <h3>Analysis</h3>
+          <pre id="nodeAnalysis" class="card"></pre>
+        </div>
+        <div class="section">
+          <h3>Review</h3>
+          <pre id="nodeReview" class="card"></pre>
+        </div>
+        <div class="section">
+          <h3>Prior vs Posterior</h3>
+          <canvas id="betaCanvas" width="340" height="180"></canvas>
+          <div class="legend">
+            <span><span class="swatch" style="background:#7dd3fc"></span>Prior</span>
+            <span><span class="swatch" style="background:#fca5a5"></span>Posterior</span>
+          </div>
+          <div id="betaMeta" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+<script>
+(function() {
+  const canvas = document.getElementById('treeCanvas');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('status');
+  const resetBtn = document.getElementById('resetView');
+  const betaCanvas = document.getElementById('betaCanvas');
+  const betaCtx = betaCanvas.getContext('2d');
+
+  const state = {
+    nodes: new Map(),
+    selectedId: null,
+    transform: { x: 0, y: 0, scale: 1 },
+    layout: new Map(),
+  };
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  function setStatus(text, ok = true) {
+    statusEl.textContent = text;
+    statusEl.style.color = ok ? 'var(--muted)' : 'var(--danger)';
+  }
+
+  function groupLevels() {
+    const levels = new Map();
+    state.nodes.forEach((node) => {
+      const level = Number.isFinite(node.level) ? node.level : inferLevel(node.id);
+      if (!levels.has(level)) levels.set(level, []);
+      levels.get(level).push(node);
+    });
+    const sortedLevels = Array.from(levels.entries()).sort((a,b)=>a[0]-b[0]);
+    sortedLevels.forEach(([level, arr]) => arr.sort((a,b)=> (a.index ?? 0) - (b.index ?? 0)));
+    return sortedLevels;
+  }
+
+  function inferLevel(id) {
+    const m = /node_(\d+)_/i.exec(id || '');
+    return m ? Number(m[1]) : 0;
+  }
+
+  function computeLayout() {
+    const padding = 80;
+    const yGap = 140;
+    const { width, height } = canvas;
+    const levels = groupLevels();
+    const layout = new Map();
+    levels.forEach(([level, nodes]) => {
+      const gap = Math.max(120, (width - 2*padding) / Math.max(nodes.length, 1));
+      nodes.forEach((node, idx) => {
+        const x = padding + gap * (idx + 0.5);
+        const y = padding + level * yGap;
+        layout.set(node.id, { x, y });
+      });
+    });
+    state.layout = layout;
+  }
+
+  function valueColor(v) {
+    if (v == null || Number.isNaN(v)) return '#cbd5e1';
+    const clamped = Math.max(-1, Math.min(1, v));
+    const hue = 160 * (clamped + 1) / 2; // -1 -> 0 (red-ish), 1 -> 160 (green)
+    return `hsl(${hue}, 80%, 60%)`;
+  }
+
+  function draw() {
+    if (!ctx) return;
+    computeLayout();
+    ctx.save();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.translate(state.transform.x, state.transform.y);
+    ctx.scale(state.transform.scale, state.transform.scale);
+
+    // edges
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.4;
+    state.nodes.forEach((node) => {
+      const parentId = node.parent_id;
+      if (!parentId) return;
+      const from = state.layout.get(parentId);
+      const to = state.layout.get(node.id);
+      if (!from || !to) return;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    });
+
+    // nodes
+    state.nodes.forEach((node) => {
+      const pos = state.layout.get(node.id);
+      if (!pos) return;
+      const r = 18;
+      const color = valueColor(node.value);
+      ctx.beginPath();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = node.id === state.selectedId ? '#fbbf24' : '#0f172a';
+      ctx.lineWidth = node.id === state.selectedId ? 3 : 1.5;
+      ctx.arc(pos.x, pos.y, r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((node.value ?? 0).toFixed(2), pos.x, pos.y);
+    });
+    ctx.restore();
+  }
+
+  function screenToWorld(x, y) {
+    const s = state.transform.scale;
+    return {
+      x: (x - state.transform.x) / s,
+      y: (y - state.transform.y) / s,
+    };
+  }
+
+  function pickNode(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    const world = screenToWorld(x, y);
+    const radius = 20;
+    let hit = null;
+    state.nodes.forEach((node) => {
+      const pos = state.layout.get(node.id);
+      if (!pos) return;
+      const dx = pos.x - world.x;
+      const dy = pos.y - world.y;
+      if (dx*dx + dy*dy <= radius*radius) hit = node.id;
+    });
+    if (hit) {
+      selectNode(hit);
+      draw();
+    }
+  }
+
+  canvas.addEventListener('click', pickNode);
+
+  // Pan & zoom
+  let isPanning = false;
+  let panStart = { x:0, y:0 };
+  canvas.addEventListener('mousedown', (e) => {
+    isPanning = true;
+    panStart = { x: e.clientX - state.transform.x, y: e.clientY - state.transform.y };
+  });
+  window.addEventListener('mouseup', () => { isPanning = false; });
+  window.addEventListener('mousemove', (e) => {
+    if (!isPanning) return;
+    state.transform.x = e.clientX - panStart.x;
+    state.transform.y = e.clientY - panStart.y;
+    draw();
+  });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const scaleAmount = e.deltaY < 0 ? 1.1 : 0.9;
+    const mouse = screenToWorld(e.offsetX, e.offsetY);
+    state.transform.x = e.offsetX - (mouse.x * state.transform.scale * scaleAmount);
+    state.transform.y = e.offsetY - (mouse.y * state.transform.scale * scaleAmount);
+    state.transform.scale *= scaleAmount;
+    state.transform.scale = Math.min(Math.max(state.transform.scale, 0.5), 3);
+    draw();
+  }, { passive: false });
+
+  resetBtn.addEventListener('click', () => {
+    state.transform = { x: 0, y: 0, scale: 1 };
+    draw();
+  });
+
+  function updateNodes(list) {
+    list.forEach((n) => state.nodes.set(n.id, n));
+    draw();
+    if (!state.selectedId && list.length) selectNode(list[0].id);
+  }
+
+  function selectNode(id) {
+    const node = state.nodes.get(id);
+    if (!node) return;
+    state.selectedId = id;
+    updateDetails(node);
+  }
+
+  function formatObj(obj) {
+    if (!obj) return '';
+    if (typeof obj === 'string') return obj;
+    return Object.entries(obj).map(([k,v]) => `${k}: ${v}`).join('\n');
+  }
+
+  const els = {
+    title: document.getElementById('nodeTitle').querySelector('strong'),
+    value: document.getElementById('nodeValue'),
+    visits: document.getElementById('nodeVisits'),
+    time: document.getElementById('nodeTime'),
+    hyp: document.getElementById('nodeHypothesis'),
+    plan: document.getElementById('nodePlan'),
+    code: document.getElementById('nodeCode'),
+    output: document.getElementById('nodeOutput'),
+    analysis: document.getElementById('nodeAnalysis'),
+    review: document.getElementById('nodeReview'),
+    betaMeta: document.getElementById('betaMeta'),
+  };
+
+  function setOrEmpty(el, value) {
+    if (value && String(value).trim().length) {
+      el.textContent = value;
+      el.classList.remove('empty');
+    } else {
+      el.textContent = 'No data';
+      el.classList.add('empty');
+    }
+  }
+
+  function updateDetails(node) {
+    els.title.textContent = node.id || '-';
+    els.value.textContent = `value: ${(node.value ?? '-').toString().slice(0,6)}`;
+    els.visits.textContent = `visits: ${node.visits ?? '-'}`;
+    els.time.textContent = `time: ${node.time_elapsed ? node.time_elapsed.toFixed(2)+'s' : '-'}`;
+    els.hyp.innerText = node.hypothesis || 'No hypothesis';
+    setOrEmpty(els.plan, formatPlan(node.experiment_plan));
+    setOrEmpty(els.code, node.code || '');
+    setOrEmpty(els.output, node.code_output || '');
+    setOrEmpty(els.analysis, node.analysis || '');
+    setOrEmpty(els.review, node.review || '');
+    drawBeta(node.prior, node.posterior);
+  }
+
+  function formatPlan(plan) {
+    if (!plan) return '';
+    const parts = [];
+    if (plan.objective) parts.push(`Objective: ${plan.objective}`);
+    if (plan.steps) parts.push(`Steps:\n${plan.steps}`);
+    if (plan.deliverables) parts.push(`Deliverables:\n${plan.deliverables}`);
+    return parts.join('\n\n');
+  }
+
+  function logGamma(z) {
+    const cof = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    let x = z;
+    let y = z;
+    let tmp = x + 5.5;
+    tmp -= (x + 0.5) * Math.log(tmp);
+    let ser = 1.000000000190015;
+    for (let j = 0; j < cof.length; j++) {
+      ser += cof[j] / ++y;
+    }
+    return Math.log(2.5066282746310005 * ser / x) - tmp;
+  }
+
+  function betaPdf(x, a, b) {
+    if (x <= 0 || x >= 1) return 0;
+    const logVal = (a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) - (logGamma(a) + logGamma(b) - logGamma(a + b));
+    return Math.exp(logVal);
+  }
+
+  function drawBeta(prior, posterior) {
+    betaCtx.clearRect(0,0,betaCanvas.width,betaCanvas.height);
+    const samples = 200;
+    const priorParams = prior?.prior_params;
+    const postParams = posterior?.prior_params;
+    const curves = [];
+    if (Array.isArray(priorParams)) curves.push({ params: priorParams, color: '#7dd3fc', label: 'prior' });
+    if (Array.isArray(postParams)) curves.push({ params: postParams, color: '#fca5a5', label: 'posterior' });
+    if (!curves.length) {
+      betaCtx.fillStyle = '#9ca3af';
+      betaCtx.fillText('No prior/posterior available', 20, 40);
+      els.betaMeta.textContent = '';
+      return;
+    }
+    const data = curves.map((c) => {
+      const [a,b] = c.params;
+      const arr = [];
+      for (let i=0;i<=samples;i++) {
+        const x = i / samples;
+        arr.push({ x, y: betaPdf(x, a, b) });
+      }
+      return { ...c, points: arr };
+    });
+    const maxY = Math.max(...data.flatMap(d => d.points.map(p=>p.y))) || 1;
+    const w = betaCanvas.width - 40;
+    const h = betaCanvas.height - 30;
+    const ox = 20, oy = betaCanvas.height - 10;
+
+    // axes
+    betaCtx.strokeStyle = '#334155';
+    betaCtx.lineWidth = 1;
+    betaCtx.beginPath();
+    betaCtx.moveTo(ox, oy);
+    betaCtx.lineTo(ox + w, oy);
+    betaCtx.moveTo(ox, oy);
+    betaCtx.lineTo(ox, oy - h);
+    betaCtx.stroke();
+
+    data.forEach((curve) => {
+      betaCtx.beginPath();
+      betaCtx.strokeStyle = curve.color;
+      betaCtx.lineWidth = 2;
+      curve.points.forEach((p, idx) => {
+        const x = ox + p.x * w;
+        const y = oy - (p.y / maxY) * h;
+        if (idx === 0) betaCtx.moveTo(x,y); else betaCtx.lineTo(x,y);
+      });
+      betaCtx.stroke();
+    });
+
+    const metaText = curves.map((c)=> `${c.label}: α=${c.params[0].toFixed(2)}, β=${c.params[1].toFixed(2)}`).join(' · ');
+    els.betaMeta.textContent = metaText;
+  }
+
+  async function fetchInitial() {
+    const res = await fetch('/api/nodes');
+    const json = await res.json();
+    updateNodes(json.nodes || []);
+    setStatus('Live (HTTP)');
+  }
+
+  function connectWS() {
+    const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${wsProtocol}://${location.host}`);
+    ws.onopen = () => setStatus('Live (WS)');
+    ws.onerror = () => setStatus('WebSocket error', false);
+    ws.onclose = () => { setStatus('Disconnected · retrying', false); setTimeout(connectWS, 1500); };
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'init') {
+        updateNodes(msg.nodes || []);
+      } else if (msg.type === 'upsert') {
+        updateNodes([msg.node]);
+      } else if (msg.type === 'remove') {
+        state.nodes.delete(msg.id);
+        draw();
+      }
+    };
+  }
+
+  fetchInitial().then(connectWS);
+  resize();
+})();
+</script>
+</body>
+</html>

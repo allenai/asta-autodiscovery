@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MCTS Tree Explorer</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -191,6 +192,7 @@
     selectedId: null,
     transform: { x: 0, y: 0, scale: 1 },
     layout: new Map(),
+    layoutDirty: true,
   };
 
   function resize() {
@@ -206,38 +208,134 @@
     statusEl.style.color = ok ? 'var(--muted)' : 'var(--danger)';
   }
 
-  function groupLevels() {
-    const levels = new Map();
-    state.nodes.forEach((node) => {
-      const level = Number.isFinite(node.level) ? node.level : inferLevel(node.id);
-      if (!levels.has(level)) levels.set(level, []);
-      levels.get(level).push(node);
-    });
-    const sortedLevels = Array.from(levels.entries()).sort((a,b)=>a[0]-b[0]);
-    sortedLevels.forEach(([level, arr]) => arr.sort((a,b)=> (a.index ?? 0) - (b.index ?? 0)));
-    return sortedLevels;
-  }
-
   function inferLevel(id) {
     const m = /node_(\d+)_/i.exec(id || '');
     return m ? Number(m[1]) : 0;
   }
 
   function computeLayout() {
-    const padding = 80;
-    const yGap = 140;
-    const { width, height } = canvas;
-    const levels = groupLevels();
-    const layout = new Map();
-    levels.forEach(([level, nodes]) => {
-      const gap = Math.max(120, (width - 2*padding) / Math.max(nodes.length, 1));
-      nodes.forEach((node, idx) => {
-        const x = padding + gap * (idx + 0.5);
-        const y = padding + level * yGap;
-        layout.set(node.id, { x, y });
-      });
+    const nodesArr = Array.from(state.nodes.values());
+    if (!nodesArr.length) return;
+
+    const byId = new Map(nodesArr.map((n) => [n.id, n]));
+    const children = new Map();
+    nodesArr.forEach((n) => {
+      if (n.parent_id && byId.has(n.parent_id)) {
+        if (!children.has(n.parent_id)) children.set(n.parent_id, []);
+        children.get(n.parent_id).push(n);
+      }
     });
+
+    // Prefer stated root; otherwise first node without parent
+    const roots = nodesArr.filter((n) => !n.parent_id || !byId.has(n.parent_id));
+    let root = byId.get('node_1_0') || roots[0];
+    if (!root) root = nodesArr[0];
+
+    // Depth-first leaf counting
+    const leafCount = new Map();
+    function countLeaves(node) {
+      const kids = children.get(node.id) || [];
+      if (!kids.length) {
+        leafCount.set(node.id, 1);
+        return 1;
+      }
+      const s = kids.reduce((acc, c) => acc + countLeaves(c), 0);
+      leafCount.set(node.id, s);
+      return s;
+    }
+    countLeaves(root);
+
+    // Depth mapping
+    const depthMap = new Map([[root.id, 0]]);
+    function assignDepth(node) {
+      const d = depthMap.get(node.id) ?? 0;
+      const kids = children.get(node.id) || [];
+      kids.forEach((c) => {
+        depthMap.set(c.id, d + 1);
+        assignDepth(c);
+      });
+    }
+    assignDepth(root);
+    const maxDepth = Math.max(...depthMap.values());
+
+    // Angle assignment
+    function setAngles(node, start, end) {
+      const kids = children.get(node.id) || [];
+      if (!kids.length) {
+        node._angle = (start + end) / 2;
+        return;
+      }
+      const totalLeaves = leafCount.get(node.id) || kids.length;
+      let cursor = start;
+      kids.forEach((c) => {
+        const span = (leafCount.get(c.id) || 1) / totalLeaves * (end - start);
+        setAngles(c, cursor, cursor + span);
+        cursor += span;
+      });
+      node._angle = (start + end) / 2;
+    }
+    setAngles(root, 0, Math.PI * 2);
+
+    // Positioning
+    const { width, height } = canvas;
+    const cx = width / 2;
+    const cy = height / 2;
+    const maxR = Math.min(width, height) * 0.46;
+    const rStep = maxDepth === 0 ? 0 : maxR / (maxDepth + 1);
+
+    const positioned = nodesArr.map((n) => {
+      const d = depthMap.get(n.id) ?? inferLevel(n.id) ?? 0;
+      const r = 60 + d * rStep;
+      const theta = n._angle ?? 0;
+      return {
+        id: n.id,
+        depth: d,
+        x: cx + r * Math.cos(theta),
+        y: cy + r * Math.sin(theta),
+      };
+    });
+
+    // Simple collision resolution within each depth ring
+    const minDist = 44; // twice node radius plus margin
+    const depthBuckets = new Map();
+    positioned.forEach((p) => {
+      if (!depthBuckets.has(p.depth)) depthBuckets.set(p.depth, []);
+      depthBuckets.get(p.depth).push(p);
+    });
+    depthBuckets.forEach((arr) => {
+      for (let iter = 0; iter < 4; iter++) {
+        for (let i = 0; i < arr.length; i++) {
+          for (let j = i + 1; j < arr.length; j++) {
+            const a = arr[i], b = arr[j];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const dist = Math.hypot(dx, dy) || 0.001;
+            if (dist < minDist) {
+              const push = (minDist - dist) / 2;
+              const nx = dx / dist;
+              const ny = dy / dist;
+              a.x -= nx * push;
+              a.y -= ny * push;
+              b.x += nx * push;
+              b.y += ny * push;
+            }
+          }
+        }
+      }
+    });
+
+    const layout = new Map(positioned.map((p) => [p.id, { x: p.x, y: p.y }]));
+
+    // Place stray nodes not connected to root evenly on outer ring
+    const placed = new Set(layout.keys());
+    const stray = nodesArr.filter((n) => !placed.has(n.id));
+    stray.forEach((n, i) => {
+      const theta = (i / stray.length) * Math.PI * 2;
+      layout.set(n.id, { x: cx + maxR * Math.cos(theta), y: cy + maxR * Math.sin(theta) });
+    });
+
     state.layout = layout;
+    state.layoutDirty = false;
   }
 
   function valueColor(v) {
@@ -249,7 +347,7 @@
 
   function draw() {
     if (!ctx) return;
-    computeLayout();
+    if (state.layoutDirty) computeLayout();
     ctx.save();
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.translate(state.transform.x, state.transform.y);
@@ -257,7 +355,7 @@
 
     // edges
     ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.2;
     state.nodes.forEach((node) => {
       const parentId = node.parent_id;
       if (!parentId) return;
@@ -354,9 +452,21 @@
   });
 
   function updateNodes(list) {
-    list.forEach((n) => state.nodes.set(n.id, n));
+    list.forEach((n) => {
+      if (n.id === 'node_0_0') return; // skip synthetic root
+      const node = { ...n };
+      if (node.parent_id === 'node_0_0') node.parent_id = null;
+      state.nodes.set(node.id, node);
+    });
+    // purge if any lingering node_0_0
+    state.nodes.delete('node_0_0');
+    state.layoutDirty = true;
     draw();
-    if (!state.selectedId && list.length) selectNode(list[0].id);
+    if (!state.selectedId) {
+      const preferred = state.nodes.get('node_1_0');
+      if (preferred) selectNode('node_1_0');
+      else if (state.nodes.size) selectNode(state.nodes.keys().next().value);
+    }
   }
 
   function selectNode(id) {
@@ -440,7 +550,7 @@
 
   function drawBeta(prior, posterior) {
     betaCtx.clearRect(0,0,betaCanvas.width,betaCanvas.height);
-    const samples = 200;
+    const samples = 240;
     const priorParams = prior?.prior_params;
     const postParams = posterior?.prior_params;
     const curves = [];
@@ -462,11 +572,11 @@
       return { ...c, points: arr };
     });
     const maxY = Math.max(...data.flatMap(d => d.points.map(p=>p.y))) || 1;
-    const w = betaCanvas.width - 40;
-    const h = betaCanvas.height - 30;
-    const ox = 20, oy = betaCanvas.height - 10;
+    const w = betaCanvas.width - 50;
+    const h = betaCanvas.height - 40;
+    const ox = 30, oy = betaCanvas.height - 18;
 
-    // axes
+    // axes + ticks
     betaCtx.strokeStyle = '#334155';
     betaCtx.lineWidth = 1;
     betaCtx.beginPath();
@@ -476,7 +586,33 @@
     betaCtx.lineTo(ox, oy - h);
     betaCtx.stroke();
 
+    betaCtx.fillStyle = '#94a3b8';
+    betaCtx.font = '10px Inter, sans-serif';
+    for (let i=0;i<=5;i++) {
+      const x = ox + (i/5)*w;
+      betaCtx.beginPath();
+      betaCtx.moveTo(x, oy);
+      betaCtx.lineTo(x, oy+4);
+      betaCtx.stroke();
+      betaCtx.fillText((i/5).toFixed(1), x-6, oy+14);
+    }
+
     data.forEach((curve) => {
+      const grad = betaCtx.createLinearGradient(0, oy-h, 0, oy);
+      grad.addColorStop(0, curve.color + '55');
+      grad.addColorStop(1, curve.color + '11');
+      betaCtx.beginPath();
+      curve.points.forEach((p, idx) => {
+        const x = ox + p.x * w;
+        const y = oy - (p.y / maxY) * h;
+        if (idx === 0) betaCtx.moveTo(x,y); else betaCtx.lineTo(x,y);
+      });
+      betaCtx.lineTo(ox + w, oy);
+      betaCtx.lineTo(ox, oy);
+      betaCtx.closePath();
+      betaCtx.fillStyle = grad;
+      betaCtx.fill();
+
       betaCtx.beginPath();
       betaCtx.strokeStyle = curve.color;
       betaCtx.lineWidth = 2;
@@ -486,9 +622,21 @@
         if (idx === 0) betaCtx.moveTo(x,y); else betaCtx.lineTo(x,y);
       });
       betaCtx.stroke();
+
+      // mean marker
+      const [a,b] = curve.params;
+      const mean = a / (a + b);
+      const mx = ox + mean * w;
+      betaCtx.strokeStyle = curve.color;
+      betaCtx.setLineDash([4,3]);
+      betaCtx.beginPath();
+      betaCtx.moveTo(mx, oy);
+      betaCtx.lineTo(mx, oy - h - 4);
+      betaCtx.stroke();
+      betaCtx.setLineDash([]);
     });
 
-    const metaText = curves.map((c)=> `${c.label}: α=${c.params[0].toFixed(2)}, β=${c.params[1].toFixed(2)}`).join(' · ');
+    const metaText = curves.map((c)=> `${c.label}: α=${c.params[0].toFixed(2)}, β=${c.params[1].toFixed(2)}, mean=${(c.params[0]/(c.params[0]+c.params[1])).toFixed(2)}`).join(' · ');
     els.betaMeta.textContent = metaText;
   }
 
@@ -513,6 +661,7 @@
         updateNodes([msg.node]);
       } else if (msg.type === 'remove') {
         state.nodes.delete(msg.id);
+        state.layoutDirty = true;
         draw();
       }
     };

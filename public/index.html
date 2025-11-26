@@ -66,7 +66,7 @@
       font-size: 12px;
       border: 1px solid rgba(125, 211, 252, 0.35);
     }
-    #canvas-container {
+    #graph-container {
       grid-area: canvas;
       background: var(--panel);
       border-radius: var(--radius);
@@ -75,7 +75,7 @@
       overflow: hidden;
       box-shadow: var(--shadow);
     }
-    canvas { display: block; width: 100%; height: 100%; }
+    svg { display: block; width: 100%; height: 100%; }
     #sidebar {
       grid-area: sidebar;
       background: var(--panel);
@@ -126,8 +126,8 @@
       <button id="resetView">Reset View</button>
     </div>
   </header>
-  <div id="canvas-container">
-    <canvas id="treeCanvas"></canvas>
+  <div id="graph-container">
+    <svg id="treeSvg"></svg>
   </div>
   <aside id="sidebar">
     <div class="section">
@@ -180,26 +180,27 @@
 
 <script>
 (function() {
-  const canvas = document.getElementById('treeCanvas');
-  const ctx = canvas.getContext('2d');
+  const svg = d3.select('#treeSvg');
+  const graphG = svg.append('g');
+  const linkG = graphG.append('g').attr('stroke', '#334155').attr('stroke-width', 1.2).attr('stroke-linecap', 'round').attr('fill', 'none');
+  const nodeG = graphG.append('g');
+  const labelG = graphG.append('g').attr('font-family', 'Inter, sans-serif').attr('font-size', 11).attr('fill', '#0f172a').attr('text-anchor', 'middle').attr('dominant-baseline', 'central');
   const statusEl = document.getElementById('status');
   const resetBtn = document.getElementById('resetView');
   const betaCanvas = document.getElementById('betaCanvas');
   const betaCtx = betaCanvas.getContext('2d');
+  let currentTransform = d3.zoomIdentity;
 
   const state = {
     nodes: new Map(),
     selectedId: null,
-    transform: { x: 0, y: 0, scale: 1 },
-    layout: new Map(),
-    layoutDirty: true,
+    layout: [],
   };
 
   function resize() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    draw();
+    const rect = svg.node().parentElement.getBoundingClientRect();
+    svg.attr('width', rect.width).attr('height', rect.height);
+    renderGraph(); // recompute layout with new size
   }
   window.addEventListener('resize', resize);
 
@@ -208,135 +209,6 @@
     statusEl.style.color = ok ? 'var(--muted)' : 'var(--danger)';
   }
 
-  function inferLevel(id) {
-    const m = /node_(\d+)_/i.exec(id || '');
-    return m ? Number(m[1]) : 0;
-  }
-
-  function computeLayout() {
-    const nodesArr = Array.from(state.nodes.values());
-    if (!nodesArr.length) return;
-
-    const byId = new Map(nodesArr.map((n) => [n.id, n]));
-    const children = new Map();
-    nodesArr.forEach((n) => {
-      if (n.parent_id && byId.has(n.parent_id)) {
-        if (!children.has(n.parent_id)) children.set(n.parent_id, []);
-        children.get(n.parent_id).push(n);
-      }
-    });
-
-    // Prefer stated root; otherwise first node without parent
-    const roots = nodesArr.filter((n) => !n.parent_id || !byId.has(n.parent_id));
-    let root = byId.get('node_1_0') || roots[0];
-    if (!root) root = nodesArr[0];
-
-    // Depth-first leaf counting
-    const leafCount = new Map();
-    function countLeaves(node) {
-      const kids = children.get(node.id) || [];
-      if (!kids.length) {
-        leafCount.set(node.id, 1);
-        return 1;
-      }
-      const s = kids.reduce((acc, c) => acc + countLeaves(c), 0);
-      leafCount.set(node.id, s);
-      return s;
-    }
-    countLeaves(root);
-
-    // Depth mapping
-    const depthMap = new Map([[root.id, 0]]);
-    function assignDepth(node) {
-      const d = depthMap.get(node.id) ?? 0;
-      const kids = children.get(node.id) || [];
-      kids.forEach((c) => {
-        depthMap.set(c.id, d + 1);
-        assignDepth(c);
-      });
-    }
-    assignDepth(root);
-    const maxDepth = Math.max(...depthMap.values());
-
-    // Angle assignment
-    function setAngles(node, start, end) {
-      const kids = children.get(node.id) || [];
-      if (!kids.length) {
-        node._angle = (start + end) / 2;
-        return;
-      }
-      const totalLeaves = leafCount.get(node.id) || kids.length;
-      let cursor = start;
-      kids.forEach((c) => {
-        const span = (leafCount.get(c.id) || 1) / totalLeaves * (end - start);
-        setAngles(c, cursor, cursor + span);
-        cursor += span;
-      });
-      node._angle = (start + end) / 2;
-    }
-    setAngles(root, 0, Math.PI * 2);
-
-    // Positioning
-    const { width, height } = canvas;
-    const cx = width / 2;
-    const cy = height / 2;
-    const maxR = Math.min(width, height) * 0.46;
-    const rStep = maxDepth === 0 ? 0 : maxR / (maxDepth + 1);
-
-    const positioned = nodesArr.map((n) => {
-      const d = depthMap.get(n.id) ?? inferLevel(n.id) ?? 0;
-      const r = 60 + d * rStep;
-      const theta = n._angle ?? 0;
-      return {
-        id: n.id,
-        depth: d,
-        x: cx + r * Math.cos(theta),
-        y: cy + r * Math.sin(theta),
-      };
-    });
-
-    // Simple collision resolution within each depth ring
-    const minDist = 44; // twice node radius plus margin
-    const depthBuckets = new Map();
-    positioned.forEach((p) => {
-      if (!depthBuckets.has(p.depth)) depthBuckets.set(p.depth, []);
-      depthBuckets.get(p.depth).push(p);
-    });
-    depthBuckets.forEach((arr) => {
-      for (let iter = 0; iter < 4; iter++) {
-        for (let i = 0; i < arr.length; i++) {
-          for (let j = i + 1; j < arr.length; j++) {
-            const a = arr[i], b = arr[j];
-            const dx = b.x - a.x;
-            const dy = b.y - a.y;
-            const dist = Math.hypot(dx, dy) || 0.001;
-            if (dist < minDist) {
-              const push = (minDist - dist) / 2;
-              const nx = dx / dist;
-              const ny = dy / dist;
-              a.x -= nx * push;
-              a.y -= ny * push;
-              b.x += nx * push;
-              b.y += ny * push;
-            }
-          }
-        }
-      }
-    });
-
-    const layout = new Map(positioned.map((p) => [p.id, { x: p.x, y: p.y }]));
-
-    // Place stray nodes not connected to root evenly on outer ring
-    const placed = new Set(layout.keys());
-    const stray = nodesArr.filter((n) => !placed.has(n.id));
-    stray.forEach((n, i) => {
-      const theta = (i / stray.length) * Math.PI * 2;
-      layout.set(n.id, { x: cx + maxR * Math.cos(theta), y: cy + maxR * Math.sin(theta) });
-    });
-
-    state.layout = layout;
-    state.layoutDirty = false;
-  }
 
   function valueColor(v) {
     if (v == null || Number.isNaN(v)) return '#cbd5e1';
@@ -345,123 +217,144 @@
     return `hsl(${hue}, 80%, 60%)`;
   }
 
-  function draw() {
-    if (!ctx) return;
-    if (state.layoutDirty) computeLayout();
-    ctx.save();
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.translate(state.transform.x, state.transform.y);
-    ctx.scale(state.transform.scale, state.transform.scale);
-
-    // edges
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.2;
-    state.nodes.forEach((node) => {
-      const parentId = node.parent_id;
-      if (!parentId) return;
-      const from = state.layout.get(parentId);
-      const to = state.layout.get(node.id);
-      if (!from || !to) return;
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-    });
-
-    // nodes
-    state.nodes.forEach((node) => {
-      const pos = state.layout.get(node.id);
-      if (!pos) return;
-      const r = 18;
-      const color = valueColor(node.value);
-      ctx.beginPath();
-      ctx.fillStyle = color;
-      ctx.strokeStyle = node.id === state.selectedId ? '#fbbf24' : '#0f172a';
-      ctx.lineWidth = node.id === state.selectedId ? 3 : 1.5;
-      ctx.arc(pos.x, pos.y, r, 0, Math.PI*2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 12px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText((node.value ?? 0).toFixed(2), pos.x, pos.y);
-    });
-    ctx.restore();
-  }
-
-  function screenToWorld(x, y) {
-    const s = state.transform.scale;
-    return {
-      x: (x - state.transform.x) / s,
-      y: (y - state.transform.y) / s,
-    };
-  }
-
-  function pickNode(evt) {
-    const rect = canvas.getBoundingClientRect();
-    const x = evt.clientX - rect.left;
-    const y = evt.clientY - rect.top;
-    const world = screenToWorld(x, y);
-    const radius = 20;
-    let hit = null;
-    state.nodes.forEach((node) => {
-      const pos = state.layout.get(node.id);
-      if (!pos) return;
-      const dx = pos.x - world.x;
-      const dy = pos.y - world.y;
-      if (dx*dx + dy*dy <= radius*radius) hit = node.id;
-    });
-    if (hit) {
-      selectNode(hit);
-      draw();
+  function renderGraph() {
+    graphG.attr('transform', currentTransform);
+    const nodesArr = Array.from(state.nodes.values());
+    if (!nodesArr.length) {
+      linkG.selectAll('path').remove();
+      nodeG.selectAll('circle').remove();
+      labelG.selectAll('text').remove();
+      return;
     }
+
+    // Build hierarchy
+    const byId = new Map(nodesArr.map((n) => [n.id, n]));
+    const root = byId.get('node_1_0') || nodesArr.find((n) => !byId.has(n.parent_id)) || nodesArr[0];
+    const toTree = (n) => ({
+      data: n,
+      children: nodesArr.filter((c) => c.parent_id === n.id).map(toTree)
+    });
+    const hierarchy = d3.hierarchy(toTree(root));
+
+    // Radial tidy tree
+    const rect = svg.node().getBoundingClientRect();
+    const radius = Math.min(rect.width, rect.height) / 2 - 40;
+    const tree = d3.tree()
+      .size([2 * Math.PI, radius])
+      .separation((a, b) => {
+        const base = a.parent === b.parent ? 1 : 2;
+        const minPx = 42; // desired minimum pixel spacing
+        // translate to angular spacing based on average radius of the two nodes
+        const r = (a.y + b.y) / 2 || radius;
+        const minAngle = minPx / r;
+        return Math.max(base, minAngle);
+      });
+    const layout = tree(hierarchy);
+
+    layout.each((d) => {
+      d.angle = d.x - Math.PI / 2; // store angle for later adjustments
+      d.xPos = d.y * Math.cos(d.angle);
+      d.yPos = d.y * Math.sin(d.angle);
+    });
+
+    // Within each depth ring, enforce minimum arc length to avoid overlaps
+    const minDist = 48; // desired pixel spacing between node centers
+    const depthBuckets = new Map();
+    layout.descendants().forEach((d) => {
+      if (!depthBuckets.has(d.depth)) depthBuckets.set(d.depth, []);
+      depthBuckets.get(d.depth).push(d);
+    });
+    depthBuckets.forEach((arr) => {
+      if (arr.length < 2) return;
+      // sort by angle
+      arr.sort((a, b) => a.angle - b.angle);
+      for (let iter = 0; iter < 5; iter++) {
+        for (let i = 0; i < arr.length - 1; i++) {
+          const a = arr[i], b = arr[i + 1];
+          const r = (a.y + b.y) / 2 || radius;
+          const angGap = b.angle - a.angle;
+          const arc = r * angGap;
+          if (arc < minDist) {
+            const needed = (minDist - arc) / 2;
+            const angAdjust = needed / r;
+            a.angle -= angAdjust;
+            b.angle += angAdjust;
+          }
+        }
+      }
+      // recompute positions after adjustments
+      arr.forEach((d) => {
+        d.xPos = d.y * Math.cos(d.angle);
+        d.yPos = d.y * Math.sin(d.angle);
+      });
+    });
+
+    const nodesLayout = layout.descendants();
+    const linksLayout = layout.links();
+
+    const linkSel = linkG.selectAll('path').data(linksLayout, (d) => `${d.source.data.data.id}->${d.target.data.data.id}`);
+    linkSel.exit().remove();
+    linkSel.enter().append('path')
+      .attr('stroke', '#334155')
+      .attr('stroke-width', 1.2)
+      .attr('fill', 'none');
+    linkG.selectAll('path')
+      .attr('d', (d) => `M${d.source.xPos},${d.source.yPos}L${d.target.xPos},${d.target.yPos}`);
+
+    const nodeSel = nodeG.selectAll('circle').data(nodesLayout, (d) => d.data.data.id);
+    nodeSel.exit().remove();
+    nodeSel.enter().append('circle')
+      .attr('r', 18)
+      .attr('stroke', '#0f172a')
+      .attr('stroke-width', 1.5)
+      .attr('cursor', 'pointer')
+      .on('click', (_, d) => selectNode(d.data.data.id));
+    nodeG.selectAll('circle')
+      .attr('fill', (d) => valueColor(d.data.data.value))
+      .attr('cx', (d) => d.xPos)
+      .attr('cy', (d) => d.yPos);
+
+    const labelSel = labelG.selectAll('text').data(nodesLayout, (d) => d.data.data.id);
+    labelSel.exit().remove();
+    labelSel.enter().append('text')
+      .attr('pointer-events', 'none')
+      .attr('font-weight', '700');
+    labelG.selectAll('text')
+      .text((d) => (d.data.data.value ?? 0).toFixed(2))
+      .attr('x', (d) => d.xPos)
+      .attr('y', (d) => d.yPos);
+
+    highlightSelection();
   }
 
-  canvas.addEventListener('click', pickNode);
+  function highlightSelection() {
+    nodeG.selectAll('circle')
+      .attr('stroke-width', (d) => d.id === state.selectedId ? 3 : 1.5)
+      .attr('stroke', (d) => d.id === state.selectedId ? '#fbbf24' : '#0f172a');
+  }
 
-  // Pan & zoom
-  let isPanning = false;
-  let panStart = { x:0, y:0 };
-  canvas.addEventListener('mousedown', (e) => {
-    isPanning = true;
-    panStart = { x: e.clientX - state.transform.x, y: e.clientY - state.transform.y };
-  });
-  window.addEventListener('mouseup', () => { isPanning = false; });
-  window.addEventListener('mousemove', (e) => {
-    if (!isPanning) return;
-    state.transform.x = e.clientX - panStart.x;
-    state.transform.y = e.clientY - panStart.y;
-    draw();
-  });
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const scaleAmount = e.deltaY < 0 ? 1.1 : 0.9;
-    const mouse = screenToWorld(e.offsetX, e.offsetY);
-    state.transform.x = e.offsetX - (mouse.x * state.transform.scale * scaleAmount);
-    state.transform.y = e.offsetY - (mouse.y * state.transform.scale * scaleAmount);
-    state.transform.scale *= scaleAmount;
-    state.transform.scale = Math.min(Math.max(state.transform.scale, 0.5), 3);
-    draw();
-  }, { passive: false });
+  const zoom = d3.zoom()
+    .scaleExtent([0.4, 3])
+    .on('zoom', (event) => {
+      currentTransform = event.transform;
+      graphG.attr('transform', currentTransform);
+    });
+  svg.call(zoom);
 
   resetBtn.addEventListener('click', () => {
-    state.transform = { x: 0, y: 0, scale: 1 };
-    draw();
+    currentTransform = d3.zoomIdentity;
+    svg.transition().duration(250).call(zoom.transform, currentTransform);
   });
 
   function updateNodes(list) {
     list.forEach((n) => {
-      if (n.id === 'node_0_0') return; // skip synthetic root
+      if (n.id === 'node_0_0') return;
       const node = { ...n };
       if (node.parent_id === 'node_0_0') node.parent_id = null;
       state.nodes.set(node.id, node);
     });
-    // purge if any lingering node_0_0
     state.nodes.delete('node_0_0');
-    state.layoutDirty = true;
-    draw();
+    renderGraph();
     if (!state.selectedId) {
       const preferred = state.nodes.get('node_1_0');
       if (preferred) selectNode('node_1_0');
@@ -474,6 +367,7 @@
     if (!node) return;
     state.selectedId = id;
     updateDetails(node);
+    highlightSelection();
   }
 
   function formatObj(obj) {
@@ -661,8 +555,7 @@
         updateNodes([msg.node]);
       } else if (msg.type === 'remove') {
         state.nodes.delete(msg.id);
-        state.layoutDirty = true;
-        draw();
+        renderGraph();
       }
     };
   }

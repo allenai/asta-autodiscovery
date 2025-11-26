@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MCTS Tree Explorer</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -111,10 +112,7 @@
     }
     button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(125, 211, 252, 0.35); }
     #status { font-size: 12px; color: var(--muted); }
-    #betaCanvas { width: 100%; height: 180px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); }
-    .legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 6px; }
-    .legend span { display: inline-flex; align-items: center; gap: 6px; }
-    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    #betaCanvas { width: 100%; height: 200px; max-height: 200px; display: block; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); }
     .empty { color: var(--muted); font-style: italic; }
   </style>
 </head>
@@ -167,12 +165,8 @@
         </div>
         <div class="section">
           <h3>Prior vs Posterior</h3>
-          <canvas id="betaCanvas" width="340" height="180"></canvas>
-          <div class="legend">
-            <span><span class="swatch" style="background:#7dd3fc"></span>Prior</span>
-            <span><span class="swatch" style="background:#fca5a5"></span>Posterior</span>
-          </div>
-          <div id="betaMeta" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+          <canvas id="betaCanvas" width="360" height="200"></canvas>
+          <div id="betaMeta" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>
         </div>
       </div>
     </div>
@@ -188,7 +182,7 @@
   const statusEl = document.getElementById('status');
   const resetBtn = document.getElementById('resetView');
   const betaCanvas = document.getElementById('betaCanvas');
-  const betaCtx = betaCanvas.getContext('2d');
+  let betaChart;
   let currentTransform = d3.zoomIdentity;
 
   const state = {
@@ -443,95 +437,90 @@
   }
 
   function drawBeta(prior, posterior) {
-    betaCtx.clearRect(0,0,betaCanvas.width,betaCanvas.height);
-    const samples = 240;
     const priorParams = prior?.prior_params;
     const postParams = posterior?.prior_params;
     const curves = [];
-    if (Array.isArray(priorParams)) curves.push({ params: priorParams, color: '#7dd3fc', label: 'prior' });
-    if (Array.isArray(postParams)) curves.push({ params: postParams, color: '#fca5a5', label: 'posterior' });
+    if (Array.isArray(priorParams)) curves.push({ params: priorParams, color: 'rgb(125, 211, 252)', label: 'Prior' });
+    if (Array.isArray(postParams)) curves.push({ params: postParams, color: 'rgb(252, 165, 165)', label: 'Posterior' });
+
     if (!curves.length) {
-      betaCtx.fillStyle = '#9ca3af';
-      betaCtx.fillText('No prior/posterior available', 20, 40);
-      els.betaMeta.textContent = '';
+      if (betaChart) { betaChart.destroy(); betaChart = null; }
+      els.betaMeta.textContent = 'No prior/posterior available';
+      betaCanvas.style.height = '200px';
       return;
     }
-    const data = curves.map((c) => {
-      const [a,b] = c.params;
-      const arr = [];
-      for (let i=0;i<=samples;i++) {
-        const x = i / samples;
-        arr.push({ x, y: betaPdf(x, a, b) });
-      }
-      return { ...c, points: arr };
+
+    const xs = Array.from({ length: 240 }, (_, i) => i / 239);
+    const datasets = curves.map((curve) => {
+      const [a, b] = curve.params;
+      const points = xs.map((x) => ({ x, y: betaPdf(x, a, b) }));
+      return {
+        label: curve.label,
+        data: points,
+        borderColor: curve.color,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true,
+        backgroundColor: (ctx) => {
+          const { chart } = ctx;
+          const { ctx: cctx, chartArea } = chart;
+          if (!chartArea) return curve.color;
+          const gradient = cctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, `${curve.color.replace('rgb', 'rgba').replace(')', ',0.35)')}`);
+          gradient.addColorStop(1, `${curve.color.replace('rgb', 'rgba').replace(')', ',0.05)')}`);
+          return gradient;
+        },
+      };
     });
-    const maxY = Math.max(...data.flatMap(d => d.points.map(p=>p.y))) || 1;
-    const w = betaCanvas.width - 50;
-    const h = betaCanvas.height - 40;
-    const ox = 30, oy = betaCanvas.height - 18;
 
-    // axes + ticks
-    betaCtx.strokeStyle = '#334155';
-    betaCtx.lineWidth = 1;
-    betaCtx.beginPath();
-    betaCtx.moveTo(ox, oy);
-    betaCtx.lineTo(ox + w, oy);
-    betaCtx.moveTo(ox, oy);
-    betaCtx.lineTo(ox, oy - h);
-    betaCtx.stroke();
+    // lock the canvas size so it doesn't balloon during repeated updates
+    betaCanvas.height = 200;
+    betaCanvas.width = betaCanvas.parentElement?.clientWidth || betaCanvas.clientWidth || 360;
 
-    betaCtx.fillStyle = '#94a3b8';
-    betaCtx.font = '10px Inter, sans-serif';
-    for (let i=0;i<=5;i++) {
-      const x = ox + (i/5)*w;
-      betaCtx.beginPath();
-      betaCtx.moveTo(x, oy);
-      betaCtx.lineTo(x, oy+4);
-      betaCtx.stroke();
-      betaCtx.fillText((i/5).toFixed(1), x-6, oy+14);
+    if (!betaChart) {
+      betaChart = new Chart(betaCanvas, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: false,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: 'nearest', intersect: false },
+          layout: { padding: 6 },
+          plugins: {
+            legend: {
+              display: true,
+              labels: { color: '#cbd5e1', boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 4 }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: x=${ctx.parsed.x.toFixed(2)}, p=${ctx.parsed.y.toFixed(3)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              min: 0,
+              max: 1,
+              ticks: { color: '#94a3b8' },
+              grid: { color: 'rgba(148,163,184,0.12)' }
+            },
+            y: {
+              ticks: { color: '#94a3b8' },
+              grid: { color: 'rgba(148,163,184,0.12)' }
+            }
+          }
+        }
+      });
+    } else {
+      betaChart.data.datasets = datasets;
+      betaChart.update('none');
     }
 
-    data.forEach((curve) => {
-      const grad = betaCtx.createLinearGradient(0, oy-h, 0, oy);
-      grad.addColorStop(0, curve.color + '55');
-      grad.addColorStop(1, curve.color + '11');
-      betaCtx.beginPath();
-      curve.points.forEach((p, idx) => {
-        const x = ox + p.x * w;
-        const y = oy - (p.y / maxY) * h;
-        if (idx === 0) betaCtx.moveTo(x,y); else betaCtx.lineTo(x,y);
-      });
-      betaCtx.lineTo(ox + w, oy);
-      betaCtx.lineTo(ox, oy);
-      betaCtx.closePath();
-      betaCtx.fillStyle = grad;
-      betaCtx.fill();
-
-      betaCtx.beginPath();
-      betaCtx.strokeStyle = curve.color;
-      betaCtx.lineWidth = 2;
-      curve.points.forEach((p, idx) => {
-        const x = ox + p.x * w;
-        const y = oy - (p.y / maxY) * h;
-        if (idx === 0) betaCtx.moveTo(x,y); else betaCtx.lineTo(x,y);
-      });
-      betaCtx.stroke();
-
-      // mean marker
-      const [a,b] = curve.params;
-      const mean = a / (a + b);
-      const mx = ox + mean * w;
-      betaCtx.strokeStyle = curve.color;
-      betaCtx.setLineDash([4,3]);
-      betaCtx.beginPath();
-      betaCtx.moveTo(mx, oy);
-      betaCtx.lineTo(mx, oy - h - 4);
-      betaCtx.stroke();
-      betaCtx.setLineDash([]);
-    });
-
-    const metaText = curves.map((c)=> `${c.label}: α=${c.params[0].toFixed(2)}, β=${c.params[1].toFixed(2)}, mean=${(c.params[0]/(c.params[0]+c.params[1])).toFixed(2)}`).join(' · ');
-    els.betaMeta.textContent = metaText;
+    els.betaMeta.textContent = curves
+      .map((c) => `${c.label.toLowerCase()}: α=${c.params[0].toFixed(2)}, β=${c.params[1].toFixed(2)}, mean=${(c.params[0] / (c.params[0] + c.params[1])).toFixed(2)}`)
+      .join(' · ');
   }
 
   async function fetchInitial() {

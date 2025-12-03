@@ -614,11 +614,46 @@
     const cs = getComputedStyle(document.documentElement);
     const priorColor = cs.getPropertyValue('--asta-color-primary').trim() || 'rgb(240, 82, 156)';
     const postColor = cs.getPropertyValue('--asta-color-secondary').trim() || 'rgb(15, 203, 140)';
-    const priorParams = prior?.prior_params;
-    const postParams = posterior?.prior_params;
+    const scorePerCategory = {
+      definitely_false: 0.0,
+      maybe_false: 0.25,
+      uncertain: 0.5,
+      maybe_true: 0.75,
+      definitely_true: 1.0,
+    };
+
+    const catParams = (belief) => {
+      if (!belief) return [0, 0];
+      const dt = Number(belief.definitely_true ?? 0);
+      const mt = Number(belief.maybe_true ?? 0);
+      const un = Number(belief.uncertain ?? 0);
+      const mf = Number(belief.maybe_false ?? 0);
+      const df = Number(belief.definitely_false ?? 0);
+      const total = dt + mt + un + mf + df;
+      const alpha = dt * scorePerCategory.definitely_true +
+                   mt * scorePerCategory.maybe_true +
+                   un * scorePerCategory.uncertain +
+                   mf * scorePerCategory.maybe_false +
+                   df * scorePerCategory.definitely_false;
+      const beta = total - alpha;
+      return [alpha, beta];
+    };
+
+    const mergedParams = (belief) => {
+      if (!belief) return null;
+      const base = Array.isArray(belief.prior_params) ? belief.prior_params : [0, 0];
+      const [alphaCats, betaCats] = catParams(belief);
+      const alpha = (Number(base[0]) || 0) + alphaCats;
+      const beta = (Number(base[1]) || 0) + betaCats;
+      if (alpha <= 0 || beta <= 0) return null;
+      return [alpha, beta];
+    };
+
+    const priorParams = mergedParams(prior);
+    const postParams = mergedParams(posterior);
     const curves = [];
-    if (Array.isArray(priorParams)) curves.push({ params: priorParams, color: priorColor, label: 'Prior' });
-    if (Array.isArray(postParams)) curves.push({ params: postParams, color: postColor, label: 'Posterior' });
+    if (priorParams) curves.push({ params: priorParams, color: priorColor, label: 'Prior' });
+    if (postParams) curves.push({ params: postParams, color: postColor, label: 'Posterior' });
 
     if (!curves.length) {
       if (betaChart) { betaChart.destroy(); betaChart = null; }

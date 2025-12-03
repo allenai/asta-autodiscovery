@@ -482,15 +482,8 @@
       .attr('cx', (d) => d.xPos)
       .attr('cy', (d) => d.yPos);
 
-    const labelSel = labelG.selectAll('text').data(nodesLayout, (d) => d.data.data.id);
-    labelSel.exit().remove();
-    labelSel.enter().append('text')
-      .attr('pointer-events', 'none')
-      .attr('font-weight', '700');
-    labelG.selectAll('text')
-      .text((d) => (d.data.data.value ?? 0).toFixed(2))
-      .attr('x', (d) => d.xPos)
-      .attr('y', (d) => d.yPos);
+    // Hide inline value labels on the tree; values remain visible in the sidebar.
+    labelG.selectAll('text').remove();
 
     highlightSelection();
   }

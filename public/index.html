@@ -369,11 +369,20 @@
   }
 
 
-  function valueColor(v) {
-    if (v == null || Number.isNaN(v)) return 'var(--muted)';
-    const clamped = Math.max(-1, Math.min(1, v));
-    const hue = 160 * (clamped + 1) / 2; // -1 -> 0 (red-ish), 1 -> 160 (green)
-    return `hsl(${hue}, 80%, 60%)`;
+  function surprisalColor(node) {
+    const priorMean = node?.prior?.mean;
+    const postMean = node?.posterior?.mean;
+    if (typeof priorMean !== 'number' || typeof postMean !== 'number') return 'var(--muted)';
+
+    const delta = postMean - priorMean; // direction of belief shift
+    const intensityRaw = Math.abs(node?.belief_change ?? delta ?? 0);
+    const intensity = Math.max(0, Math.min(1, intensityRaw)); // clamp 0-1
+
+    const hue = delta >= 0 ? 145 : 0; // green for positive shift, red for negative
+    const saturation = 60 + 30 * intensity; // more vivid with larger belief_change
+    const lightness = 80 - 45 * intensity; // darker with stronger belief_change
+
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   }
 
   function renderGraph() {
@@ -469,7 +478,7 @@
       .attr('cursor', 'pointer')
       .on('click', (_, d) => selectNode(d.data.data.id));
     nodeG.selectAll('circle')
-      .attr('fill', (d) => valueColor(d.data.data.value))
+      .attr('fill', (d) => surprisalColor(d.data.data))
       .attr('cx', (d) => d.xPos)
       .attr('cy', (d) => d.yPos);
 

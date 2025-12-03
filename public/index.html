@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,26 +8,156 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --card: #1f2937;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #7dd3fc;
-      --danger: #fca5a5;
-      --success: #a7f3d0;
-      --border: #1f2937;
-      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --asta-color-primary: rgba(240, 82, 156, 1);
+      --asta-color-primary-dark: rgba(168, 57, 109, 1);
+      --asta-color-primary-light: rgba(243, 116, 175, 1);
+      --asta-color-secondary: rgba(15, 203, 140, 1);
+      --asta-color-secondary-dark: rgba(10, 142, 98, 1);
+      --asta-color-secondary-light: rgba(63, 213, 163, 1);
+      --asta-color-tertiary: rgba(177, 27, 232, 1);
+      --asta-color-tertiary-dark: rgba(123, 18, 162, 1);
+      --asta-color-tertiary-light: rgba(192, 72, 236, 1);
+      --asta-white: rgba(255, 255, 255, 1);
+      --asta-black: rgba(0, 0, 0, 1);
+      --asta-extra-dark-teal-4: rgba(3, 38, 41, 0.04);
+      --asta-extra-dark-teal-10: rgba(3, 38, 41, 0.1);
+      --asta-extra-dark-teal-20: rgba(3, 38, 41, 0.2);
+      --asta-extra-dark-teal-30: rgba(3, 38, 41, 0.3);
+      --asta-extra-dark-teal-40: rgba(3, 38, 41, 0.4);
+      --asta-extra-dark-teal-50: rgba(3, 38, 41, 0.5);
+      --asta-extra-dark-teal-60: rgba(3, 38, 41, 0.6);
+      --asta-extra-dark-teal-70: rgba(3, 38, 41, 0.7);
+      --asta-extra-dark-teal-80: rgba(3, 38, 41, 0.8);
+      --asta-extra-dark-teal-90: rgba(3, 38, 41, 0.9);
+      --asta-extra-dark-teal-100: rgba(3, 38, 41, 1);
+      --asta-dark-teal-10: rgba(10, 50, 53, 0.1);
+      --asta-dark-teal-20: rgba(10, 50, 53, 0.2);
+      --asta-dark-teal-30: rgba(10, 50, 53, 0.3);
+      --asta-dark-teal-40: rgba(10, 50, 53, 0.4);
+      --asta-dark-teal-50: rgba(10, 50, 53, 0.5);
+      --asta-dark-teal-60: rgba(10, 50, 53, 0.6);
+      --asta-dark-teal-70: rgba(10, 50, 53, 0.7);
+      --asta-dark-teal-80: rgba(10, 50, 53, 0.8);
+      --asta-dark-teal-90: rgba(10, 50, 53, 0.9);
+      --asta-dark-teal-100: rgba(10, 50, 53, 1);
+      --asta-cream-4: rgba(250, 242, 233, 0.04);
+      --asta-cream-10: rgba(250, 242, 233, 0.1);
+      --asta-cream-20: rgba(250, 242, 233, 0.2);
+      --asta-cream-30: rgba(250, 242, 233, 0.3);
+      --asta-cream-40: rgba(250, 242, 233, 0.4);
+      --asta-cream-50: rgba(250, 242, 233, 0.5);
+      --asta-cream-60: rgba(250, 242, 233, 0.6);
+      --asta-cream-70: rgba(250, 242, 233, 0.7);
+      --asta-cream-80: rgba(250, 242, 233, 0.8);
+      --asta-cream-90: rgba(250, 242, 233, 0.9);
+      --asta-cream-100: rgba(250, 242, 233, 1);
+      --asta-info-blue-20: rgba(212, 231, 252, 1);
+      --asta-info-blue-40: rgba(170, 207, 249, 1);
+      --asta-info-blue-60: rgba(127, 184, 245, 1);
+      --asta-info-blue-80: rgba(85, 160, 242, 1);
+      --asta-info-blue-100: rgba(42, 136, 239, 1);
+      --asta-error-red-20: rgba(255, 218, 218, 1);
+      --asta-error-red-40: rgba(254, 181, 181, 1);
+      --asta-error-red-60: rgba(254, 144, 143, 1);
+      --asta-error-red-80: rgba(253, 107, 106, 1);
+      --asta-error-red-100: rgba(253, 70, 69, 1);
+      --asta-success-green-20: rgba(221, 235, 215, 1);
+      --asta-success-green-40: rgba(187, 215, 174, 1);
+      --asta-success-green-60: rgba(152, 196, 134, 1);
+      --asta-success-green-80: rgba(118, 176, 93, 1);
+      --asta-success-green-100: rgba(84, 156, 53, 1);
+      --asta-warning-orange-20: rgba(255, 237, 210, 1);
+      --asta-warning-orange-40: rgba(255, 218, 164, 1);
+      --asta-warning-orange-60: rgba(255, 200, 119, 1);
+      --asta-warning-orange-80: rgba(255, 181, 73, 1);
+      --asta-warning-orange-100: rgba(255, 163, 28, 1);
+      --asta-teal-10: rgba(16, 82, 87, 0.1);
+      --asta-teal-20: rgba(16, 82, 87, 0.2);
+      --asta-teal-30: rgba(16, 82, 87, 0.3);
+      --asta-teal-40: rgba(16, 82, 87, 0.4);
+      --asta-teal-50: rgba(16, 82, 87, 0.5);
+      --asta-teal-60: rgba(16, 82, 87, 0.6);
+      --asta-teal-70: rgba(16, 82, 87, 0.7);
+      --asta-teal-80: rgba(16, 82, 87, 0.8);
+      --asta-teal-90: rgba(16, 82, 87, 0.9);
+      --asta-teal-100: rgba(16, 82, 87, 1);
+      --asta-pink-10: rgba(253, 238, 245, 1);
+      --asta-pink-20: rgba(252, 220, 235, 1);
+      --asta-pink-30: rgba(251, 203, 225, 1);
+      --asta-pink-40: rgba(249, 186, 215, 1);
+      --asta-pink-50: rgba(247, 168, 205, 1);
+      --asta-pink-60: rgba(246, 151, 196, 1);
+      --asta-pink-70: rgba(245, 134, 186, 1);
+      --asta-pink-80: rgba(243, 117, 176, 1);
+      --asta-pink-90: rgba(242, 99, 166, 1);
+      --asta-pink-100: rgba(240, 82, 156, 1);
+      --asta-purple-10: rgba(247, 232, 253, 1);
+      --asta-purple-20: rgba(239, 209, 250, 1);
+      --asta-purple-30: rgba(232, 187, 248, 1);
+      --asta-purple-40: rgba(224, 164, 246, 1);
+      --asta-purple-50: rgba(216, 141, 243, 1);
+      --asta-purple-60: rgba(208, 118, 241, 1);
+      --asta-purple-70: rgba(200, 95, 239, 1);
+      --asta-purple-80: rgba(193, 73, 237, 1);
+      --asta-purple-90: rgba(185, 50, 234, 1);
+      --asta-purple-100: rgba(177, 27, 232, 1);
+      --asta-green-10: rgba(231, 250, 243, 1);
+      --asta-green-20: rgba(207, 245, 232, 1);
+      --asta-green-30: rgba(183, 239, 221, 1);
+      --asta-green-40: rgba(159, 234, 209, 1);
+      --asta-green-50: rgba(135, 229, 197, 1);
+      --asta-green-60: rgba(111, 224, 186, 1);
+      --asta-green-70: rgba(87, 219, 175, 1);
+      --asta-green-80: rgba(63, 213, 163, 1);
+      --asta-green-90: rgba(39, 208, 156, 1);
+      --asta-green-100: rgba(15, 203, 140, 1);
+      --asta-gray-10: rgba(235, 235, 235, 1);
+      --asta-gray-20: rgba(214, 214, 214, 1);
+      --asta-gray-30: rgba(194, 194, 194, 1);
+      --asta-gray-40: rgba(174, 174, 174, 1);
+      --asta-gray-50: rgba(153, 153, 153, 1);
+      --asta-gray-60: rgba(133, 133, 133, 1);
+      --asta-gray-70: rgba(113, 113, 113, 1);
+      --asta-gray-80: rgba(93, 93, 93, 1);
+      --asta-gray-90: rgba(72, 72, 72, 1);
+      --asta-gray-100: rgba(52, 52, 52, 1);
+
       --radius: 12px;
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     }
+
+    :root[data-theme="light"] {
+      --bg: var(--asta-cream-90);
+      --panel: var(--asta-cream-80);
+      --card: var(--asta-cream-70);
+      --text: var(--asta-dark-teal-100);
+      --muted: var(--asta-dark-teal-70);
+      --accent: var(--asta-color-primary);
+      --danger: var(--asta-error-red-80);
+      --success: var(--asta-success-green-80);
+      --border: var(--asta-cream-60);
+      --shadow: 0 12px 35px var(--asta-dark-teal-10);
+    }
+
+    :root[data-theme="dark"] {
+      --bg: var(--asta-extra-dark-teal-100);
+      --panel: var(--asta-extra-dark-teal-80);
+      --card: var(--asta-dark-teal-80);
+      --text: var(--asta-cream-100);
+      --muted: var(--asta-cream-70);
+      --accent: var(--asta-color-secondary-light);
+      --danger: var(--asta-error-red-80);
+      --success: var(--asta-success-green-80);
+      --border: var(--asta-extra-dark-teal-60);
+      --shadow: 0 12px 35px var(--asta-extra-dark-teal-40);
+    }
+
+    :root { color-scheme: light dark; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Inter", system-ui, -apple-system, sans-serif;
-      background: radial-gradient(circle at 20% 20%, rgba(125, 211, 252, 0.08), transparent 30%),
-                  radial-gradient(circle at 80% 10%, rgba(167, 243, 208, 0.05), transparent 25%),
-                  var(--bg);
+      background: var(--bg);
       color: var(--text);
       height: 100vh;
       overflow: hidden;
@@ -39,6 +169,7 @@
         "canvas sidebar";
       gap: 10px;
       padding: 10px;
+      transition: background 160ms ease, color 160ms ease;
     }
     header {
       grid-area: top;
@@ -50,6 +181,7 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       border: 1px solid var(--border);
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
     }
     header h1 {
       margin: 0;
@@ -60,12 +192,12 @@
       gap: 10px;
     }
     header .pill {
-      background: rgba(125, 211, 252, 0.15);
+      background: var(--asta-cream-60);
       color: var(--accent);
       padding: 4px 10px;
       border-radius: 999px;
       font-size: 12px;
-      border: 1px solid rgba(125, 211, 252, 0.35);
+      border: 1px solid var(--border);
     }
     #graph-container {
       grid-area: canvas;
@@ -75,6 +207,7 @@
       position: relative;
       overflow: hidden;
       box-shadow: var(--shadow);
+      transition: background 160ms ease, border-color 160ms ease;
     }
     svg { display: block; width: 100%; height: 100%; }
     #sidebar {
@@ -85,6 +218,7 @@
       box-shadow: var(--shadow);
       padding: 12px;
       overflow: auto;
+      transition: background 160ms ease, border-color 160ms ease;
     }
     .section { margin-bottom: 12px; }
     .section h3 { margin: 0 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -94,23 +228,24 @@
       border-radius: var(--radius);
       padding: 10px 12px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+      transition: background 160ms ease, border-color 160ms ease;
     }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 12px; }
     .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); font-size: 12px; color: var(--muted); border: 1px solid var(--border); }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: var(--card); font-size: 12px; color: var(--muted); border: 1px solid var(--border); }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     button {
       background: var(--accent);
-      color: #0b1021;
+      color: var(--asta-black);
       border: none;
       border-radius: 10px;
       padding: 8px 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: 0 10px 25px rgba(125, 211, 252, 0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 160ms ease;
+      box-shadow: 0 10px 25px var(--asta-teal-30);
     }
-    button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(125, 211, 252, 0.35); }
+    button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px var(--asta-teal-40); }
     #status { font-size: 12px; color: var(--muted); }
     #betaCanvas { width: 100%; height: 200px; max-height: 200px; display: block; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); }
     .empty { color: var(--muted); font-style: italic; }
@@ -119,10 +254,11 @@
 <body>
   <header>
     <h1>Exploration Tree <span class="pill">Live</span></h1>
-    <div class="row">
-      <span id="status">Connecting…</span>
-      <button id="resetView">Reset View</button>
-    </div>
+      <div class="row" style="gap:6px;">
+        <span id="status">Connecting…</span>
+        <button id="themeToggle">Theme</button>
+        <button id="resetView">Reset View</button>
+      </div>
   </header>
   <div id="graph-container">
     <svg id="treeSvg"></svg>
@@ -176,11 +312,12 @@
 (function() {
   const svg = d3.select('#treeSvg');
   const graphG = svg.append('g');
-  const linkG = graphG.append('g').attr('stroke', '#334155').attr('stroke-width', 1.2).attr('stroke-linecap', 'round').attr('fill', 'none');
+  const linkG = graphG.append('g').attr('stroke', 'var(--border)').attr('stroke-width', 1.2).attr('stroke-linecap', 'round').attr('fill', 'none');
   const nodeG = graphG.append('g');
-  const labelG = graphG.append('g').attr('font-family', 'Inter, sans-serif').attr('font-size', 11).attr('fill', '#0f172a').attr('text-anchor', 'middle').attr('dominant-baseline', 'central');
+  const labelG = graphG.append('g').attr('font-family', 'Inter, sans-serif').attr('font-size', 11).attr('fill', 'var(--asta-black)').attr('text-anchor', 'middle').attr('dominant-baseline', 'central');
   const statusEl = document.getElementById('status');
   const resetBtn = document.getElementById('resetView');
+  const themeBtn = document.getElementById('themeToggle');
   const betaCanvas = document.getElementById('betaCanvas');
   let betaChart;
   let currentTransform = d3.zoomIdentity;
@@ -194,9 +331,37 @@
   function resize() {
     const rect = svg.node().parentElement.getBoundingClientRect();
     svg.attr('width', rect.width).attr('height', rect.height);
+    betaCanvas.width = betaCanvas.parentElement?.clientWidth || 360;
+    betaCanvas.height = 200;
+    if (betaChart) {
+      betaChart.resize();
+    }
     renderGraph(); // recompute layout with new size
   }
   window.addEventListener('resize', resize);
+
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const savedTheme = localStorage.getItem('theme');
+  let theme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+  function applyTheme(next) {
+    theme = next;
+    document.documentElement.setAttribute('data-theme', next);
+    themeBtn.textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
+    localStorage.setItem('theme', next);
+    if (betaChart) {
+      const cs = getComputedStyle(document.documentElement);
+      const labelColor = cs.getPropertyValue('--text') || '#e5e7eb';
+      const tickColor = cs.getPropertyValue('--muted') || '#94a3b8';
+      betaChart.options.plugins.legend.labels.color = labelColor;
+      betaChart.options.scales.x.ticks.color = tickColor;
+      betaChart.options.scales.y.ticks.color = tickColor;
+      betaChart.update('none');
+    }
+  }
+
+  applyTheme(theme);
+  themeBtn.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
 
   function setStatus(text, ok = true) {
     statusEl.textContent = text;
@@ -205,7 +370,7 @@
 
 
   function valueColor(v) {
-    if (v == null || Number.isNaN(v)) return '#cbd5e1';
+    if (v == null || Number.isNaN(v)) return 'var(--muted)';
     const clamped = Math.max(-1, Math.min(1, v));
     const hue = 160 * (clamped + 1) / 2; // -1 -> 0 (red-ish), 1 -> 160 (green)
     return `hsl(${hue}, 80%, 60%)`;
@@ -437,11 +602,14 @@
   }
 
   function drawBeta(prior, posterior) {
+    const cs = getComputedStyle(document.documentElement);
+    const priorColor = cs.getPropertyValue('--asta-color-primary').trim() || 'rgb(240, 82, 156)';
+    const postColor = cs.getPropertyValue('--asta-color-secondary').trim() || 'rgb(15, 203, 140)';
     const priorParams = prior?.prior_params;
     const postParams = posterior?.prior_params;
     const curves = [];
-    if (Array.isArray(priorParams)) curves.push({ params: priorParams, color: 'rgb(125, 211, 252)', label: 'Prior' });
-    if (Array.isArray(postParams)) curves.push({ params: postParams, color: 'rgb(252, 165, 165)', label: 'Posterior' });
+    if (Array.isArray(priorParams)) curves.push({ params: priorParams, color: priorColor, label: 'Prior' });
+    if (Array.isArray(postParams)) curves.push({ params: postParams, color: postColor, label: 'Posterior' });
 
     if (!curves.length) {
       if (betaChart) { betaChart.destroy(); betaChart = null; }
@@ -460,22 +628,13 @@
         borderColor: curve.color,
         pointRadius: 0,
         tension: 0.3,
-        fill: true,
-        backgroundColor: (ctx) => {
-          const { chart } = ctx;
-          const { ctx: cctx, chartArea } = chart;
-          if (!chartArea) return curve.color;
-          const gradient = cctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, `${curve.color.replace('rgb', 'rgba').replace(')', ',0.35)')}`);
-          gradient.addColorStop(1, `${curve.color.replace('rgb', 'rgba').replace(')', ',0.05)')}`);
-          return gradient;
-        },
+        fill: false,
       };
     });
 
     // lock the canvas size so it doesn't balloon during repeated updates
     betaCanvas.height = 200;
-    betaCanvas.width = betaCanvas.parentElement?.clientWidth || betaCanvas.clientWidth || 360;
+    betaCanvas.width = betaCanvas.parentElement?.clientWidth || 360;
 
     if (!betaChart) {
       betaChart = new Chart(betaCanvas, {
@@ -487,10 +646,14 @@
           animation: false,
           interaction: { mode: 'nearest', intersect: false },
           layout: { padding: 6 },
+          parsing: {
+            xAxisKey: 'x',
+            yAxisKey: 'y'
+          },
           plugins: {
             legend: {
               display: true,
-              labels: { color: '#cbd5e1', boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 4 }
+              labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text') || '#e5e7eb', boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 4 }
             },
             tooltip: {
               callbacks: {
@@ -503,13 +666,13 @@
               type: 'linear',
               min: 0,
               max: 1,
-              ticks: { color: '#94a3b8' },
-              grid: { color: 'rgba(148,163,184,0.12)' }
-            },
-            y: {
-              ticks: { color: '#94a3b8' },
-              grid: { color: 'rgba(148,163,184,0.12)' }
-            }
+              ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--muted') || '#94a3b8' },
+          grid: { color: 'rgba(148,163,184,0.12)' }
+        },
+        y: {
+          ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--muted') || '#94a3b8' },
+          grid: { color: 'rgba(148,163,184,0.12)' }
+        }
           }
         }
       });

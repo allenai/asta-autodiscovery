@@ -260,16 +260,34 @@
     #status { font-size: 12px; color: var(--muted); }
     #betaCanvas { width: 100%; height: 200px; max-height: 200px; display: block; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); }
     .empty { color: var(--muted); font-style: italic; }
+    input[type="number"] {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-weight: 600;
+      width: 90px;
+      box-shadow: 0 6px 15px var(--asta-dark-teal-20);
+    }
+    .inline-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    header { flex-wrap: wrap; gap: 8px; }
   </style>
 </head>
 <body>
   <header>
     <h1>Exploration Tree <span class="pill">Live</span></h1>
-      <div class="row" style="gap:6px;">
+      <div class="row" style="gap:6px; justify-content:flex-start; flex-wrap:wrap;">
         <span id="status">Connecting…</span>
         <select id="runSelect" aria-label="Select run"></select>
         <button id="themeToggle">Theme</button>
         <button id="resetView">Reset View</button>
+      </div>
+      <div class="row" id="playbackControls" style="gap:8px; justify-content:flex-start; flex-wrap:wrap;">
+        <button id="playbackToggle">Play Build</button>
+        <label class="inline-label" for="delayInput">Delay (s)
+          <input type="number" id="delayInput" min="0" step="0.1" value="2" aria-label="Delay between node reveals in seconds" />
+        </label>
       </div>
   </header>
   <div id="graph-container">
@@ -332,15 +350,27 @@
   const themeBtn = document.getElementById('themeToggle');
   const runSelect = document.getElementById('runSelect');
   const betaCanvas = document.getElementById('betaCanvas');
+  const playBtn = document.getElementById('playbackToggle');
+  const delayInput = document.getElementById('delayInput');
   let betaChart;
   let currentTransform = d3.zoomIdentity;
 
   const state = {
+    allNodes: new Map(),
     nodes: new Map(),
     selectedId: null,
     layout: [],
     runs: [],
     currentRun: '',
+  };
+
+  const playback = {
+    playing: false,
+    timer: null,
+    delayMs: 2000,
+    sequence: [],
+    cursor: 0,
+    maxCreation: -Infinity,
   };
 
   function resize() {
@@ -378,6 +408,16 @@
   applyTheme(theme);
   themeBtn.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
   runSelect?.addEventListener('change', (e) => switchRun(e.target.value));
+  delayInput.value = (playback.delayMs / 1000).toString();
+  delayInput.addEventListener('change', () => {
+    const val = parseFloat(delayInput.value);
+    playback.delayMs = Number.isFinite(val) && val >= 0 ? val * 1000 : 2000;
+    delayInput.value = (playback.delayMs / 1000).toString();
+  });
+  playBtn.addEventListener('click', () => {
+    if (playback.playing) stopPlayback({ restore: true });
+    else startPlayback();
+  });
 
   function setStatus(text, ok = true) {
     statusEl.textContent = text;
@@ -431,6 +471,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to switch run');
 
+      stopPlayback({ restore: false });
+      state.allNodes.clear();
       state.nodes.clear();
       state.selectedId = null;
       updateNodes(data.nodes || []);
@@ -570,6 +612,68 @@
       .attr('stroke', (d) => d.id === state.selectedId ? '#fbbf24' : '#0f172a');
   }
 
+  function stopPlayback({ restore = true } = {}) {
+    if (playback.timer) {
+      clearTimeout(playback.timer);
+      playback.timer = null;
+    }
+    playback.playing = false;
+    playback.sequence = [];
+    playback.cursor = 0;
+    playback.maxCreation = -Infinity;
+    playBtn.textContent = 'Play Build';
+    if (restore) {
+      state.nodes = new Map(state.allNodes);
+      if (state.selectedId && !state.nodes.has(state.selectedId)) state.selectedId = null;
+      renderGraph();
+      if (!state.selectedId && state.nodes.size) {
+        const preferred = state.nodes.get('node_1_0');
+        if (preferred) selectNode('node_1_0');
+        else selectNode(state.nodes.keys().next().value);
+      }
+    }
+  }
+
+  function buildPlaybackSequence() {
+    const withIndex = [];
+    const withoutIndex = [];
+    state.allNodes.forEach((node) => {
+      if (Number.isFinite(node.creation_index)) withIndex.push(node);
+      else withoutIndex.push(node);
+    });
+    withIndex.sort((a, b) => a.creation_index - b.creation_index);
+    withoutIndex.sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+    return [...withIndex, ...withoutIndex];
+  }
+
+  function stepPlayback() {
+    if (!playback.playing) return;
+    if (playback.cursor >= playback.sequence.length) {
+      stopPlayback({ restore: true });
+      return;
+    }
+    const node = playback.sequence[playback.cursor++];
+    playback.maxCreation = Math.max(playback.maxCreation, node.creation_index ?? playback.maxCreation);
+    state.nodes.set(node.id, node);
+    renderGraph();
+    if (!state.selectedId) selectNode(node.id);
+    playback.timer = setTimeout(stepPlayback, playback.delayMs);
+  }
+
+  function startPlayback() {
+    if (!state.allNodes.size) return;
+    stopPlayback({ restore: false });
+    playback.sequence = buildPlaybackSequence();
+    playback.cursor = 0;
+    playback.maxCreation = -Infinity;
+    playback.playing = true;
+    playBtn.textContent = 'Stop';
+    state.nodes = new Map();
+    state.selectedId = null;
+    renderGraph();
+    stepPlayback();
+  }
+
   const zoom = d3.zoom()
     .scaleExtent([0.4, 3])
     .on('zoom', (event) => {
@@ -583,19 +687,35 @@
     svg.transition().duration(250).call(zoom.transform, currentTransform);
   });
 
+  function normalizeNode(n) {
+    if (!n || n.id === 'node_0_0') return null;
+    const node = { ...n };
+    if (node.parent_id === 'node_0_0') node.parent_id = null;
+    if (typeof node.creation_index === 'string') {
+      const parsed = Number(node.creation_index);
+      if (!Number.isNaN(parsed)) node.creation_index = parsed;
+    }
+    return node;
+  }
+
   function updateNodes(list) {
     list.forEach((n) => {
-      if (n.id === 'node_0_0') return;
-      const node = { ...n };
-      if (node.parent_id === 'node_0_0') node.parent_id = null;
-      state.nodes.set(node.id, node);
+      const node = normalizeNode(n);
+      if (!node) return;
+      state.allNodes.set(node.id, node);
+      if (!playback.playing) {
+        state.nodes.set(node.id, node);
+      } else if ((node.creation_index ?? Infinity) <= playback.maxCreation) {
+        state.nodes.set(node.id, node);
+      }
     });
+    state.allNodes.delete('node_0_0');
     state.nodes.delete('node_0_0');
     renderGraph();
-    if (!state.selectedId) {
+    if (!playback.playing && !state.selectedId && state.nodes.size) {
       const preferred = state.nodes.get('node_1_0');
       if (preferred) selectNode('node_1_0');
-      else if (state.nodes.size) selectNode(state.nodes.keys().next().value);
+      else selectNode(state.nodes.keys().next().value);
     }
   }
 
@@ -802,6 +922,10 @@
   async function fetchInitial() {
     const res = await fetch('/api/nodes');
     const json = await res.json();
+    stopPlayback({ restore: false });
+    state.allNodes.clear();
+    state.nodes.clear();
+    state.selectedId = null;
     if (json.run) {
       state.currentRun = json.run;
       renderRunSelect();
@@ -819,6 +943,8 @@
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'init') {
+        stopPlayback({ restore: false });
+        state.allNodes.clear();
         state.nodes.clear();
         state.selectedId = null;
         if (msg.run) {
@@ -830,7 +956,9 @@
       } else if (msg.type === 'upsert') {
         updateNodes([msg.node]);
       } else if (msg.type === 'remove') {
+        state.allNodes.delete(msg.id);
         state.nodes.delete(msg.id);
+        if (state.selectedId === msg.id) state.selectedId = null;
         renderGraph();
       }
     };

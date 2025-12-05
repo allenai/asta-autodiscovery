@@ -532,6 +532,11 @@
 
   function shouldDimNode(node) {
     const threshold = Number(state.beliefThreshold) || 0;
+    const direct = Number(node?.belief_change);
+
+    // When user sets a positive threshold, nodes without a meaningful belief_change (null/0) are dimmed
+    if (threshold > 0 && (!Number.isFinite(direct) || direct === 0)) return true;
+
     if (threshold <= 0) return false;
     const bc = beliefChangeMagnitude(node);
     if (!Number.isFinite(bc)) return false;

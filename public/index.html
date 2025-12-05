@@ -246,6 +246,17 @@
       box-shadow: 0 10px 25px var(--asta-teal-30);
     }
     button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px var(--asta-teal-40); }
+    select {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 15px var(--asta-dark-teal-20);
+    }
+    select:disabled { cursor: not-allowed; color: var(--muted); }
     #status { font-size: 12px; color: var(--muted); }
     #betaCanvas { width: 100%; height: 200px; max-height: 200px; display: block; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); }
     .empty { color: var(--muted); font-style: italic; }
@@ -256,6 +267,7 @@
     <h1>Exploration Tree <span class="pill">Live</span></h1>
       <div class="row" style="gap:6px;">
         <span id="status">Connecting…</span>
+        <select id="runSelect" aria-label="Select run"></select>
         <button id="themeToggle">Theme</button>
         <button id="resetView">Reset View</button>
       </div>
@@ -318,6 +330,7 @@
   const statusEl = document.getElementById('status');
   const resetBtn = document.getElementById('resetView');
   const themeBtn = document.getElementById('themeToggle');
+  const runSelect = document.getElementById('runSelect');
   const betaCanvas = document.getElementById('betaCanvas');
   let betaChart;
   let currentTransform = d3.zoomIdentity;
@@ -326,6 +339,8 @@
     nodes: new Map(),
     selectedId: null,
     layout: [],
+    runs: [],
+    currentRun: '',
   };
 
   function resize() {
@@ -362,10 +377,71 @@
 
   applyTheme(theme);
   themeBtn.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
+  runSelect?.addEventListener('change', (e) => switchRun(e.target.value));
 
   function setStatus(text, ok = true) {
     statusEl.textContent = text;
     statusEl.style.color = ok ? 'var(--muted)' : 'var(--danger)';
+  }
+
+  function renderRunSelect() {
+    if (!runSelect) return;
+    runSelect.innerHTML = '';
+    if (!state.runs.length) {
+      const opt = document.createElement('option');
+      opt.textContent = 'No runs found';
+      opt.value = '';
+      runSelect.appendChild(opt);
+      runSelect.disabled = true;
+      return;
+    }
+
+    runSelect.disabled = false;
+    state.runs.forEach((run) => {
+      const opt = document.createElement('option');
+      opt.value = run;
+      opt.textContent = run;
+      if (run === state.currentRun) opt.selected = true;
+      runSelect.appendChild(opt);
+    });
+  }
+
+  async function loadRuns() {
+    try {
+      const res = await fetch('/api/runs');
+      const data = await res.json();
+      state.runs = data.runs || [];
+      state.currentRun = data.current || state.currentRun || state.runs[0] || '';
+      renderRunSelect();
+    } catch (err) {
+      console.error('Failed to load runs', err);
+      setStatus('Failed to load runs', false);
+    }
+  }
+
+  async function switchRun(nextRun) {
+    if (!nextRun || nextRun === state.currentRun) return;
+    setStatus(`Switching to ${nextRun}…`);
+    try {
+      const res = await fetch('/api/watch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run: nextRun }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to switch run');
+
+      state.nodes.clear();
+      state.selectedId = null;
+      updateNodes(data.nodes || []);
+      state.currentRun = data.current || nextRun;
+      renderRunSelect();
+      setStatus(`Watching ${state.currentRun}`);
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || 'Switch failed', false);
+      renderRunSelect();
+    }
   }
 
 
@@ -726,20 +802,31 @@
   async function fetchInitial() {
     const res = await fetch('/api/nodes');
     const json = await res.json();
+    if (json.run) {
+      state.currentRun = json.run;
+      renderRunSelect();
+    }
     updateNodes(json.nodes || []);
-    setStatus('Live (HTTP)');
+    setStatus(state.currentRun ? `Watching ${state.currentRun}` : 'Live (HTTP)');
   }
 
   function connectWS() {
     const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${wsProtocol}://${location.host}`);
-    ws.onopen = () => setStatus('Live (WS)');
+    ws.onopen = () => setStatus(state.currentRun ? `Live (WS) · ${state.currentRun}` : 'Live (WS)');
     ws.onerror = () => setStatus('WebSocket error', false);
     ws.onclose = () => { setStatus('Disconnected · retrying', false); setTimeout(connectWS, 1500); };
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'init') {
+        state.nodes.clear();
+        state.selectedId = null;
+        if (msg.run) {
+          state.currentRun = msg.run;
+          renderRunSelect();
+        }
         updateNodes(msg.nodes || []);
+        setStatus(state.currentRun ? `Live (WS) · ${state.currentRun}` : 'Live (WS)');
       } else if (msg.type === 'upsert') {
         updateNodes([msg.node]);
       } else if (msg.type === 'remove') {
@@ -749,7 +836,11 @@
     };
   }
 
-  fetchInitial().then(connectWS);
+  (async () => {
+    await loadRuns();
+    await fetchInitial();
+    connectWS();
+  })();
   resize();
 })();
 </script>

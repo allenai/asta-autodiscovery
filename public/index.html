@@ -289,6 +289,11 @@
           <input type="number" id="delayInput" min="0" step="0.1" value="2" aria-label="Delay between node reveals in seconds" />
         </label>
       </div>
+      <div class="row" id="beliefControls" style="gap:8px; justify-content:flex-start; flex-wrap:wrap;">
+        <label class="inline-label" for="beliefThreshold">Highlight Δ ≥
+          <input type="number" id="beliefThreshold" min="0" step="0.05" value="0" aria-label="Only highlight nodes whose |belief_change| meets this threshold" />
+        </label>
+      </div>
   </header>
   <div id="graph-container">
     <svg id="treeSvg"></svg>
@@ -352,6 +357,7 @@
   const betaCanvas = document.getElementById('betaCanvas');
   const playBtn = document.getElementById('playbackToggle');
   const delayInput = document.getElementById('delayInput');
+  const beliefInput = document.getElementById('beliefThreshold');
   let betaChart;
   let currentTransform = d3.zoomIdentity;
 
@@ -362,6 +368,7 @@
     layout: [],
     runs: [],
     currentRun: '',
+    beliefThreshold: 0,
   };
 
   const playback = {
@@ -413,6 +420,16 @@
     const val = parseFloat(delayInput.value);
     playback.delayMs = Number.isFinite(val) && val >= 0 ? val * 1000 : 2000;
     delayInput.value = (playback.delayMs / 1000).toString();
+  });
+  const savedBeliefThreshold = Number.parseFloat(localStorage.getItem('beliefThreshold') ?? '0');
+  state.beliefThreshold = Number.isFinite(savedBeliefThreshold) && savedBeliefThreshold >= 0 ? savedBeliefThreshold : 0;
+  if (beliefInput) beliefInput.value = state.beliefThreshold.toString();
+  beliefInput?.addEventListener('change', () => {
+    const val = parseFloat(beliefInput.value);
+    state.beliefThreshold = Number.isFinite(val) && val >= 0 ? val : 0;
+    beliefInput.value = state.beliefThreshold.toString();
+    localStorage.setItem('beliefThreshold', state.beliefThreshold.toString());
+    renderGraph();
   });
   playBtn.addEventListener('click', () => {
     if (playback.playing) stopPlayback({ restore: true });
@@ -501,6 +518,25 @@
     const lightness = 80 - 45 * intensity; // darker with stronger belief_change
 
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  }
+
+  function beliefChangeMagnitude(node) {
+    if (!node) return null;
+    const direct = Number(node.belief_change);
+    if (Number.isFinite(direct)) return direct;
+    const priorMean = node?.prior?.mean;
+    const postMean = node?.posterior?.mean;
+    if (typeof priorMean === 'number' && typeof postMean === 'number') return postMean - priorMean;
+    return null;
+  }
+
+  function shouldDimNode(node) {
+    const threshold = Number(state.beliefThreshold) || 0;
+    if (threshold <= 0) return false;
+    const bc = beliefChangeMagnitude(node);
+    if (!Number.isFinite(bc)) return false;
+    if (bc === 0) return false; // explicit: delta 0 → no highlight/dim
+    return Math.abs(bc) < threshold;
   }
 
   function renderGraph() {
@@ -608,8 +644,20 @@
 
   function highlightSelection() {
     nodeG.selectAll('circle')
-      .attr('stroke-width', (d) => d.id === state.selectedId ? 3 : 1.5)
-      .attr('stroke', (d) => d.id === state.selectedId ? '#fbbf24' : '#0f172a');
+      .attr('stroke-width', (d) => {
+        const selected = d.id === state.selectedId;
+        if (selected) return 3;
+        return 1.5;
+      })
+      .attr('stroke', (d) => {
+        const selected = d.id === state.selectedId;
+        if (selected) return '#fbbf24';
+        return '#0f172a';
+      })
+      .attr('opacity', (d) => {
+        const selected = d.id === state.selectedId;
+        return selected || !shouldDimNode(d.data.data) ? 1 : 0.25;
+      });
   }
 
   function stopPlayback({ restore = true } = {}) {

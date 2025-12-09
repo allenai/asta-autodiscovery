@@ -593,21 +593,28 @@
     });
     depthBuckets.forEach((arr) => {
       if (arr.length < 2) return;
-      // sort by angle
-      arr.sort((a, b) => a.angle - b.angle);
-      for (let iter = 0; iter < 5; iter++) {
-        for (let i = 0; i < arr.length - 1; i++) {
-          const a = arr[i], b = arr[i + 1];
-          const r = (a.y + b.y) / 2 || radius;
-          const angGap = b.angle - a.angle;
-          const arc = r * angGap;
-          if (arc < minDist) {
-            const needed = (minDist - arc) / 2;
-            const angAdjust = needed / r;
-            a.angle -= angAdjust;
-            b.angle += angAdjust;
+      const r = Math.max(arr[0]?.y || radius, 1);
+      const maxIter = 12;
+      for (let iter = 0; iter < maxIter; iter++) {
+        let moved = false;
+        for (let i = 0; i < arr.length; i++) {
+          for (let j = i + 1; j < arr.length; j++) {
+            const a = arr[i];
+            const b = arr[j];
+            // shortest signed angular difference (wrap-aware)
+            let diff = b.angle - a.angle;
+            diff = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+            const gapArc = Math.abs(diff) * r; // current arc length between nodes
+            if (gapArc < minDist) {
+              const delta = ((minDist / r) - Math.abs(diff)) / 2;
+              const sign = diff >= 0 ? 1 : -1;
+              a.angle -= delta * sign;
+              b.angle += delta * sign;
+              moved = true;
+            }
           }
         }
+        if (!moved) break; // early exit once spacing is satisfied
       }
       // recompute positions after adjustments
       arr.forEach((d) => {

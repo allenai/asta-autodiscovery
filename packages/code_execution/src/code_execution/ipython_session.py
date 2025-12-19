@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from multiprocessing import get_context
 from typing import Any, cast
 
-from IPython.core.interactiveshell import InteractiveShell
 from IPython.core.formatters import DisplayFormatter
+from IPython.core.interactiveshell import InteractiveShell
 from IPython.utils.capture import capture_output
 
 

@@ -3,7 +3,6 @@
 from typing import Any
 
 import modal
-
 from code_execution.ipython_session import ExecutionConfig, IPythonSession
 
 APP_NAME = "autodiscovery"

@@ -22,5 +22,5 @@ uv run modal run -m autodiscovery_modal.ipython_session::app.run_ipython_cell --
 
 To deploy, run the following from the root project:
 ```sh
-uv run deploy-modal
+just modal-deploy
 ```

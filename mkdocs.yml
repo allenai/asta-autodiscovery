@@ -33,6 +33,8 @@ nav:
   - Home: index.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md
+  - Modal:
+      - IPython Session: autodiscovery_modal/ipython_session.md
 
 markdown_extensions:
   - pymdownx.highlight:

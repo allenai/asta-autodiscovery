@@ -1,0 +1,33 @@
+[project]
+name = "asta-autodiscovery"
+version = "0.0.1"
+description = "Asta AutoDiscovery"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pyright",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.optional-dependencies]
+docs = [
+  "mkdocs",
+  "mkdocs-autorefs",
+  "mkdocs-material",
+  "mkdocstrings[python]",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["packages"]
+
+[tool.uv.workspace]
+members = [
+    "packages/code_execution",
+    "packages/agents",
+    "packages/modal"
+]

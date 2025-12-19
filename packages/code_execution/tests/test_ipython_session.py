@@ -44,6 +44,30 @@ plt.show()
     )
 
 
+def test_matplotlib_formats_respect_allow_mime() -> None:
+    default_session = IPythonSession()
+    code = """
+import matplotlib.pyplot as plt
+
+plt.plot([0, 1], [0, 1])
+plt.show()
+"""
+    default_outputs = default_session.run_cell(code)
+
+    assert default_outputs["success"] is True
+    assert any(
+        {"image/png", "image/svg+xml", "image/jpeg"}.issubset(bundle.keys())
+        for bundle in default_outputs["rich_outputs"]
+    )
+
+    png_only_session = IPythonSession(allow_mime=["image/png"])
+    png_only_outputs = png_only_session.run_cell(code)
+
+    assert png_only_outputs["success"] is True
+    assert png_only_outputs["rich_outputs"]
+    assert all(bundle.keys() == {"image/png"} for bundle in png_only_outputs["rich_outputs"])
+
+
 def test_run_cell_subprocess_success() -> None:
     session = IPythonSession(use_subprocess=True, timeout_s=2.0)
     outputs = session.run_cell("x = 3; print(x)")

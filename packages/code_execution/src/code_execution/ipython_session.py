@@ -17,7 +17,20 @@ class ExecutionConfig:
 
     use_subprocess: bool = False
     timeout_s: float | None = None
-    allow_mime: frozenset[str] = frozenset({"text/plain", "text/html", "image/png"})
+    allow_mime: frozenset[str] = frozenset(
+        {
+            "text/plain",
+            "text/html",
+            "text/markdown",
+            "text/latex",
+            "image/png",
+            "image/svg+xml",
+            "image/jpeg",
+            "application/json",
+            "application/javascript",
+            "application/pdf",
+        }
+    )
     matplotlib_backend: str | None = "module://matplotlib_inline.backend_inline"
 
 
@@ -79,13 +92,75 @@ def _run_cell_with_shell(
     return outputs
 
 
+def _configure_display_formatters(
+    shell: InteractiveShell,
+    allow_mime: frozenset[str],
+) -> None:
+    formatter = shell.display_formatter
+    available = [mime for mime in allow_mime if mime in formatter.formatters]
+    if not available:
+        return
+    for mime in available:
+        formatter.formatters[mime].enabled = True
+    formatter.active_types = available
+
+
+def _configure_matplotlib_backend(
+    backend: str | None,
+    allow_mime: frozenset[str],
+) -> None:
+    if not backend:
+        return
+    try:
+        import matplotlib
+        import matplotlib_inline.backend_inline as backend_inline
+    except Exception:
+        return
+
+    try:
+        current = matplotlib.get_backend()
+    except Exception:
+        current = None
+
+    if current == backend:
+        return
+
+    try:
+        # Ensure rich display payloads are emitted in non-interactive contexts.
+        matplotlib.use(backend, force=True)
+        if "matplotlib_inline.backend_inline" in backend:
+            formats: list[str] = []
+            if "image/png" in allow_mime:
+                formats.append("png")
+            if "image/svg+xml" in allow_mime:
+                formats.append("svg")
+            if "image/jpeg" in allow_mime:
+                formats.append("jpeg")
+            if formats:
+                backend_inline.set_matplotlib_formats(*formats)
+    except Exception:
+        # If pyplot or another backend is already loaded, keep running.
+        return
+
+
+def _configure_shell(
+    shell: InteractiveShell,
+    allow_mime: frozenset[str],
+    matplotlib_backend: str | None,
+) -> None:
+    _configure_display_formatters(shell, allow_mime)
+    _configure_matplotlib_backend(matplotlib_backend, allow_mime)
+
+
 def _run_cell_in_subprocess(
     code_str: str,
     allow_mime: frozenset[str],
+    matplotlib_backend: str | None,
     connection,
 ) -> None:
     # Run in a child process so a hard timeout can be enforced without blocking.
     shell = InteractiveShell.instance()
+    _configure_shell(shell, allow_mime, matplotlib_backend)
     outputs = _run_cell_with_shell(shell, code_str, allow_mime)
     connection.send(outputs)
     connection.close()
@@ -111,34 +186,7 @@ class IPythonSession:
         )
         # Create a shell instance that persists variables between calls.
         self.shell = InteractiveShell.instance()
-        self._configure_matplotlib_backend()
-
-    def _configure_matplotlib_backend(self) -> None:
-        backend = self._config.matplotlib_backend
-        if not backend:
-            return
-        try:
-            import matplotlib
-            import matplotlib_inline.backend_inline as backend_inline
-        except Exception:
-            return
-
-        try:
-            current = matplotlib.get_backend()
-        except Exception:
-            current = None
-
-        if current == backend:
-            return
-
-        try:
-            # Ensure rich display payloads are emitted in non-interactive contexts.
-            matplotlib.use(backend, force=True)
-            if "matplotlib_inline.backend_inline" in backend:
-                backend_inline.set_matplotlib_formats("png")
-        except Exception:
-            # If pyplot or another backend is already loaded, keep running.
-            return
+        _configure_shell(self.shell, self._config.allow_mime, self._config.matplotlib_backend)
 
     def run_cell(self, code_str: str) -> dict[str, Any]:
         """Run a code cell and return captured outputs, errors, and success state."""
@@ -151,7 +199,7 @@ class IPythonSession:
         parent_conn, child_conn = ctx.Pipe(duplex=False)
         process = ctx.Process(
             target=_run_cell_in_subprocess,
-            args=(code_str, self._config.allow_mime, child_conn),
+            args=(code_str, self._config.allow_mime, self._config.matplotlib_backend, child_conn),
         )
         process.start()
         child_conn.close()

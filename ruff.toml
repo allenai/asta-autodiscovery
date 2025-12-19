@@ -8,4 +8,4 @@ select = ["D", "E", "F", "UP", "B", "SIM", "I", "W", "Q", "ASYNC", "T20"]
 convention = "google"
 
 [lint.per-file-ignores]
-"tests/*.py" = ["D"]
+"**/tests/*.py" = ["D"]

@@ -1,8 +1,6 @@
 # General Guidance
 
 - Assume backwards compatibility is not required unless explicitly stated.
-- Always use the `adk-docs` MCP server to verify the correct syntax for Google ADK agents and tools.
-- Documentation for packages provided by this project is in `docs/`
 
 # Repository Actions
 

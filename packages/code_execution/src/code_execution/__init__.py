@@ -1,2 +1,7 @@
-def hello() -> str:
-    return "Hello from code-execution!"
+"""Code Execution."""
+
+from .ipython_session import IPythonSession
+
+__all__ = [
+    "IPythonSession",
+]

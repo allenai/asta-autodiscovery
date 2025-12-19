@@ -11,6 +11,7 @@ dev = [
     "pyright",
     "pytest",
     "pytest-cov",
+    "matplotlib",
     "ruff",
 ]
 
@@ -24,10 +25,20 @@ docs = [
 
 [tool.pytest.ini_options]
 testpaths = ["packages"]
+pythonpath = [
+    "packages/code_execution/src",
+    "packages/agents/src",
+    "packages/modal/src",
+]
 
 [tool.uv.workspace]
 members = [
     "packages/code_execution",
     "packages/agents",
     "packages/modal"
+]
+
+[tool.coverage.run]
+omit = [
+    "packages/**/tests/**",
 ]

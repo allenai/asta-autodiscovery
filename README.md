@@ -7,23 +7,19 @@
 Install all required packages (including those for testing and documentation) using:
 
 ```sh
-uv sync --all-packages --all-extras
+just sync
 ```
 
 ## Running Tests
 
-Execute the test suite with:
+Execute the test suites with:
 
 ```sh
-uv run pytest
-```
+just test           # Run main test suite. Excludes Modal Tests
+just test-modal     # Run Modal tests only
+just test-all       # Run all tests
 
-## Code Coverage
-
-Measure code coverage with:
-
-```sh
-uv run pytest --cov
+just test -- --cov  # Run main tests and report coverage
 ```
 
 ## Linting and Formatting
@@ -31,19 +27,19 @@ uv run pytest --cov
 Run Ruff via uv to check code style and lint errors:
 
 ```sh
-uv run ruff check
+just lint
 ```
 
 To apply Ruff's formatter, use:
 
 ```sh
-uv run ruff format
+just format
 ```
 
 ## Typing
 
-Run the static type checker with 
+Run the static type checker with
 
 ```sh
-uv run pyright
+just type-check
 ```

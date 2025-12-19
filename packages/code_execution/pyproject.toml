@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Reece", email = "41651655+radamson@users.noreply.github.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "ipython>=9.8.0",
 ]

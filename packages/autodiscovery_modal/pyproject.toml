@@ -1,13 +1,16 @@
 [project]
-name = "modal"
+name = "autodiscovery-modal"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
     { name = "Reece", email = "41651655+radamson@users.noreply.github.com" }
 ]
-requires-python = ">=3.14"
-dependencies = []
+requires-python = ">=3.13"
+dependencies = [
+    "code-execution",
+    "modal>=1.2.6",
+]
 
 [build-system]
 requires = ["uv_build>=0.8.16,<0.9.0"]

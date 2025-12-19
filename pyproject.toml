@@ -28,20 +28,20 @@ testpaths = ["packages"]
 pythonpath = [
     "packages/code_execution/src",
     "packages/agents/src",
-    "packages/modal/src",
+    "packages/autodiscovery_modal/src",
 ]
 
 [tool.uv.workspace]
 members = [
     "packages/code_execution",
     "packages/agents",
-    "packages/modal",
+    "packages/autodiscovery_modal",
     "packages/devtools"
 ]
 
 [tool.uv.sources]
 agents = { workspace = true }
-modal = { workspace = true }
+autodiscovery_modal = { workspace = true }
 code-execution = { workspace = true }
 
 [tool.coverage.run]

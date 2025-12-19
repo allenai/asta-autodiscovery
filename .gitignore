@@ -11,3 +11,6 @@ wheels/
 
 # Unit test / coverage reports
 .coverage
+
+# Environment variables
+.envrc

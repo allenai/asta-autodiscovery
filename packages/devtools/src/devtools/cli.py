@@ -98,10 +98,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     results = session.run_cell(code_str)
 
-    json_kwargs = {"ensure_ascii": True}
-    if args.pretty:
-        json_kwargs.update({"indent": 2, "sort_keys": True})
-    json.dump(results, sys.stdout, **json_kwargs)
+    json.dump(
+        results,
+        sys.stdout,
+        ensure_ascii=True,
+        indent=2 if args.pretty else None,
+        sort_keys=args.pretty,
+    )
     sys.stdout.write("\n")
     return 0 if results.get("success") else 1
 

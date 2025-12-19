@@ -2,6 +2,14 @@
 
 > AutoDiscovery for Asta
 
+## Setting Up
+
+Install all required packages (including those for testing and documentation) using:
+
+```sh
+uv sync --all-packages --all-extras
+```
+
 ## Running Tests
 
 Execute the test suite with:

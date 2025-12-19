@@ -39,9 +39,7 @@ plt.show()
     outputs = session.run_cell(code)
 
     assert outputs["success"] is True
-    assert any(
-        "image/png" in bundle and bundle["image/png"] for bundle in outputs["rich_outputs"]
-    )
+    assert any("image/png" in bundle and bundle["image/png"] for bundle in outputs["rich_outputs"])
 
 
 def test_matplotlib_formats_respect_allow_mime() -> None:
@@ -123,9 +121,7 @@ display(HTML("<b>hi</b>"))
 
 def test_normalize_helpers() -> None:
     assert _normalize_value(b"hi") == base64.b64encode(b"hi").decode("ascii")
-    assert _normalize_value({1: b"hi"}) == {
-        "1": base64.b64encode(b"hi").decode("ascii")
-    }
+    assert _normalize_value({1: b"hi"}) == {"1": base64.b64encode(b"hi").decode("ascii")}
 
     bundle = _normalize_mime_bundle(
         {"text/plain": "ok", "text/html": "<b>no</b>"},

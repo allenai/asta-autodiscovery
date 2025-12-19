@@ -5,9 +5,10 @@ import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass
 from multiprocessing import get_context
-from typing import Any
+from typing import Any, cast
 
 from IPython.core.interactiveshell import InteractiveShell
+from IPython.core.formatters import DisplayFormatter
 from IPython.utils.capture import capture_output
 
 
@@ -97,12 +98,15 @@ def _configure_display_formatters(
     allow_mime: frozenset[str],
 ) -> None:
     formatter = shell.display_formatter
-    available = [mime for mime in allow_mime if mime in formatter.formatters]
+    if formatter is None:
+        return
+    display_formatter = cast(DisplayFormatter, formatter)
+    available = [mime for mime in allow_mime if mime in display_formatter.formatters]
     if not available:
         return
     for mime in available:
-        formatter.formatters[mime].enabled = True
-    formatter.active_types = available
+        display_formatter.formatters[mime].enabled = True
+    display_formatter.active_types = available
 
 
 def _configure_matplotlib_backend(

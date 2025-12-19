@@ -35,6 +35,9 @@ nav:
       - IPython Session: code_execution/ipython_session.md
   - Modal:
       - IPython Session: autodiscovery_modal/ipython_session.md
+  - API Reference:
+      - AutoDiscovery Modal: api/autodiscovery_modal.md
+      - Code Execution: api/code_execution.md
 
 markdown_extensions:
   - pymdownx.highlight:

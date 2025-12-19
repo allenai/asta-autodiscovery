@@ -72,7 +72,3 @@ success, error details).
 `lookup_run_ipython_cell` returns a `modal.Function` handle for a deployed app
 so you can invoke the function without importing the module into the caller
 runtime.
-
-## API Reference
-
-::: autodiscovery_modal.ipython_session

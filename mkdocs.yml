@@ -21,9 +21,18 @@ theme:
     text: Manrope
     code: JetBrains Mono
   logo: assets/images/asta-logo.svg
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
 
 nav:
   - Home: index.md
+  - Code Execution:
+      - IPython Session: code_execution/ipython_session.md
 
 markdown_extensions:
   - pymdownx.highlight:

@@ -44,6 +44,9 @@ agents = { workspace = true }
 autodiscovery_modal = { workspace = true }
 code-execution = { workspace = true }
 
+[tool.uv.scripts]
+deploy-modal = "modal deploy -m autodiscovery_modal.ipython_session"
+
 [tool.coverage.run]
 omit = [
     "packages/**/tests/**",

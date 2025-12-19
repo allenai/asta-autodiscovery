@@ -20,7 +20,7 @@ To test remotely (ephemeral run):
 uv run modal run -m autodiscovery_modal.ipython_session::app.run_ipython_cell --code-str "print('hi')"
 ```
 
-To deploy:
+To deploy, run the following from the root project:
 ```sh
-uv run modal deploy -m autodiscovery_modal.ipython_session
+uv run deploy-modal
 ```

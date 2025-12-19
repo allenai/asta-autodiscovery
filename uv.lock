@@ -7,6 +7,7 @@ members = [
     "agents",
     "asta-autodiscovery",
     "code-execution",
+    "devtools",
     "modal",
 ]
 
@@ -425,6 +426,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/43/fa/6d96a0978d19e17b6
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl", hash = "sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a", size = 9190, upload-time = "2025-02-24T04:41:32.565Z" },
 ]
+
+[[package]]
+name = "devtools"
+version = "0.1.0"
+source = { editable = "packages/devtools" }
+dependencies = [
+    { name = "code-execution" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "code-execution", editable = "packages/code_execution" }]
 
 [[package]]
 name = "distro"

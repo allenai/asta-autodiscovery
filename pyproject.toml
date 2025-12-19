@@ -35,8 +35,14 @@ pythonpath = [
 members = [
     "packages/code_execution",
     "packages/agents",
-    "packages/modal"
+    "packages/modal",
+    "packages/devtools"
 ]
+
+[tool.uv.sources]
+code-execution = { workspace = true }
+agents = { workspace = true }
+modal = { workspace = true }
 
 [tool.coverage.run]
 omit = [

@@ -78,6 +78,48 @@ def test_lookup_run_ipython_cell_accepts_custom_app_name(monkeypatch) -> None:
     )
 
 
+def test_main_entrypoint_invokes_remote(monkeypatch) -> None:
+    called_with: dict[str, object] = {}
+
+    def _remote(
+        code_str: str,
+        *,
+        use_subprocess: bool,
+        timeout_s: float | None,
+        allow_mime: str | None,
+        matplotlib_backend: str | None,
+    ) -> dict[str, Any]:
+        called_with.update(
+            {
+                "code_str": code_str,
+                "use_subprocess": use_subprocess,
+                "timeout_s": timeout_s,
+                "allow_mime": allow_mime,
+                "matplotlib_backend": matplotlib_backend,
+            }
+        )
+        return {"ok": True}
+
+    monkeypatch.setattr(ipython_session.run_ipython_cell, "remote", _remote)
+
+    result = ipython_session.main(
+        "print('hello')",
+        use_subprocess=True,
+        timeout_s=1.5,
+        allow_mime="text/plain",
+        matplotlib_backend="inline",
+    )
+
+    assert result == {"ok": True}
+    assert called_with == {
+        "code_str": "print('hello')",
+        "use_subprocess": True,
+        "timeout_s": 1.5,
+        "allow_mime": "text/plain",
+        "matplotlib_backend": "inline",
+    }
+
+
 @pytest.mark.modal
 def test_run_ipython_cell_remote_deployed_executes() -> None:
     function = ipython_session.lookup_run_ipython_cell()

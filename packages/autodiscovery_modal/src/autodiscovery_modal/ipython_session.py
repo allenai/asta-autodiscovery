@@ -10,7 +10,7 @@ RUN_IPYTHON_CELL_FUNCTION_NAME = "run_ipython_cell"
 
 app = modal.App(APP_NAME)
 image = (
-    modal.Image.debian_slim()
+    modal.Image.debian_slim(python_version="3.13")
     .uv_pip_install("ipython>=9.8.0")
     .add_local_python_source("code_execution")
 )
@@ -45,7 +45,6 @@ def _run_ipython_cell_impl(
 @app.function(
     image=image,
     restrict_modal_access=True,
-    max_inputs=1,
     timeout=600,
     block_network=False,
 )
@@ -91,3 +90,33 @@ def lookup_run_ipython_cell(app_name: str = APP_NAME) -> modal.Function:
         A Modal Function handle for invoking run_ipython_cell remotely.
     """
     return modal.Function.from_name(app_name, RUN_IPYTHON_CELL_FUNCTION_NAME)
+
+
+@app.local_entrypoint()
+def main(
+    code_str: str,
+    *,
+    use_subprocess: bool = False,
+    timeout_s: float | None = None,
+    allow_mime: str | None = None,
+    matplotlib_backend: str | None = ExecutionConfig.matplotlib_backend,
+) -> dict[str, Any]:
+    """Run a single IPython cell via Modal and return its outputs.
+
+    Args:
+        code_str: The code cell to execute.
+        use_subprocess: Whether to run the cell in a subprocess.
+        timeout_s: Hard timeout in seconds; requires subprocess execution.
+        allow_mime: Comma-separated MIME types to retain, e.g. "text/plain,image/png".
+        matplotlib_backend: Matplotlib backend string for inline rendering.
+
+    Returns:
+        A dictionary with stdout, stderr, rich outputs, success, and error details.
+    """
+    return run_ipython_cell.remote(
+        code_str,
+        use_subprocess=use_subprocess,
+        timeout_s=timeout_s,
+        allow_mime=allow_mime,
+        matplotlib_backend=matplotlib_backend,
+    )

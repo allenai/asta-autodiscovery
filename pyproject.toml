@@ -44,7 +44,7 @@ members = [
 
 [tool.uv.sources]
 agents = { workspace = true }
-autodiscovery_modal = { workspace = true }
+autodiscovery-modal = { workspace = true }
 code-execution = { workspace = true }
 
 [tool.coverage.run]

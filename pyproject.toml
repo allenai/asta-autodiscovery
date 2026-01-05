@@ -11,6 +11,7 @@ dev = [
     "pyright",
     "pytest",
     "pytest-cov",
+    "pytest-asyncio",
     "matplotlib",
     "ruff",
 ]

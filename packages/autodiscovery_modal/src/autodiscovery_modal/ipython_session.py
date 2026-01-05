@@ -1,5 +1,6 @@
 """Stateless IPython execution helpers for use in Modal functions."""
 
+from collections.abc import Iterable
 from typing import Any
 
 import modal
@@ -21,6 +22,34 @@ def _parse_allow_mime(allow_mime: str | None) -> list[str] | None:
     if not allow_mime:
         return None
     return [item.strip() for item in allow_mime.split(",") if item.strip()]
+
+
+class ModalIPythonBackend:
+    """Backend that executes IPython cells via a Modal function handle."""
+
+    def __init__(self, *, app_name: str = APP_NAME) -> None:
+        """Initialize the backend with the Modal app name."""
+        self._app_name = app_name
+        self._modal_function = lookup_run_ipython_cell(app_name)
+
+    def run_cell(
+        self,
+        code_str: str,
+        *,
+        use_subprocess: bool = False,
+        timeout_s: float | None = None,
+        allow_mime: Iterable[str] | None = None,
+        matplotlib_backend: str | None = ExecutionConfig.matplotlib_backend,
+    ) -> dict[str, Any]:
+        """Execute a code cell remotely using the Modal function."""
+        allow_mime_csv = ",".join(allow_mime) if allow_mime else None
+        return self._modal_function.remote(
+            code_str,
+            use_subprocess=use_subprocess,
+            timeout_s=timeout_s,
+            allow_mime=allow_mime_csv,
+            matplotlib_backend=matplotlib_backend,
+        )
 
 
 def _run_ipython_cell_impl(

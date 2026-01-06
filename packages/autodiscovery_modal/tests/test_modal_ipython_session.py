@@ -163,3 +163,20 @@ def test_run_ipython_cell_remote_can_install_requests_with_pip_magic() -> None:
     lines = [line.strip() for line in result["stdout"].splitlines() if line.strip()]
     assert lines[-2] == "requests"
     assert re.match(r"^\d+\.\d+\.\d+(?:\.\d+)?$", lines[-1])
+
+
+@pytest.mark.modal
+def test_run_ipython_cell_remote_can_install_requests_with_subprocess_pip() -> None:
+    function = ipython_session.lookup_run_ipython_cell()
+    code_str = (
+        "import subprocess\n"
+        "import sys\n"
+        'subprocess.run([sys.executable, "-m", "pip", "install", "requests"], check=True)\n'
+        'import requests\nprint("requests")\nprint(requests.__version__)'
+    )
+    result = function.remote(code_str)
+
+    assert result["success"] is True
+    lines = [line.strip() for line in result["stdout"].splitlines() if line.strip()]
+    assert lines[-2] == "requests"
+    assert re.match(r"^\d+\.\d+\.\d+(?:\.\d+)?$", lines[-1])

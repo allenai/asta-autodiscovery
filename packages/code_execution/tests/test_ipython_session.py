@@ -215,3 +215,24 @@ def test_ipython_session_can_install_local_wheel_with_pip_magic(tmp_path: Path) 
     lines = [line.strip() for line in outputs["stdout"].splitlines() if line.strip()]
     assert lines[-2] == package_name
     assert lines[-1] == "0.0.0"
+
+
+@pytest.mark.filterwarnings(r"ignore:.*forkpty\(\).*deadlocks.*:DeprecationWarning:pty")
+def test_ipython_session_can_install_local_wheel_with_subprocess_pip(tmp_path: Path) -> None:
+    session = IPythonSession()
+    package_name = f"subprocess_pip_demo_{uuid.uuid4().hex}"
+    wheel_path = _build_wheel(tmp_path, package_name)
+    code = (
+        "import subprocess\n"
+        "import sys\n"
+        f'subprocess.run([sys.executable, "-m", "pip", "install", "{wheel_path}"], check=True)\n'
+        f"import {package_name}\n"
+        f'print("{package_name}")\n'
+        f"print({package_name}.__version__)"
+    )
+    outputs = session.run_cell(code)
+
+    assert outputs["success"] is True
+    lines = [line.strip() for line in outputs["stdout"].splitlines() if line.strip()]
+    assert lines[-2] == package_name
+    assert lines[-1] == "0.0.0"

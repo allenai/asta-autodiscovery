@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import AsyncGenerator
+import textwrap
 from typing import Any, Literal, Protocol, cast, override
 
 from autodiscovery_modal import ModalIPythonBackend
@@ -29,13 +30,14 @@ MODEL_ENV_VAR = "ASTA_AGENTS_MODEL"
 DEFAULT_MODEL: LiteLlm = LiteLlm(model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini"))
 ExecutionBackend = Literal["local", "modal"]
 
-INSTALL_SNIPPET = (
-    "\nimport subprocess\n"
-    "import sys\n\n"
-    "def install(package):\n"
-    '    subprocess.check_call([sys.executable, "-m", "pip", '
-    '"install", "--quiet", package])\n\n\n'
-)
+INSTALL_SNIPPET = "%pip install package1 package2"
+
+ALTERNATIVE_INSTALL_SNIPPET = textwrap.dedent("""
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "package1", "package2"],
+        check=True,
+    )
+""").strip()
 
 
 def create_experiment_agents(*, model: LiteLlm | None = None) -> dict[str, LlmAgent]:
@@ -118,10 +120,11 @@ def create_experiment_agents(*, model: LiteLlm | None = None) -> dict[str, LlmAg
             "between code blocks, so do not assume any variables or imports from previous "
             "code blocks. Import any libraries you need to use. Always attempt to import a "
             "library before installing it (it may already be installed). If you need to "
-            "install a library, use the following code example:"
-            f"{INSTALL_SNIPPET}"
-            "When installing python packages, use the --quiet option to minimize unnecessary "
-            "output. Prefer using installed libraries over installing new libraries whenever "
+            "install a library, use the following code example at the start of your code:"
+            f"{INSTALL_SNIPPET}\n"
+            "or use this alternative approach if necessary:\n"
+            f"{ALTERNATIVE_INSTALL_SNIPPET}\n"
+            "Prefer using installed libraries over installing new libraries whenever "
             "possible. If possible, instead of downgrading library versions, try to adapt "
             "your code to work with a more updated version that is already installed. Never "
             "attempt to create a new environment. Always use the current environment. If the "

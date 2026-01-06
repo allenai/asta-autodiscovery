@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -138,3 +139,25 @@ def test_run_ipython_cell_remote_ephemeralexecutes() -> None:
     assert result["success"] is True
     assert result["stdout"].strip() == "hello\nOut[0]: 2"
     assert result["error"] is None
+
+
+@pytest.mark.modal
+def test_run_ipython_cell_remote_requests_not_installed_by_default() -> None:
+    function = ipython_session.lookup_run_ipython_cell()
+    result = function.remote("import requests\nprint(requests.__version__)")
+
+    assert result["success"] is False
+    assert result["error"] is not None
+    assert result["error"]["type"] == "ModuleNotFoundError"
+
+
+@pytest.mark.modal
+def test_run_ipython_cell_remote_can_install_requests_with_pip_magic() -> None:
+    function = ipython_session.lookup_run_ipython_cell()
+    code_str = "%pip install requests\nimport requests\nprint(\"requests\")\nprint(requests.__version__)"
+    result = function.remote(code_str)
+
+    assert result["success"] is True
+    lines = [line.strip() for line in result["stdout"].splitlines() if line.strip()]
+    assert lines[-2] == "requests"
+    assert re.match(r"^\d+\.\d+\.\d+(?:\.\d+)?$", lines[-1])

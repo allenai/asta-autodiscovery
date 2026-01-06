@@ -129,6 +129,7 @@ def test_run_ipython_cell_remote_deployed_executes() -> None:
     assert result["stdout"].strip() == "hello\nOut[0]: 2"
     assert result["error"] is None
 
+
 @pytest.mark.modal
 def test_run_ipython_cell_remote_ephemeralexecutes() -> None:
     with ipython_session.app.run():

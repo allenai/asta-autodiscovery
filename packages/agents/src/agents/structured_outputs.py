@@ -1,10 +1,17 @@
 """Structured outputs for experiment agents."""
 
-from pydantic import BaseModel, model_validator
-from typing_extensions import Self
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
-class Relationship(BaseModel):
+class StrictBaseModel(BaseModel):
+    """Base model enforcing strict schemas for LLM structured outputs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class Relationship(StrictBaseModel):
     """Represents a relationship between two variables in a hypothesis.
 
     Attributes:
@@ -18,7 +25,7 @@ class Relationship(BaseModel):
     relationship: str
 
 
-class HypothesisDimensions(BaseModel):
+class HypothesisDimensions(StrictBaseModel):
     """Structured representation of the key dimensions of a hypothesis.
 
     Attributes:
@@ -32,7 +39,7 @@ class HypothesisDimensions(BaseModel):
     relationships: list[Relationship]
 
 
-class Hypothesis(BaseModel):
+class Hypothesis(StrictBaseModel):
     """A falsifiable hypothesis supported by structured dimensions.
 
     Attributes:
@@ -44,7 +51,7 @@ class Hypothesis(BaseModel):
     dimensions: HypothesisDimensions
 
 
-class ExperimentPlan(BaseModel):
+class ExperimentPlan(StrictBaseModel):
     """Represents the experiment plan with a title, objective, steps, and deliverables.
 
     Attributes:
@@ -58,7 +65,7 @@ class ExperimentPlan(BaseModel):
     deliverables: str
 
 
-class Experiment(BaseModel):
+class Experiment(StrictBaseModel):
     """Represents an experiment with a hypothesis and plan.
 
     Attributes:
@@ -70,7 +77,7 @@ class Experiment(BaseModel):
     experiment_plan: ExperimentPlan
 
 
-class ExperimentHypothesis(BaseModel):
+class ExperimentHypothesis(StrictBaseModel):
     """Represents an experiment hypothesis and its plan.
 
     Attributes:
@@ -82,7 +89,7 @@ class ExperimentHypothesis(BaseModel):
     hypothesis: str
 
 
-class ExperimentList(BaseModel):
+class ExperimentList(StrictBaseModel):
     """A collection of experiments.
 
     Attributes:
@@ -92,7 +99,7 @@ class ExperimentList(BaseModel):
     experiments: list[Experiment]
 
 
-class ExperimentHypothesisList(BaseModel):
+class ExperimentHypothesisList(StrictBaseModel):
     """A collection of experiment hypotheses.
 
     Attributes:
@@ -102,7 +109,7 @@ class ExperimentHypothesisList(BaseModel):
     experiments: list[ExperimentHypothesis]
 
 
-class ExperimentCode(BaseModel):
+class ExperimentCode(StrictBaseModel):
     """Contains the code implementation for an experiment.
 
     Attributes:
@@ -112,7 +119,7 @@ class ExperimentCode(BaseModel):
     code: str
 
 
-class ProgramCritique(BaseModel):
+class ProgramCritique(StrictBaseModel):
     """Feedback on experiment code implementation.
 
     Attributes:
@@ -122,7 +129,7 @@ class ProgramCritique(BaseModel):
     fixes: list[str]
 
 
-class ExperimentAnalyst(BaseModel):
+class ExperimentAnalyst(StrictBaseModel):
     """Analysis of experiment results.
 
     Attributes:
@@ -141,7 +148,7 @@ class ExperimentAnalyst(BaseModel):
         return self
 
 
-class ExperimentReviewer(BaseModel):
+class ExperimentReviewer(StrictBaseModel):
     """Review of an experiment's execution and results.
 
     Attributes:
@@ -160,7 +167,7 @@ class ExperimentReviewer(BaseModel):
         return self
 
 
-class ImageAnalysis(BaseModel):
+class ImageAnalysis(StrictBaseModel):
     """Structured representation of plot axes and analysis information.
 
     Attributes:
@@ -186,7 +193,7 @@ class ImageAnalysis(BaseModel):
     annotations_and_legends: list[str]
 
 
-class ExecutionResult(BaseModel):
+class ExecutionResult(StrictBaseModel):
     """Execution output for code runs."""
 
     exit_code: int

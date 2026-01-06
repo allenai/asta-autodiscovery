@@ -21,3 +21,6 @@ modal-deploy:
 
 sync:
   uv sync --all-packages --all-extras
+
+adk-web:
+  adk web devtools --port 8000

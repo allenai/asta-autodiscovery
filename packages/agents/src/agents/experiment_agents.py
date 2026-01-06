@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import AsyncGenerator
-from typing import Any, Literal, override
+from typing import Any, Literal, Protocol, cast, override
 
 from autodiscovery_modal import ModalIPythonBackend
 from autodiscovery_modal.ipython_session import APP_NAME as MODAL_APP_NAME
@@ -234,12 +234,13 @@ class CodeExecutorAgent(BaseAgent):
             name: The agent name.
             code_executor: IPython execution helper for running code.
         """
-        super().__init__(
-            name=name,
-            description="Executes experiment code and stores summarized outputs.",
-            code_executor=code_executor,
-            sub_agents=[],
-        )
+        data: dict[str, Any] = {
+            "name": name,
+            "description": "Executes experiment code and stores summarized outputs.",
+            "code_executor": code_executor,
+            "sub_agents": [],
+        }
+        super().__init__(**data)
 
     @override
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event]:
@@ -350,20 +351,20 @@ class ExperimentWorkflowAgent(BaseAgent):
             code_executor: Runs experiment code and summarizes output.
             max_programmer_attempts: Maximum programmer retries after analysis failure.
         """
-        super().__init__(
-            name=name,
-            description=(
+        data: dict[str, Any] = {
+            "name": name,
+            "description": (
                 "Orchestrates programming, execution, analysis, review, revision, and"
                 " generation for experiments."
             ),
-            experiment_generator=experiment_generator,
-            experiment_programmer=experiment_programmer,
-            experiment_analyst=experiment_analyst,
-            experiment_reviewer=experiment_reviewer,
-            experiment_reviser=experiment_reviser,
-            code_executor=code_executor,
-            max_programmer_attempts=max_programmer_attempts,
-            sub_agents=[
+            "experiment_generator": experiment_generator,
+            "experiment_programmer": experiment_programmer,
+            "experiment_analyst": experiment_analyst,
+            "experiment_reviewer": experiment_reviewer,
+            "experiment_reviser": experiment_reviser,
+            "code_executor": code_executor,
+            "max_programmer_attempts": max_programmer_attempts,
+            "sub_agents": [
                 experiment_programmer,
                 code_executor,
                 experiment_analyst,
@@ -371,7 +372,8 @@ class ExperimentWorkflowAgent(BaseAgent):
                 experiment_reviser,
                 experiment_generator,
             ],
-        )
+        }
+        super().__init__(**data)
 
     @override
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event]:
@@ -423,18 +425,24 @@ class ExperimentWorkflowAgent(BaseAgent):
     def _parse_success(self, payload: object, schema: type[BaseModel]) -> bool:
         """Extract a success boolean from a structured payload."""
         # Interpret structured outputs stored in session state.
+        class _SupportsSuccess(Protocol):
+            success: bool
+
         if payload is None:
             return False
         if isinstance(payload, schema):
-            return bool(getattr(payload, "success", False))
+            return bool(cast(_SupportsSuccess, payload).success)
         if isinstance(payload, dict):
-            return bool(schema.model_validate(payload).success)
+            parsed = schema.model_validate(payload)
+            return bool(cast(_SupportsSuccess, parsed).success)
         if isinstance(payload, str):
             try:
-                return bool(schema.model_validate_json(payload).success)
+                parsed = schema.model_validate_json(payload)
+                return bool(cast(_SupportsSuccess, parsed).success)
             except ValueError:
                 try:
-                    return bool(schema.model_validate(json.loads(payload)).success)
+                    parsed = schema.model_validate(json.loads(payload))
+                    return bool(cast(_SupportsSuccess, parsed).success)
                 except (ValueError, json.JSONDecodeError, TypeError):
                     return False
         return False

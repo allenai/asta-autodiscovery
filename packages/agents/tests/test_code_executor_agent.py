@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from agents import experiment_agents
@@ -61,9 +61,9 @@ async def test_code_executor_agent_local(monkeypatch: pytest.MonkeyPatch) -> Non
     assert len(events) == 1
     event = events[0]
     assert captured["code"] == "print('hi')"
-    assert event.actions.state_delta is not None
-    assert event.actions.state_delta["execution_summary"].startswith("success: True")
-    assert event.actions.state_delta["execution_result_raw"]["stdout"] == "hello\n"
+    state_delta = cast(dict[str, Any], event.actions.state_delta)
+    assert state_delta["execution_summary"].startswith("success: True")
+    assert state_delta["execution_result_raw"]["stdout"] == "hello\n"
 
     await session_service.append_event(session=session, event=event)
     assert session.state["execution_summary"].startswith("success: True")
@@ -103,8 +103,7 @@ async def test_code_executor_agent_modal(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert len(events) == 1
     event = events[0]
-    assert event.actions.state_delta is not None
-    result = event.actions.state_delta["execution_result_raw"]
+    result = cast(dict[str, Any], event.actions.state_delta)["execution_result_raw"]
     assert result["success"] is True
     assert "modal" in result["stdout"]
 
@@ -132,7 +131,6 @@ async def test_code_executor_agent_modal_deployed() -> None:
 
     assert len(events) == 1
     event = events[0]
-    assert event.actions.state_delta is not None
-    result = event.actions.state_delta["execution_result_raw"]
+    result = cast(dict[str, Any], event.actions.state_delta)["execution_result_raw"]
     assert result["success"] is True
     assert "modal-deployed" in result["stdout"]

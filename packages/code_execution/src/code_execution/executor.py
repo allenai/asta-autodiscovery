@@ -21,6 +21,7 @@ class IPythonBackend(Protocol):
         matplotlib_backend: str | None = ExecutionConfig.matplotlib_backend,
     ) -> dict[str, Any]:
         """Execute a code cell and return normalized outputs."""
+        ...
 
 
 class LocalIPythonBackend:

@@ -59,6 +59,12 @@ result = remote.remote("print('hello from deployed Modal')")
 print(result["stdout"])
 ```
 
+## Modal Backend
+
+For a higher-level facade that matches the local executor API, see
+`docs/autodiscovery_modal/ipython_executor.md` for usage examples with
+`ModalIPythonBackend` and `IPythonExecutor`.
+
 ## Public API
 
 ### `run_ipython_cell`

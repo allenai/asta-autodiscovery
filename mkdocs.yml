@@ -33,8 +33,10 @@ nav:
   - Home: index.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md
+      - IPython Executor: code_execution/ipython_executor.md
   - Modal:
       - IPython Session: autodiscovery_modal/ipython_session.md
+      - IPython Executor: autodiscovery_modal/ipython_executor.md
   - API Reference:
       - AutoDiscovery Modal: api/autodiscovery_modal.md
       - Code Execution: api/code_execution.md

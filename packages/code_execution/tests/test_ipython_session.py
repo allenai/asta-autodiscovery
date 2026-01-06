@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import base64
+from pathlib import Path
+import uuid
+import zipfile
 
 import pytest
 from code_execution.ipython_session import (
@@ -128,3 +131,89 @@ def test_normalize_helpers() -> None:
         frozenset({"text/plain"}),
     )
     assert bundle == {"text/plain": "ok"}
+
+
+def _build_wheel(tmp_path: Path, package_name: str, version: str = "0.0.0") -> Path:
+    module_dir = tmp_path / package_name
+    module_dir.mkdir(parents=True)
+    (module_dir / "__init__.py").write_text(
+        "\n".join(
+            [
+                f'__version__ = "{version}"',
+                "VALUE = 42",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    dist_info = f"{package_name}-{version}.dist-info"
+    dist_dir = tmp_path / dist_info
+    dist_dir.mkdir(parents=True)
+    (dist_dir / "METADATA").write_text(
+        "\n".join(
+            [
+                "Metadata-Version: 2.1",
+                f"Name: {package_name}",
+                f"Version: {version}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (dist_dir / "WHEEL").write_text(
+        "\n".join(
+            [
+                "Wheel-Version: 1.0",
+                "Generator: ipython-session-tests",
+                "Root-Is-Purelib: true",
+                "Tag: py3-none-any",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    wheel_name = f"{package_name}-{version}-py3-none-any.whl"
+    wheel_path = tmp_path / wheel_name
+
+    record_rows: list[tuple[str, int]] = []
+    with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in module_dir.rglob("*"):
+            if file_path.is_file():
+                arcname = f"{package_name}/{file_path.name}"
+                zip_file.write(file_path, arcname)
+                record_rows.append((arcname, file_path.stat().st_size))
+        for file_path in dist_dir.rglob("*"):
+            if file_path.is_file():
+                arcname = f"{dist_info}/{file_path.name}"
+                zip_file.write(file_path, arcname)
+                record_rows.append((arcname, file_path.stat().st_size))
+
+        record_name = f"{dist_info}/RECORD"
+        record_lines = [f"{path},,{size}" for path, size in record_rows]
+        record_lines.append(f"{record_name},,")
+        zip_file.writestr(record_name, "\n".join(record_lines))
+
+    return wheel_path
+
+
+@pytest.mark.filterwarnings(
+    r"ignore:.*forkpty\(\).*deadlocks.*:DeprecationWarning:pty"
+)
+def test_ipython_session_can_install_local_wheel_with_pip_magic(tmp_path: Path) -> None:
+    session = IPythonSession()
+    package_name = f"pip_magic_demo_{uuid.uuid4().hex}"
+    wheel_path = _build_wheel(tmp_path, package_name)
+    code = (
+        f'%pip install "{wheel_path}"\n'
+        f"import {package_name}\n"
+        f'print("{package_name}")\n'
+        f"print({package_name}.__version__)"
+    )
+    outputs = session.run_cell(code)
+
+    assert outputs["success"] is True
+    lines = [line.strip() for line in outputs["stdout"].splitlines() if line.strip()]
+    assert lines[-2] == package_name
+    assert lines[-1] == "0.0.0"

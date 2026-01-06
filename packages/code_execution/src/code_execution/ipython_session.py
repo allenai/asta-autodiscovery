@@ -156,6 +156,25 @@ def _configure_shell(
     _configure_matplotlib_backend(matplotlib_backend, allow_mime)
 
 
+def _ensure_pip_available() -> None:
+    # Bootstrap pip so %pip magic can install packages on demand.
+    try:
+        import pip  # noqa: F401
+        return
+    except Exception:
+        pass
+
+    try:
+        import ensurepip
+    except Exception:
+        return
+
+    try:
+        ensurepip.bootstrap()
+    except Exception:
+        return
+
+
 def _run_cell_in_subprocess(
     code_str: str,
     allow_mime: frozenset[str],
@@ -182,6 +201,7 @@ class IPythonSession:
         matplotlib_backend: str | None = ExecutionConfig.matplotlib_backend,
     ) -> None:
         """Initialize an IPython execution session with optional isolation settings."""
+        _ensure_pip_available()
         self._config = ExecutionConfig(
             use_subprocess=use_subprocess,
             timeout_s=timeout_s,

@@ -1,6 +1,7 @@
 """Stateless IPython execution helpers for use in Modal functions."""
 
 from collections.abc import Iterable
+import sys
 from typing import Any
 
 import modal
@@ -69,6 +70,14 @@ def _run_ipython_cell_impl(
         matplotlib_backend=matplotlib_backend,
     )
     return session.run_cell(code_str)
+
+
+def _print_labeled_section(label: str, content: str, *, stream: Any = sys.stdout) -> None:
+    # Emit labeled CLI sections so stdout/stderr/rich/error are visually distinct.
+    header = f"[{label}]"
+    print(header, file=stream)
+    print(content, end="" if content.endswith("\n") else "\n", file=stream)
+    print(file=stream)
 
 
 @app.function(
@@ -149,3 +158,44 @@ def main(
         allow_mime=allow_mime,
         matplotlib_backend=matplotlib_backend,
     )
+
+
+@app.local_entrypoint()
+def main_print(
+    code_str: str,
+    *,
+    use_subprocess: bool = False,
+    timeout_s: float | None = None,
+    allow_mime: str | None = None,
+    matplotlib_backend: str | None = ExecutionConfig.matplotlib_backend,
+) -> dict[str, Any]:
+    """Run a single IPython cell via Modal and print outputs.
+
+    Args:
+        code_str: The code cell to execute.
+        use_subprocess: Whether to run the cell in a subprocess.
+        timeout_s: Hard timeout in seconds; requires subprocess execution.
+        allow_mime: Comma-separated MIME types to retain, e.g. "text/plain,image/png".
+        matplotlib_backend: Matplotlib backend string for inline rendering.
+
+    Returns:
+        A dictionary with stdout, stderr, rich outputs, success, and error details.
+    """
+    result = run_ipython_cell.remote(
+        code_str,
+        use_subprocess=use_subprocess,
+        timeout_s=timeout_s,
+        allow_mime=allow_mime,
+        matplotlib_backend=matplotlib_backend,
+    )
+    stdout = result.get("stdout", "")
+    stderr = result.get("stderr", "")
+    if stdout:
+        _print_labeled_section("STDOUT", stdout)
+    if stderr:
+        _print_labeled_section("STDERR", stderr, stream=sys.stderr)
+    if result.get("rich_outputs"):
+        _print_labeled_section("RICH OUTPUTS", str(result["rich_outputs"]))
+    if result.get("error"):
+        _print_labeled_section("ERROR", str(result["error"]), stream=sys.stderr)
+    return result

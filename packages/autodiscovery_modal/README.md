@@ -17,8 +17,15 @@ export MODAL_IMAGE_BUILDER_VERSION= # Only required for ephemeral runs or deploy
 To test remotely (ephemeral run):
 
 ```sh
+# Displaying Output
+uv run modal run -m autodiscovery_modal.ipython_session::main_print --code-str "print('hi')"
+
+# Without Displaying Output
 uv run modal run -m autodiscovery_modal.ipython_session --code-str "print('hi')"
 ```
+
+Note: `run_ipython_cell` returns a dictionary of outputs but does not print them.
+Use `main_print` to emit stdout/stderr and rich outputs in the CLI.
 
 To deploy, run the following from the root project:
 ```sh

@@ -1,7 +1,7 @@
 """Stateless IPython execution helpers for use in Modal functions."""
 
-from collections.abc import Iterable
 import sys
+from collections.abc import Iterable
 from typing import Any
 
 import modal

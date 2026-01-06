@@ -7,14 +7,14 @@ from typing import Any
 
 import pytest
 from agents import experiment_agents
-from agents.structured_outputs import ExperimentAnalyst, ExperimentCode, ExperimentReviewer
+from agents.structured_outputs import ExperimentAnalyst, ExperimentCode
 from google.adk.agents import LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.run_config import RunConfig
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.models.llm_response import LlmResponse
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
-from google.adk.models.llm_response import LlmResponse
 
 
 def _make_llm_response(payload: dict[str, Any]) -> LlmResponse:
@@ -124,13 +124,8 @@ def test_parse_success_handles_payload_types() -> None:
     assert workflow._parse_success(None, ExperimentAnalyst) is False
     assert workflow._parse_success(success_payload, ExperimentAnalyst) is True
     assert workflow._parse_success(failure_payload, ExperimentAnalyst) is False
-    assert (
-        workflow._parse_success(success_payload.model_dump(), ExperimentAnalyst) is True
-    )
-    assert (
-        workflow._parse_success(success_payload.model_dump_json(), ExperimentAnalyst)
-        is True
-    )
+    assert workflow._parse_success(success_payload.model_dump(), ExperimentAnalyst) is True
+    assert workflow._parse_success(success_payload.model_dump_json(), ExperimentAnalyst) is True
     assert workflow._parse_success("not-json", ExperimentAnalyst) is False
 
 
@@ -148,6 +143,7 @@ def test_extract_code_handles_payload_types() -> None:
 
 def test_create_code_executor_agent_backend_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     """Select local vs modal execution backends when building agents."""
+
     class DummyLocalBackend:
         def __init__(self) -> None:
             self.marker = "local"
@@ -180,15 +176,10 @@ def test_create_code_executor_agent_backend_selection(monkeypatch: pytest.Monkey
 
 def test_create_experiment_agents_model_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     """Apply default or provided model values across experiment agents."""
-    monkeypatch.setattr(
-        experiment_agents, "DEFAULT_MODEL", LiteLlm(model="openai/default-model")
-    )
+    monkeypatch.setattr(experiment_agents, "DEFAULT_MODEL", LiteLlm(model="openai/default-model"))
 
     default_agents = experiment_agents.create_experiment_agents()
-    assert all(
-        agent.model is experiment_agents.DEFAULT_MODEL
-        for agent in default_agents.values()
-    )
+    assert all(agent.model is experiment_agents.DEFAULT_MODEL for agent in default_agents.values())
 
     custom_model = LiteLlm(model="openai/custom-model")
     custom_agents = experiment_agents.create_experiment_agents(model=custom_model)
@@ -220,18 +211,10 @@ async def test_workflow_stops_after_analysis_success() -> None:
     programmer_events = [
         event for event in session.events if event.author == "experiment_programmer"
     ]
-    analyst_events = [
-        event for event in session.events if event.author == "experiment_analyst"
-    ]
-    reviewer_events = [
-        event for event in session.events if event.author == "experiment_reviewer"
-    ]
-    reviser_events = [
-        event for event in session.events if event.author == "experiment_reviser"
-    ]
-    generator_events = [
-        event for event in session.events if event.author == "experiment_generator"
-    ]
+    analyst_events = [event for event in session.events if event.author == "experiment_analyst"]
+    reviewer_events = [event for event in session.events if event.author == "experiment_reviewer"]
+    reviser_events = [event for event in session.events if event.author == "experiment_reviser"]
+    generator_events = [event for event in session.events if event.author == "experiment_generator"]
     assert len(programmer_events) == 1
     assert len(analyst_events) == 1
     assert len(reviewer_events) == 1
@@ -270,12 +253,8 @@ async def test_workflow_retries_until_max_attempts() -> None:
     programmer_events = [
         event for event in session.events if event.author == "experiment_programmer"
     ]
-    analyst_events = [
-        event for event in session.events if event.author == "experiment_analyst"
-    ]
-    reviewer_events = [
-        event for event in session.events if event.author == "experiment_reviewer"
-    ]
+    analyst_events = [event for event in session.events if event.author == "experiment_analyst"]
+    reviewer_events = [event for event in session.events if event.author == "experiment_reviewer"]
     assert len(programmer_events) == 3
     assert len(analyst_events) == 3
     assert len(reviewer_events) == 1
@@ -310,18 +289,10 @@ async def test_workflow_revision_flow_after_review_failure() -> None:
     programmer_events = [
         event for event in session.events if event.author == "experiment_programmer"
     ]
-    analyst_events = [
-        event for event in session.events if event.author == "experiment_analyst"
-    ]
-    reviewer_events = [
-        event for event in session.events if event.author == "experiment_reviewer"
-    ]
-    reviser_events = [
-        event for event in session.events if event.author == "experiment_reviser"
-    ]
-    generator_events = [
-        event for event in session.events if event.author == "experiment_generator"
-    ]
+    analyst_events = [event for event in session.events if event.author == "experiment_analyst"]
+    reviewer_events = [event for event in session.events if event.author == "experiment_reviewer"]
+    reviser_events = [event for event in session.events if event.author == "experiment_reviser"]
+    generator_events = [event for event in session.events if event.author == "experiment_generator"]
     assert len(programmer_events) == 2
     assert len(analyst_events) == 1
     assert len(reviewer_events) == 1

@@ -26,9 +26,7 @@ from .structured_outputs import (
 )
 
 MODEL_ENV_VAR = "ASTA_AGENTS_MODEL"
-DEFAULT_MODEL: LiteLlm = LiteLlm(
-    model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini")
-)
+DEFAULT_MODEL: LiteLlm = LiteLlm(model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini"))
 ExecutionBackend = Literal["local", "modal"]
 
 INSTALL_SNIPPET = (
@@ -51,9 +49,7 @@ def create_experiment_agents(*, model: LiteLlm | None = None) -> dict[str, LlmAg
     """
     resolved_model = model or DEFAULT_MODEL
     if not isinstance(resolved_model, LiteLlm):
-        raise TypeError(
-            "Experiment agents require a LiteLlm instance for the model configuration."
-        )
+        raise TypeError("Experiment agents require a LiteLlm instance for the model configuration.")
     experiment_generator = LlmAgent(
         name="experiment_generator",
         model=resolved_model,

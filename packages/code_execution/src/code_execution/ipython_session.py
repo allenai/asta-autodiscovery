@@ -160,6 +160,7 @@ def _ensure_pip_available() -> None:
     # Bootstrap pip so %pip magic can install packages on demand.
     try:
         import pip  # noqa: F401
+
         return
     except Exception:
         pass

@@ -154,7 +154,9 @@ def test_run_ipython_cell_remote_requests_not_installed_by_default() -> None:
 @pytest.mark.modal
 def test_run_ipython_cell_remote_can_install_requests_with_pip_magic() -> None:
     function = ipython_session.lookup_run_ipython_cell()
-    code_str = "%pip install requests\nimport requests\nprint(\"requests\")\nprint(requests.__version__)"
+    code_str = (
+        '%pip install requests\nimport requests\nprint("requests")\nprint(requests.__version__)'
+    )
     result = function.remote(code_str)
 
     assert result["success"] is True

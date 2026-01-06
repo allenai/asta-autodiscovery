@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 import uuid
 import zipfile
+from pathlib import Path
 
 import pytest
 from code_execution.ipython_session import (
@@ -198,9 +198,7 @@ def _build_wheel(tmp_path: Path, package_name: str, version: str = "0.0.0") -> P
     return wheel_path
 
 
-@pytest.mark.filterwarnings(
-    r"ignore:.*forkpty\(\).*deadlocks.*:DeprecationWarning:pty"
-)
+@pytest.mark.filterwarnings(r"ignore:.*forkpty\(\).*deadlocks.*:DeprecationWarning:pty")
 def test_ipython_session_can_install_local_wheel_with_pip_magic(tmp_path: Path) -> None:
     session = IPythonSession()
     package_name = f"pip_magic_demo_{uuid.uuid4().hex}"

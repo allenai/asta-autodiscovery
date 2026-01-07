@@ -72,7 +72,9 @@ def test_sandbox_backend_creates_mount_and_passes_env(monkeypatch) -> None:
     def _dummy_app_lookup(app_name: str, *, create_if_missing: bool) -> str:
         return f"app:{app_name}:{create_if_missing}"
 
-    def _dummy_sandbox_create(*, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int) -> _DummySandbox:
+    def _dummy_sandbox_create(
+        *, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int
+    ) -> _DummySandbox:
         sandbox_create_kwargs.update(
             {
                 "app": app,
@@ -82,7 +84,13 @@ def test_sandbox_backend_creates_mount_and_passes_env(monkeypatch) -> None:
                 "timeout": timeout,
             }
         )
-        result_payload = {"stdout": "ok", "stderr": "", "rich_outputs": [], "success": True, "error": None}
+        result_payload = {
+            "stdout": "ok",
+            "stderr": "",
+            "rich_outputs": [],
+            "success": True,
+            "error": None,
+        }
         process = _DummyProcess(stdout=json.dumps(result_payload), stderr="")
         return _DummySandbox(process)
 
@@ -135,7 +143,9 @@ def test_sandbox_backend_writes_payload_and_terminates(monkeypatch) -> None:
     sandbox = _DummySandbox(process)
     captured_secret: dict[str, str] = {}
 
-    def _dummy_sandbox_create(*, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int) -> _DummySandbox:
+    def _dummy_sandbox_create(
+        *, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int
+    ) -> _DummySandbox:
         return sandbox
 
     monkeypatch.setattr(
@@ -152,7 +162,11 @@ def test_sandbox_backend_writes_payload_and_terminates(monkeypatch) -> None:
     monkeypatch.setattr(
         sandbox_backend.modal,
         "Secret",
-        type("_Secret", (), {"from_dict": staticmethod(lambda payload: captured_secret.update(payload) or payload)}),
+        type(
+            "_Secret",
+            (),
+            {"from_dict": staticmethod(lambda payload: captured_secret.update(payload) or payload)},
+        ),
     )
 
     backend = sandbox_backend.ModalSandboxIPythonBackend(
@@ -176,7 +190,9 @@ def test_sandbox_backend_returns_error_on_invalid_json(monkeypatch) -> None:
     process = _DummyProcess(stdout="not-json", stderr="bad")
     sandbox = _DummySandbox(process)
 
-    def _dummy_sandbox_create(*, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int) -> _DummySandbox:
+    def _dummy_sandbox_create(
+        *, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int
+    ) -> _DummySandbox:
         return sandbox
 
     monkeypatch.setattr(

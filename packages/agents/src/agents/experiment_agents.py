@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import AsyncGenerator
 import textwrap
+from collections.abc import AsyncGenerator
 from typing import Any, Literal, Protocol, cast, override
 
 from autodiscovery_modal import ModalIPythonBackend
@@ -427,6 +427,7 @@ class ExperimentWorkflowAgent(BaseAgent):
 
     def _parse_success(self, payload: object, schema: type[BaseModel]) -> bool:
         """Extract a success boolean from a structured payload."""
+
         # Interpret structured outputs stored in session state.
         class _SupportsSuccess(Protocol):
             success: bool

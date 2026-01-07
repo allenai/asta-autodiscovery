@@ -134,7 +134,7 @@ class ModalSandboxIPythonBackend:
         oidc_auth_role_arn: str | None = None,
         env: dict[str, str] | None = None,
         sandbox_timeout_s: int = _DEFAULT_SANDBOX_TIMEOUT_S,
-    ) -> "ModalSandboxIPythonBackend":
+    ) -> ModalSandboxIPythonBackend:
         """Create a Sandbox backend for a specific user/run dataset prefix.
 
         Args:

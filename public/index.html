@@ -282,6 +282,7 @@
         <select id="runSelect" aria-label="Select run"></select>
         <button id="themeToggle">Theme</button>
         <button id="resetView">Reset View</button>
+        <button id="exportHtml">Export HTML</button>
       </div>
       <div class="row" id="playbackControls" style="gap:8px; justify-content:flex-start; flex-wrap:wrap;">
         <button id="playbackToggle">Play Build</button>
@@ -353,11 +354,14 @@
   const statusEl = document.getElementById('status');
   const resetBtn = document.getElementById('resetView');
   const themeBtn = document.getElementById('themeToggle');
+  const exportBtn = document.getElementById('exportHtml');
   const runSelect = document.getElementById('runSelect');
   const betaCanvas = document.getElementById('betaCanvas');
   const playBtn = document.getElementById('playbackToggle');
   const delayInput = document.getElementById('delayInput');
   const beliefInput = document.getElementById('beliefThreshold');
+  const embeddedData = window.__EXPORTED_DATA__;
+  const isExport = Boolean(embeddedData);
   let betaChart;
   let currentTransform = d3.zoomIdentity;
 
@@ -394,7 +398,9 @@
 
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const savedTheme = localStorage.getItem('theme');
-  let theme = savedTheme || (prefersDark ? 'dark' : 'light');
+  let theme = isExport && embeddedData?.theme
+    ? embeddedData.theme
+    : (savedTheme || (prefersDark ? 'dark' : 'light'));
 
   function applyTheme(next) {
     theme = next;
@@ -435,6 +441,7 @@
     if (playback.playing) stopPlayback({ restore: true });
     else startPlayback();
   });
+  exportBtn?.addEventListener('click', exportCurrentHtml);
 
   function setStatus(text, ok = true) {
     statusEl.textContent = text;
@@ -1024,7 +1031,41 @@
     };
   }
 
+  function exportCurrentHtml() {
+    const snapshot = {
+      run: state.currentRun || 'export',
+      nodes: Array.from(state.allNodes.values()),
+      theme,
+      generated_at: new Date().toISOString(),
+    };
+
+    // Escape closing script tags to keep the export safe to embed.
+    const payload = JSON.stringify(snapshot).replace(/</g, '\\u003c');
+    // Use <\/script> so the HTML parser doesn't terminate this script block early.
+    const injection = `<script id="exportedData">window.__EXPORTED_DATA__ = ${payload};<\\/script>`;
+    const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML.replace('</head>', `${injection}</head>`);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const safeRun = (snapshot.run || 'export').replace(/[^a-z0-9_-]/gi, '-');
+    const timestamp = snapshot.generated_at.replace(/[:.]/g, '-');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mcts-${safeRun}-${timestamp}.html`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
   (async () => {
+    if (isExport && embeddedData) {
+      state.currentRun = embeddedData.run || 'export';
+      state.runs = [state.currentRun];
+      renderRunSelect();
+      runSelect.disabled = true;
+      updateNodes(embeddedData.nodes || []);
+      setStatus(`Snapshot · ${state.currentRun}`);
+      return;
+    }
+
     await loadRuns();
     await fetchInitial();
     connectWS();

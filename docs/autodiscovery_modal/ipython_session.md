@@ -63,7 +63,7 @@ print(result["stdout"])
 
 For a higher-level facade that matches the local executor API, see
 `docs/autodiscovery_modal/ipython_executor.md` for usage examples with
-`ModalIPythonBackend` and `IPythonExecutor`.
+`ModalIPythonBackend`, `ModalSandboxIPythonBackend`, and `IPythonExecutor`.
 
 ## Public API
 

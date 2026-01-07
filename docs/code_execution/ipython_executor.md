@@ -5,7 +5,8 @@ execution. It lets you swap execution backends (local, remote, mocked) without
 changing the call sites. The executor returns the same output schema as
 `IPythonSession`.
 
-`autodiscovery_modal` ships a `ModalIPythonBackend` that plugs into `IPythonExecutor`. See
+`autodiscovery_modal` ships Modal-backed executors (`ModalIPythonBackend` and
+`ModalSandboxIPythonBackend`) that plug into `IPythonExecutor`. See
 `docs/autodiscovery_modal/ipython_executor.md` for details.
 
 ## Public API
@@ -27,6 +28,23 @@ result = executor.run_cell("print('hello')\n1 + 1")
 
 print(result["stdout"].strip())  # hello
 print(result["success"])  # True
+```
+
+### Local execution with a working directory and env vars
+
+```python
+from code_execution import IPythonExecutor, LocalIPythonBackend
+
+backend = LocalIPythonBackend(
+    cwd="/tmp",
+    env={"DATASET_ROOT": "/tmp/data"},
+)
+executor = IPythonExecutor(backend)
+result = executor.run_cell(
+    "import os; print(os.getcwd()); print(os.environ['DATASET_ROOT'])"
+)
+
+print(result["stdout"].strip())
 ```
 
 ### Persistent state across calls

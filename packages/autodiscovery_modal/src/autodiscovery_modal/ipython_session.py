@@ -1,4 +1,4 @@
-"""Stateless IPython execution helpers for use in Modal functions."""
+"""Stateless IPython execution helpers for use in Modal."""
 
 import sys
 from collections.abc import Iterable

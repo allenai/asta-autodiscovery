@@ -1,0 +1,153 @@
+{
+  "id": "node_2_6",
+  "success": true,
+  "parent_id": "node_1_0",
+  "creation_idx": 8,
+  "time_elapsed": 216.57,
+  "visits": 1,
+  "value": 1.1872794422589892,
+  "self_value": 1.1872794422589892,
+  "surprising": true,
+  "belief_change": 0.29776674937965264,
+  "kl_divergence": 5.9363972112949455,
+  "prior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      0.5,
+      0.5
+    ],
+    "n": 30.0,
+    "definitely_true": 0.0,
+    "maybe_true": 25.0,
+    "uncertain": 5.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.7083333333333334,
+    "mean": 0.7016129032258065
+  },
+  "posterior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      21.75,
+      9.25
+    ],
+    "n": 60.0,
+    "definitely_true": 0.0,
+    "maybe_true": 0.0,
+    "uncertain": 0.0,
+    "maybe_false": 60.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.25,
+    "mean": 0.40384615384615385
+  },
+  "hypothesis": "Younger breast cancer patients (<50 years at diagnosis) have a higher prevalence of TP53 mutations compared to older patients (\u226550 years).",
+  "experiment_plan": {
+    "objective": "Test whether TP53 mutation frequency differs by age group at diagnosis.",
+    "steps": "1. Load clinical and mutation datasets.\n2. Classify patients into two age groups based on age_at_diagnosis: <50 vs \u226550.\n3. From mutation data, determine which patients have at least one Hugo_Symbol = 'TP53' mutation.\n4. Merge age group and TP53 status by patient barcode.\n5. Construct a 2\u00d72 contingency table: age group \u00d7 TP53 mutation presence.\n6. Perform chi-squared test of independence.\n7. Report mutation prevalence in each age group and p-value.",
+    "deliverables": "\u2022 Contingency table of counts.\n\u2022 Prevalence (%) of TP53 mutations in each age group.\n\u2022 Chi-squared test statistic and p-value."
+  },
+  "code": "import pandas as pd\nfrom scipy.stats import chi2_contingency\n\n# 1. Load datasets\nclinical = pd.read_csv('cleaned_clinical_data.csv', usecols=['bcr_patient_barcode', 'age_at_diagnosis'])\nmutations = pd.read_csv('cleaned_mutations.csv', usecols=['bcr_patient_barcode', 'Hugo_Symbol'])\n\n# 2. Classify age groups\nclinical = clinical.dropna(subset=['age_at_diagnosis'])\nclinical['age_group'] = clinical['age_at_diagnosis'].apply(lambda x: '<50' if x < 50 else '>=50')\n\n# 3. Identify patients with TP53 mutations\ntp53_patients = set(mutations.loc[mutations['Hugo_Symbol'] == 'TP53', 'bcr_patient_barcode'])\n\n# 4. Merge age group and TP53 status\nclinical['tp53_mutation'] = clinical['bcr_patient_barcode'].isin(tp53_patients).astype(int)\n\n# 5. Construct contingency table\ncontingency = pd.crosstab(clinical['age_group'], clinical['tp53_mutation'], \n                          rownames=['Age Group'], colnames=['TP53 Mutation'], dropna=False)\n# Ensure columns 0 and 1 exist\nfor col in [0, 1]:\n    if col not in contingency.columns:\n        contingency[col] = 0\ncontingency = contingency[[0, 1]]\n\n# 6. Chi-squared test\nchi2, p, dof, expected = chi2_contingency(contingency)\n\n# 7. Report results\nprint(\"Contingency Table (counts):\")\nprint(contingency.rename(columns={0: 'No', 1: 'Yes'}))\n\n# Prevalence calculation\nresults = []\nfor group in ['<50', '>=50']:\n    total = contingency.loc[group].sum()\n    mutated = contingency.loc[group, 1]\n    pct = mutated / total * 100 if total > 0 else 0\n    results.append((group, mutated, total, pct))\n\nprint(\"\\nPrevalence of TP53 mutations by age group:\")\nfor group, mutated, total, pct in results:\n    print(f\"  {group}: {mutated}/{total} = {pct:.2f}%\")\n\nprint(f\"\\nChi-squared test:\\n  chi2 = {chi2:.4f}\\n  p-value = {p:.4f}\")\n",
+  "code_output": "exitcode: 0 (execution succeeded)\nCode output: Contingency Table (counts):\nTP53 Mutation   No  Yes\nAge Group              \n<50            194  103\n>=50           553  247\n\nPrevalence of TP53 mutations by age group:\n  <50: 103/297 = 34.68%\n  >=50: 247/800 = 30.88%\n\nChi-squared test:\n  chi2 = 1.2736\n  p-value = 0.2591\n",
+  "analysis": "The analysis compared TP53 mutation prevalence between breast cancer patients diagnosed before 50 years and those 50 or older. Among 297 younger patients, 103 had TP53 mutations (34.68%), and among 800 older patients, 247 had TP53 mutations (30.88%). A chi-squared test of independence yielded \u03c7\u00b2=1.2736 with p=0.2591, indicating no statistically significant difference in TP53 mutation prevalence between the two age groups.",
+  "review": "N/A",
+  "untried_experiments": [
+    {
+      "hypothesis": "Higher tumor mutational burden (TMB) is associated with shorter overall survival (OS) in breast cancer patients.",
+      "experiment_plan": {
+        "objective": "Assess whether patients with high TMB have worse overall survival compared to those with low TMB.",
+        "steps": "1. Load cleaned_mutations.csv and cleaned_clinical_data.csv (use bcr_patient_barcode, days_to_death, vital_status).\n2. Compute TMB per patient as the count of somatic mutations in cleaned_mutations.csv grouped by bcr_patient_barcode.\n3. Merge TMB values with clinical data on bcr_patient_barcode.\n4. Remove patients missing days_to_death or vital_status; define OS time and event indicator.\n5. Split cohort into high\u2010TMB and low\u2010TMB groups using the median TMB as cutoff.\n6. Perform Kaplan\u2013Meier survival analysis and log\u2010rank test comparing OS between the two groups.",
+        "deliverables": "- Table of TMB summary (median, IQR).\n- Kaplan\u2013Meier survival curves for high vs low TMB.\n- Log\u2010rank test statistic and p\u2010value."
+      }
+    },
+    {
+      "hypothesis": "ESR1 gene expression level correlates with clinical ER status and higher ESR1 expression predicts longer disease\u2010free survival.",
+      "experiment_plan": {
+        "objective": "Test the concordance of ESR1 mRNA expression with ER IHC status and its prognostic value for disease\u2010free survival.",
+        "steps": "1. Load cleaned_gene_expression.csv and cleaned_clinical_data.csv (use bcr_patient_barcode, er_status, days_to_new_tumor, new_tumor_event).\n2. Extract ESR1 expression vector for each patient and merge with clinical ER status.\n3. Compare ESR1 expression between ER\u2010Positive and ER\u2010Negative groups using a two\u2010sample t\u2010test (or Wilcoxon test).\n4. Define disease\u2010free survival (DFS) time = days_to_new_tumor, event = new_tumor_event ('YES' vs 'NO').\n5. Split patients at the median ESR1 expression into high\u2010ESR1 and low\u2010ESR1 groups.\n6. Perform Kaplan\u2013Meier DFS analysis and log\u2010rank test between high and low ESR1 groups.",
+        "deliverables": "- Boxplots and summary statistics of ESR1 expression by ER status.\n- t\u2010test/Wilcoxon test statistic and p\u2010value for expression difference.\n- Kaplan\u2013Meier DFS curves for high vs low ESR1 expression.\n- Log\u2010rank test statistic and p\u2010value."
+      }
+    },
+    {
+      "hypothesis": "Prevalence of PIK3CA mutations is higher in older patients (\u226560 years) compared to younger patients (<60 years).",
+      "experiment_plan": {
+        "objective": "Evaluate whether age at diagnosis is associated with PIK3CA mutation frequency.",
+        "steps": "1. Load cleaned_clinical_data.csv (bcr_patient_barcode, age_at_diagnosis) and cleaned_mutations.csv (bcr_patient_barcode, Hugo_Symbol).\n2. Classify patients into two age groups: <60 and \u226560 years.\n3. Identify patients with at least one mutation in Hugo_Symbol 'PIK3CA'.\n4. Merge age group and PIK3CA mutation status per patient.\n5. Build a 2\u00d72 contingency table (age group \u00d7 mutation presence).\n6. Perform a chi\u2010squared test of independence (or Fisher\u2019s exact test if counts are small).\n7. Calculate mutation prevalence (%) in each age group.",
+        "deliverables": "- Contingency table of counts.\n- Prevalence of PIK3CA mutations in each age group.\n- Chi\u2010squared or Fisher\u2019s exact test statistic and p\u2010value."
+      }
+    },
+    {
+      "hypothesis": "Triple\u2010negative breast cancers (ER\u2013, PR\u2013, HER2\u2013) exhibit higher expression of basal marker KRT5 compared to non\u2010triple\u2010negative cancers.",
+      "experiment_plan": {
+        "objective": "Test whether triple\u2010negative subtype has elevated basal cytokeratin expression.",
+        "steps": "1. Load cleaned_clinical_data.csv (bcr_patient_barcode, er_status, pr_status, her2_ihc_status).\n2. Define triple\u2010negative (TNBC) as er_status='Negative', pr_status='Negative', her2_ihc_status='Negative'. Label others as non\u2010TNBC.\n3. Load cleaned_gene_expression.csv and extract KRT5 expression for all patients.\n4. Merge KRT5 expression with TNBC vs non\u2010TNBC labels.\n5. Compare KRT5 expression distributions between TNBC and non\u2010TNBC using a two\u2010sample t\u2010test or Wilcoxon rank\u2010sum test.",
+        "deliverables": "- Summary statistics (mean, median, IQR) of KRT5 expression by subtype.\n- Boxplot of KRT5 expression in TNBC vs non\u2010TNBC.\n- t\u2010test/Wilcoxon test statistic and p\u2010value."
+      }
+    },
+    {
+      "hypothesis": "Patients who received radiation therapy have lower tumor proliferation marker MKI67 expression than those who did not receive radiation.",
+      "experiment_plan": {
+        "objective": "Determine if radiation therapy is associated with reduced MKI67 expression.",
+        "steps": "1. Load cleaned_clinical_data.csv (bcr_patient_barcode, radiation_therapy).\n2. Categorize patients into 'Radiation yes' vs 'Radiation no'. Exclude missing.\n3. Load cleaned_gene_expression.csv, extract MKI67 gene expression.\n4. Merge MKI67 expression with radiation therapy status per patient.\n5. Compare MKI67 expression between the two groups using a two\u2010sample t\u2010test or nonparametric test.\n6. Check for potential confounders (e.g., stage) and optionally adjust using linear regression.",
+        "deliverables": "- Group means and standard deviations of MKI67 expression.\n- Boxplots or violin plots.\n- Test statistic and p\u2010value (t\u2010test or nonparametric).\n- (If adjusted) regression coefficients and p\u2010values."
+      }
+    },
+    {
+      "hypothesis": "Histological tumor type (infiltrating ductal vs infiltrating lobular) is associated with overall somatic mutation burden.",
+      "experiment_plan": {
+        "objective": "Compare somatic mutation burden between ductal and lobular histologies.",
+        "steps": "1. Load cleaned_clinical_data.csv (bcr_patient_barcode, histological_type).\n2. Filter to patients with histological_type 'Infiltrating Ductal Carcinoma' or 'Infiltrating Lobular Carcinoma'.\n3. Load cleaned_mutations.csv and count total mutations per patient (TMB).\n4. Merge TMB with histological type per patient.\n5. Compare TMB distributions between the two groups using Mann\u2013Whitney U test.\n6. Report medians and IQRs in each group.",
+        "deliverables": "- Table of TMB median and IQR by histological type.\n- Boxplots of TMB in ductal vs lobular.\n- Mann\u2013Whitney U test statistic and p\u2010value."
+      }
+    },
+    {
+      "hypothesis": "Lymph node positive count is inversely correlated with PTEN gene expression level.",
+      "experiment_plan": {
+        "objective": "Assess the relationship between tumor lymph node involvement and PTEN mRNA expression.",
+        "steps": "1. Load cleaned_clinical_data.csv (bcr_patient_barcode, lymph_nodes_positive).\n2. Load cleaned_gene_expression.csv and extract PTEN expression per patient.\n3. Merge lymph_nodes_positive and PTEN expression on bcr_patient_barcode; exclude missing.\n4. Compute Spearman rank correlation between lymph_nodes_positive and PTEN expression.\n5. Generate a scatter plot with a fitted trend line.\n6. Test the significance of the correlation.",
+        "deliverables": "- Spearman correlation coefficient and p\u2010value.\n- Scatter plot data points and trend line.\n- Summary statistics of both variables."
+      }
+    },
+    {
+      "hypothesis": "Black or African American patients have higher tumor mutational burden than White patients.",
+      "experiment_plan": {
+        "objective": "Evaluate racial differences in TMB between Black and White breast cancer patients.",
+        "steps": "1. Load cleaned_clinical_data.csv (bcr_patient_barcode, race).\n2. Filter to patients with race 'BLACK OR AFRICAN AMERICAN' and 'WHITE'.\n3. Load cleaned_mutations.csv; compute TMB per patient.\n4. Merge TMB with race per patient.\n5. Compare TMB distributions between races using Mann\u2013Whitney U test (or t\u2010test if normal).\n6. Report group medians, boxplots, and test results.",
+        "deliverables": "- Median and IQR of TMB in Black vs White patients.\n- Boxplots of TMB by race.\n- Mann\u2013Whitney U (or t\u2010test) statistic and p\u2010value."
+      }
+    }
+  ],
+  "tried_experiments": [],
+  "query": "Hypothesis: Younger breast cancer patients (<50 years at diagnosis) have a higher prevalence of TP53 mutations compared to older patients (\u226550 years).\n\nExperiment objective: Test whether TP53 mutation frequency differs by age group at diagnosis.\n\nSteps for the programmer:\n1. Load clinical and mutation datasets.\n2. Classify patients into two age groups based on age_at_diagnosis: <50 vs \u226550.\n3. From mutation data, determine which patients have at least one Hugo_Symbol = 'TP53' mutation.\n4. Merge age group and TP53 status by patient barcode.\n5. Construct a 2\u00d72 contingency table: age group \u00d7 TP53 mutation presence.\n6. Perform chi-squared test of independence.\n7. Report mutation prevalence in each age group and p-value.\n\nDeliverables:\n\u2022 Contingency table of counts.\n\u2022 Prevalence (%) of TP53 mutations in each age group.\n\u2022 Chi-squared test statistic and p-value.",
+  "messages": [
+    {
+      "content": "Hypothesis: Younger breast cancer patients (<50 years at diagnosis) have a higher prevalence of TP53 mutations compared to older patients (\u226550 years).\n\nExperiment objective: Test whether TP53 mutation frequency differs by age group at diagnosis.\n\nSteps for the programmer:\n1. Load clinical and mutation datasets.\n2. Classify patients into two age groups based on age_at_diagnosis: <50 vs \u226550.\n3. From mutation data, determine which patients have at least one Hugo_Symbol = 'TP53' mutation.\n4. Merge age group and TP53 status by patient barcode.\n5. Construct a 2\u00d72 contingency table: age group \u00d7 TP53 mutation presence.\n6. Perform chi-squared test of independence.\n7. Report mutation prevalence in each age group and p-value.\n\nDeliverables:\n\u2022 Contingency table of counts.\n\u2022 Prevalence (%) of TP53 mutations in each age group.\n\u2022 Chi-squared test statistic and p-value.",
+      "name": "user_proxy",
+      "role": "user"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nfrom scipy.stats import chi2_contingency\\n\\n# 1. Load datasets\\nclinical = pd.read_csv('cleaned_clinical_data.csv', usecols=['bcr_patient_barcode', 'age_at_diagnosis'])\\nmutations = pd.read_csv('cleaned_mutations.csv', usecols=['bcr_patient_barcode', 'Hugo_Symbol'])\\n\\n# 2. Classify age groups\\nclinical = clinical.dropna(subset=['age_at_diagnosis'])\\nclinical['age_group'] = clinical['age_at_diagnosis'].apply(lambda x: '<50' if x < 50 else '>=50')\\n\\n# 3. Identify patients with TP53 mutations\\ntp53_patients = set(mutations.loc[mutations['Hugo_Symbol'] == 'TP53', 'bcr_patient_barcode'])\\n\\n# 4. Merge age group and TP53 status\\nclinical['tp53_mutation'] = clinical['bcr_patient_barcode'].isin(tp53_patients).astype(int)\\n\\n# 5. Construct contingency table\\ncontingency = pd.crosstab(clinical['age_group'], clinical['tp53_mutation'], \\n                          rownames=['Age Group'], colnames=['TP53 Mutation'], dropna=False)\\n# Ensure columns 0 and 1 exist\\nfor col in [0, 1]:\\n    if col not in contingency.columns:\\n        contingency[col] = 0\\ncontingency = contingency[[0, 1]]\\n\\n# 6. Chi-squared test\\nchi2, p, dof, expected = chi2_contingency(contingency)\\n\\n# 7. Report results\\nprint(\\\"Contingency Table (counts):\\\")\\nprint(contingency.rename(columns={0: 'No', 1: 'Yes'}))\\n\\n# Prevalence calculation\\nresults = []\\nfor group in ['<50', '>=50']:\\n    total = contingency.loc[group].sum()\\n    mutated = contingency.loc[group, 1]\\n    pct = mutated / total * 100 if total > 0 else 0\\n    results.append((group, mutated, total, pct))\\n\\nprint(\\\"\\\\nPrevalence of TP53 mutations by age group:\\\")\\nfor group, mutated, total, pct in results:\\n    print(f\\\"  {group}: {mutated}/{total} = {pct:.2f}%\\\")\\n\\nprint(f\\\"\\\\nChi-squared test:\\\\n  chi2 = {chi2:.4f}\\\\n  p-value = {p:.4f}\\\")\\n\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 0 (execution succeeded)\nCode output: Contingency Table (counts):\nTP53 Mutation   No  Yes\nAge Group              \n<50            194  103\n>=50           553  247\n\nPrevalence of TP53 mutations by age group:\n  <50: 103/297 = 34.68%\n  >=50: 247/800 = 30.88%\n\nChi-squared test:\n  chi2 = 1.2736\n  p-value = 0.2591\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"The analysis compared TP53 mutation prevalence between breast cancer patients diagnosed before 50 years and those 50 or older. Among 297 younger patients, 103 had TP53 mutations (34.68%), and among 800 older patients, 247 had TP53 mutations (30.88%). A chi-squared test of independence yielded \u03c7\u00b2=1.2736 with p=0.2591, indicating no statistically significant difference in TP53 mutation prevalence between the two age groups.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"feedback\": \"\", \"success\": true}",
+      "role": "user",
+      "name": "experiment_reviewer"
+    },
+    {
+      "content": "{\"experiments\":[{\"hypothesis\":\"Higher tumor mutational burden (TMB) is associated with shorter overall survival (OS) in breast cancer patients.\",\"experiment_plan\":{\"objective\":\"Assess whether patients with high TMB have worse overall survival compared to those with low TMB.\",\"steps\":\"1. Load cleaned_mutations.csv and cleaned_clinical_data.csv (use bcr_patient_barcode, days_to_death, vital_status).\\n2. Compute TMB per patient as the count of somatic mutations in cleaned_mutations.csv grouped by bcr_patient_barcode.\\n3. Merge TMB values with clinical data on bcr_patient_barcode.\\n4. Remove patients missing days_to_death or vital_status; define OS time and event indicator.\\n5. Split cohort into high\u2010TMB and low\u2010TMB groups using the median TMB as cutoff.\\n6. Perform Kaplan\u2013Meier survival analysis and log\u2010rank test comparing OS between the two groups.\",\"deliverables\":\"- Table of TMB summary (median, IQR).\\n- Kaplan\u2013Meier survival curves for high vs low TMB.\\n- Log\u2010rank test statistic and p\u2010value.\"}},{\"hypothesis\":\"ESR1 gene expression level correlates with clinical ER status and higher ESR1 expression predicts longer disease\u2010free survival.\",\"experiment_plan\":{\"objective\":\"Test the concordance of ESR1 mRNA expression with ER IHC status and its prognostic value for disease\u2010free survival.\",\"steps\":\"1. Load cleaned_gene_expression.csv and cleaned_clinical_data.csv (use bcr_patient_barcode, er_status, days_to_new_tumor, new_tumor_event).\\n2. Extract ESR1 expression vector for each patient and merge with clinical ER status.\\n3. Compare ESR1 expression between ER\u2010Positive and ER\u2010Negative groups using a two\u2010sample t\u2010test (or Wilcoxon test).\\n4. Define disease\u2010free survival (DFS) time = days_to_new_tumor, event = new_tumor_event ('YES' vs 'NO').\\n5. Split patients at the median ESR1 expression into high\u2010ESR1 and low\u2010ESR1 groups.\\n6. Perform Kaplan\u2013Meier DFS analysis and log\u2010rank test between high and low ESR1 groups.\",\"deliverables\":\"- Boxplots and summary statistics of ESR1 expression by ER status.\\n- t\u2010test/Wilcoxon test statistic and p\u2010value for expression difference.\\n- Kaplan\u2013Meier DFS curves for high vs low ESR1 expression.\\n- Log\u2010rank test statistic and p\u2010value.\"}},{\"hypothesis\":\"Prevalence of PIK3CA mutations is higher in older patients (\u226560 years) compared to younger patients (<60 years).\",\"experiment_plan\":{\"objective\":\"Evaluate whether age at diagnosis is associated with PIK3CA mutation frequency.\",\"steps\":\"1. Load cleaned_clinical_data.csv (bcr_patient_barcode, age_at_diagnosis) and cleaned_mutations.csv (bcr_patient_barcode, Hugo_Symbol).\\n2. Classify patients into two age groups: <60 and \u226560 years.\\n3. Identify patients with at least one mutation in Hugo_Symbol 'PIK3CA'.\\n4. Merge age group and PIK3CA mutation status per patient.\\n5. Build a 2\u00d72 contingency table (age group \u00d7 mutation presence).\\n6. Perform a chi\u2010squared test of independence (or Fisher\u2019s exact test if counts are small).\\n7. Calculate mutation prevalence (%) in each age group.\",\"deliverables\":\"- Contingency table of counts.\\n- Prevalence of PIK3CA mutations in each age group.\\n- Chi\u2010squared or Fisher\u2019s exact test statistic and p\u2010value.\"}},{\"hypothesis\":\"Triple\u2010negative breast cancers (ER\u2013, PR\u2013, HER2\u2013) exhibit higher expression of basal marker KRT5 compared to non\u2010triple\u2010negative cancers.\",\"experiment_plan\":{\"objective\":\"Test whether triple\u2010negative subtype has elevated basal cytokeratin expression.\",\"steps\":\"1. Load cleaned_clinical_data.csv (bcr_patient_barcode, er_status, pr_status, her2_ihc_status).\\n2. Define triple\u2010negative (TNBC) as er_status='Negative', pr_status='Negative', her2_ihc_status='Negative'. Label others as non\u2010TNBC.\\n3. Load cleaned_gene_expression.csv and extract KRT5 expression for all patients.\\n4. Merge KRT5 expression with TNBC vs non\u2010TNBC labels.\\n5. Compare KRT5 expression distributions between TNBC and non\u2010TNBC using a two\u2010sample t\u2010test or Wilcoxon rank\u2010sum test.\",\"deliverables\":\"- Summary statistics (mean, median, IQR) of KRT5 expression by subtype.\\n- Boxplot of KRT5 expression in TNBC vs non\u2010TNBC.\\n- t\u2010test/Wilcoxon test statistic and p\u2010value.\"}},{\"hypothesis\":\"Patients who received radiation therapy have lower tumor proliferation marker MKI67 expression than those who did not receive radiation.\",\"experiment_plan\":{\"objective\":\"Determine if radiation therapy is associated with reduced MKI67 expression.\",\"steps\":\"1. Load cleaned_clinical_data.csv (bcr_patient_barcode, radiation_therapy).\\n2. Categorize patients into 'Radiation yes' vs 'Radiation no'. Exclude missing.\\n3. Load cleaned_gene_expression.csv, extract MKI67 gene expression.\\n4. Merge MKI67 expression with radiation therapy status per patient.\\n5. Compare MKI67 expression between the two groups using a two\u2010sample t\u2010test or nonparametric test.\\n6. Check for potential confounders (e.g., stage) and optionally adjust using linear regression.\",\"deliverables\":\"- Group means and standard deviations of MKI67 expression.\\n- Boxplots or violin plots.\\n- Test statistic and p\u2010value (t\u2010test or nonparametric).\\n- (If adjusted) regression coefficients and p\u2010values.\"}},{\"hypothesis\":\"Histological tumor type (infiltrating ductal vs infiltrating lobular) is associated with overall somatic mutation burden.\",\"experiment_plan\":{\"objective\":\"Compare somatic mutation burden between ductal and lobular histologies.\",\"steps\":\"1. Load cleaned_clinical_data.csv (bcr_patient_barcode, histological_type).\\n2. Filter to patients with histological_type 'Infiltrating Ductal Carcinoma' or 'Infiltrating Lobular Carcinoma'.\\n3. Load cleaned_mutations.csv and count total mutations per patient (TMB).\\n4. Merge TMB with histological type per patient.\\n5. Compare TMB distributions between the two groups using Mann\u2013Whitney U test.\\n6. Report medians and IQRs in each group.\",\"deliverables\":\"- Table of TMB median and IQR by histological type.\\n- Boxplots of TMB in ductal vs lobular.\\n- Mann\u2013Whitney U test statistic and p\u2010value.\"}},{\"hypothesis\":\"Lymph node positive count is inversely correlated with PTEN gene expression level.\",\"experiment_plan\":{\"objective\":\"Assess the relationship between tumor lymph node involvement and PTEN mRNA expression.\",\"steps\":\"1. Load cleaned_clinical_data.csv (bcr_patient_barcode, lymph_nodes_positive).\\n2. Load cleaned_gene_expression.csv and extract PTEN expression per patient.\\n3. Merge lymph_nodes_positive and PTEN expression on bcr_patient_barcode; exclude missing.\\n4. Compute Spearman rank correlation between lymph_nodes_positive and PTEN expression.\\n5. Generate a scatter plot with a fitted trend line.\\n6. Test the significance of the correlation.\",\"deliverables\":\"- Spearman correlation coefficient and p\u2010value.\\n- Scatter plot data points and trend line.\\n- Summary statistics of both variables.\"}},{\"hypothesis\":\"Black or African American patients have higher tumor mutational burden than White patients.\",\"experiment_plan\":{\"objective\":\"Evaluate racial differences in TMB between Black and White breast cancer patients.\",\"steps\":\"1. Load cleaned_clinical_data.csv (bcr_patient_barcode, race).\\n2. Filter to patients with race 'BLACK OR AFRICAN AMERICAN' and 'WHITE'.\\n3. Load cleaned_mutations.csv; compute TMB per patient.\\n4. Merge TMB with race per patient.\\n5. Compare TMB distributions between races using Mann\u2013Whitney U test (or t\u2010test if normal).\\n6. Report group medians, boxplots, and test results.\",\"deliverables\":\"- Median and IQR of TMB in Black vs White patients.\\n- Boxplots of TMB by race.\\n- Mann\u2013Whitney U (or t\u2010test) statistic and p\u2010value.\"}}]}",
+      "role": "user",
+      "name": "experiment_generator"
+    }
+  ]
+}

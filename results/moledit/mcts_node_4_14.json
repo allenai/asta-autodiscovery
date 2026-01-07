@@ -1,0 +1,168 @@
+{
+  "id": "node_4_14",
+  "success": true,
+  "parent_id": "node_3_3",
+  "creation_idx": 47,
+  "time_elapsed": 259.18,
+  "visits": 1,
+  "value": 0.654772626525687,
+  "self_value": 0.654772626525687,
+  "surprising": false,
+  "belief_change": 0.15916341722793337,
+  "kl_divergence": 3.273863132628435,
+  "prior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      0.5,
+      0.5
+    ],
+    "n": 30.0,
+    "definitely_true": 0.0,
+    "maybe_true": 30.0,
+    "uncertain": 0.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.75,
+    "mean": 0.7419354838709677
+  },
+  "posterior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      23.0,
+      8.0
+    ],
+    "n": 60.0,
+    "definitely_true": 56.0,
+    "maybe_true": 4.0,
+    "uncertain": 0.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.9833333333333333,
+    "mean": 0.9010989010989011
+  },
+  "hypothesis": "In successful edits, larger absolute molecular weight changes (|MW_delta|) are associated with greater losses in drug-likeness (more negative QED_delta).",
+  "experiment_plan": {
+    "objective": "Assess the relationship between |MW_delta| and QED_delta in train.parquet.",
+    "steps": "1. Load train.parquet and drop rows with null MW_delta or QED_delta.  2. Compute abs_MW_delta = absolute value of MW_delta.  3. Fit a linear regression: QED_delta ~ abs_MW_delta.  4. Evaluate the slope coefficient for negativity and its significance.  5. Create a scatter plot (or hexbin) of abs_MW_delta vs QED_delta with the regression line.",
+    "deliverables": "1. Regression summary (slope, intercept, p-value, R\u00b2). 2. Estimated slope indicating change in QED_delta per unit |MW_delta|. 3. Scatter or hexbin plot with fitted line."
+  },
+  "code": "import pandas as pd\nimport numpy as np\nimport statsmodels.formula.api as smf\nimport matplotlib.pyplot as plt\n\n# 1. Load dataset and drop nulls\ndf = pd.read_parquet('train.parquet')\ndf = df[['MW_delta', 'QED_delta']].dropna()\n\n# 2. Compute absolute MW change\ndf['abs_MW_delta'] = df['MW_delta'].abs()\n\n# 3. Fit linear regression: QED_delta ~ abs_MW_delta\nmodel = smf.ols('QED_delta ~ abs_MW_delta', data=df).fit()\n\n# 4. Print regression summary metrics\nintercept = model.params['Intercept']\nslope = model.params['abs_MW_delta']\npval = model.pvalues['abs_MW_delta']\nr2 = model.rsquared\nprint(\"Linear Regression Results:\")\nprint(f\"  Intercept: {intercept:.6f}\")\nprint(f\"  Slope (|MW_delta|): {slope:.6f}\")\nprint(f\"  p-value (slope): {pval:.3e}\")\nprint(f\"  R-squared: {r2:.6f}\")\n\n# 5. Plot hexbin with regression line\nplt.figure(figsize=(8, 6))\nplt.hexbin(df['abs_MW_delta'], df['QED_delta'], gridsize=60, cmap='Blues')\n# regression line\nx = np.linspace(df['abs_MW_delta'].min(), df['abs_MW_delta'].max(), 200)\ny = intercept + slope * x\nplt.plot(x, y, color='red', linewidth=2, label='Fitted line')\nplt.xlabel('|MW_delta|')\nplt.ylabel('QED_delta')\nplt.title('Relationship between |MW_delta| and QED_delta')\ncb = plt.colorbar()\ncb.set_label('Counts')\nplt.legend()\nplt.tight_layout()\nplt.show()",
+  "code_output": "exitcode: 0 (execution succeeded)\nCode output: Linear Regression Results:\n  Intercept: -0.064485\n  Slope (|MW_delta|): -0.001801\n  p-value (slope): 0.000e+00\n  R-squared: 0.193461\n\n=== Plot Analysis (fig. 1) ===\n\n1. **Plot Type:**\n   - The plot is a hexbin plot. It is used to visualize the relationship between two numeric variables through hexagonal binning, which helps in identifying the density and distribution of data points.\n\n2. **Axes:**\n   - **X-axis:**\n     - Title/Label: \\(|\\text{MW_delta}|\\)\n     - Value Range: 0 to 300+\n   - **Y-axis:**\n     - Title/Label: \\(\\text{QED_delta}\\)\n     - Value Range: -0.8 to 0.6\n   - **Color Bar (Legend):**\n     - Title/Label: Counts\n     - Value Range: 0 to 3000\n   \n3. **Data Trends:**\n   - The plot shows a negative trend: as \\(|\\text{MW_delta}|\\) increases, \\(\\text{QED_delta}\\) tends to decrease.\n   - There is a noticeable clustering of data points around the lower values of \\(|\\text{MW_delta}|\\) (0-100) and \\(\\text{QED_delta}\\) close to 0.\n   - The data points are denser for lower values of \\(|\\text{MW_delta}|\\).\n\n4. **Annotations and Legends:**\n   - A red fitted line is plotted, indicating a negative correlation between the two variables.\n   - The color bar on the right shows the density of the data points, with darker shades representing higher counts.\n\n5. **Statistical Insights:**\n   - The fitted line suggests a linear relationship with a negative slope, indicating that increases in \\(|\\text{MW_delta}|\\) are associated with decreases in \\(\\text{QED_delta}\\).\n   - The spread and density of data clusters suggest more variability in \\(\\text{QED_delta}\\) at moderately high values of \\(|\\text{MW_delta}|\\).\n   - The darkest hexagons, indicating the highest counts, are concentrated at lower \\(|\\text{MW_delta}|\\), suggesting frequent occurrences of similar values in this range.\n\n==================================================\n",
+  "analysis": "The regression of QED_delta on |MW_delta| (n\u2248469K) yielded:\n- Intercept: \u20130.064485\n- Slope: \u20130.001801 (p < 1e-300)\n- R\u00b2 = 0.193461\n\nInterpretation: Each unit increase in |MW_delta| is associated with a 0.0018 decrease in QED_delta, confirming a small but highly significant negative relationship. The hexbin plot with the fitted line visually supports this downward trend.",
+  "review": "Hypothesis: In successful edits, larger absolute molecular weight changes (|MW_delta|) are associated with greater losses in drug-likeness (more negative QED_delta).\n\nExperiment Implementation:\n- Loaded train.parquet and dropped rows with null MW_delta or QED_delta.\n- Computed abs_MW_delta = |MW_delta|.\n- Fitted linear regression QED_delta ~ abs_MW_delta on ~469K observations.\n- Generated a hexbin plot of abs_MW_delta vs QED_delta with the fitted regression line.\n\nResults:\n- Intercept: \u20130.064485\n- Slope (|MW_delta|): \u20130.001801 (p < 1e-300)\n- R\u00b2 = 0.193461\n- The negative slope is highly significant, indicating that each unit increase in |MW_delta| is associated with a 0.0018 decrease in QED_delta.\n- The hexbin plot and fitted line visually confirm a downward trend.\n\nConclusion:\n- The analysis was correctly implemented and fully tests the hypothesis.\n- Findings support the hypothesis: larger absolute MW changes correspond to greater losses in drug-likeness.",
+  "untried_experiments": [
+    {
+      "hypothesis": "In successful edits, preserving the Murcko scaffold is associated with significantly shorter edit descriptions, implying simpler edits tend to retain the scaffold.",
+      "experiment_plan": {
+        "objective": "Compare edit description length between scaffold\u2010retained and scaffold\u2010changed successful edits.",
+        "steps": "1. Load train.parquet and filter rows where murcko_scaffold_retained is not null.\n2. Compute edit_length = character count of the edit field.\n3. Split into two groups: murcko_scaffold_retained == True vs False.\n4. Test for difference in mean edit_length using an independent\u2010samples t\u2010test (or Mann\u2013Whitney U if non\u2010normal).\n5. Visualize with boxplots of edit_length by scaffold retention.",
+        "deliverables": "1. Summary statistics: mean, median, std of edit_length for each group.\n2. Test statistic, p\u2010value, and effect size.\n3. Boxplot comparing edit_length distributions."
+      }
+    },
+    {
+      "hypothesis": "The impact of Murcko scaffold retention on target_delta differs across optimization objectives, suggesting some tasks tolerate scaffold changes more than others.",
+      "experiment_plan": {
+        "objective": "Assess interaction between task_id and scaffold retention on target_delta in successful edits.",
+        "steps": "1. Load train.parquet and drop rows with null target_delta.\n2. Encode murcko_scaffold_retained as binary (1/0).\n3. Fit two\u2010way ANOVA or linear model: target_delta ~ C(task_id) * murcko_scaffold_retained.\n4. Examine interaction terms and their significance.\n5. For tasks with significant interactions, plot mean target_delta by scaffold retention.",
+        "deliverables": "1. ANOVA table with F\u2010values and p\u2010values for main effects and interaction.\n2. Estimated marginal means per task_id \u00d7 scaffold retention.\n3. Interaction plots for significant tasks."
+      }
+    },
+    {
+      "hypothesis": "In successful edits, replace operations exhibit a stronger positive correlation between SA_delta and target_delta than insert operations, implying replacement edits more directly trade synthetic accessibility for property improvement.",
+      "experiment_plan": {
+        "objective": "Compare SA_delta vs target_delta correlation by action_type within successful edits.",
+        "steps": "1. Load train.parquet; drop rows with null SA_delta or target_delta.\n2. Subset data by action_type == 'replace' and action_type == 'insert'.\n3. For each subset, compute Pearson correlation and 95% CI between SA_delta and target_delta.\n4. Test difference in correlations using Fisher's z\u2010test.\n5. Plot scatter or hexbin for both groups with regression lines.",
+        "deliverables": "1. Correlation coefficients and CIs for insert and replace.\n2. Fisher\u2019s z\u2010test statistic and p\u2010value.\n3. Overlaid scatter/regression plots for comparison."
+      }
+    },
+    {
+      "hypothesis": "In successful edits, target_delta follows an inverted\u2010U relationship with abs(MW_delta), indicating moderate weight changes yield maximal property improvements.",
+      "experiment_plan": {
+        "objective": "Test for a quadratic relationship between abs(MW_delta) and target_delta.",
+        "steps": "1. Load train.parquet; drop null MW_delta and target_delta.\n2. Compute abs_MW_delta = |MW_delta|; center it (subtract mean).\n3. Fit linear model: target_delta ~ abs_MW_delta + I(abs_MW_delta^2).\n4. Test significance and sign of the quadratic term.\n5. Visualize by binning abs_MW_delta into quintiles and plotting mean target_delta per bin with a smooth curve.",
+        "deliverables": "1. Regression summary with coefficients, p\u2010values for linear and quadratic terms, and R\u00b2.\n2. Plot of mean target_delta vs abs_MW_delta bins with fitted quadratic curve."
+      }
+    },
+    {
+      "hypothesis": "In unsuccessful edits, the ratio QED_delta/SA_delta is more negative for delete operations than for insert or replace, suggesting deletion more severely harms drug-likeness relative to synthetic accessibility.",
+      "experiment_plan": {
+        "objective": "Compare the QED_delta to SA_delta ratio across action types in unsuccessful edits.",
+        "steps": "1. Load train_neg.parquet; drop rows with null QED_delta or SA_delta and where SA_delta is zero.\n2. Compute ratio = QED_delta / SA_delta for each row.\n3. Group by action_type and compute group means and variances of ratio.\n4. Use one\u2010way ANOVA (or Kruskal\u2013Wallis) to test differences across action types.\n5. Post\u2010hoc pairwise comparisons (e.g., Tukey HSD).\n6. Visualize with violin plots per action_type.",
+        "deliverables": "1. Group summary: mean and std of ratio by action_type.\n2. ANOVA table or nonparametric test results and post\u2010hoc p\u2010values.\n3. Violin plot of ratio distributions by action_type."
+      }
+    },
+    {
+      "hypothesis": "Longer natural\u2010language prompts are associated with higher success probability when controlling for task_id and action_type, indicating more detailed instructions improve editing outcomes.",
+      "experiment_plan": {
+        "objective": "Model success probability as a function of prompt length, controlling for task and action type.",
+        "steps": "1. Load train.parquet and train_neg.parquet; label success = 1 for train, 0 for train_neg.\n2. Compute prompt_length = number of words in prompt (split on whitespace).\n3. Combine datasets; encode task_id and action_type as categorical dummies.\n4. Fit logistic regression: success ~ prompt_length + C(task_id) + C(action_type).\n5. Examine coefficient for prompt_length and its significance.\n6. Plot binned success rates vs prompt_length, overlaid with predicted probabilities.",
+        "deliverables": "1. Logistic regression summary with coefficient, odds ratio, CI, p\u2010value for prompt_length.\n2. Binned observed vs predicted success rate plot."
+      }
+    },
+    {
+      "hypothesis": "Prompts containing directional keywords like 'increase' or 'decrease' differ in success rates, with 'increase' directives yielding higher success than 'decrease' directives.",
+      "experiment_plan": {
+        "objective": "Evaluate how keyword presence in prompts affects success probability.",
+        "steps": "1. Load both datasets with success labels as above.\n2. Define binary flags for keywords: has_increase = prompt.str.contains('increase'), has_decrease = prompt.str.contains('decrease').\n3. Fit logistic regression: success ~ has_increase + has_decrease + C(task_id) + C(action_type).\n4. Compare odds ratios for has_increase vs has_decrease.\n5. Visualize success rates for four groups: increase only, decrease only, both, neither.",
+        "deliverables": "1. Regression output: coefficients, odds ratios, p\u2010values for keyword flags.\n2. Bar chart of observed success rates for the four keyword\u2010presence groups."
+      }
+    },
+    {
+      "hypothesis": "Across optimization tasks, tasks with higher average edit_length have lower overall success rates, suggesting more complex edits reduce likelihood of success at the task level.",
+      "experiment_plan": {
+        "objective": "Correlate task\u2010level average edit complexity with success rate across tasks.",
+        "steps": "1. Load train.parquet and train_neg.parquet; label success as before.\n2. Compute edit_length = character count of edit for all rows.\n3. Group by task_id in each dataset to compute: mean_edit_length and n_success, n_total.\n4. For each task_id, compute success_rate = n_success / n_total and average edit_length (averaged over both datasets).\n5. Calculate Pearson correlation between average edit_length and success_rate across tasks.\n6. Plot scatter of success_rate vs avg_edit_length with fitted regression line.",
+        "deliverables": "1. Table per task_id: avg_edit_length, success_rate.\n2. Correlation coefficient and p\u2010value.\n3. Scatter plot with regression line."
+      }
+    }
+  ],
+  "tried_experiments": [],
+  "query": "Hypothesis: In successful edits, larger absolute molecular weight changes (|MW_delta|) are associated with greater losses in drug-likeness (more negative QED_delta).\n\nExperiment objective: Assess the relationship between |MW_delta| and QED_delta in train.parquet.\n\nSteps for the programmer:\n1. Load train.parquet and drop rows with null MW_delta or QED_delta.  2. Compute abs_MW_delta = absolute value of MW_delta.  3. Fit a linear regression: QED_delta ~ abs_MW_delta.  4. Evaluate the slope coefficient for negativity and its significance.  5. Create a scatter plot (or hexbin) of abs_MW_delta vs QED_delta with the regression line.\n\nDeliverables:\n1. Regression summary (slope, intercept, p-value, R\u00b2). 2. Estimated slope indicating change in QED_delta per unit |MW_delta|. 3. Scatter or hexbin plot with fitted line.",
+  "messages": [
+    {
+      "content": "Hypothesis: In successful edits, larger absolute molecular weight changes (|MW_delta|) are associated with greater losses in drug-likeness (more negative QED_delta).\n\nExperiment objective: Assess the relationship between |MW_delta| and QED_delta in train.parquet.\n\nSteps for the programmer:\n1. Load train.parquet and drop rows with null MW_delta or QED_delta.  2. Compute abs_MW_delta = absolute value of MW_delta.  3. Fit a linear regression: QED_delta ~ abs_MW_delta.  4. Evaluate the slope coefficient for negativity and its significance.  5. Create a scatter plot (or hexbin) of abs_MW_delta vs QED_delta with the regression line.\n\nDeliverables:\n1. Regression summary (slope, intercept, p-value, R\u00b2). 2. Estimated slope indicating change in QED_delta per unit |MW_delta|. 3. Scatter or hexbin plot with fitted line.",
+      "name": "user_proxy",
+      "role": "user"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nimport numpy as np\\nimport statsmodels.formula.api as smf\\nimport matplotlib.pyplot as plt\\n\\n# 1. Load dataset and drop nulls\\ndf = pd.read_parquet('train.parquet')\\ndf = df[['MW_delta', 'QED_delta']].dropna()\\n\\n# 2. Compute absolute MW change\\ndf['abs_MW_delta'] = df['MW_delta'].abs()\\n\\n# 3. Fit linear regression: QED_delta ~ abs_MW_delta\\nmodel = smf.ols('QED_delta ~ abs_MW_delta', data=df).fit()\\n\\n# 4. Print regression summary metrics\\nslope = model.params['abs_MW_delta']\\nintercept = model.params['Intercept']\\npval = model.pvalues['abs_MW_delta']\\rr2 = model.rsquared\\nprint(\\\"Linear Regression Results:\\\")\\nprint(f\\\"  Intercept: {intercept:.6f}\\\")\\nprint(f\\\"  Slope (|MW_delta|): {slope:.6f}\\\")\\nprint(f\\\"  p-value (slope): {pval:.3e}\\\")\\nprint(f\\\"  R-squared: {rr2:.6f}\\\")\\n\\n# 5. Plot hexbin with regression line\\nplt.figure(figsize=(8, 6))\\nplt.hexbin(df['abs_MW_delta'], df['QED_delta'], gridsize=60, cmap='Blues')\\n# regression line\\nx = np.linspace(df['abs_MW_delta'].min(), df['abs_MW_delta'].max(), 200)\\ny = intercept + slope * x\\nplt.plot(x, y, color='red', linewidth=2, label='Fitted line')\\nplt.xlabel('|MW_delta|')\\nplt.ylabel('QED_delta')\\nplt.title('Relationship between |MW_delta| and QED_delta')\\ncb = plt.colorbar()\\ncb.set_label('Counts')\\nplt.legend()\\nplt.tight_layout()\\nplt.show()\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 1 (execution failed)\nCode output: Traceback (most recent call last):\n  File \"/gantry-runtime/work/20251202-100236/tmp_code_d4a579a69974b9b0ddd9687aba842a6a.py\", line 99, in <module>\n    print(f\"  R-squared: {rr2:.6f}\")\n                          ^^^\nNameError: name 'rr2' is not defined. Did you mean: 'r2'?\nLinear Regression Results:\n  Intercept: -0.064485\n  Slope (|MW_delta|): -0.001801\n  p-value (slope): 0.000e+00\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"The code execution failed due to a NameError: the variable \u2018rr2\u2019 is not defined (it was stored in \u2018r2\u2019). As a result, the R-squared value was not printed and the script crashed. Please correct the variable name (e.g., use \u2018r2\u2019 consistently) and rerun the experiment to obtain the regression summary and plot.\",\"success\":false}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nimport numpy as np\\nimport statsmodels.formula.api as smf\\nimport matplotlib.pyplot as plt\\n\\n# 1. Load dataset and drop nulls\\ndf = pd.read_parquet('train.parquet')\\ndf = df[['MW_delta', 'QED_delta']].dropna()\\n\\n# 2. Compute absolute MW change\\ndf['abs_MW_delta'] = df['MW_delta'].abs()\\n\\n# 3. Fit linear regression: QED_delta ~ abs_MW_delta\\nmodel = smf.ols('QED_delta ~ abs_MW_delta', data=df).fit()\\n\\n# 4. Print regression summary metrics\\nintercept = model.params['Intercept']\\nslope = model.params['abs_MW_delta']\\npval = model.pvalues['abs_MW_delta']\\nr2 = model.rsquared\\nprint(\\\"Linear Regression Results:\\\")\\nprint(f\\\"  Intercept: {intercept:.6f}\\\")\\nprint(f\\\"  Slope (|MW_delta|): {slope:.6f}\\\")\\nprint(f\\\"  p-value (slope): {pval:.3e}\\\")\\nprint(f\\\"  R-squared: {r2:.6f}\\\")\\n\\n# 5. Plot hexbin with regression line\\nplt.figure(figsize=(8, 6))\\nplt.hexbin(df['abs_MW_delta'], df['QED_delta'], gridsize=60, cmap='Blues')\\n# regression line\\nx = np.linspace(df['abs_MW_delta'].min(), df['abs_MW_delta'].max(), 200)\\ny = intercept + slope * x\\nplt.plot(x, y, color='red', linewidth=2, label='Fitted line')\\nplt.xlabel('|MW_delta|')\\nplt.ylabel('QED_delta')\\nplt.title('Relationship between |MW_delta| and QED_delta')\\ncb = plt.colorbar()\\ncb.set_label('Counts')\\nplt.legend()\\nplt.tight_layout()\\nplt.show()\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 0 (execution succeeded)\nCode output: Linear Regression Results:\n  Intercept: -0.064485\n  Slope (|MW_delta|): -0.001801\n  p-value (slope): 0.000e+00\n  R-squared: 0.193461\n\n=== Plot Analysis (fig. 1) ===\n\n1. **Plot Type:**\n   - The plot is a hexbin plot. It is used to visualize the relationship between two numeric variables through hexagonal binning, which helps in identifying the density and distribution of data points.\n\n2. **Axes:**\n   - **X-axis:**\n     - Title/Label: \\(|\\text{MW_delta}|\\)\n     - Value Range: 0 to 300+\n   - **Y-axis:**\n     - Title/Label: \\(\\text{QED_delta}\\)\n     - Value Range: -0.8 to 0.6\n   - **Color Bar (Legend):**\n     - Title/Label: Counts\n     - Value Range: 0 to 3000\n   \n3. **Data Trends:**\n   - The plot shows a negative trend: as \\(|\\text{MW_delta}|\\) increases, \\(\\text{QED_delta}\\) tends to decrease.\n   - There is a noticeable clustering of data points around the lower values of \\(|\\text{MW_delta}|\\) (0-100) and \\(\\text{QED_delta}\\) close to 0.\n   - The data points are denser for lower values of \\(|\\text{MW_delta}|\\).\n\n4. **Annotations and Legends:**\n   - A red fitted line is plotted, indicating a negative correlation between the two variables.\n   - The color bar on the right shows the density of the data points, with darker shades representing higher counts.\n\n5. **Statistical Insights:**\n   - The fitted line suggests a linear relationship with a negative slope, indicating that increases in \\(|\\text{MW_delta}|\\) are associated with decreases in \\(\\text{QED_delta}\\).\n   - The spread and density of data clusters suggest more variability in \\(\\text{QED_delta}\\) at moderately high values of \\(|\\text{MW_delta}|\\).\n   - The darkest hexagons, indicating the highest counts, are concentrated at lower \\(|\\text{MW_delta}|\\), suggesting frequent occurrences of similar values in this range.\n\n==================================================\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"The regression of QED_delta on |MW_delta| (n\u2248469K) yielded:\\n- Intercept: \u20130.064485\\n- Slope: \u20130.001801 (p < 1e-300)\\n- R\u00b2 = 0.193461\\n\\nInterpretation: Each unit increase in |MW_delta| is associated with a 0.0018 decrease in QED_delta, confirming a small but highly significant negative relationship. The hexbin plot with the fitted line visually supports this downward trend.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"feedback\":\"Hypothesis: In successful edits, larger absolute molecular weight changes (|MW_delta|) are associated with greater losses in drug-likeness (more negative QED_delta).\\n\\nExperiment Implementation:\\n- Loaded train.parquet and dropped rows with null MW_delta or QED_delta.\\n- Computed abs_MW_delta = |MW_delta|.\\n- Fitted linear regression QED_delta ~ abs_MW_delta on ~469K observations.\\n- Generated a hexbin plot of abs_MW_delta vs QED_delta with the fitted regression line.\\n\\nResults:\\n- Intercept: \u20130.064485\\n- Slope (|MW_delta|): \u20130.001801 (p < 1e-300)\\n- R\u00b2 = 0.193461\\n- The negative slope is highly significant, indicating that each unit increase in |MW_delta| is associated with a 0.0018 decrease in QED_delta.\\n- The hexbin plot and fitted line visually confirm a downward trend.\\n\\nConclusion:\\n- The analysis was correctly implemented and fully tests the hypothesis.\\n- Findings support the hypothesis: larger absolute MW changes correspond to greater losses in drug-likeness.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_reviewer"
+    },
+    {
+      "content": "{\"experiments\":[{\"hypothesis\":\"In successful edits, preserving the Murcko scaffold is associated with significantly shorter edit descriptions, implying simpler edits tend to retain the scaffold.\",\"experiment_plan\":{\"objective\":\"Compare edit description length between scaffold\u2010retained and scaffold\u2010changed successful edits.\",\"steps\":\"1. Load train.parquet and filter rows where murcko_scaffold_retained is not null.\\n2. Compute edit_length = character count of the edit field.\\n3. Split into two groups: murcko_scaffold_retained == True vs False.\\n4. Test for difference in mean edit_length using an independent\u2010samples t\u2010test (or Mann\u2013Whitney U if non\u2010normal).\\n5. Visualize with boxplots of edit_length by scaffold retention.\",\"deliverables\":\"1. Summary statistics: mean, median, std of edit_length for each group.\\n2. Test statistic, p\u2010value, and effect size.\\n3. Boxplot comparing edit_length distributions.\"}},{\"hypothesis\":\"The impact of Murcko scaffold retention on target_delta differs across optimization objectives, suggesting some tasks tolerate scaffold changes more than others.\",\"experiment_plan\":{\"objective\":\"Assess interaction between task_id and scaffold retention on target_delta in successful edits.\",\"steps\":\"1. Load train.parquet and drop rows with null target_delta.\\n2. Encode murcko_scaffold_retained as binary (1/0).\\n3. Fit two\u2010way ANOVA or linear model: target_delta ~ C(task_id) * murcko_scaffold_retained.\\n4. Examine interaction terms and their significance.\\n5. For tasks with significant interactions, plot mean target_delta by scaffold retention.\",\"deliverables\":\"1. ANOVA table with F\u2010values and p\u2010values for main effects and interaction.\\n2. Estimated marginal means per task_id \u00d7 scaffold retention.\\n3. Interaction plots for significant tasks.\"}},{\"hypothesis\":\"In successful edits, replace operations exhibit a stronger positive correlation between SA_delta and target_delta than insert operations, implying replacement edits more directly trade synthetic accessibility for property improvement.\",\"experiment_plan\":{\"objective\":\"Compare SA_delta vs target_delta correlation by action_type within successful edits.\",\"steps\":\"1. Load train.parquet; drop rows with null SA_delta or target_delta.\\n2. Subset data by action_type == 'replace' and action_type == 'insert'.\\n3. For each subset, compute Pearson correlation and 95% CI between SA_delta and target_delta.\\n4. Test difference in correlations using Fisher's z\u2010test.\\n5. Plot scatter or hexbin for both groups with regression lines.\",\"deliverables\":\"1. Correlation coefficients and CIs for insert and replace.\\n2. Fisher\u2019s z\u2010test statistic and p\u2010value.\\n3. Overlaid scatter/regression plots for comparison.\"}},{\"hypothesis\":\"In successful edits, target_delta follows an inverted\u2010U relationship with abs(MW_delta), indicating moderate weight changes yield maximal property improvements.\",\"experiment_plan\":{\"objective\":\"Test for a quadratic relationship between abs(MW_delta) and target_delta.\",\"steps\":\"1. Load train.parquet; drop null MW_delta and target_delta.\\n2. Compute abs_MW_delta = |MW_delta|; center it (subtract mean).\\n3. Fit linear model: target_delta ~ abs_MW_delta + I(abs_MW_delta^2).\\n4. Test significance and sign of the quadratic term.\\n5. Visualize by binning abs_MW_delta into quintiles and plotting mean target_delta per bin with a smooth curve.\",\"deliverables\":\"1. Regression summary with coefficients, p\u2010values for linear and quadratic terms, and R\u00b2.\\n2. Plot of mean target_delta vs abs_MW_delta bins with fitted quadratic curve.\"}},{\"hypothesis\":\"In unsuccessful edits, the ratio QED_delta/SA_delta is more negative for delete operations than for insert or replace, suggesting deletion more severely harms drug-likeness relative to synthetic accessibility.\",\"experiment_plan\":{\"objective\":\"Compare the QED_delta to SA_delta ratio across action types in unsuccessful edits.\",\"steps\":\"1. Load train_neg.parquet; drop rows with null QED_delta or SA_delta and where SA_delta is zero.\\n2. Compute ratio = QED_delta / SA_delta for each row.\\n3. Group by action_type and compute group means and variances of ratio.\\n4. Use one\u2010way ANOVA (or Kruskal\u2013Wallis) to test differences across action types.\\n5. Post\u2010hoc pairwise comparisons (e.g., Tukey HSD).\\n6. Visualize with violin plots per action_type.\",\"deliverables\":\"1. Group summary: mean and std of ratio by action_type.\\n2. ANOVA table or nonparametric test results and post\u2010hoc p\u2010values.\\n3. Violin plot of ratio distributions by action_type.\"}},{\"hypothesis\":\"Longer natural\u2010language prompts are associated with higher success probability when controlling for task_id and action_type, indicating more detailed instructions improve editing outcomes.\",\"experiment_plan\":{\"objective\":\"Model success probability as a function of prompt length, controlling for task and action type.\",\"steps\":\"1. Load train.parquet and train_neg.parquet; label success = 1 for train, 0 for train_neg.\\n2. Compute prompt_length = number of words in prompt (split on whitespace).\\n3. Combine datasets; encode task_id and action_type as categorical dummies.\\n4. Fit logistic regression: success ~ prompt_length + C(task_id) + C(action_type).\\n5. Examine coefficient for prompt_length and its significance.\\n6. Plot binned success rates vs prompt_length, overlaid with predicted probabilities.\",\"deliverables\":\"1. Logistic regression summary with coefficient, odds ratio, CI, p\u2010value for prompt_length.\\n2. Binned observed vs predicted success rate plot.\"}},{\"hypothesis\":\"Prompts containing directional keywords like 'increase' or 'decrease' differ in success rates, with 'increase' directives yielding higher success than 'decrease' directives.\",\"experiment_plan\":{\"objective\":\"Evaluate how keyword presence in prompts affects success probability.\",\"steps\":\"1. Load both datasets with success labels as above.\\n2. Define binary flags for keywords: has_increase = prompt.str.contains('increase'), has_decrease = prompt.str.contains('decrease').\\n3. Fit logistic regression: success ~ has_increase + has_decrease + C(task_id) + C(action_type).\\n4. Compare odds ratios for has_increase vs has_decrease.\\n5. Visualize success rates for four groups: increase only, decrease only, both, neither.\",\"deliverables\":\"1. Regression output: coefficients, odds ratios, p\u2010values for keyword flags.\\n2. Bar chart of observed success rates for the four keyword\u2010presence groups.\"}},{\"hypothesis\":\"Across optimization tasks, tasks with higher average edit_length have lower overall success rates, suggesting more complex edits reduce likelihood of success at the task level.\",\"experiment_plan\":{\"objective\":\"Correlate task\u2010level average edit complexity with success rate across tasks.\",\"steps\":\"1. Load train.parquet and train_neg.parquet; label success as before.\\n2. Compute edit_length = character count of edit for all rows.\\n3. Group by task_id in each dataset to compute: mean_edit_length and n_success, n_total.\\n4. For each task_id, compute success_rate = n_success / n_total and average edit_length (averaged over both datasets).\\n5. Calculate Pearson correlation between average edit_length and success_rate across tasks.\\n6. Plot scatter of success_rate vs avg_edit_length with fitted regression line.\",\"deliverables\":\"1. Table per task_id: avg_edit_length, success_rate.\\n2. Correlation coefficient and p\u2010value.\\n3. Scatter plot with regression line.\"}}]}",
+      "role": "user",
+      "name": "experiment_generator"
+    }
+  ]
+}

@@ -36,7 +36,10 @@ def main() -> None:
             use_subprocess=payload.get("use_subprocess", False),
             timeout_s=payload.get("timeout_s"),
             allow_mime=allow_mime,
-            matplotlib_backend=payload.get("matplotlib_backend", ExecutionConfig.matplotlib_backend),
+            matplotlib_backend=payload.get(
+                "matplotlib_backend",
+                ExecutionConfig.matplotlib_backend,
+            ),
         )
         result = session.run_cell(payload["code_str"])
     except BaseException as exc:
@@ -65,6 +68,7 @@ def _build_bucket_mount(
     bucket: str,
     key_prefix: str,
     read_only: bool,
+    bucket_endpoint_url: str | None,
     bucket_secret: modal.Secret | None,
     oidc_auth_role_arn: str | None,
 ) -> modal.CloudBucketMount:
@@ -75,6 +79,8 @@ def _build_bucket_mount(
         "key_prefix": normalized_prefix,
         "read_only": read_only,
     }
+    if bucket_endpoint_url is not None:
+        mount_kwargs["bucket_endpoint_url"] = bucket_endpoint_url
     if bucket_secret is not None:
         mount_kwargs["secret"] = bucket_secret
     if oidc_auth_role_arn is not None:
@@ -130,6 +136,7 @@ class ModalSandboxIPythonBackend:
         mount_path: str = "/data",
         auth_mode: Literal["per_user_role", "shared_role"] = "per_user_role",
         read_only: bool = True,
+        bucket_endpoint_url: str | None = None,
         bucket_secret: modal.Secret | None = None,
         oidc_auth_role_arn: str | None = None,
         env: dict[str, str] | None = None,
@@ -147,6 +154,7 @@ class ModalSandboxIPythonBackend:
             auth_mode: Indicates whether per-user or shared credentials are used.
                 This backend does not enforce the policy; callers must pass the right credentials.
             read_only: Whether the mount should be read-only by default.
+            bucket_endpoint_url: Endpoint URL for S3-compatible buckets, if needed.
             bucket_secret: Modal Secret with bucket credentials, if needed.
             oidc_auth_role_arn: IAM role ARN for OIDC-based auth, if used.
             env: Environment variables for the Sandbox process.
@@ -160,6 +168,7 @@ class ModalSandboxIPythonBackend:
             bucket=bucket,
             key_prefix=key_prefix,
             read_only=read_only,
+            bucket_endpoint_url=bucket_endpoint_url,
             bucket_secret=bucket_secret,
             oidc_auth_role_arn=oidc_auth_role_arn,
         )
@@ -168,6 +177,57 @@ class ModalSandboxIPythonBackend:
             "RUN_ID": run_id,
             "DATASET_ROOT": mount_path,
         }
+        if env:
+            runtime_env.update(env)
+        return cls(
+            app_name=app_name,
+            bucket_mount=bucket_mount,
+            mount_path=mount_path,
+            env=runtime_env,
+            sandbox_timeout_s=sandbox_timeout_s,
+        )
+
+    @classmethod
+    def for_bucket_prefix(
+        cls,
+        *,
+        app_name: str,
+        bucket: str,
+        key_prefix: str,
+        mount_path: str = "/data",
+        read_only: bool = True,
+        bucket_endpoint_url: str | None = None,
+        bucket_secret: modal.Secret | None = None,
+        oidc_auth_role_arn: str | None = None,
+        env: dict[str, str] | None = None,
+        sandbox_timeout_s: int = _DEFAULT_SANDBOX_TIMEOUT_S,
+    ) -> ModalSandboxIPythonBackend:
+        """Create a Sandbox backend for a bucket prefix without user/run metadata.
+
+        Args:
+            app_name: Modal app name used to create Sandboxes.
+            bucket: Cloud bucket name backing the dataset.
+            key_prefix: Prefix within the bucket to mount (must be a directory).
+            mount_path: Path in the Sandbox where the dataset mount is attached.
+            read_only: Whether the mount should be read-only by default.
+            bucket_endpoint_url: Endpoint URL for S3-compatible buckets, if needed.
+            bucket_secret: Modal Secret with bucket credentials, if needed.
+            oidc_auth_role_arn: IAM role ARN for OIDC-based auth, if used.
+            env: Environment variables for the Sandbox process.
+            sandbox_timeout_s: Max Sandbox lifetime in seconds.
+
+        Returns:
+            A ModalSandboxIPythonBackend instance scoped to the bucket prefix.
+        """
+        bucket_mount = _build_bucket_mount(
+            bucket=bucket,
+            key_prefix=key_prefix,
+            read_only=read_only,
+            bucket_endpoint_url=bucket_endpoint_url,
+            bucket_secret=bucket_secret,
+            oidc_auth_role_arn=oidc_auth_role_arn,
+        )
+        runtime_env = {"DATASET_ROOT": mount_path}
         if env:
             runtime_env.update(env)
         return cls(

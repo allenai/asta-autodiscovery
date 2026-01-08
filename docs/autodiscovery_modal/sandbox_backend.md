@@ -48,6 +48,27 @@ print(result["stdout"])
 print(result["success"])
 ```
 
+### Execution with a generic bucket prefix (no user/run metadata)
+
+```python
+from autodiscovery_modal import ModalSandboxIPythonBackend
+from code_execution import IPythonExecutor
+
+backend = ModalSandboxIPythonBackend.for_bucket_prefix(
+    app_name="asta-autodiscovery",
+    bucket="myapp-datasets",
+    key_prefix="samples/",
+    read_only=True,
+    env={"EXPERIMENT_NAME": "smoke-test"},
+)
+
+executor = IPythonExecutor(backend)
+result = executor.run_cell("import os; print(os.environ['DATASET_ROOT'])")
+
+print(result["stdout"].strip())
+print(result["success"])
+```
+
 ### Write-enabled dataset mounts
 
 ```python
@@ -106,6 +127,8 @@ print(result["stdout"].strip())
 - Each call creates a fresh Sandbox. This prevents untrusted code from
   inspecting other runs, and avoids cross-run leakage.
 - `key_prefix` must end with `/`. The backend normalizes prefixes automatically.
+- Use `for_bucket_prefix` when you want a generic storage prefix without user/run metadata.
+- For S3-compatible services (e.g., GCS), pass `bucket_endpoint_url` so Modal mounts the right endpoint.
 - For bucket authentication, pass `bucket_secret` (static credentials) or
   `oidc_auth_role_arn` (OIDC-based IAM role).
 - Sandboxes default to a 10-minute lifetime. Override with `sandbox_timeout_s`

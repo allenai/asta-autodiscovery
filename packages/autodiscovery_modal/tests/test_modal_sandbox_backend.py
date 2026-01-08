@@ -186,6 +186,83 @@ def test_sandbox_backend_writes_payload_and_terminates(monkeypatch) -> None:
     assert captured_secret["DATASET_ROOT"] == "/data"
 
 
+def test_sandbox_backend_for_bucket_prefix_sets_dataset_root(monkeypatch) -> None:
+    created_mount: dict[str, Any] = {}
+    created_secret: dict[str, Any] = {}
+    sandbox_create_kwargs: dict[str, Any] = {}
+
+    def _dummy_mount(**kwargs: Any) -> dict[str, Any]:
+        created_mount.update(kwargs)
+        return {"mount": kwargs}
+
+    def _dummy_secret_from_dict(payload: dict[str, str]) -> dict[str, str]:
+        created_secret.update(payload)
+        return {"secret": payload}
+
+    def _dummy_app_lookup(app_name: str, *, create_if_missing: bool) -> str:
+        return f"app:{app_name}:{create_if_missing}"
+
+    def _dummy_sandbox_create(
+        *, app: Any, image: Any, volumes: dict[str, Any], secrets: list[Any], timeout: int
+    ) -> _DummySandbox:
+        sandbox_create_kwargs.update(
+            {
+                "app": app,
+                "image": image,
+                "volumes": volumes,
+                "secrets": secrets,
+                "timeout": timeout,
+            }
+        )
+        result_payload = {
+            "stdout": "ok",
+            "stderr": "",
+            "rich_outputs": [],
+            "success": True,
+            "error": None,
+        }
+        process = _DummyProcess(stdout=json.dumps(result_payload), stderr="")
+        return _DummySandbox(process)
+
+    monkeypatch.setattr(sandbox_backend.modal, "CloudBucketMount", _dummy_mount)
+    monkeypatch.setattr(
+        sandbox_backend.modal,
+        "Secret",
+        type("_Secret", (), {"from_dict": staticmethod(_dummy_secret_from_dict)}),
+    )
+    monkeypatch.setattr(
+        sandbox_backend.modal, "App", type("_App", (), {"lookup": staticmethod(_dummy_app_lookup)})
+    )
+    monkeypatch.setattr(
+        sandbox_backend.modal,
+        "Sandbox",
+        type("_Sandbox", (), {"create": staticmethod(_dummy_sandbox_create)}),
+    )
+
+    backend = sandbox_backend.ModalSandboxIPythonBackend.for_bucket_prefix(
+        app_name="demo-app",
+        bucket="my-bucket",
+        key_prefix="samples/",
+        mount_path="/data",
+        read_only=False,
+        bucket_endpoint_url="https://storage.googleapis.com",
+        env={"EXTRA": "value"},
+    )
+
+    result = backend.run_cell("print('hello')")
+
+    assert created_mount["bucket_name"] == "my-bucket"
+    assert created_mount["key_prefix"].endswith("/")
+    assert created_mount["read_only"] is False
+    assert created_mount["bucket_endpoint_url"] == "https://storage.googleapis.com"
+    assert sandbox_create_kwargs["volumes"]["/data"] == {"mount": created_mount}
+    assert created_secret["DATASET_ROOT"] == "/data"
+    assert created_secret["EXTRA"] == "value"
+    assert "USER_ID" not in created_secret
+    assert "RUN_ID" not in created_secret
+    assert result["success"] is True
+
+
 def test_sandbox_backend_returns_error_on_invalid_json(monkeypatch) -> None:
     process = _DummyProcess(stdout="not-json", stderr="bad")
     sandbox = _DummySandbox(process)

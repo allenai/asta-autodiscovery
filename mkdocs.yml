@@ -1,0 +1,50 @@
+site_name: AutoDiscovery
+site_url: https://allenai.github.io/asta-autodiscovery
+theme:
+  name: material
+  palette:
+    - scheme: asta-light
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: asta-dark
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+  font:
+    text: Manrope
+    code: JetBrains Mono
+  logo: assets/images/asta-logo.svg
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+
+nav:
+  - Home: index.md
+  - Code Execution:
+      - IPython Session: code_execution/ipython_session.md
+      - IPython Executor: code_execution/ipython_executor.md
+  - Modal:
+      - IPython Session: autodiscovery_modal/ipython_session.md
+      - IPython Executor: autodiscovery_modal/ipython_executor.md
+  - API Reference:
+      - AutoDiscovery Modal: api/autodiscovery_modal.md
+      - Code Execution: api/code_execution.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+
+extra_css:
+  - assets/styles/asta.css

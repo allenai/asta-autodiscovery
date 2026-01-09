@@ -1,0 +1,19 @@
+[project]
+name = "devtools"
+version = "0.1.0"
+description = "Developer tooling for AutoDiscovery"
+readme = "README.md"
+authors = [
+    { name = "Allen Institute for Artificial Intelligence" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "code-execution",
+]
+
+[project.scripts]
+ipython-session = "devtools.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.16,<0.9.0"]
+build-backend = "uv_build"

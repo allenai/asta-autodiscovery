@@ -1,0 +1,42 @@
+version: '3'
+services:
+  sonar:
+    build: ./sonar
+    depends_on:
+      - api
+      - ui
+      - proxy
+  api:
+    build: ./api
+    volumes:
+      - ./api:/api
+    environment:
+      # This ensures that errors are printed as they occur, which
+      # makes debugging easier.
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+  ui:
+    build:
+      context: ./ui
+      dockerfile: dev.Dockerfile
+    volumes:
+      - ./ui/src:/ui/src
+      - ./ui/public:/ui/public
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "localhost:3000"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+  proxy:
+    build: ./proxy
+    ports:
+      - "8080:8080"
+    depends_on:
+      ui:
+        condition: service_healthy
+      api:
+        condition: service_started

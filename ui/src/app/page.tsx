@@ -1,0 +1,16 @@
+import { Typography } from '@mui/material';
+
+import QuestionAndAnswer from './components/QuestionAndAnswer';
+
+export default function Home() {
+    return (
+        <>
+            <Typography variant="h1">Skiff NextJS Template</Typography>
+            <Typography sx={{ marginBottom: 2 }} component="p">
+                This is an example Skiff application that uses{' '}
+                <a href="https://nextjs.org">NextJS</a>.
+            </Typography>
+            <QuestionAndAnswer />
+        </>
+    );
+}

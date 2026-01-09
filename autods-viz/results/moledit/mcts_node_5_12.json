@@ -1,0 +1,153 @@
+{
+  "id": "node_5_12",
+  "success": true,
+  "parent_id": "node_4_1",
+  "creation_idx": 66,
+  "time_elapsed": 278.56,
+  "visits": 1,
+  "value": 2.5451396444180316,
+  "self_value": 2.5451396444180316,
+  "surprising": true,
+  "belief_change": 0.4406130268199233,
+  "kl_divergence": 12.725698222090159,
+  "prior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      0.5,
+      0.5
+    ],
+    "n": 26.0,
+    "definitely_true": 0.0,
+    "maybe_true": 15.0,
+    "uncertain": 11.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.6442307692307693,
+    "mean": 0.6388888888888888
+  },
+  "posterior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      17.25,
+      9.75
+    ],
+    "n": 60.0,
+    "definitely_true": 0.0,
+    "maybe_true": 0.0,
+    "uncertain": 0.0,
+    "maybe_false": 0.0,
+    "definitely_false": 60.0,
+    "_empirical_mean": 0.0,
+    "mean": 0.19827586206896552
+  },
+  "hypothesis": "For QED optimization tasks (task_id 103), unsuccessful edits (train_neg.parquet) involve more complex edit patterns (higher sub-edit counts, measured by the number of ';' in 'edit') than successful edits (train.parquet).",
+  "experiment_plan": {
+    "objective": "Compare edit complexity between successful and unsuccessful QED tasks.",
+    "steps": "1. Load train.parquet and train_neg.parquet; filter both to task_id == 103.\n2. Drop rows where 'edit' is null.\n3. For each row, count sub_edits = number of ';' characters in the 'edit' string.\n4. Separate into two groups: successful vs unsuccessful QED edits.\n5. Compute mean, standard deviation, and sample size of sub_edits for each group.\n6. Perform a nonparametric test (Mann\u2013Whitney U) comparing sub_edits distributions.\n7. Visualize with side-by-side violin plots or boxplots of sub_edits.",
+    "deliverables": "- Summary statistics (mean, std, n) of sub_edit counts by success status.\n- Mann\u2013Whitney U test statistic and p-value.\n- Violin or boxplot comparing sub_edit distributions."
+  },
+  "code": "import pandas as pd\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nfrom scipy.stats import mannwhitneyu\n\n# 1. Load datasets\ntrain = pd.read_parquet('train.parquet')\ntrain_neg = pd.read_parquet('train_neg.parquet')\n\n# 2. Filter for QED optimization tasks (task_id == 103) and drop null edits\ntrain_qed = train[train['task_id'] == 103].dropna(subset=['edit']).copy()\ntrain_neg_qed = train_neg[train_neg['task_id'] == 103].dropna(subset=['edit']).copy()\n\n# 3. Compute sub_edits as the count of ';' in the edit string\ntrain_qed['sub_edits'] = train_qed['edit'].str.count(';')\ntrain_neg_qed['sub_edits'] = train_neg_qed['edit'].str.count(';')\n\n# 4. Summary statistics\nfor label, df in [('Successful', train_qed), ('Unsuccessful', train_neg_qed)]:\n    n = len(df)\n    mean = df['sub_edits'].mean()\n    std = df['sub_edits'].std()\n    print(f\"{label} QED edits: n = {n}, mean sub_edits = {mean:.3f}, std = {std:.3f}\")\n\n# 5. Mann-Whitney U test\nu_stat, p_value = mannwhitneyu(train_qed['sub_edits'], train_neg_qed['sub_edits'], alternative='two-sided')\nprint(f\"Mann-Whitney U test: U = {u_stat:.3f}, p-value = {p_value:.3e}\")\n\n# 6. Visualization: boxplots of sub_edits by status\nplot_df = pd.concat([\n    train_qed.assign(status='Successful'),\n    train_neg_qed.assign(status='Unsuccessful')\n])\nplt.figure(figsize=(8, 6))\nsns.boxplot(x='status', y='sub_edits', data=plot_df)\nplt.title('Sub-edit Count Distribution for QED Task (task_id 103)')\nplt.xlabel('Edit Status')\nplt.ylabel('Number of \";\" (sub_edits)')\nplt.show()",
+  "code_output": "exitcode: 0 (execution succeeded)\nCode output: Successful QED edits: n = 15997, mean sub_edits = 0.000, std = 0.000\nUnsuccessful QED edits: n = 35816, mean sub_edits = 0.000, std = 0.000\nMann-Whitney U test: U = 286474276.000, p-value = 1.000e+00\n\n=== Plot Analysis (fig. 1) ===\n\n1. **Plot Type:** \n   - The image shows a box plot. The purpose of a box plot is to display the distribution, variability, and outliers of a dataset.\n\n2. **Axes:**\n   - **X-Axis:**\n     - Title/Label: \"Edit Status\"\n     - Categories: \"Successful\" and \"Unsuccessful\" \n   - **Y-Axis:**\n     - Title/Label: \"Number of ','\" (sub_edits)\n     - Value Range: Approximately -0.05 to 0.05\n\n3. **Data Trends:**\n   - Both categories (\"Successful\" and \"Unsuccessful\") show a central tendency around zero with no visible spreading of data.\n   - There are no apparent outliers or variability differences between the categories in this plot.\n\n4. **Annotations and Legends:**\n   - Title: \"Sub-edit Count Distribution for QED Task (task_id 103)\"\n   - There are no additional legends or annotations in the image.\n\n5. **Statistical Insights:**\n   - The distribution of sub-edits in both categories seems to be very similar, clustered around zero.\n   - This indicates there is no significant difference in the number of sub-edits between successful and unsuccessful edits, suggesting that these edits do not vary much in terms of sub-edit count.\n\n==================================================\n",
+  "analysis": "The code ran successfully without errors. For QED optimization tasks (task_id 103), both successful (n = 15,997) and unsuccessful (n = 35,816) edits have a mean sub_edit count of 0.000 (std 0.000), indicating every \u2018edit\u2019 string contains zero semicolons. The Mann\u2013Whitney U test yields U = 286,474,276.000, p = 1.0, confirming no difference in sub-edit counts between groups. The box plot shows both distributions are flat at zero. These results do not support the hypothesis that unsuccessful QED edits involve more complex sub-edit patterns than successful edits.",
+  "review": "Hypothesis: Unsuccessful QED\u2010optimization edits (task_id 103 in train_neg.parquet) involve more complex sub\u2010edit patterns (measured by count of \u2018;\u2019 in the edit string) than successful edits (train.parquet).\n\nImplementation: The code correctly loaded both datasets, filtered to task_id 103, dropped null edits, counted semicolons in each edit, computed group statistics (n, mean, std), performed a two\u2010sided Mann\u2013Whitney U test, and visualized via boxplots.\n\nResults:\n- Successful edits: n = 15,997; mean sub_edits = 0.000; std = 0.000\n- Unsuccessful edits: n = 35,816; mean sub_edits = 0.000; std = 0.000\n- Mann\u2013Whitney U = 286,474,276; p = 1.0\n- Boxplots show both distributions flat at zero.\n\nConclusion: There is no difference in sub\u2010edit count complexity between successful and unsuccessful QED edits (all have zero semicolons), so the hypothesis is not supported.",
+  "untried_experiments": [
+    {
+      "hypothesis": "Larger absolute changes in molecular weight (|MW_delta|) are associated with lower success rates of molecular edits across all tasks.",
+      "experiment_plan": {
+        "objective": "Quantify how the magnitude of molecular weight change affects edit success probability.",
+        "steps": "1. Load train.parquet and train_neg.parquet.\n2. Add a binary flag 'success' (1 for train, 0 for train_neg).\n3. Drop rows with null MW_delta.\n4. Compute abs_MW_delta = abs(MW_delta).\n5. Bin abs_MW_delta into quartiles or equal\u2010width bins.\n6. For each bin, calculate success rate and sample size.\n7. Perform a Cochran\u2010Armitage trend test or fit a logistic regression model (success ~ abs_MW_delta) to assess trend significance.\n8. Visualize success rate versus abs_MW_delta bins with error bars or trend line.",
+        "deliverables": "\u2022 Table of bins, sample sizes, and success rates (with 95% CIs).\n\u2022 Trend test statistic and p\u2010value or logistic regression coefficient and p\u2010value.\n\u2022 Plot of success rate against abs_MW_delta bins."
+      }
+    },
+    {
+      "hypothesis": "Insertion edits with large molecular weight increases (MW_delta above the median) have lower success rates than insertion edits with smaller weight changes.",
+      "experiment_plan": {
+        "objective": "Test whether the magnitude of weight added by insertion operations predicts success.",
+        "steps": "1. Load both datasets and tag success as above.\n2. Filter to action_type == 'insert'.\n3. Drop rows with null MW_delta.\n4. Compute the median MW_delta among all insertions and create a binary flag 'high_insert' (MW_delta > median).\n5. For high_insert and low_insert groups, compute success rates and sample sizes.\n6. Use a two\u2010sample proportion z\u2010test to compare success rates between the two groups.\n7. Visualize the two success rates with 95% confidence error bars.",
+        "deliverables": "\u2022 Success rate and 95% CI for high versus low MW_delta insertions.\n\u2022 Z\u2010statistic and p\u2010value from the proportion test.\n\u2022 Bar chart comparing success rates."
+      }
+    },
+    {
+      "hypothesis": "For deletion edits, retaining the Murcko scaffold significantly increases the probability of a successful edit compared to deletions that break the scaffold.",
+      "experiment_plan": {
+        "objective": "Determine whether scaffold retention in deletions boosts edit success.",
+        "steps": "1. Load train.parquet and train_neg.parquet; add success flag.\n2. Filter to action_type == 'delete'.\n3. Drop rows with null murcko_scaffold_retained.\n4. Build a 2\u00d72 contingency table of success vs murcko_scaffold_retained.\n5. Perform a chi\u2010square test of independence on the table.\n6. Visualize the proportion of successful edits for scaffold\u2010retained vs scaffold\u2010broken deletions.",
+        "deliverables": "\u2022 Contingency table of success by scaffold retention.\n\u2022 Chi\u2010square statistic, degrees of freedom, and p\u2010value.\n\u2022 Bar chart of success rates with scaffold retention status."
+      }
+    },
+    {
+      "hypothesis": "In permeability optimization tasks (task_id 105), unsuccessful edits decrease QED to a greater extent (more negative QED_delta) than successful edits.",
+      "experiment_plan": {
+        "objective": "Compare the impact of edits on drug\u2010likeness (QED_delta) between successful and unsuccessful permeability optimizations.",
+        "steps": "1. Load both datasets and flag success.\n2. Filter both to task_id == 105.\n3. Drop rows with null QED_delta.\n4. Separate into successful and unsuccessful groups.\n5. Compute mean, standard deviation, and sample size of QED_delta for each group.\n6. Conduct an independent two\u2010sample t\u2010test (Welch\u2019s) comparing QED_delta between the two groups.\n7. Visualize the distributions via boxplots or violin plots.",
+        "deliverables": "\u2022 Group statistics (n, mean QED_delta, std).\n\u2022 t\u2010statistic, degrees of freedom, and p\u2010value.\n\u2022 Boxplot or violin plot contrasting QED_delta."
+      }
+    },
+    {
+      "hypothesis": "Replacement edits produce larger average QED_delta improvements than insertion or deletion edits in the QED optimization task (task_id 103).",
+      "experiment_plan": {
+        "objective": "Assess whether replace operations yield superior QED improvements for QED tasks.",
+        "steps": "1. Load train.parquet; filter to task_id == 103.\n2. Drop rows with null QED_delta or action_type.\n3. Group by action_type (replace, insert, delete) and compute n, mean, and std of QED_delta.\n4. Perform a Kruskal\u2013Wallis H\u2010test to compare QED_delta distributions across the three action types.\n5. If significant, run post\u2010hoc pairwise Dunn\u2019s tests with Bonferroni correction.\n6. Visualize group distributions with boxplots.",
+        "deliverables": "\u2022 Table of action_type groups with n, mean, std QED_delta.\n\u2022 Kruskal\u2013Wallis H statistic and p\u2010value.\n\u2022 Pairwise post\u2010hoc test results.\n\u2022 Boxplot of QED_delta by action_type."
+      }
+    },
+    {
+      "hypothesis": "Longer natural language prompts are associated with lower success rates of the corresponding molecular edits.",
+      "experiment_plan": {
+        "objective": "Quantify the relationship between prompt length and edit success.",
+        "steps": "1. Load both datasets; add a success flag.\n2. Drop rows with null prompt.\n3. For each prompt, compute word_count by splitting on whitespace.\n4. Fit a logistic regression model (success ~ word_count) to test significance.\n5. Optionally compute the point\u2010biserial correlation between word_count and success.\n6. Bin prompts into quartiles of word_count and compute success rate per bin.\n7. Plot success rate versus prompt_length bins.",
+        "deliverables": "\u2022 Logistic regression coefficient for word_count and p\u2010value.\n\u2022 Point\u2010biserial correlation coefficient and p\u2010value (optional).\n\u2022 Table of success rates by prompt-length quartile.\n\u2022 Line or bar chart of success rate against prompt length bins."
+      }
+    },
+    {
+      "hypothesis": "Successful edits that retain the Murcko scaffold exhibit smaller absolute changes in molecular weight (|MW_delta|) than successful edits that do not retain the scaffold.",
+      "experiment_plan": {
+        "objective": "Test whether scaffold retention constrains weight changes in successful edits.",
+        "steps": "1. Load train.parquet; filter to successful edits.\n2. Drop rows with null MW_delta or murcko_scaffold_retained.\n3. Compute abs_MW_delta = abs(MW_delta).\n4. Split data into retained vs broken scaffold.\n5. Calculate n, mean, and std of abs_MW_delta for each group.\n6. Perform an independent two\u2010sample t\u2010test (Welch\u2019s) comparing abs_MW_delta.\n7. Visualize the two distributions via boxplots.",
+        "deliverables": "\u2022 Group statistics (n, mean abs_MW_delta, std).\n\u2022 t\u2010statistic, degrees of freedom, and p\u2010value.\n\u2022 Boxplot of abs_MW_delta by scaffold retention status."
+      }
+    },
+    {
+      "hypothesis": "In successful edits, increases in molecular weight (MW_delta) are positively correlated with increases in synthetic accessibility difficulty (SA_delta), indicating larger additions make molecules harder to synthesize.",
+      "experiment_plan": {
+        "objective": "Measure the correlation between MW_delta and SA_delta among successful edits.",
+        "steps": "1. Load train.parquet; filter to successful edits.\n2. Drop rows with null MW_delta or SA_delta.\n3. Compute Pearson\u2019s correlation coefficient between MW_delta and SA_delta and its p\u2010value.\n4. Optionally compute Spearman\u2019s rank correlation as a robustness check.\n5. Create a scatter plot of MW_delta vs SA_delta with a fitted regression line.",
+        "deliverables": "\u2022 Pearson correlation coefficient and p\u2010value (and Spearman coefficient, optional).\n\u2022 Scatter plot with regression line showing the relationship."
+      }
+    }
+  ],
+  "tried_experiments": [],
+  "query": "Hypothesis: For QED optimization tasks (task_id 103), unsuccessful edits (train_neg.parquet) involve more complex edit patterns (higher sub-edit counts, measured by the number of ';' in 'edit') than successful edits (train.parquet).\n\nExperiment objective: Compare edit complexity between successful and unsuccessful QED tasks.\n\nSteps for the programmer:\n1. Load train.parquet and train_neg.parquet; filter both to task_id == 103.\n2. Drop rows where 'edit' is null.\n3. For each row, count sub_edits = number of ';' characters in the 'edit' string.\n4. Separate into two groups: successful vs unsuccessful QED edits.\n5. Compute mean, standard deviation, and sample size of sub_edits for each group.\n6. Perform a nonparametric test (Mann\u2013Whitney U) comparing sub_edits distributions.\n7. Visualize with side-by-side violin plots or boxplots of sub_edits.\n\nDeliverables:\n- Summary statistics (mean, std, n) of sub_edit counts by success status.\n- Mann\u2013Whitney U test statistic and p-value.\n- Violin or boxplot comparing sub_edit distributions.",
+  "messages": [
+    {
+      "content": "Hypothesis: For QED optimization tasks (task_id 103), unsuccessful edits (train_neg.parquet) involve more complex edit patterns (higher sub-edit counts, measured by the number of ';' in 'edit') than successful edits (train.parquet).\n\nExperiment objective: Compare edit complexity between successful and unsuccessful QED tasks.\n\nSteps for the programmer:\n1. Load train.parquet and train_neg.parquet; filter both to task_id == 103.\n2. Drop rows where 'edit' is null.\n3. For each row, count sub_edits = number of ';' characters in the 'edit' string.\n4. Separate into two groups: successful vs unsuccessful QED edits.\n5. Compute mean, standard deviation, and sample size of sub_edits for each group.\n6. Perform a nonparametric test (Mann\u2013Whitney U) comparing sub_edits distributions.\n7. Visualize with side-by-side violin plots or boxplots of sub_edits.\n\nDeliverables:\n- Summary statistics (mean, std, n) of sub_edit counts by success status.\n- Mann\u2013Whitney U test statistic and p-value.\n- Violin or boxplot comparing sub_edit distributions.",
+      "name": "user_proxy",
+      "role": "user"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nimport matplotlib.pyplot as plt\\nimport seaborn as sns\\nfrom scipy.stats import mannwhitneyu\\n\\n# 1. Load datasets\\ntrain = pd.read_parquet('train.parquet')\\ntrain_neg = pd.read_parquet('train_neg.parquet')\\n\\n# 2. Filter for QED optimization tasks (task_id == 103) and drop null edits\\ntrain_qed = train[train['task_id'] == 103].dropna(subset=['edit']).copy()\\ntrain_neg_qed = train_neg[train_neg['task_id'] == 103].dropna(subset=['edit']).copy()\\n\\n# 3. Compute sub_edits as the count of ';' in the edit string\\ntrain_qed['sub_edits'] = train_qed['edit'].str.count(';')\\ntrain_neg_qed['sub_edits'] = train_neg_qed['edit'].str.count(';')\\n\\n# 4. Summary statistics\\nfor label, df in [('Successful', train_qed), ('Unsuccessful', train_neg_qed)]:\\n    n = len(df)\\n    mean = df['sub_edits'].mean()\\n    std = df['sub_edits'].std()\\n    print(f\\\"{label} QED edits: n = {n}, mean sub_edits = {mean:.3f}, std = {std:.3f}\\\")\\n\\n# 5. Mann-Whitney U test\\nu_stat, p_value = mannwhitneyu(train_qed['sub_edits'], train_neg_qed['sub_edits'], alternative='two-sided')\\nprint(f\\\"Mann-Whitney U test: U = {u_stat:.3f}, p-value = {p_value:.3e}\\\")\\n\\n# 6. Visualization: boxplots of sub_edits by status\\nplot_df = pd.concat([\\n    train_qed.assign(status='Successful'),\\n    train_neg_qed.assign(status='Unsuccessful')\\n])\\nplt.figure(figsize=(8, 6))\\nsns.boxplot(x='status', y='sub_edits', data=plot_df)\\nplt.title('Sub-edit Count Distribution for QED Task (task_id 103)')\\nplt.xlabel('Edit Status')\\nplt.ylabel('Number of \\\";\\\" (sub_edits)')\\nplt.show()\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 0 (execution succeeded)\nCode output: Successful QED edits: n = 15997, mean sub_edits = 0.000, std = 0.000\nUnsuccessful QED edits: n = 35816, mean sub_edits = 0.000, std = 0.000\nMann-Whitney U test: U = 286474276.000, p-value = 1.000e+00\n\n=== Plot Analysis (fig. 1) ===\n\n1. **Plot Type:** \n   - The image shows a box plot. The purpose of a box plot is to display the distribution, variability, and outliers of a dataset.\n\n2. **Axes:**\n   - **X-Axis:**\n     - Title/Label: \"Edit Status\"\n     - Categories: \"Successful\" and \"Unsuccessful\" \n   - **Y-Axis:**\n     - Title/Label: \"Number of ','\" (sub_edits)\n     - Value Range: Approximately -0.05 to 0.05\n\n3. **Data Trends:**\n   - Both categories (\"Successful\" and \"Unsuccessful\") show a central tendency around zero with no visible spreading of data.\n   - There are no apparent outliers or variability differences between the categories in this plot.\n\n4. **Annotations and Legends:**\n   - Title: \"Sub-edit Count Distribution for QED Task (task_id 103)\"\n   - There are no additional legends or annotations in the image.\n\n5. **Statistical Insights:**\n   - The distribution of sub-edits in both categories seems to be very similar, clustered around zero.\n   - This indicates there is no significant difference in the number of sub-edits between successful and unsuccessful edits, suggesting that these edits do not vary much in terms of sub-edit count.\n\n==================================================\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"The code ran successfully without errors. For QED optimization tasks (task_id 103), both successful (n = 15,997) and unsuccessful (n = 35,816) edits have a mean sub_edit count of 0.000 (std 0.000), indicating every \u2018edit\u2019 string contains zero semicolons. The Mann\u2013Whitney U test yields U = 286,474,276.000, p = 1.0, confirming no difference in sub-edit counts between groups. The box plot shows both distributions are flat at zero. These results do not support the hypothesis that unsuccessful QED edits involve more complex sub-edit patterns than successful edits.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"feedback\":\"Hypothesis: Unsuccessful QED\u2010optimization edits (task_id 103 in train_neg.parquet) involve more complex sub\u2010edit patterns (measured by count of \u2018;\u2019 in the edit string) than successful edits (train.parquet).\\n\\nImplementation: The code correctly loaded both datasets, filtered to task_id 103, dropped null edits, counted semicolons in each edit, computed group statistics (n, mean, std), performed a two\u2010sided Mann\u2013Whitney U test, and visualized via boxplots.\\n\\nResults:\\n- Successful edits: n = 15,997; mean sub_edits = 0.000; std = 0.000\\n- Unsuccessful edits: n = 35,816; mean sub_edits = 0.000; std = 0.000\\n- Mann\u2013Whitney U = 286,474,276; p = 1.0\\n- Boxplots show both distributions flat at zero.\\n\\nConclusion: There is no difference in sub\u2010edit count complexity between successful and unsuccessful QED edits (all have zero semicolons), so the hypothesis is not supported.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_reviewer"
+    },
+    {
+      "content": "{\"experiments\":[{\"hypothesis\":\"Larger absolute changes in molecular weight (|MW_delta|) are associated with lower success rates of molecular edits across all tasks.\",\"experiment_plan\":{\"objective\":\"Quantify how the magnitude of molecular weight change affects edit success probability.\",\"steps\":\"1. Load train.parquet and train_neg.parquet.\\n2. Add a binary flag 'success' (1 for train, 0 for train_neg).\\n3. Drop rows with null MW_delta.\\n4. Compute abs_MW_delta = abs(MW_delta).\\n5. Bin abs_MW_delta into quartiles or equal\u2010width bins.\\n6. For each bin, calculate success rate and sample size.\\n7. Perform a Cochran\u2010Armitage trend test or fit a logistic regression model (success ~ abs_MW_delta) to assess trend significance.\\n8. Visualize success rate versus abs_MW_delta bins with error bars or trend line.\",\"deliverables\":\"\u2022 Table of bins, sample sizes, and success rates (with 95% CIs).\\n\u2022 Trend test statistic and p\u2010value or logistic regression coefficient and p\u2010value.\\n\u2022 Plot of success rate against abs_MW_delta bins.\"}},{\"hypothesis\":\"Insertion edits with large molecular weight increases (MW_delta above the median) have lower success rates than insertion edits with smaller weight changes.\",\"experiment_plan\":{\"objective\":\"Test whether the magnitude of weight added by insertion operations predicts success.\",\"steps\":\"1. Load both datasets and tag success as above.\\n2. Filter to action_type == 'insert'.\\n3. Drop rows with null MW_delta.\\n4. Compute the median MW_delta among all insertions and create a binary flag 'high_insert' (MW_delta > median).\\n5. For high_insert and low_insert groups, compute success rates and sample sizes.\\n6. Use a two\u2010sample proportion z\u2010test to compare success rates between the two groups.\\n7. Visualize the two success rates with 95% confidence error bars.\",\"deliverables\":\"\u2022 Success rate and 95% CI for high versus low MW_delta insertions.\\n\u2022 Z\u2010statistic and p\u2010value from the proportion test.\\n\u2022 Bar chart comparing success rates.\"}},{\"hypothesis\":\"For deletion edits, retaining the Murcko scaffold significantly increases the probability of a successful edit compared to deletions that break the scaffold.\",\"experiment_plan\":{\"objective\":\"Determine whether scaffold retention in deletions boosts edit success.\",\"steps\":\"1. Load train.parquet and train_neg.parquet; add success flag.\\n2. Filter to action_type == 'delete'.\\n3. Drop rows with null murcko_scaffold_retained.\\n4. Build a 2\u00d72 contingency table of success vs murcko_scaffold_retained.\\n5. Perform a chi\u2010square test of independence on the table.\\n6. Visualize the proportion of successful edits for scaffold\u2010retained vs scaffold\u2010broken deletions.\",\"deliverables\":\"\u2022 Contingency table of success by scaffold retention.\\n\u2022 Chi\u2010square statistic, degrees of freedom, and p\u2010value.\\n\u2022 Bar chart of success rates with scaffold retention status.\"}},{\"hypothesis\":\"In permeability optimization tasks (task_id 105), unsuccessful edits decrease QED to a greater extent (more negative QED_delta) than successful edits.\",\"experiment_plan\":{\"objective\":\"Compare the impact of edits on drug\u2010likeness (QED_delta) between successful and unsuccessful permeability optimizations.\",\"steps\":\"1. Load both datasets and flag success.\\n2. Filter both to task_id == 105.\\n3. Drop rows with null QED_delta.\\n4. Separate into successful and unsuccessful groups.\\n5. Compute mean, standard deviation, and sample size of QED_delta for each group.\\n6. Conduct an independent two\u2010sample t\u2010test (Welch\u2019s) comparing QED_delta between the two groups.\\n7. Visualize the distributions via boxplots or violin plots.\",\"deliverables\":\"\u2022 Group statistics (n, mean QED_delta, std).\\n\u2022 t\u2010statistic, degrees of freedom, and p\u2010value.\\n\u2022 Boxplot or violin plot contrasting QED_delta.\"}},{\"hypothesis\":\"Replacement edits produce larger average QED_delta improvements than insertion or deletion edits in the QED optimization task (task_id 103).\",\"experiment_plan\":{\"objective\":\"Assess whether replace operations yield superior QED improvements for QED tasks.\",\"steps\":\"1. Load train.parquet; filter to task_id == 103.\\n2. Drop rows with null QED_delta or action_type.\\n3. Group by action_type (replace, insert, delete) and compute n, mean, and std of QED_delta.\\n4. Perform a Kruskal\u2013Wallis H\u2010test to compare QED_delta distributions across the three action types.\\n5. If significant, run post\u2010hoc pairwise Dunn\u2019s tests with Bonferroni correction.\\n6. Visualize group distributions with boxplots.\",\"deliverables\":\"\u2022 Table of action_type groups with n, mean, std QED_delta.\\n\u2022 Kruskal\u2013Wallis H statistic and p\u2010value.\\n\u2022 Pairwise post\u2010hoc test results.\\n\u2022 Boxplot of QED_delta by action_type.\"}},{\"hypothesis\":\"Longer natural language prompts are associated with lower success rates of the corresponding molecular edits.\",\"experiment_plan\":{\"objective\":\"Quantify the relationship between prompt length and edit success.\",\"steps\":\"1. Load both datasets; add a success flag.\\n2. Drop rows with null prompt.\\n3. For each prompt, compute word_count by splitting on whitespace.\\n4. Fit a logistic regression model (success ~ word_count) to test significance.\\n5. Optionally compute the point\u2010biserial correlation between word_count and success.\\n6. Bin prompts into quartiles of word_count and compute success rate per bin.\\n7. Plot success rate versus prompt_length bins.\",\"deliverables\":\"\u2022 Logistic regression coefficient for word_count and p\u2010value.\\n\u2022 Point\u2010biserial correlation coefficient and p\u2010value (optional).\\n\u2022 Table of success rates by prompt-length quartile.\\n\u2022 Line or bar chart of success rate against prompt length bins.\"}},{\"hypothesis\":\"Successful edits that retain the Murcko scaffold exhibit smaller absolute changes in molecular weight (|MW_delta|) than successful edits that do not retain the scaffold.\",\"experiment_plan\":{\"objective\":\"Test whether scaffold retention constrains weight changes in successful edits.\",\"steps\":\"1. Load train.parquet; filter to successful edits.\\n2. Drop rows with null MW_delta or murcko_scaffold_retained.\\n3. Compute abs_MW_delta = abs(MW_delta).\\n4. Split data into retained vs broken scaffold.\\n5. Calculate n, mean, and std of abs_MW_delta for each group.\\n6. Perform an independent two\u2010sample t\u2010test (Welch\u2019s) comparing abs_MW_delta.\\n7. Visualize the two distributions via boxplots.\",\"deliverables\":\"\u2022 Group statistics (n, mean abs_MW_delta, std).\\n\u2022 t\u2010statistic, degrees of freedom, and p\u2010value.\\n\u2022 Boxplot of abs_MW_delta by scaffold retention status.\"}},{\"hypothesis\":\"In successful edits, increases in molecular weight (MW_delta) are positively correlated with increases in synthetic accessibility difficulty (SA_delta), indicating larger additions make molecules harder to synthesize.\",\"experiment_plan\":{\"objective\":\"Measure the correlation between MW_delta and SA_delta among successful edits.\",\"steps\":\"1. Load train.parquet; filter to successful edits.\\n2. Drop rows with null MW_delta or SA_delta.\\n3. Compute Pearson\u2019s correlation coefficient between MW_delta and SA_delta and its p\u2010value.\\n4. Optionally compute Spearman\u2019s rank correlation as a robustness check.\\n5. Create a scatter plot of MW_delta vs SA_delta with a fitted regression line.\",\"deliverables\":\"\u2022 Pearson correlation coefficient and p\u2010value (and Spearman coefficient, optional).\\n\u2022 Scatter plot with regression line showing the relationship.\"}}]}",
+      "role": "user",
+      "name": "experiment_generator"
+    }
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "id": "node_4_26",
+  "success": true,
+  "parent_id": "node_3_4",
+  "creation_idx": 73,
+  "time_elapsed": 240.51,
+  "visits": 1,
+  "value": 0.3891514431588462,
+  "self_value": 0.3891514431588462,
+  "surprising": false,
+  "belief_change": 0.09039347749025173,
+  "kl_divergence": 1.9457572157942309,
+  "prior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      0.5,
+      0.5
+    ],
+    "n": 30.0,
+    "definitely_true": 15.0,
+    "maybe_true": 15.0,
+    "uncertain": 0.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.875,
+    "mean": 0.8629032258064516
+  },
+  "posterior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      26.75,
+      4.25
+    ],
+    "n": 60.0,
+    "definitely_true": 60.0,
+    "maybe_true": 0.0,
+    "uncertain": 0.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 1.0,
+    "mean": 0.9532967032967034
+  },
+  "hypothesis": "For the drug-likeness optimization task (task_id = 103), the correlation between target_delta and QED_delta is stronger than for other tasks, reflecting alignment between the objective and QED metric.",
+  "experiment_plan": {
+    "objective": "Compare how well QED_delta tracks the declared optimization target for task 103 versus other tasks.",
+    "steps": "1. Load train.parquet and drop rows with null target_delta or QED_delta. 2. Subset data into two groups: task_id == 103 and task_id != 103. 3. Compute Pearson correlation between target_delta and QED_delta in each subset. 4. Apply Fisher\u2019s z-transformation to test for difference between the two correlation coefficients. 5. Report and interpret results.",
+    "deliverables": "1. Correlation coefficients and p-values for both subsets. 2. Z-statistic and p-value for comparing correlations. 3. Summary statement on whether task 103 shows a stronger QED-target alignment."
+  },
+  "code": "import pandas as pd\nimport numpy as np\nfrom scipy.stats import pearsonr, norm\n\n# Load dataset\ndf = pd.read_parquet('train.parquet')\n\n# Drop rows with null target_delta or QED_delta\ndf_clean = df.dropna(subset=['target_delta', 'QED_delta'])\n\n# Subset for task 103 and others\ngroup1 = df_clean[df_clean['task_id'] == 103]\ngroup2 = df_clean[df_clean['task_id'] != 103]\n\n# Compute Pearson correlations\nr1, p1 = pearsonr(group1['target_delta'], group1['QED_delta'])\nr2, p2 = pearsonr(group2['target_delta'], group2['QED_delta'])\n\n# Fisher's z-transformation\nn1 = len(group1)\nn2 = len(group2)\n\nz1 = np.arctanh(r1)\nz2 = np.arctanh(r2)\nse_diff = np.sqrt(1/(n1 - 3) + 1/(n2 - 3))\nz_stat = (z1 - z2) / se_diff\np_z = 2 * (1 - norm.cdf(abs(z_stat)))\n\n# Output results\nprint(f\"Task 103: n = {n1}, Pearson r = {r1:.4f}, p-value = {p1:.2e}\")\nprint(f\"Other tasks: n = {n2}, Pearson r = {r2:.4f}, p-value = {p2:.2e}\")\nprint(f\"Fisher z-test for difference: z-statistic = {z_stat:.4f}, p-value = {p_z:.2e}\")\n\n# Summary statement\nalpha = 0.05\nif p_z < alpha:\n    if abs(r1) > abs(r2):\n        direction = 'stronger'\n    else:\n        direction = 'weaker'\n    print(f\"Summary: The correlation in task 103 is significantly {direction} than in other tasks (p = {p_z:.2e}).\")\nelse:\n    print(f\"Summary: No significant difference in correlation strength between task 103 and other tasks (p = {p_z:.2e}).\")",
+  "code_output": "exitcode: 0 (execution succeeded)\nCode output: Task 103: n = 15997, Pearson r = 1.0000, p-value = 0.00e+00\nOther tasks: n = 252105, Pearson r = -0.1401, p-value = 0.00e+00\nFisher z-test for difference: z-statistic = 2269.9435, p-value = 0.00e+00\nSummary: The correlation in task 103 is significantly stronger than in other tasks (p = 0.00e+00).\n",
+  "analysis": "The code ran successfully. Results:\n- For task 103 (n=15,997): Pearson r = +1.0000, p < 1e\u2212300 (perfect correlation, since target_delta\u2009=\u2009QED_delta for the drug-likeness objective).\n- For other tasks (n=252,105): Pearson r = \u22120.1401, p < 1e\u2212300 (weak negative correlation).\n- Fisher\u2019s z-test: z = 2269.94, p < 1e\u2212300, indicating the correlation in task 103 is significantly stronger than in the other tasks.",
+  "review": "Hypothesis: For the drug-likeness task (task_id = 103), target_delta and QED_delta correlate more strongly than for other tasks.\n\nImplementation: Loaded train.parquet, dropped nulls, computed Pearson correlations separately for task 103 (n = 15,997) and other tasks (n = 252,105), applied Fisher\u2019s z-test to compare correlations.\n\nResults:\n- Task 103: r = 0.9999\u2026 (printed 1.0000), p < 1e\u2212300\n- Other tasks: r = \u20130.1401, p < 1e\u2212300\n- Fisher z\u2010statistic \u2248 2269.94, p < 1e\u2212300\n\nConclusion: The correlation in task 103 is statistically and practically much stronger than in other tasks, confirming the hypothesis. All deliverables are present and analysis follows the plan.",
+  "untried_experiments": [
+    {
+      "hypothesis": "In successful edits (train.parquet), delete operations yield a significantly more negative average MW_delta than insert or replace operations, reflecting that deletions reduce molecular weight more drastically.",
+      "experiment_plan": {
+        "objective": "Compare the distribution of MW_delta across action_type categories (delete, insert, replace) in successful edits to test whether deletions produce larger weight reductions.",
+        "steps": "1. Load train.parquet and drop any rows with null MW_delta or action_type.\n2. Group the data by action_type and compute the mean and median MW_delta for each category.\n3. Use a one-way ANOVA or Kruskal\u2013Wallis test to assess whether MW_delta differs across the three action_type groups.\n4. If the global test is significant, perform post-hoc pairwise comparisons (e.g., Tukey\u2019s HSD or Dunn\u2019s test) to identify which groups differ.\n5. Summarize the results in a table and visualize boxplots of MW_delta by action_type.",
+        "deliverables": "1. Table of mean and median MW_delta per action_type.\n2. ANOVA/Kruskal\u2013Wallis test statistic and p-value.\n3. Post-hoc pairwise comparison results.\n4. Boxplot of MW_delta by action_type."
+      }
+    },
+    {
+      "hypothesis": "Unsuccessful edits (train_neg.parquet) originate from shorter and less detailed prompts than successful edits, so the median prompt length is lower in train_neg than in train.parquet.",
+      "experiment_plan": {
+        "objective": "Test whether the textual prompt length differs between successful and unsuccessful edits.",
+        "steps": "1. Load both train.parquet and train_neg.parquet.\n2. Drop any rows with null prompt.\n3. For each dataset, compute a new column prompt_length as the number of characters (or tokens) in the prompt string.\n4. Compare the distributions of prompt_length between the two datasets using a two-sample t-test or Mann\u2013Whitney U test.\n5. Plot density or boxplot overlays of prompt_length for the two groups.",
+        "deliverables": "1. Summary statistics (mean, median, IQR) of prompt_length for train.parquet vs train_neg.parquet.\n2. Test statistic and p-value for the distribution comparison.\n3. Density plot or boxplot overlay of prompt_length distributions."
+      }
+    },
+    {
+      "hypothesis": "For the water-solubility optimization task (task_id = 101) in successful edits, retaining the Murcko scaffold leads to smaller target_delta improvements compared to edits that change the scaffold, indicating scaffold changes drive larger solubility gains.",
+      "experiment_plan": {
+        "objective": "Within task_id 101, assess whether edits that break (non-retain) the Murcko scaffold produce larger target_delta than those that retain it.",
+        "steps": "1. Load train.parquet and filter rows to task_id == 101, dropping null target_delta or murcko_scaffold_retained.\n2. Split examples into two groups by murcko_scaffold_retained (true vs false).\n3. Compute mean and median target_delta for each group.\n4. Use a two-sample t-test or Mann\u2013Whitney U test to compare target_delta between scaffold-retained and scaffold-broken edits.\n5. Plot boxplots or violin plots of target_delta by scaffold retention status.",
+        "deliverables": "1. Mean and median target_delta for scaffold-retained vs scaffold-broken groups under task 101.\n2. Test statistic and p-value for the group comparison.\n3. Boxplot/violin plot visualizing the difference."
+      }
+    },
+    {
+      "hypothesis": "In successful edits, increases in the number of rings (ring_count_delta > 0) correlate with higher synthetic accessibility penalties (SA_delta), because more rings make synthesis harder.",
+      "experiment_plan": {
+        "objective": "Compute ring count changes between input and output molecules and test their correlation with SA_delta.",
+        "steps": "1. Load train.parquet and drop rows with null SA_delta.\n2. Use RDKit to parse input_smiles and output_smiles, compute their number of rings (e.g., rdMolDescriptors.CalcNumRings).\n3. Derive ring_count_delta = output_ring_count \u2212 input_ring_count.\n4. Compute Pearson or Spearman correlation between ring_count_delta and SA_delta.\n5. Fit a linear regression model SA_delta ~ ring_count_delta + C(task_id) to estimate the effect while controlling for task.\n6. Plot ring_count_delta vs SA_delta with a trendline.",
+        "deliverables": "1. Correlation coefficient (and p-value) between ring_count_delta and SA_delta.\n2. Regression summary for SA_delta ~ ring_count_delta + task fixed effects.\n3. Scatter plot of ring_count_delta vs SA_delta with fitted line."
+      }
+    },
+    {
+      "hypothesis": "The ratio of MW_delta to target_delta (|MW_delta/target_delta|) is higher on average in unsuccessful edits than in successful edits, indicating inefficient weight changes when the optimization fails.",
+      "experiment_plan": {
+        "objective": "Compare the distribution of the absolute MW_delta/target_delta ratio between train.parquet and train_neg.parquet.",
+        "steps": "1. Load both datasets and drop rows where target_delta is zero or null, and MW_delta is null.\n2. Compute abs_ratio = abs(MW_delta / target_delta) for each row.\n3. Compare the distributions of abs_ratio between successful and unsuccessful datasets using a Mann\u2013Whitney U test.\n4. Summarize median and IQR of abs_ratio for each dataset.\n5. Plot boxplots or violin plots of abs_ratio by dataset type.",
+        "deliverables": "1. Median and IQR of abs_ratio in both datasets.\n2. U-test statistic and p-value.\n3. Boxplot/violin plot comparing abs_ratio distributions."
+      }
+    },
+    {
+      "hypothesis": "The correlation between SA_delta and QED_delta varies by action_type in successful edits: insert operations show a weaker negative correlation than delete or replace.",
+      "experiment_plan": {
+        "objective": "Within train.parquet, compute and compare the SA_delta\u2013QED_delta correlation across action_type categories.",
+        "steps": "1. Load train.parquet and drop rows with null SA_delta or QED_delta or action_type.\n2. For each action_type (insert, delete, replace), compute Pearson correlation and p-value between SA_delta and QED_delta.\n3. Use Fisher\u2019s z-test to assess whether correlations differ significantly between pairs of action_types.\n4. Create a table of correlations with confidence intervals.\n5. Plot scatter plots with separate trendlines for each action_type.",
+        "deliverables": "1. Pearson r and p-value for each action_type.\n2. Fisher\u2019s z-test results comparing correlations between action_types.\n3. Combined scatter plot with colored trendlines."
+      }
+    },
+    {
+      "hypothesis": "Some optimization tasks exhibit more variability in outcomes: tasks targeting permeability (task_id = 105) have higher variance in target_delta than tasks targeting drug-likeness (103).",
+      "experiment_plan": {
+        "objective": "Quantify and compare the variance of target_delta across different task_ids, focusing on 105 vs 103.",
+        "steps": "1. Load train.parquet and drop rows with null target_delta.\n2. Group data by task_id and compute variance and standard deviation of target_delta for each task.\n3. Use Levene\u2019s test or Bartlett\u2019s test to compare variances between task 105 and task 103.\n4. Present a ranked list of task_ids by target_delta variance.\n5. Visualize variances via a bar chart.",
+        "deliverables": "1. Table of target_delta variance and SD for each task_id.\n2. Variance comparison test statistic and p-value for 105 vs 103.\n3. Bar chart of variances by task_id."
+      }
+    },
+    {
+      "hypothesis": "Within successful edits, high QED improvements (QED_delta > 0.2) are associated with a lower rate of scaffold retention than modest or negative QED_delta, indicating that large drug-likeness gains often require scaffold changes.",
+      "experiment_plan": {
+        "objective": "Test whether the proportion of murcko_scaffold_retained differs between high QED_delta and low QED_delta groups.",
+        "steps": "1. Load train.parquet and drop rows with null QED_delta or murcko_scaffold_retained.\n2. Define two groups: high_QED = QED_delta > 0.2, low_QED = QED_delta \u2264 0.2.\n3. Compute the proportion of murcko_scaffold_retained (true) in each group.\n4. Use a chi-square test of independence to assess whether scaffold retention is associated with the QED_delta group.\n5. Report counts, proportions, test statistic, and p-value. Plot a clustered bar chart.",
+        "deliverables": "1. Counts and retention rates for high_QED vs low_QED groups.\n2. Chi-square test statistic and p-value.\n3. Clustered bar chart of scaffold retention by QED group."
+      }
+    }
+  ],
+  "tried_experiments": [],
+  "query": "Hypothesis: For the drug-likeness optimization task (task_id = 103), the correlation between target_delta and QED_delta is stronger than for other tasks, reflecting alignment between the objective and QED metric.\n\nExperiment objective: Compare how well QED_delta tracks the declared optimization target for task 103 versus other tasks.\n\nSteps for the programmer:\n1. Load train.parquet and drop rows with null target_delta or QED_delta. 2. Subset data into two groups: task_id == 103 and task_id != 103. 3. Compute Pearson correlation between target_delta and QED_delta in each subset. 4. Apply Fisher\u2019s z-transformation to test for difference between the two correlation coefficients. 5. Report and interpret results.\n\nDeliverables:\n1. Correlation coefficients and p-values for both subsets. 2. Z-statistic and p-value for comparing correlations. 3. Summary statement on whether task 103 shows a stronger QED-target alignment.",
+  "messages": [
+    {
+      "content": "Hypothesis: For the drug-likeness optimization task (task_id = 103), the correlation between target_delta and QED_delta is stronger than for other tasks, reflecting alignment between the objective and QED metric.\n\nExperiment objective: Compare how well QED_delta tracks the declared optimization target for task 103 versus other tasks.\n\nSteps for the programmer:\n1. Load train.parquet and drop rows with null target_delta or QED_delta. 2. Subset data into two groups: task_id == 103 and task_id != 103. 3. Compute Pearson correlation between target_delta and QED_delta in each subset. 4. Apply Fisher\u2019s z-transformation to test for difference between the two correlation coefficients. 5. Report and interpret results.\n\nDeliverables:\n1. Correlation coefficients and p-values for both subsets. 2. Z-statistic and p-value for comparing correlations. 3. Summary statement on whether task 103 shows a stronger QED-target alignment.",
+      "name": "user_proxy",
+      "role": "user"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nimport numpy as np\\nfrom scipy.stats import pearsonr, norm\\n\\n# Load dataset\\ndf = pd.read_parquet('train.parquet')\\n\\n# Drop rows with null target_delta or QED_delta\\ndf_clean = df.dropna(subset=['target_delta', 'QED_delta'])\\n\\n# Subset for task 103 and others\\ngroup1 = df_clean[df_clean['task_id'] == 103]\\ngroup2 = df_clean[df_clean['task_id'] != 103]\\n\\n# Compute Pearson correlations\\nr1, p1 = pearsonr(group1['target_delta'], group1['QED_delta'])\\nr2, p2 = pearsonr(group2['target_delta'], group2['QED_delta'])\\n\\n# Fisher's z-transformation\\nn1 = len(group1)\\nn2 = len(group2)\\n\\nz1 = np.arctanh(r1)\\nz2 = np.arctanh(r2)\\nse_diff = np.sqrt(1/(n1 - 3) + 1/(n2 - 3))\\nz_stat = (z1 - z2) / se_diff\\np_z = 2 * (1 - norm.cdf(abs(z_stat)))\\n\\n# Output results\\nprint(f\\\"Task 103: n = {n1}, Pearson r = {r1:.4f}, p-value = {p1:.2e}\\\")\\nprint(f\\\"Other tasks: n = {n2}, Pearson r = {r2:.4f}, p-value = {p2:.2e}\\\\n\\\")\\nprint(f\\\"Fisher z-test for difference:\\n  z-statistic = {z_stat:.4f}, p-value = {p_z:.2e}\\\\n\\\")\\n\\n# Summary statement\\nif abs(z_stat) > norm.ppf(0.975):\\n    stronger = 'stronger' if abs(r1) > abs(r2) else 'weaker'\\n    print(f\\\"Summary: The correlation in task 103 is significantly {stronger} than in other tasks (p = {p_z:.2e}).\\\")\\nelse:\\n    print(\\\"Summary: No significant difference in correlation strength between task 103 and other tasks.\\\")\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 1 (execution failed)\nCode output:   File \"/gantry-runtime/work/20251202-100236/tmp_code_c27677f57300a3f74b1c3b4677567804.py\", line 106\n    print(f\"Fisher z-test for difference:\n          ^\nSyntaxError: unterminated string literal (detected at line 106)\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"The code failed with a SyntaxError due to an unterminated string literal in the print statement for the Fisher z-test output. The f-string spans multiple lines but isn\u2019t properly closed. Please correct the quoting (e.g., use triple-quoted strings or escape the newline) and rerun the experiment.\",\"success\":false}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nimport numpy as np\\nfrom scipy.stats import pearsonr, norm\\n\\n# Load dataset\\ndf = pd.read_parquet('train.parquet')\\n\\n# Drop rows with null target_delta or QED_delta\\ndf_clean = df.dropna(subset=['target_delta', 'QED_delta'])\\n\\n# Subset for task 103 and others\\ngroup1 = df_clean[df_clean['task_id'] == 103]\\ngroup2 = df_clean[df_clean['task_id'] != 103]\\n\\n# Compute Pearson correlations\\nr1, p1 = pearsonr(group1['target_delta'], group1['QED_delta'])\\nr2, p2 = pearsonr(group2['target_delta'], group2['QED_delta'])\\n\\n# Fisher's z-transformation\\nn1 = len(group1)\\nn2 = len(group2)\\n\\nz1 = np.arctanh(r1)\\nz2 = np.arctanh(r2)\\nse_diff = np.sqrt(1/(n1 - 3) + 1/(n2 - 3))\\nz_stat = (z1 - z2) / se_diff\\np_z = 2 * (1 - norm.cdf(abs(z_stat)))\\n\\n# Output results\\nprint(f\\\"Task 103: n = {n1}, Pearson r = {r1:.4f}, p-value = {p1:.2e}\\\")\\nprint(f\\\"Other tasks: n = {n2}, Pearson r = {r2:.4f}, p-value = {p2:.2e}\\\")\\nprint(f\\\"Fisher z-test for difference: z-statistic = {z_stat:.4f}, p-value = {p_z:.2e}\\\")\\n\\n# Summary statement\\nalpha = 0.05\\nif p_z < alpha:\\n    if abs(r1) > abs(r2):\\n        direction = 'stronger'\\n    else:\\n        direction = 'weaker'\\n    print(f\\\"Summary: The correlation in task 103 is significantly {direction} than in other tasks (p = {p_z:.2e}).\\\")\\nelse:\\n    print(f\\\"Summary: No significant difference in correlation strength between task 103 and other tasks (p = {p_z:.2e}).\\\")\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 0 (execution succeeded)\nCode output: Task 103: n = 15997, Pearson r = 1.0000, p-value = 0.00e+00\nOther tasks: n = 252105, Pearson r = -0.1401, p-value = 0.00e+00\nFisher z-test for difference: z-statistic = 2269.9435, p-value = 0.00e+00\nSummary: The correlation in task 103 is significantly stronger than in other tasks (p = 0.00e+00).\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"The code ran successfully. Results:\\n- For task 103 (n=15,997): Pearson r = +1.0000, p < 1e\u2212300 (perfect correlation, since target_delta\u2009=\u2009QED_delta for the drug-likeness objective).\\n- For other tasks (n=252,105): Pearson r = \u22120.1401, p < 1e\u2212300 (weak negative correlation).\\n- Fisher\u2019s z-test: z = 2269.94, p < 1e\u2212300, indicating the correlation in task 103 is significantly stronger than in the other tasks.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"feedback\": \"Hypothesis: For the drug-likeness task (task_id = 103), target_delta and QED_delta correlate more strongly than for other tasks.\\n\\nImplementation: Loaded train.parquet, dropped nulls, computed Pearson correlations separately for task 103 (n = 15,997) and other tasks (n = 252,105), applied Fisher\u2019s z-test to compare correlations.\\n\\nResults:\\n- Task 103: r = 0.9999\u2026 (printed 1.0000), p < 1e\u2212300\\n- Other tasks: r = \u20130.1401, p < 1e\u2212300\\n- Fisher z\u2010statistic \u2248 2269.94, p < 1e\u2212300\\n\\nConclusion: The correlation in task 103 is statistically and practically much stronger than in other tasks, confirming the hypothesis. All deliverables are present and analysis follows the plan.\", \"success\": true}",
+      "role": "user",
+      "name": "experiment_reviewer"
+    },
+    {
+      "content": "{\"experiments\":[  \n  {  \n    \"hypothesis\":\"In successful edits (train.parquet), delete operations yield a significantly more negative average MW_delta than insert or replace operations, reflecting that deletions reduce molecular weight more drastically.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Compare the distribution of MW_delta across action_type categories (delete, insert, replace) in successful edits to test whether deletions produce larger weight reductions.\",  \n      \"steps\":\"1. Load train.parquet and drop any rows with null MW_delta or action_type.\\n2. Group the data by action_type and compute the mean and median MW_delta for each category.\\n3. Use a one-way ANOVA or Kruskal\u2013Wallis test to assess whether MW_delta differs across the three action_type groups.\\n4. If the global test is significant, perform post-hoc pairwise comparisons (e.g., Tukey\u2019s HSD or Dunn\u2019s test) to identify which groups differ.\\n5. Summarize the results in a table and visualize boxplots of MW_delta by action_type.\",  \n      \"deliverables\":\"1. Table of mean and median MW_delta per action_type.\\n2. ANOVA/Kruskal\u2013Wallis test statistic and p-value.\\n3. Post-hoc pairwise comparison results.\\n4. Boxplot of MW_delta by action_type.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"Unsuccessful edits (train_neg.parquet) originate from shorter and less detailed prompts than successful edits, so the median prompt length is lower in train_neg than in train.parquet.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Test whether the textual prompt length differs between successful and unsuccessful edits.\",  \n      \"steps\":\"1. Load both train.parquet and train_neg.parquet.\\n2. Drop any rows with null prompt.\\n3. For each dataset, compute a new column prompt_length as the number of characters (or tokens) in the prompt string.\\n4. Compare the distributions of prompt_length between the two datasets using a two-sample t-test or Mann\u2013Whitney U test.\\n5. Plot density or boxplot overlays of prompt_length for the two groups.\",  \n      \"deliverables\":\"1. Summary statistics (mean, median, IQR) of prompt_length for train.parquet vs train_neg.parquet.\\n2. Test statistic and p-value for the distribution comparison.\\n3. Density plot or boxplot overlay of prompt_length distributions.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"For the water-solubility optimization task (task_id = 101) in successful edits, retaining the Murcko scaffold leads to smaller target_delta improvements compared to edits that change the scaffold, indicating scaffold changes drive larger solubility gains.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Within task_id 101, assess whether edits that break (non-retain) the Murcko scaffold produce larger target_delta than those that retain it.\",  \n      \"steps\":\"1. Load train.parquet and filter rows to task_id == 101, dropping null target_delta or murcko_scaffold_retained.\\n2. Split examples into two groups by murcko_scaffold_retained (true vs false).\\n3. Compute mean and median target_delta for each group.\\n4. Use a two-sample t-test or Mann\u2013Whitney U test to compare target_delta between scaffold-retained and scaffold-broken edits.\\n5. Plot boxplots or violin plots of target_delta by scaffold retention status.\",  \n      \"deliverables\":\"1. Mean and median target_delta for scaffold-retained vs scaffold-broken groups under task 101.\\n2. Test statistic and p-value for the group comparison.\\n3. Boxplot/violin plot visualizing the difference.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"In successful edits, increases in the number of rings (ring_count_delta > 0) correlate with higher synthetic accessibility penalties (SA_delta), because more rings make synthesis harder.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Compute ring count changes between input and output molecules and test their correlation with SA_delta.\",  \n      \"steps\":\"1. Load train.parquet and drop rows with null SA_delta.\\n2. Use RDKit to parse input_smiles and output_smiles, compute their number of rings (e.g., rdMolDescriptors.CalcNumRings).\\n3. Derive ring_count_delta = output_ring_count \u2212 input_ring_count.\\n4. Compute Pearson or Spearman correlation between ring_count_delta and SA_delta.\\n5. Fit a linear regression model SA_delta ~ ring_count_delta + C(task_id) to estimate the effect while controlling for task.\\n6. Plot ring_count_delta vs SA_delta with a trendline.\",  \n      \"deliverables\":\"1. Correlation coefficient (and p-value) between ring_count_delta and SA_delta.\\n2. Regression summary for SA_delta ~ ring_count_delta + task fixed effects.\\n3. Scatter plot of ring_count_delta vs SA_delta with fitted line.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"The ratio of MW_delta to target_delta (|MW_delta/target_delta|) is higher on average in unsuccessful edits than in successful edits, indicating inefficient weight changes when the optimization fails.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Compare the distribution of the absolute MW_delta/target_delta ratio between train.parquet and train_neg.parquet.\",  \n      \"steps\":\"1. Load both datasets and drop rows where target_delta is zero or null, and MW_delta is null.\\n2. Compute abs_ratio = abs(MW_delta / target_delta) for each row.\\n3. Compare the distributions of abs_ratio between successful and unsuccessful datasets using a Mann\u2013Whitney U test.\\n4. Summarize median and IQR of abs_ratio for each dataset.\\n5. Plot boxplots or violin plots of abs_ratio by dataset type.\",  \n      \"deliverables\":\"1. Median and IQR of abs_ratio in both datasets.\\n2. U-test statistic and p-value.\\n3. Boxplot/violin plot comparing abs_ratio distributions.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"The correlation between SA_delta and QED_delta varies by action_type in successful edits: insert operations show a weaker negative correlation than delete or replace.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Within train.parquet, compute and compare the SA_delta\u2013QED_delta correlation across action_type categories.\",  \n      \"steps\":\"1. Load train.parquet and drop rows with null SA_delta or QED_delta or action_type.\\n2. For each action_type (insert, delete, replace), compute Pearson correlation and p-value between SA_delta and QED_delta.\\n3. Use Fisher\u2019s z-test to assess whether correlations differ significantly between pairs of action_types.\\n4. Create a table of correlations with confidence intervals.\\n5. Plot scatter plots with separate trendlines for each action_type.\",  \n      \"deliverables\":\"1. Pearson r and p-value for each action_type.\\n2. Fisher\u2019s z-test results comparing correlations between action_types.\\n3. Combined scatter plot with colored trendlines.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"Some optimization tasks exhibit more variability in outcomes: tasks targeting permeability (task_id = 105) have higher variance in target_delta than tasks targeting drug-likeness (103).\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Quantify and compare the variance of target_delta across different task_ids, focusing on 105 vs 103.\",  \n      \"steps\":\"1. Load train.parquet and drop rows with null target_delta.\\n2. Group data by task_id and compute variance and standard deviation of target_delta for each task.\\n3. Use Levene\u2019s test or Bartlett\u2019s test to compare variances between task 105 and task 103.\\n4. Present a ranked list of task_ids by target_delta variance.\\n5. Visualize variances via a bar chart.\",  \n      \"deliverables\":\"1. Table of target_delta variance and SD for each task_id.\\n2. Variance comparison test statistic and p-value for 105 vs 103.\\n3. Bar chart of variances by task_id.\"  \n    }  \n  },  \n  {  \n    \"hypothesis\":\"Within successful edits, high QED improvements (QED_delta > 0.2) are associated with a lower rate of scaffold retention than modest or negative QED_delta, indicating that large drug-likeness gains often require scaffold changes.\",  \n    \"experiment_plan\":{  \n      \"objective\":\"Test whether the proportion of murcko_scaffold_retained differs between high QED_delta and low QED_delta groups.\",  \n      \"steps\":\"1. Load train.parquet and drop rows with null QED_delta or murcko_scaffold_retained.\\n2. Define two groups: high_QED = QED_delta > 0.2, low_QED = QED_delta \u2264 0.2.\\n3. Compute the proportion of murcko_scaffold_retained (true) in each group.\\n4. Use a chi-square test of independence to assess whether scaffold retention is associated with the QED_delta group.\\n5. Report counts, proportions, test statistic, and p-value. Plot a clustered bar chart.\",  \n      \"deliverables\":\"1. Counts and retention rates for high_QED vs low_QED groups.\\n2. Chi-square test statistic and p-value.\\n3. Clustered bar chart of scaffold retention by QED group.\"  \n    }  \n  }  \n]}",
+      "role": "user",
+      "name": "experiment_generator"
+    }
+  ]
+}

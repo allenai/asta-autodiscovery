@@ -1,0 +1,153 @@
+{
+  "id": "node_4_2",
+  "success": true,
+  "parent_id": "node_3_0",
+  "creation_idx": 24,
+  "time_elapsed": 228.41,
+  "visits": 1,
+  "value": 2.533751454970388,
+  "self_value": 2.533751454970388,
+  "surprising": true,
+  "belief_change": 0.40872031194611835,
+  "kl_divergence": 12.668757274851941,
+  "prior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      0.5,
+      0.5
+    ],
+    "n": 30.0,
+    "definitely_true": 20.0,
+    "maybe_true": 10.0,
+    "uncertain": 0.0,
+    "maybe_false": 0.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.9166666666666666,
+    "mean": 0.9032258064516129
+  },
+  "posterior": {
+    "_type": "boolean_cat",
+    "prior_params": [
+      28.0,
+      3.0
+    ],
+    "n": 60.0,
+    "definitely_true": 0.0,
+    "maybe_true": 0.0,
+    "uncertain": 8.0,
+    "maybe_false": 52.0,
+    "definitely_false": 0.0,
+    "_empirical_mean": 0.2833333333333333,
+    "mean": 0.4945054945054945
+  },
+  "hypothesis": "Receipt of neoadjuvant treatment is associated with lower pathological T stage at surgery (pathologic_t) in breast cancer patients.",
+  "experiment_plan": {
+    "objective": "Evaluate whether neoadjuvant treatment leads to downstaging of tumor size category at pathology.",
+    "steps": "1. Load cleaned_clinical_data.csv.\n2. Recode neoadjuvant_treatment into binary (Yes/No); exclude missing.\n3. Recode pathologic_t into ordinal ranks T1<T2<T3<T4; exclude MX/other.\n4. Merge and create a dataset of neoadjuvant_treatment and pathologic_t.\n5. Compare pathologic_t rank distributions between treated and untreated groups using Mann-Whitney U test.\n6. Fit an ordinal logistic regression model: pathologic_t_rank ~ neoadjuvant_treatment + age_at_diagnosis + ER_status.\n7. Report test statistics and regression coefficients.",
+    "deliverables": "\u2022 Table of patient neoadjuvant status and pathologic_t rank.\n\u2022 Mann-Whitney U test statistic and p-value.\n\u2022 Ordinal logistic regression summary (odds ratios and p-values)."
+  },
+  "code": "import pandas as pd\nimport numpy as np\nfrom scipy.stats import mannwhitneyu\nimport statsmodels.api as sm\nfrom statsmodels.miscmodels.ordinal_model import OrderedModel\n\n# 1. Load clinical data\nclinical = pd.read_csv('cleaned_clinical_data.csv')\n\n# 2. Recode neoadjuvant_treatment\nclinical = clinical[['bcr_patient_barcode', 'neoadjuvant_treatment', 'pathologic_t', 'age_at_diagnosis', 'er_status']]\nclinical = clinical.dropna(subset=['neoadjuvant_treatment', 'pathologic_t', 'age_at_diagnosis', 'er_status'])\nclinical = clinical[clinical['neoadjuvant_treatment'].isin(['Yes', 'No'])]\nclinical['neo_binary'] = clinical['neoadjuvant_treatment'].map({'No': 0, 'Yes': 1})\n\n# 3. Recode pathologic_t into ranks\ndef map_t_rank(t):\n    if isinstance(t, str):\n        if t.startswith('T1'): return 1\n        if t.startswith('T2'): return 2\n        if t.startswith('T3'): return 3\n        if t.startswith('T4'): return 4\n    return np.nan\n\nclinical['t_rank'] = clinical['pathologic_t'].apply(map_t_rank)\nclinical = clinical.dropna(subset=['t_rank'])\nclinical['t_rank'] = clinical['t_rank'].astype(int)\n\n# 4. Recode ER status\nclinical = clinical[clinical['er_status'].isin(['Positive', 'Negative'])]\nclinical['er_binary'] = clinical['er_status'].map({'Negative': 0, 'Positive': 1})\n\n# Final dataset\ndata = clinical[['bcr_patient_barcode', 'neo_binary', 't_rank', 'age_at_diagnosis', 'er_binary']]\nprint(f\"Included patients: {data.shape[0]}\")\nprint(\"Pathologic T rank counts by neoadjuvant treatment:\")\nprint(pd.crosstab(data['neo_binary'], data['t_rank']))\n\n# 5. Mann-Whitney U test\ngroup0 = data.loc[data['neo_binary'] == 0, 't_rank']\ngroup1 = data.loc[data['neo_binary'] == 1, 't_rank']\nu_stat, p_val = mannwhitneyu(group1, group0, alternative='two-sided')\nprint(f\"Mann-Whitney U test: U = {u_stat:.2f}, p-value = {p_val:.4f}\")\n\n# 6. Ordinal logistic regression\nendog = data['t_rank']\nexog = data[['neo_binary', 'age_at_diagnosis', 'er_binary']]\n# Fit OrderedModel with logit link\neom = OrderedModel(endog, exog, distr='logit')\nres = eom.fit(method='bfgs', disp=False)\n\n# 7. Regression results: odds ratios and p-values for covariates\nparams = res.params\npvalues = res.pvalues\nexog_names = exog.columns\nresults_df = pd.DataFrame({\n    'coef': params[exog_names],\n    'OR': np.exp(params[exog_names]),\n    'p-value': pvalues[exog_names]\n})\nprint(\"\\nOrdinal Logistic Regression Results:\")\nprint(results_df)\n",
+  "code_output": "exitcode: 0 (execution succeeded)\nCode output: Included patients: 1041\nPathologic T rank counts by neoadjuvant treatment:\nt_rank        1    2    3   4\nneo_binary                   \n0           265  596  135  32\n1             3    6    0   4\nMann-Whitney U test: U = 7823.50, p-value = 0.2326\n\nOrdinal Logistic Regression Results:\n                      coef        OR   p-value\nneo_binary        0.851760  2.343767  0.173885\nage_at_diagnosis  0.000623  1.000623  0.894368\ner_binary        -0.050789  0.950479  0.724575\n",
+  "analysis": "1041 patients included (neo=0: 1028, neo=1: 13). Pathologic T stage counts by treatment: untreated (T1\u2013T4 = 265, 596, 135, 32), treated (3, 6, 0, 4). Mann-Whitney U test: U=7823.50, p=0.2326 (no significant difference). Ordinal logistic regression (adjusted for age and ER status) shows neoadjuvant treatment coef=0.852 (OR=2.34, p=0.174), age p=0.894, ER p=0.725, indicating no significant association between neoadjuvant treatment and lower pathologic T stage.",
+  "review": "Hypothesis: Receipt of neoadjuvant treatment is associated with lower pathologic T stage at surgery.\n\nImplementation: The cleaned clinical data were filtered to exclude missing values, neoadjuvant_treatment was binarized (Yes/No), pathologic_t was mapped to ordinal ranks T1=1 \u2026 T4=4 (excluding MX/others), and ER status was binarized. A Mann\u2013Whitney U test compared T stage distributions between treated (n=13) and untreated (n=1028) groups, yielding U = 7823.50, p = 0.2326. An ordinal logistic regression adjusting for age and ER status produced an odds ratio for neoadjuvant treatment of 2.34 (p = 0.174), with no significant effects for age or ER status.\n\nFindings: Neither the nonparametric test nor the adjusted regression supports an association between neoadjuvant treatment and lower pathologic T stage. The very small treated sample (n=13) limits power, but the analysis was executed correctly according to the plan.",
+  "untried_experiments": [
+    {
+      "hypothesis": "PDCD1 (the gene encoding PD-1) expression in tumors is positively correlated with tumor mutational burden (TMB) in breast cancer patients.",
+      "experiment_plan": {
+        "objective": "Assess whether higher PDCD1 expression is associated with increased TMB across patients.",
+        "steps": "1. Load cleaned_gene_expression.csv and cleaned_mutations.csv and cleaned_clinical_data.csv.\n2. From the mutation dataset, compute TMB per patient as the total number of somatic mutations grouped by bcr_patient_barcode.\n3. From the gene expression matrix, extract the PDCD1 expression vector for all samples; map sample barcodes to patient barcodes.\n4. Merge TMB and PDCD1 expression by patient, excluding missing values.\n5. Compute Spearman rank correlation between TMB and PDCD1 expression; record \u03c1 and p-value.\n6. Generate a scatter plot of PDCD1 expression versus TMB with a fitted trend line and annotate correlation statistics.",
+        "deliverables": "\u2022 A merged table of patient barcodes, TMB, and PDCD1 expression.\n\u2022 Spearman correlation coefficient and p-value.\n\u2022 Scatter plot with regression line and annotation of \u03c1 and p-value."
+      }
+    },
+    {
+      "hypothesis": "Breast tumors harboring TP53 mutations exhibit higher MKI67 (proliferation marker) expression compared to TP53 wild-type tumors.",
+      "experiment_plan": {
+        "objective": "Compare proliferation marker expression between TP53-mutant and TP53-wild-type tumors.",
+        "steps": "1. Load cleaned_mutations.csv and cleaned_gene_expression.csv.\n2. Define TP53 status: flag each patient as mutant if any mutation record exists for Hugo_Symbol == 'TP53'; otherwise wild-type.\n3. Extract MKI67 expression for each patient from the gene expression dataset.\n4. Merge TP53 status and MKI67 expression by patient barcode, excluding missing values.\n5. Compare MKI67 expression distributions between mutant and wild-type groups using the two-sided Mann\u2013Whitney U test; record U and p-value.\n6. Visualize the group distributions with a boxplot or violin plot annotated with the test result.",
+        "deliverables": "\u2022 Table of patient TP53 mutation status and MKI67 expression.\n\u2022 Mann\u2013Whitney U statistic and p-value.\n\u2022 Boxplot or violin plot of MKI67 expression by TP53 status."
+      }
+    },
+    {
+      "hypothesis": "Patients with HER2 IHC score '3+' have higher ERBB2 (HER2) gene expression than patients with score '0'.",
+      "experiment_plan": {
+        "objective": "Test whether ERBB2 expression differs between patients with extreme HER2 IHC scores.",
+        "steps": "1. Load cleaned_clinical_data.csv and cleaned_gene_expression.csv.\n2. From clinical data, filter patients with her2_ihc_score in {'0','3+'} and drop missing.\n3. Extract ERBB2 gene expression values for those patients from the gene expression dataset.\n4. Merge IHC score category and ERBB2 expression by patient barcode.\n5. Compare ERBB2 expression between '0' and '3+' groups using a two-sample t-test (or Mann\u2013Whitney U if non-normal).\n6. Plot expression distributions with group means and error bars.",
+        "deliverables": "\u2022 Table of patients with her2_ihc_score and ERBB2 expression.\n\u2022 Test statistic (t or U) and p-value.\n\u2022 Distribution plot of ERBB2 expression by IHC score category."
+      }
+    },
+    {
+      "hypothesis": "African American breast cancer patients have a higher tumor mutational burden compared to White patients.",
+      "experiment_plan": {
+        "objective": "Evaluate racial differences in TMB between African American and White patients.",
+        "steps": "1. Load cleaned_clinical_data.csv and cleaned_mutations.csv.\n2. From mutations, compute TMB per patient as total mutation count.\n3. From clinical data, select patients with race equal to 'BLACK OR AFRICAN AMERICAN' or 'WHITE'. Exclude other or missing.\n4. Merge TMB and race by patient barcode.\n5. Compare TMB distributions between the two race groups using the two-sided Wilcoxon rank-sum test; record W statistic and p-value.\n6. Visualize TMB distributions by race with boxplots.",
+        "deliverables": "\u2022 Table of patient barcodes, race, and TMB.\n\u2022 Wilcoxon rank-sum test statistic and p-value.\n\u2022 Boxplots of TMB by race group."
+      }
+    },
+    {
+      "hypothesis": "ESR1 gene expression levels are significantly higher in ER-positive tumors compared to ER-negative tumors.",
+      "experiment_plan": {
+        "objective": "Confirm that ESR1 expression distinguishes ER receptor status.",
+        "steps": "1. Load cleaned_clinical_data.csv and cleaned_gene_expression.csv.\n2. From clinical data, select patients with er_status in {'Positive','Negative'} and exclude missing/indeterminate.\n3. Extract ESR1 expression for those patients from the gene expression matrix.\n4. Merge er_status and ESR1 expression by patient barcode.\n5. Compare ESR1 expression between ER-positive and ER-negative groups using a two-sided t-test or Mann\u2013Whitney U test.\n6. Create a boxplot of ESR1 expression stratified by ER status with test annotation.",
+        "deliverables": "\u2022 Table of patient barcodes, ER status, and ESR1 expression.\n\u2022 Test statistic and p-value.\n\u2022 Boxplot showing ESR1 expression by ER status."
+      }
+    },
+    {
+      "hypothesis": "High lymph node positivity (\u22653 positive nodes) is associated with increased expression of the epithelial\u2010to\u2010mesenchymal transition marker VIM (vimentin).",
+      "experiment_plan": {
+        "objective": "Assess whether extensive nodal involvement correlates with EMT marker expression.",
+        "steps": "1. Load cleaned_clinical_data.csv and cleaned_gene_expression.csv.\n2. Define lymph node groups: \u2018High\u2019 if lymph_nodes_positive \u2265 3, \u2018Low\u2019 otherwise; exclude missing.\n3. Extract VIM expression values for all patients.\n4. Merge lymph node group label and VIM expression by patient barcode.\n5. Compare VIM expression between High and Low groups using Mann\u2013Whitney U test.\n6. Plot the two distributions side by side with median lines.",
+        "deliverables": "\u2022 Table of patient barcodes, lymph node group, and VIM expression.\n\u2022 Mann\u2013Whitney U statistic and p-value.\n\u2022 Comparative plot of VIM expression by nodal involvement group."
+      }
+    },
+    {
+      "hypothesis": "Breast cancer patients diagnosed in 2010 or later have lower tumor mutational burden than those diagnosed before 2010.",
+      "experiment_plan": {
+        "objective": "Test whether diagnosis year cohort differs in TMB, possibly reflecting improvements in detection or treatment.",
+        "steps": "1. Load cleaned_clinical_data.csv and cleaned_mutations.csv.\n2. Compute TMB per patient from the mutation dataset.\n3. From clinical data, create two cohorts: 'Pre-2010' if diagnosis_year < 2010, 'Post-2010' if \u2265 2010; exclude missing.\n4. Merge TMB and cohort label by patient barcode.\n5. Compare TMB between the two cohorts using Wilcoxon rank-sum test; record statistic and p-value.\n6. Visualize TMB distributions with violin plots and annotate with cohort medians.",
+        "deliverables": "\u2022 Table of patient barcodes, diagnosis cohort, and TMB.\n\u2022 Wilcoxon rank-sum statistic and p-value.\n\u2022 Violin plot of TMB by diagnosis cohort."
+      }
+    },
+    {
+      "hypothesis": "Presence of PIK3CA mutations is associated with reduced AKT1 gene expression in breast tumors.",
+      "experiment_plan": {
+        "objective": "Investigate whether PIK3CA mutation status correlates inversely with downstream AKT1 expression.",
+        "steps": "1. Load cleaned_mutations.csv and cleaned_gene_expression.csv.\n2. Determine PIK3CA mutation status per patient: mutated if any mutation record Hugo_Symbol == 'PIK3CA'.\n3. Extract AKT1 expression for each patient from the gene expression dataset.\n4. Merge PIK3CA status and AKT1 expression by patient barcode.\n5. Compare AKT1 expression between mutated and wild-type groups using Mann\u2013Whitney U test.\n6. Plot the AKT1 expression distributions per group with medians annotated.",
+        "deliverables": "\u2022 Table of patient barcodes, PIK3CA mutation status, and AKT1 expression.\n\u2022 Mann\u2013Whitney U statistic and p-value.\n\u2022 Distribution plot of AKT1 expression by PIK3CA status."
+      }
+    }
+  ],
+  "tried_experiments": [],
+  "query": "Hypothesis: Receipt of neoadjuvant treatment is associated with lower pathological T stage at surgery (pathologic_t) in breast cancer patients.\n\nExperiment objective: Evaluate whether neoadjuvant treatment leads to downstaging of tumor size category at pathology.\n\nSteps for the programmer:\n1. Load cleaned_clinical_data.csv.\n2. Recode neoadjuvant_treatment into binary (Yes/No); exclude missing.\n3. Recode pathologic_t into ordinal ranks T1<T2<T3<T4; exclude MX/other.\n4. Merge and create a dataset of neoadjuvant_treatment and pathologic_t.\n5. Compare pathologic_t rank distributions between treated and untreated groups using Mann-Whitney U test.\n6. Fit an ordinal logistic regression model: pathologic_t_rank ~ neoadjuvant_treatment + age_at_diagnosis + ER_status.\n7. Report test statistics and regression coefficients.\n\nDeliverables:\n\u2022 Table of patient neoadjuvant status and pathologic_t rank.\n\u2022 Mann-Whitney U test statistic and p-value.\n\u2022 Ordinal logistic regression summary (odds ratios and p-values).",
+  "messages": [
+    {
+      "content": "Hypothesis: Receipt of neoadjuvant treatment is associated with lower pathological T stage at surgery (pathologic_t) in breast cancer patients.\n\nExperiment objective: Evaluate whether neoadjuvant treatment leads to downstaging of tumor size category at pathology.\n\nSteps for the programmer:\n1. Load cleaned_clinical_data.csv.\n2. Recode neoadjuvant_treatment into binary (Yes/No); exclude missing.\n3. Recode pathologic_t into ordinal ranks T1<T2<T3<T4; exclude MX/other.\n4. Merge and create a dataset of neoadjuvant_treatment and pathologic_t.\n5. Compare pathologic_t rank distributions between treated and untreated groups using Mann-Whitney U test.\n6. Fit an ordinal logistic regression model: pathologic_t_rank ~ neoadjuvant_treatment + age_at_diagnosis + ER_status.\n7. Report test statistics and regression coefficients.\n\nDeliverables:\n\u2022 Table of patient neoadjuvant status and pathologic_t rank.\n\u2022 Mann-Whitney U test statistic and p-value.\n\u2022 Ordinal logistic regression summary (odds ratios and p-values).",
+      "name": "user_proxy",
+      "role": "user"
+    },
+    {
+      "content": "{\"code\":\"import pandas as pd\\nimport numpy as np\\nfrom scipy.stats import mannwhitneyu\\nimport statsmodels.api as sm\\nfrom statsmodels.miscmodels.ordinal_model import OrderedModel\\n\\n# 1. Load clinical data\\nclinical = pd.read_csv('cleaned_clinical_data.csv')\\n\\n# 2. Recode neoadjuvant_treatment\\nclinical = clinical[['bcr_patient_barcode', 'neoadjuvant_treatment', 'pathologic_t', 'age_at_diagnosis', 'er_status']]\\nclinical = clinical.dropna(subset=['neoadjuvant_treatment', 'pathologic_t', 'age_at_diagnosis', 'er_status'])\\nclinical = clinical[clinical['neoadjuvant_treatment'].isin(['Yes', 'No'])]\\nclinical['neo_binary'] = clinical['neoadjuvant_treatment'].map({'No': 0, 'Yes': 1})\\n\\n# 3. Recode pathologic_t into ranks\\ndef map_t_rank(t):\\n    if isinstance(t, str):\\n        if t.startswith('T1'): return 1\\n        if t.startswith('T2'): return 2\\n        if t.startswith('T3'): return 3\\n        if t.startswith('T4'): return 4\\n    return np.nan\\n\\nclinical['t_rank'] = clinical['pathologic_t'].apply(map_t_rank)\\nclinical = clinical.dropna(subset=['t_rank'])\\nclinical['t_rank'] = clinical['t_rank'].astype(int)\\n\\n# 4. Recode ER status\\nclinical = clinical[clinical['er_status'].isin(['Positive', 'Negative'])]\\nclinical['er_binary'] = clinical['er_status'].map({'Negative': 0, 'Positive': 1})\\n\\n# Final dataset\\ndata = clinical[['bcr_patient_barcode', 'neo_binary', 't_rank', 'age_at_diagnosis', 'er_binary']]\\nprint(f\\\"Included patients: {data.shape[0]}\\\")\\nprint(\\\"Pathologic T rank counts by neoadjuvant treatment:\\\")\\nprint(pd.crosstab(data['neo_binary'], data['t_rank']))\\n\\n# 5. Mann-Whitney U test\\ngroup0 = data.loc[data['neo_binary'] == 0, 't_rank']\\ngroup1 = data.loc[data['neo_binary'] == 1, 't_rank']\\nu_stat, p_val = mannwhitneyu(group1, group0, alternative='two-sided')\\nprint(f\\\"Mann-Whitney U test: U = {u_stat:.2f}, p-value = {p_val:.4f}\\\")\\n\\n# 6. Ordinal logistic regression\\nendog = data['t_rank']\\nexog = data[['neo_binary', 'age_at_diagnosis', 'er_binary']]\\n# Fit OrderedModel with logit link\\neom = OrderedModel(endog, exog, distr='logit')\\nres = eom.fit(method='bfgs', disp=False)\\n\\n# 7. Regression results: odds ratios and p-values for covariates\\nparams = res.params\\npvalues = res.pvalues\\nexog_names = exog.columns\\nresults_df = pd.DataFrame({\\n    'coef': params[exog_names],\\n    'OR': np.exp(params[exog_names]),\\n    'p-value': pvalues[exog_names]\\n})\\nprint(\\\"\\\\nOrdinal Logistic Regression Results:\\\")\\nprint(results_df)\\n\"}",
+      "role": "user",
+      "name": "experiment_programmer"
+    },
+    {
+      "content": "exitcode: 0 (execution succeeded)\nCode output: Included patients: 1041\nPathologic T rank counts by neoadjuvant treatment:\nt_rank        1    2    3   4\nneo_binary                   \n0           265  596  135  32\n1             3    6    0   4\nMann-Whitney U test: U = 7823.50, p-value = 0.2326\n\nOrdinal Logistic Regression Results:\n                      coef        OR   p-value\nneo_binary        0.851760  2.343767  0.173885\nage_at_diagnosis  0.000623  1.000623  0.894368\ner_binary        -0.050789  0.950479  0.724575\n",
+      "role": "user",
+      "name": "code_executor"
+    },
+    {
+      "content": "{\"analysis\":\"1041 patients included (neo=0: 1028, neo=1: 13). Pathologic T stage counts by treatment: untreated (T1\u2013T4 = 265, 596, 135, 32), treated (3, 6, 0, 4). Mann-Whitney U test: U=7823.50, p=0.2326 (no significant difference). Ordinal logistic regression (adjusted for age and ER status) shows neoadjuvant treatment coef=0.852 (OR=2.34, p=0.174), age p=0.894, ER p=0.725, indicating no significant association between neoadjuvant treatment and lower pathologic T stage.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_code_analyst"
+    },
+    {
+      "content": "{\"feedback\":\"Hypothesis: Receipt of neoadjuvant treatment is associated with lower pathologic T stage at surgery.\\n\\nImplementation: The cleaned clinical data were filtered to exclude missing values, neoadjuvant_treatment was binarized (Yes/No), pathologic_t was mapped to ordinal ranks T1=1 \u2026 T4=4 (excluding MX/others), and ER status was binarized. A Mann\u2013Whitney U test compared T stage distributions between treated (n=13) and untreated (n=1028) groups, yielding U = 7823.50, p = 0.2326. An ordinal logistic regression adjusting for age and ER status produced an odds ratio for neoadjuvant treatment of 2.34 (p = 0.174), with no significant effects for age or ER status.\\n\\nFindings: Neither the nonparametric test nor the adjusted regression supports an association between neoadjuvant treatment and lower pathologic T stage. The very small treated sample (n=13) limits power, but the analysis was executed correctly according to the plan.\",\"success\":true}",
+      "role": "user",
+      "name": "experiment_reviewer"
+    },
+    {
+      "content": "{\"experiments\":[{\"hypothesis\":\"PDCD1 (the gene encoding PD-1) expression in tumors is positively correlated with tumor mutational burden (TMB) in breast cancer patients.\",\"experiment_plan\":{\"objective\":\"Assess whether higher PDCD1 expression is associated with increased TMB across patients.\",\"steps\":\"1. Load cleaned_gene_expression.csv and cleaned_mutations.csv and cleaned_clinical_data.csv.\\n2. From the mutation dataset, compute TMB per patient as the total number of somatic mutations grouped by bcr_patient_barcode.\\n3. From the gene expression matrix, extract the PDCD1 expression vector for all samples; map sample barcodes to patient barcodes.\\n4. Merge TMB and PDCD1 expression by patient, excluding missing values.\\n5. Compute Spearman rank correlation between TMB and PDCD1 expression; record \u03c1 and p-value.\\n6. Generate a scatter plot of PDCD1 expression versus TMB with a fitted trend line and annotate correlation statistics.\",\"deliverables\":\"\u2022 A merged table of patient barcodes, TMB, and PDCD1 expression.\\n\u2022 Spearman correlation coefficient and p-value.\\n\u2022 Scatter plot with regression line and annotation of \u03c1 and p-value.\"}},{\"hypothesis\":\"Breast tumors harboring TP53 mutations exhibit higher MKI67 (proliferation marker) expression compared to TP53 wild-type tumors.\",\"experiment_plan\":{\"objective\":\"Compare proliferation marker expression between TP53-mutant and TP53-wild-type tumors.\",\"steps\":\"1. Load cleaned_mutations.csv and cleaned_gene_expression.csv.\\n2. Define TP53 status: flag each patient as mutant if any mutation record exists for Hugo_Symbol == 'TP53'; otherwise wild-type.\\n3. Extract MKI67 expression for each patient from the gene expression dataset.\\n4. Merge TP53 status and MKI67 expression by patient barcode, excluding missing values.\\n5. Compare MKI67 expression distributions between mutant and wild-type groups using the two-sided Mann\u2013Whitney U test; record U and p-value.\\n6. Visualize the group distributions with a boxplot or violin plot annotated with the test result.\",\"deliverables\":\"\u2022 Table of patient TP53 mutation status and MKI67 expression.\\n\u2022 Mann\u2013Whitney U statistic and p-value.\\n\u2022 Boxplot or violin plot of MKI67 expression by TP53 status.\"}},{\"hypothesis\":\"Patients with HER2 IHC score '3+' have higher ERBB2 (HER2) gene expression than patients with score '0'.\",\"experiment_plan\":{\"objective\":\"Test whether ERBB2 expression differs between patients with extreme HER2 IHC scores.\",\"steps\":\"1. Load cleaned_clinical_data.csv and cleaned_gene_expression.csv.\\n2. From clinical data, filter patients with her2_ihc_score in {'0','3+'} and drop missing.\\n3. Extract ERBB2 gene expression values for those patients from the gene expression dataset.\\n4. Merge IHC score category and ERBB2 expression by patient barcode.\\n5. Compare ERBB2 expression between '0' and '3+' groups using a two-sample t-test (or Mann\u2013Whitney U if non-normal).\\n6. Plot expression distributions with group means and error bars.\",\"deliverables\":\"\u2022 Table of patients with her2_ihc_score and ERBB2 expression.\\n\u2022 Test statistic (t or U) and p-value.\\n\u2022 Distribution plot of ERBB2 expression by IHC score category.\"}},{\"hypothesis\":\"African American breast cancer patients have a higher tumor mutational burden compared to White patients.\",\"experiment_plan\":{\"objective\":\"Evaluate racial differences in TMB between African American and White patients.\",\"steps\":\"1. Load cleaned_clinical_data.csv and cleaned_mutations.csv.\\n2. From mutations, compute TMB per patient as total mutation count.\\n3. From clinical data, select patients with race equal to 'BLACK OR AFRICAN AMERICAN' or 'WHITE'. Exclude other or missing.\\n4. Merge TMB and race by patient barcode.\\n5. Compare TMB distributions between the two race groups using the two-sided Wilcoxon rank-sum test; record W statistic and p-value.\\n6. Visualize TMB distributions by race with boxplots.\",\"deliverables\":\"\u2022 Table of patient barcodes, race, and TMB.\\n\u2022 Wilcoxon rank-sum test statistic and p-value.\\n\u2022 Boxplots of TMB by race group.\"}},{\"hypothesis\":\"ESR1 gene expression levels are significantly higher in ER-positive tumors compared to ER-negative tumors.\",\"experiment_plan\":{\"objective\":\"Confirm that ESR1 expression distinguishes ER receptor status.\",\"steps\":\"1. Load cleaned_clinical_data.csv and cleaned_gene_expression.csv.\\n2. From clinical data, select patients with er_status in {'Positive','Negative'} and exclude missing/indeterminate.\\n3. Extract ESR1 expression for those patients from the gene expression matrix.\\n4. Merge er_status and ESR1 expression by patient barcode.\\n5. Compare ESR1 expression between ER-positive and ER-negative groups using a two-sided t-test or Mann\u2013Whitney U test.\\n6. Create a boxplot of ESR1 expression stratified by ER status with test annotation.\",\"deliverables\":\"\u2022 Table of patient barcodes, ER status, and ESR1 expression.\\n\u2022 Test statistic and p-value.\\n\u2022 Boxplot showing ESR1 expression by ER status.\"}},{\"hypothesis\":\"High lymph node positivity (\u22653 positive nodes) is associated with increased expression of the epithelial\u2010to\u2010mesenchymal transition marker VIM (vimentin).\",\"experiment_plan\":{\"objective\":\"Assess whether extensive nodal involvement correlates with EMT marker expression.\",\"steps\":\"1. Load cleaned_clinical_data.csv and cleaned_gene_expression.csv.\\n2. Define lymph node groups: \u2018High\u2019 if lymph_nodes_positive \u2265 3, \u2018Low\u2019 otherwise; exclude missing.\\n3. Extract VIM expression values for all patients.\\n4. Merge lymph node group label and VIM expression by patient barcode.\\n5. Compare VIM expression between High and Low groups using Mann\u2013Whitney U test.\\n6. Plot the two distributions side by side with median lines.\",\"deliverables\":\"\u2022 Table of patient barcodes, lymph node group, and VIM expression.\\n\u2022 Mann\u2013Whitney U statistic and p-value.\\n\u2022 Comparative plot of VIM expression by nodal involvement group.\"}},{\"hypothesis\":\"Breast cancer patients diagnosed in 2010 or later have lower tumor mutational burden than those diagnosed before 2010.\",\"experiment_plan\":{\"objective\":\"Test whether diagnosis year cohort differs in TMB, possibly reflecting improvements in detection or treatment.\",\"steps\":\"1. Load cleaned_clinical_data.csv and cleaned_mutations.csv.\\n2. Compute TMB per patient from the mutation dataset.\\n3. From clinical data, create two cohorts: 'Pre-2010' if diagnosis_year < 2010, 'Post-2010' if \u2265 2010; exclude missing.\\n4. Merge TMB and cohort label by patient barcode.\\n5. Compare TMB between the two cohorts using Wilcoxon rank-sum test; record statistic and p-value.\\n6. Visualize TMB distributions with violin plots and annotate with cohort medians.\",\"deliverables\":\"\u2022 Table of patient barcodes, diagnosis cohort, and TMB.\\n\u2022 Wilcoxon rank-sum statistic and p-value.\\n\u2022 Violin plot of TMB by diagnosis cohort.\"}},{\"hypothesis\":\"Presence of PIK3CA mutations is associated with reduced AKT1 gene expression in breast tumors.\",\"experiment_plan\":{\"objective\":\"Investigate whether PIK3CA mutation status correlates inversely with downstream AKT1 expression.\",\"steps\":\"1. Load cleaned_mutations.csv and cleaned_gene_expression.csv.\\n2. Determine PIK3CA mutation status per patient: mutated if any mutation record Hugo_Symbol == 'PIK3CA'.\\n3. Extract AKT1 expression for each patient from the gene expression dataset.\\n4. Merge PIK3CA status and AKT1 expression by patient barcode.\\n5. Compare AKT1 expression between mutated and wild-type groups using Mann\u2013Whitney U test.\\n6. Plot the AKT1 expression distributions per group with medians annotated.\",\"deliverables\":\"\u2022 Table of patient barcodes, PIK3CA mutation status, and AKT1 expression.\\n\u2022 Mann\u2013Whitney U statistic and p-value.\\n\u2022 Distribution plot of AKT1 expression by PIK3CA status.\"}}]}",
+      "role": "user",
+      "name": "experiment_generator"
+    }
+  ]
+}

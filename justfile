@@ -24,3 +24,6 @@ sync:
 
 adk-web:
   adk web devtools --port 8000
+
+serve-docs:
+  uv run mkdocs serve

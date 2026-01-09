@@ -43,3 +43,11 @@ Run the static type checker with
 ```sh
 just type-check
 ```
+
+## Documentation
+
+Serve the documentation with
+
+```sh
+just serve-docs
+```

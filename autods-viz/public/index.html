@@ -346,6 +346,10 @@
 
 <script>
 (function() {
+  // Helper to construct API URLs with base path
+  const BASE = window.BASE_PATH || '';
+  const apiUrl = (path) => BASE + path;
+
   const svg = d3.select('#treeSvg');
   const graphG = svg.append('g');
   const linkG = graphG.append('g').attr('stroke', 'var(--border)').attr('stroke-width', 1.2).attr('stroke-linecap', 'round').attr('fill', 'none');
@@ -472,7 +476,7 @@
 
   async function loadRuns() {
     try {
-      const res = await fetch('/api/runs');
+      const res = await fetch(apiUrl('/api/runs'));
       const data = await res.json();
       state.runs = data.runs || [];
       state.currentRun = data.current || state.currentRun || state.runs[0] || '';
@@ -487,7 +491,7 @@
     if (!nextRun || nextRun === state.currentRun) return;
     setStatus(`Switching to ${nextRun}…`);
     try {
-      const res = await fetch('/api/watch', {
+      const res = await fetch(apiUrl('/api/watch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ run: nextRun }),
@@ -987,7 +991,7 @@
   }
 
   async function fetchInitial() {
-    const res = await fetch('/api/nodes');
+    const res = await fetch(apiUrl('/api/nodes'));
     const json = await res.json();
     stopPlayback({ restore: false });
     state.allNodes.clear();
@@ -1003,7 +1007,7 @@
 
   function connectWS() {
     const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${wsProtocol}://${location.host}`);
+    const ws = new WebSocket(`${wsProtocol}://${location.host}${BASE}`);
     ws.onopen = () => setStatus(state.currentRun ? `Live (WS) · ${state.currentRun}` : 'Live (WS)');
     ws.onerror = () => setStatus('WebSocket error', false);
     ws.onclose = () => { setStatus('Disconnected · retrying', false); setTimeout(connectWS, 1500); };

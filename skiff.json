@@ -1,6 +1,6 @@
 {
-    "appName": "skiff-template-nextjs",
-    "contact": "reviz",
-    "team": "reviz",
+    "appName": "asta-autodiscovery",
+    "contact": "jasond",
+    "team": "asta",
     "replicas": { "prod": 2 }
 }

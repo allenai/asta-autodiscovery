@@ -7,6 +7,7 @@ import http from 'http';
 
 const resultsRoot = path.resolve('results');
 const port = Number(process.env.PORT) || 3000;
+const basePath = process.env.BASE_PATH || '';
 const app = express();
 
 app.use(express.json());
@@ -153,6 +154,16 @@ async function start() {
   });
 
   await setWatchDir(initialRun, wss, initialDir);
+
+  // Serve index.html with injected BASE_PATH
+  app.get('/', async (req, res) => {
+    const html = await fs.readFile('public/index.html', 'utf-8');
+    const injected = html.replace(
+      '</head>',
+      `  <script>window.BASE_PATH = ${JSON.stringify(basePath)};</script>\n  </head>`
+    );
+    res.type('html').send(injected);
+  });
 
   app.use(express.static('public'));
 

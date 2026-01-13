@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+
 import { Auth0Provider } from '../contexts/Auth0Context';
 
 interface ClientProvidersProps {
@@ -19,8 +20,7 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
         <Auth0Provider
             domain={auth0Config.domain}
             clientId={auth0Config.clientId}
-            audience={auth0Config.audience}
-        >
+            audience={auth0Config.audience}>
             {children}
         </Auth0Provider>
     );

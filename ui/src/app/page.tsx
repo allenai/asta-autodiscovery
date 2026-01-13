@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material';
 
 import QuestionAndAnswer from './components/QuestionAndAnswer';
+import UserProfile from './components/UserProfile';
 
 export default function Home() {
     return (
@@ -10,6 +11,7 @@ export default function Home() {
                 This is an example Skiff application that uses{' '}
                 <a href="https://nextjs.org">NextJS</a>.
             </Typography>
+            <UserProfile />
             <QuestionAndAnswer />
         </>
     );

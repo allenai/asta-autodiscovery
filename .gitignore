@@ -8,6 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+# pyenv
+.python-version
 
 # Unit test / coverage reports
 .coverage
@@ -17,3 +19,6 @@ wheels/
 
 # Google ADK
 .adk/
+
+# IDEs
+.idea/

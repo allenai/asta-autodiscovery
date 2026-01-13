@@ -1,8 +1,11 @@
 from flask import Blueprint, jsonify, request, current_app
 from typing import Tuple
 from werkzeug.exceptions import BadRequest
+from demo.auth import requires_auth
 
+import os
 import random
+import requests
 
 def create() -> Blueprint:
     """
@@ -44,6 +47,33 @@ def create() -> Blueprint:
         current_app.logger.info(entry)
 
         return jsonify(answer)
+
+    # API endpoint - returns user info if authenticated
+    @api.route("/api/user")
+    @requires_auth
+    def api_user(): # pyright: ignore reportUnusedFunction
+        auth0_domain = os.environ.get("AUTH0_DOMAIN")
+
+        # The access token only has basic claims, so fetch full user info from /userinfo endpoint
+        token = request.headers.get("Authorization").split()[1]
+
+        try:
+            userinfo_url = f"https://{auth0_domain}/userinfo"
+            headers = {"Authorization": f"Bearer {token}"}
+            userinfo_response = requests.get(userinfo_url, headers=headers)
+            userinfo_response.raise_for_status()
+            user = userinfo_response.json()
+
+            return jsonify({
+                "sub": user.get("sub"),
+                "name": user.get("name"),
+                "email": user.get("email"),
+                "picture": user.get("picture"),
+                "email_verified": user.get("email_verified"),
+            })
+        except Exception as e:
+            current_app.logger.error(f"Failed to fetch user info: {str(e)}")
+            return jsonify({"error": f"Failed to fetch user info: {str(e)}"}), 500
 
     return api
 

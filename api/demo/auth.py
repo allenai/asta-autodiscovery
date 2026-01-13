@@ -1,0 +1,92 @@
+import os
+import json
+import jwt
+import requests
+from functools import wraps
+from flask import request, jsonify
+from jwt.algorithms import RSAAlgorithm
+
+# Cache for Auth0 public keys
+_jwks_cache = {}
+
+
+def get_public_key(auth0_domain, kid):
+    """Fetch and cache Auth0 public keys"""
+    if kid in _jwks_cache:
+        return _jwks_cache[kid]
+
+    jwks_url = f"https://{auth0_domain}/.well-known/jwks.json"
+    jwks_response = requests.get(jwks_url)
+    jwks = jwks_response.json()
+
+    for key in jwks["keys"]:
+        if key["kid"] == kid:
+            public_key = RSAAlgorithm.from_jwk(json.dumps(key))
+            _jwks_cache[kid] = public_key
+            return public_key
+
+    raise ValueError(f"Unable to find key with kid: {kid}")
+
+
+def verify_token(token, auth0_domain, auth0_audience):
+    """Verify JWT token from Auth0"""
+    try:
+        # Decode header to get kid
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header["kid"]
+
+        # Get public key
+        public_key = get_public_key(auth0_domain, kid)
+
+        # Verify and decode token
+        payload = jwt.decode(
+            token,
+            public_key,
+            algorithms=["RS256"],
+            audience=auth0_audience,
+            issuer=f"https://{auth0_domain}/"
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token has expired")
+    except jwt.InvalidAudienceError:
+        raise ValueError("Invalid audience")
+    except jwt.InvalidIssuerError:
+        raise ValueError("Invalid issuer")
+    except Exception as e:
+        raise ValueError(f"Invalid token: {str(e)}")
+
+
+def requires_auth(f):
+    """Decorator to require authentication"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth0_domain = os.environ.get("AUTH0_DOMAIN")
+        auth0_audience = os.environ.get("AUTH0_AUDIENCE")
+
+        if not auth0_domain or not auth0_audience:
+            return jsonify({"error": "Auth0 configuration missing"}), 500
+
+        auth_header = request.headers.get("Authorization", None)
+
+        if not auth_header:
+            return jsonify({"error": "Authorization header is missing"}), 401
+
+        parts = auth_header.split()
+        if parts[0].lower() != "bearer":
+            return jsonify({"error": "Authorization header must start with Bearer"}), 401
+        elif len(parts) == 1:
+            return jsonify({"error": "Token not found"}), 401
+        elif len(parts) > 2:
+            return jsonify({"error": "Authorization header must be Bearer token"}), 401
+
+        token = parts[1]
+
+        try:
+            payload = verify_token(token, auth0_domain, auth0_audience)
+            request.user = payload
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 401
+
+        return f(*args, **kwargs)
+    return decorated

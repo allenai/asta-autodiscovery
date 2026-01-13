@@ -1,7 +1,9 @@
 'use client';
 
 import { Button, Avatar, Box, Typography, Menu, MenuItem } from '@mui/material';
+
 import { useState } from 'react';
+
 import { useAuth0 } from '../contexts/Auth0Context';
 
 export default function AuthButton() {
@@ -28,11 +30,7 @@ export default function AuthButton() {
 
     if (!isAuthenticated) {
         return (
-            <Button
-                variant="contained"
-                color="primary"
-                onClick={loginWithRedirect}
-            >
+            <Button variant="contained" color="primary" onClick={loginWithRedirect}>
                 Log In
             </Button>
         );
@@ -45,10 +43,9 @@ export default function AuthButton() {
                     display: 'flex',
                     alignItems: 'center',
                     cursor: 'pointer',
-                    '&:hover': { opacity: 0.8 }
+                    '&:hover': { opacity: 0.8 },
                 }}
-                onClick={handleClick}
-            >
+                onClick={handleClick}>
                 <Avatar
                     src={user?.picture}
                     alt={user?.name}
@@ -67,8 +64,7 @@ export default function AuthButton() {
                 transformOrigin={{
                     vertical: 'top',
                     horizontal: 'right',
-                }}
-            >
+                }}>
                 <MenuItem onClick={handleLogout}>Log Out</MenuItem>
             </Menu>
         </>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Box, Typography, Avatar, CircularProgress, Alert } from '@mui/material';
+
 import { useAuth0 } from '../contexts/Auth0Context';
 
 interface UserData {
@@ -32,8 +33,8 @@ export default function UserProfile() {
                 const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:8000';
                 const response = await fetch(`${apiOrigin}/api/user`, {
                     headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                        Authorization: `Bearer ${token}`,
+                    },
                 });
 
                 if (!response.ok) {

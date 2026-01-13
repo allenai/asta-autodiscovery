@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Auth0Client, User } from '@auth0/auth0-spa-js';
 
 interface Auth0ContextType {
@@ -27,7 +27,7 @@ export function Auth0Provider({
     domain,
     clientId,
     audience,
-    redirectUri
+    redirectUri,
 }: Auth0ProviderProps) {
     const [auth0Client, setAuth0Client] = useState<Auth0Client | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,13 +46,16 @@ export function Auth0Provider({
                         redirect_uri: redirectUri || window.location.origin,
                         audience,
                         scope: 'openid profile email offline_access',
-                    }
+                    },
                 });
 
                 setAuth0Client(client);
 
                 // Handle redirect callback
-                if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
+                if (
+                    window.location.search.includes('code=') &&
+                    window.location.search.includes('state=')
+                ) {
                     await client.handleRedirectCallback();
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
@@ -86,8 +89,8 @@ export function Auth0Provider({
         if (auth0Client) {
             auth0Client.logout({
                 logoutParams: {
-                    returnTo: window.location.origin
-                }
+                    returnTo: window.location.origin,
+                },
             });
         }
     };
@@ -107,9 +110,8 @@ export function Auth0Provider({
                 user,
                 loginWithRedirect,
                 logout,
-                getAccessToken
-            }}
-        >
+                getAccessToken,
+            }}>
             {children}
         </Auth0Context.Provider>
     );

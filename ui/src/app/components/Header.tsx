@@ -1,6 +1,7 @@
 'use client';
 
 import { Box } from '@mui/material';
+
 import { SimpleLogo } from './SimpleLogo';
 import { HeaderAppName, HeaderLogo, VarnishHeader } from './VarnishHeader';
 import AuthButton from './AuthButton';

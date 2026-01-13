@@ -1,5 +1,6 @@
 from demo import api, glog, error
 from flask import Flask
+from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -14,6 +15,7 @@ def create_app() -> ProxyFix:
     logging.basicConfig(level=level, handlers=handlers)
 
     app = Flask("demo")
+    CORS(app)  # Enable CORS for all routes
     app.register_blueprint(api.create(), url_prefix="/")
     app.register_error_handler(HTTPException, error.handle)
 

@@ -11,6 +11,7 @@ import '@fontsource/lato/700-italic.css';
 import '@fontsource/lato/700.css';
 
 import Header from './components/Header';
+import ClientProviders from './components/ClientProviders';
 
 export const metadata: Metadata = {
     title: 'Next Skiff Template',
@@ -24,11 +25,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <html lang="en">
             <body>
                 <AppRouterCacheProvider>
-                    <VarnishApp>
-                        <Header />
-                        <Content main>{children}</Content>
-                        <Footer />
-                    </VarnishApp>
+                    <ClientProviders>
+                        <VarnishApp>
+                            <Header />
+                            <Content main>{children}</Content>
+                            <Footer />
+                        </VarnishApp>
+                    </ClientProviders>
                 </AppRouterCacheProvider>
             </body>
         </html>

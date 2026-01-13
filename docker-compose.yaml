@@ -16,6 +16,8 @@ services:
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=DEBUG
+      - AUTH0_DOMAIN=YOUR_TENANT.us.auth0.com
+      - AUTH0_AUDIENCE=https://autodiscovery.example.com
   ui:
     build:
       context: ./ui

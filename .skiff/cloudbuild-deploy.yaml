@@ -39,6 +39,18 @@ steps:
   ]
   waitFor: [ '-' ]
   dir: 'proxy'
+- id: 'autods-viz.build'
+  name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build',
+    '-t', 'gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:latest',
+    '-t', 'gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:$COMMIT_SHA',
+    '--cache-from', 'gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:latest',
+    '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
+    '.',
+  ]
+  waitFor: [ '-' ]
+  dir: 'autods-viz'
 - id: 'api.push'
   name: 'gcr.io/cloud-builders/docker'
   args: [
@@ -60,6 +72,13 @@ steps:
     'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:$COMMIT_SHA'
   ]
   waitFor: [ 'proxy.build' ]
+- id: 'autods-viz.push'
+  name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'push',
+    'gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:$COMMIT_SHA'
+  ]
+  waitFor: [ 'autods-viz.build' ]
 # Generate our Kubernetes configuration
 - id: 'config'
   name: 'gcr.io/ai2-reviz/jsonnet'
@@ -71,6 +90,7 @@ steps:
     '--tla-str', 'apiImage=gcr.io/$PROJECT_ID/$REPO_NAME-api:$COMMIT_SHA',
     '--tla-str', 'uiImage=gcr.io/$PROJECT_ID/$REPO_NAME-ui:$COMMIT_SHA',
     '--tla-str', 'proxyImage=gcr.io/$PROJECT_ID/$REPO_NAME-proxy:$COMMIT_SHA',
+    '--tla-str', 'autodsVizImage=gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:$COMMIT_SHA',
     '--tla-str', 'sha=$COMMIT_SHA',
     '--tla-str', 'cause="Automated Skiff Deploy SHA:$COMMIT_SHA BUILD:$BUILD_ID"',
     '--tla-str', 'branch=$BRANCH_NAME',
@@ -89,7 +109,7 @@ steps:
     'webapp.yaml'
   ]
   dir: '.skiff'
-  waitFor: [ 'api.push', 'ui.push', 'proxy.push', 'config' ]
+  waitFor: [ 'api.push', 'ui.push', 'proxy.push', 'autods-viz.push', 'config' ]
 substitutions:
   _ENV: prod
 images: [
@@ -98,7 +118,9 @@ images: [
   'gcr.io/$PROJECT_ID/$REPO_NAME-ui:$COMMIT_SHA',
   'gcr.io/$PROJECT_ID/$REPO_NAME-ui:latest',
   'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:$COMMIT_SHA',
-  'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:latest'
+  'gcr.io/$PROJECT_ID/$REPO_NAME-proxy:latest',
+  'gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:$COMMIT_SHA',
+  'gcr.io/$PROJECT_ID/$REPO_NAME-autods-viz:latest'
 ]
 artifacts:
   objects:

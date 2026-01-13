@@ -11,7 +11,7 @@
 local config = import '../skiff.json';
 local util = import './util.libsonnet';
 
-function(apiImage, uiImage, proxyImage, cause, sha, env='prod', branch='', repo='', buildId='')
+function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', branch='', repo='', buildId='')
     // Produce a list of hostnames served by your application.
     // See: https://skiff.allenai.org/domains.html.
     local domains =
@@ -411,6 +411,38 @@ function(apiImage, uiImage, proxyImage, cause, sha, env='prod', branch='', repo=
                                 {
                                     name: 'API_ORIGIN',
                                     value: 'http://localhost:8000'
+                                }
+                            ]
+                        },
+                        {
+                            name: fullyQualifiedName + '-autods-viz',
+                            image: autodsVizImage,
+                            readinessProbe: {
+                                httpGet: {
+                                    port: 3001,
+                                    path: '/api/health'
+                                },
+                                periodSeconds: 10,
+                                failureThreshold: 3
+                            },
+                            resources: {
+                                requests: {
+                                    cpu: 0.1,
+                                    memory: '200M'
+                                }
+                            },
+                            env: [
+                                {
+                                    name: 'PORT',
+                                    value: '3001'
+                                },
+                                {
+                                    name: 'BASE_PATH',
+                                    value: '/autods-viz'
+                                },
+                                {
+                                    name: 'NODE_ENV',
+                                    value: 'production'
                                 }
                             ]
                         },

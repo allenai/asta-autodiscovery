@@ -14,7 +14,8 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
         domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || 'auth.example.com',
         clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || 'YOUR_AUTH0_CLIENT_ID',
         audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://autodiscovery.example.com',
-        requiredPermission: process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || 'enroll:autodiscovery_v0',
+        requiredPermission:
+            process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || 'enroll:autodiscovery_v0',
     };
 
     return (

@@ -6,13 +6,13 @@ steps:
   name: 'gcr.io/cloud-builders/docker'
   args: [
     'build',
+    '-f', 'api/Dockerfile',
     '-t', 'gcr.io/$PROJECT_ID/$REPO_NAME-api:latest',
     '-t', 'gcr.io/$PROJECT_ID/$REPO_NAME-api:$COMMIT_SHA',
     '--cache-from', 'gcr.io/$PROJECT_ID/$REPO_NAME-api:latest',
     '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
     '.',
   ]
-  dir: 'api'
   waitFor: [ '-' ]
 - id: 'ui.build'
   name: 'gcr.io/cloud-builders/docker'

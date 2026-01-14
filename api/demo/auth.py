@@ -1,9 +1,10 @@
-import os
 import json
+import os
+from functools import wraps
+
 import jwt
 import requests
-from functools import wraps
-from flask import request, jsonify
+from flask import jsonify, request
 from jwt.algorithms import RSAAlgorithm
 
 # Cache for Auth0 public keys
@@ -44,7 +45,7 @@ def verify_token(token, auth0_domain, auth0_audience):
             public_key,
             algorithms=["RS256"],
             audience=auth0_audience,
-            issuer=f"https://{auth0_domain}/"
+            issuer=f"https://{auth0_domain}/",
         )
         return payload
     except jwt.ExpiredSignatureError:
@@ -59,6 +60,7 @@ def verify_token(token, auth0_domain, auth0_audience):
 
 def requires_auth(required_permission=None):
     """Decorator to require authentication and optionally a specific permission"""
+
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
@@ -96,11 +98,15 @@ def requires_auth(required_permission=None):
                         permissions = [permissions]
 
                     if required_permission not in permissions:
-                        return jsonify({"error": f"Access denied. Required permission: {required_permission}"}), 403
+                        return jsonify(
+                            {"error": f"Access denied. Required permission: {required_permission}"}
+                        ), 403
 
             except ValueError as e:
                 return jsonify({"error": str(e)}), 401
 
             return f(*args, **kwargs)
+
         return decorated
+
     return decorator

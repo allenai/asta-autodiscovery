@@ -1,8 +1,7 @@
 """Tests for JobManager class."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
 from autodiscovery_jobs import JobManager
 
 
@@ -185,11 +184,12 @@ def test_setup_and_run(mock_config, tmp_path):
     test_file.write_text("col1,col2\n1,2")
     metadata = {"datasets": [{"name": "data.csv"}]}
 
-    with patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create, \
-         patch("autodiscovery_jobs.gcs.upload_dataset") as mock_upload_data, \
-         patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload_meta, \
-         patch("autodiscovery_jobs.cloudrun.run_job") as mock_run:
-
+    with (
+        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.gcs.upload_dataset") as mock_upload_data,
+        patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload_meta,
+        patch("autodiscovery_jobs.cloudrun.run_job") as mock_run,
+    ):
         mock_create.return_value = "gs://test-bucket/users/testuser/jobs/job1/"
         mock_upload_data.return_value = "gs://test-bucket/users/testuser/jobs/job1/data/"
         mock_upload_meta.return_value = "gs://test-bucket/users/testuser/jobs/job1/metadata.json"

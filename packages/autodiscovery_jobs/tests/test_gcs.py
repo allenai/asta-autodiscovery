@@ -1,10 +1,10 @@
 """Tests for GCS operations."""
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 from autodiscovery_jobs import gcs
-from autodiscovery_jobs.exceptions import GCSError, JobNotFoundError, JobAlreadyExistsError
+from autodiscovery_jobs.exceptions import JobAlreadyExistsError, JobNotFoundError
 
 
 def test_parse_gcs_path():

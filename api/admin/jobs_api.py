@@ -16,7 +16,8 @@ try:
     JOBS_AVAILABLE = True
 except ImportError:
     JOBS_AVAILABLE = False
-    current_app.logger.warning("autodiscovery_jobs not available") if current_app else None
+    # Note: autodiscovery_jobs package not available
+    # Logging deferred to when application context exists
 
 
 def create() -> Blueprint:
@@ -35,6 +36,10 @@ def create() -> Blueprint:
     @api.route("/api/admin/jobs/health")
     def health():
         """Health check endpoint."""
+        if not JOBS_AVAILABLE:
+            current_app.logger.warning(
+                "autodiscovery_jobs package not available - job management features disabled"
+            )
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
     @api.route("/api/admin/jobs/list/<userid>")

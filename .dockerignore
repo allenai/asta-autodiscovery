@@ -1,0 +1,36 @@
+# Ignore common development files
+.git
+.github
+.venv
+.pytest_cache
+.ruff_cache
+.vscode
+.claude
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+
+# Ignore other service directories when building API
+ui
+proxy
+sonar
+autods-viz
+devtools
+docs
+scripts
+
+# Ignore markdown and config files
+*.md
+.gitignore
+.envrc
+justfile
+mkdocs.yml
+ruff.toml
+pyproject.toml
+uv.lock
+docker-compose.yaml
+mcpdoc.json
+
+# Keep what we need
+!packages/
+!api/

@@ -384,6 +384,53 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                 {
                                     name: 'LOG_FORMAT',
                                     value: 'google:json'
+                                },
+                                {
+                                    name: 'GCS_BUCKET',
+                                    valueFrom: {
+                                        secretKeyRef: {
+                                            name: 'autodiscovery-gcs-bucket',
+                                            key: 'GCS_BUCKET'
+                                        }
+                                    }
+                                },
+                                {
+                                    name: 'GCP_PROJECT_ID',
+                                    valueFrom: {
+                                        secretKeyRef: {
+                                            name: 'autodiscovery-gcp-project',
+                                            key: 'GCP_PROJECT_ID'
+                                        }
+                                    }
+                                },
+                                {
+                                    name: 'GOOGLE_ACCESS_KEY_ID',
+                                    valueFrom: {
+                                        secretKeyRef: {
+                                            name: 'autodiscovery-google-access-key-id',
+                                            key: 'GOOGLE_ACCESS_KEY_ID'
+                                        }
+                                    }
+                                },
+                                {
+                                    name: 'GOOGLE_ACCESS_KEY_SECRET',
+                                    valueFrom: {
+                                        secretKeyRef: {
+                                            name: 'autodiscovery-google-access-key-secret',
+                                            key: 'GOOGLE_ACCESS_KEY_SECRET'
+                                        }
+                                    }
+                                },
+                                {
+                                    name: 'GOOGLE_APPLICATION_CREDENTIALS',
+                                    value: '/secret/autodiscovery-gcp-service-account'
+                                }
+                            ],
+                            volumeMounts: [
+                                {
+                                    name: 'autodiscovery-gcp-service-account',
+                                    mountPath: '/secret',
+                                    readOnly: true
                                 }
                             ]
                         },
@@ -459,6 +506,14 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                    cpu: 0.1,
                                    memory: '100M'
                                 }
+                            }
+                        }
+                    ],
+                    volumes: [
+                        {
+                            name: 'autodiscovery-gcp-service-account',
+                            secret: {
+                                secretName: 'autodiscovery-gcp-service-account'
                             }
                         }
                     ]

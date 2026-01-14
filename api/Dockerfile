@@ -9,12 +9,16 @@ FROM python:3.11.3
 
 WORKDIR /api
 
+# Copy and install autodiscovery_jobs package
+COPY packages/autodiscovery_jobs /tmp/autodiscovery_jobs
+RUN pip install /tmp/autodiscovery_jobs
+
 # Install Python dependencies
-COPY requirements.txt .
+COPY api/requirements.txt .
 RUN pip install -r requirements.txt
 
 # Copy over the source code
-COPY . .
+COPY api/ .
 
 # Kick things off
 ENTRYPOINT [ "/api/dev.sh" ]

@@ -22,3 +22,5 @@ wheels/
 
 # IDEs
 .idea/
+
+secrets/

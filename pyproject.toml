@@ -33,6 +33,7 @@ pythonpath = [
     "packages/code_execution/src",
     "packages/agents/src",
     "packages/autodiscovery_modal/src",
+    "packages/autodiscovery_jobs/src",
 ]
 markers = [
     "modal: integration tests that run against Modal",
@@ -43,12 +44,14 @@ members = [
     "packages/code_execution",
     "packages/agents",
     "packages/autodiscovery_modal",
+    "packages/autodiscovery_jobs",
     "packages/devtools"
 ]
 
 [tool.uv.sources]
 agents = { workspace = true }
 autodiscovery-modal = { workspace = true }
+autodiscovery-jobs = { workspace = true }
 code-execution = { workspace = true }
 
 [tool.coverage.run]

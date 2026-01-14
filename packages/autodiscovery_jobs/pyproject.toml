@@ -1,0 +1,35 @@
+[project]
+name = "autodiscovery_jobs"
+version = "0.1.0"
+description = "Python package for managing Cloud Run jobs with GCS integration"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-cloud-storage>=2.14.0",
+    "google-api-core>=2.15.0",
+    "google-cloud-run>=0.11.0",
+    "google-cloud-logging>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.10",
+    "mypy>=1.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.16,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

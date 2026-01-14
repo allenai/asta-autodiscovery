@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Autodiscovery Jobs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        h1 { margin-bottom: 10px; color: #333; }
+        h2 { margin-top: 30px; margin-bottom: 15px; color: #555; font-size: 1.3em; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group { margin-bottom: 15px; }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input[type="file"] {
+            padding: 6px;
+            background: #f8f9fa;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+        .info { color: #17a2b8; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <h1>Autodiscovery Jobs Admin</h1>
+    <p class="subtitle">Simple UI for managing Cloud Run jobs with GCS integration</p>
+
+    <!-- Job Management -->
+    <div class="section">
+        <h2>1. Job Management</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label>User ID</label>
+                <input type="text" id="userid" placeholder="e.g., testuser" value="testuser">
+            </div>
+            <div class="form-group">
+                <label>Job ID</label>
+                <input type="text" id="jobid" placeholder="e.g., experiment1" value="experiment1">
+            </div>
+        </div>
+        <button onclick="listJobs()">List Jobs</button>
+        <button onclick="createJob()">Create Job</button>
+        <button onclick="checkJobExists()">Check Exists</button>
+        <button onclick="deleteJob()">Delete Job</button>
+        <div id="jobOutput" class="output" style="display:none"></div>
+    </div>
+
+    <!-- Upload Dataset -->
+    <div class="section">
+        <h2>2. Upload Dataset</h2>
+        <div class="form-group">
+            <label>Dataset File (CSV, JSON, etc.)</label>
+            <input type="file" id="datasetFile" accept=".csv,.json,.txt,.tsv">
+        </div>
+        <button onclick="uploadDataset()">Upload Dataset</button>
+        <div id="datasetOutput" class="output" style="display:none"></div>
+    </div>
+
+    <!-- Upload Metadata -->
+    <div class="section">
+        <h2>3. Upload Metadata</h2>
+        <div class="form-group">
+            <label>Metadata JSON</label>
+            <textarea id="metadata" rows="15" placeholder='{"datasets": [{"name": "data.csv", "description": "Test dataset"}]}'>{
+  "datasets": [{
+    "name": "sample_dataset.csv",
+    "description": "Sample dataset for testing",
+    "columns": {
+      "raw": [
+        {
+          "name": "foo_bar",
+          "type": "string",
+          "description": "Example column"
+        }
+      ]
+    }
+  }]
+}</textarea>
+        </div>
+        <button onclick="uploadMetadata()">Upload Metadata</button>
+        <div id="metadataOutput" class="output" style="display:none"></div>
+    </div>
+
+    <!-- Run Job -->
+    <div class="section">
+        <h2>4. Run Job</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label>Number of Experiments</label>
+                <input type="number" id="n_experiments" value="4" min="1">
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <select id="model">
+                    <option value="gpt-4o">gpt-4o</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    <option value="o3-mini">o3-mini</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="runJob()">Run Job</button>
+        <div id="runOutput" class="output" style="display:none"></div>
+    </div>
+
+    <!-- Job Status & Logs -->
+    <div class="section">
+        <h2>5. Monitor Job</h2>
+        <div class="form-group">
+            <label>Execution ID</label>
+            <input type="text" id="execution_id" placeholder="e.g., autodiscovery-job-abc123">
+        </div>
+        <button onclick="getStatus()">Get Status</button>
+        <button onclick="getLogs()">Get Logs</button>
+        <button onclick="cancelJob()">Cancel Job</button>
+        <div id="monitorOutput" class="output" style="display:none"></div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        function showOutput(elementId, message, type = 'info') {
+            const output = document.getElementById(elementId);
+            output.style.display = 'block';
+            output.className = `output ${type}`;
+            output.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+        }
+
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {'Content-Type': 'application/json'}
+                };
+                if (body) options.body = JSON.stringify(body);
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    return { error: data.error || `HTTP ${response.status}`, status: response.status };
+                }
+                return data;
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        async function listJobs() {
+            const userid = document.getElementById('userid').value;
+            if (!userid) return showOutput('jobOutput', 'Please enter a user ID', 'error');
+
+            const data = await apiCall(`/api/admin/jobs/list/${userid}`);
+            showOutput('jobOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'success');
+        }
+
+        async function createJob() {
+            const userid = document.getElementById('userid').value;
+            const jobid = document.getElementById('jobid').value;
+            if (!userid || !jobid) return showOutput('jobOutput', 'Please enter user ID and job ID', 'error');
+
+            const data = await apiCall('/api/admin/jobs/create', 'POST', { userid, jobid });
+            showOutput('jobOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'success');
+        }
+
+        async function checkJobExists() {
+            const userid = document.getElementById('userid').value;
+            const jobid = document.getElementById('jobid').value;
+            if (!userid || !jobid) return showOutput('jobOutput', 'Please enter user ID and job ID', 'error');
+
+            const data = await apiCall(`/api/admin/jobs/exists/${userid}/${jobid}`);
+            showOutput('jobOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'info');
+        }
+
+        async function deleteJob() {
+            const userid = document.getElementById('userid').value;
+            const jobid = document.getElementById('jobid').value;
+            if (!userid || !jobid) return showOutput('jobOutput', 'Please enter user ID and job ID', 'error');
+            if (!confirm(`Delete job ${userid}/${jobid}?`)) return;
+
+            const data = await apiCall('/api/admin/jobs/delete', 'POST', { userid, jobid });
+            showOutput('jobOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'success');
+        }
+
+        async function uploadDataset() {
+            const userid = document.getElementById('userid').value;
+            const jobid = document.getElementById('jobid').value;
+            const fileInput = document.getElementById('datasetFile');
+
+            if (!userid || !jobid) return showOutput('datasetOutput', 'Please enter user ID and job ID', 'error');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                return showOutput('datasetOutput', 'Please select a file', 'error');
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('userid', userid);
+            formData.append('jobid', jobid);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/jobs/upload-dataset`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showOutput('datasetOutput', `Error: ${data.error || 'Upload failed'}`, 'error');
+                } else {
+                    showOutput('datasetOutput', data, 'success');
+                    // Clear the file input
+                    fileInput.value = '';
+                }
+            } catch (error) {
+                showOutput('datasetOutput', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function uploadMetadata() {
+            const userid = document.getElementById('userid').value;
+            const jobid = document.getElementById('jobid').value;
+            const metadataText = document.getElementById('metadata').value;
+
+            if (!userid || !jobid) return showOutput('metadataOutput', 'Please enter user ID and job ID', 'error');
+
+            let metadata;
+            try {
+                metadata = JSON.parse(metadataText);
+            } catch (e) {
+                return showOutput('metadataOutput', `Invalid JSON: ${e.message}`, 'error');
+            }
+
+            const data = await apiCall('/api/admin/jobs/upload-metadata', 'POST', { userid, jobid, metadata });
+            showOutput('metadataOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'success');
+        }
+
+        async function runJob() {
+            const userid = document.getElementById('userid').value;
+            const jobid = document.getElementById('jobid').value;
+            const n_experiments = parseInt(document.getElementById('n_experiments').value);
+            const model = document.getElementById('model').value;
+
+            if (!userid || !jobid) return showOutput('runOutput', 'Please enter user ID and job ID', 'error');
+
+            const data = await apiCall('/api/admin/jobs/run', 'POST', {
+                userid,
+                jobid,
+                n_experiments,
+                model
+            });
+
+            if (data.execution_id) {
+                document.getElementById('execution_id').value = data.execution_id;
+            }
+
+            showOutput('runOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'success');
+        }
+
+        async function getStatus() {
+            const execution_id = document.getElementById('execution_id').value;
+            if (!execution_id) return showOutput('monitorOutput', 'Please enter an execution ID', 'error');
+
+            const data = await apiCall(`/api/admin/jobs/status/${execution_id}`);
+            showOutput('monitorOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'info');
+        }
+
+        async function getLogs() {
+            const execution_id = document.getElementById('execution_id').value;
+            if (!execution_id) return showOutput('monitorOutput', 'Please enter an execution ID', 'error');
+
+            const data = await apiCall(`/api/admin/jobs/logs/${execution_id}?limit=100`);
+            showOutput('monitorOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'info');
+        }
+
+        async function cancelJob() {
+            const execution_id = document.getElementById('execution_id').value;
+            if (!execution_id) return showOutput('monitorOutput', 'Please enter an execution ID', 'error');
+            if (!confirm(`Cancel execution ${execution_id}?`)) return;
+
+            const data = await apiCall('/api/admin/jobs/cancel', 'POST', { execution_id });
+            showOutput('monitorOutput', data.error ? `Error: ${data.error}` : data, data.error ? 'error' : 'success');
+        }
+
+        // Check health on load
+        window.addEventListener('load', async () => {
+            const health = await apiCall('/api/admin/jobs/health');
+            if (health.error || !health.jobs_available) {
+                document.body.insertAdjacentHTML('afterbegin',
+                    '<div style="background:#fff3cd;padding:15px;margin-bottom:20px;border-radius:4px;border:1px solid #ffc107">' +
+                    '<strong>Warning:</strong> autodiscovery_jobs package is not available. API calls will fail.' +
+                    '</div>'
+                );
+            }
+        });
+    </script>
+</body>
+</html>

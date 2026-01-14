@@ -1,0 +1,301 @@
+"""High-level interface for managing Cloud Run jobs."""
+
+from typing import Optional, List, Dict, Any
+from pathlib import Path
+
+from .config import JobConfig
+from . import gcs
+from . import cloudrun
+
+
+class JobManager:
+    """High-level interface for managing Cloud Run jobs.
+
+    This class provides a convenient way to manage jobs with persistent configuration.
+    All operations delegate to the functional APIs in gcs and cloudrun modules.
+
+    Example:
+        >>> from autodiscovery_jobs import JobManager
+        >>> manager = JobManager()  # Uses default config
+        >>> manager.create_job("exampleuser", "experiment_1")
+        >>> manager.upload_dataset("exampleuser", "experiment_1", Path("./data.csv"))
+        >>> execution_id = manager.run_job("exampleuser", "experiment_1", n_experiments=4)
+    """
+
+    def __init__(self, config: Optional[JobConfig] = None):
+        """Initialize JobManager.
+
+        Args:
+            config: Configuration (uses default from environment if None)
+        """
+        self.config = config or JobConfig.from_env()
+
+    # User operations
+
+    def get_user_path(self, userid: str) -> str:
+        """Get GCS path for a user.
+
+        Args:
+            userid: User identifier
+
+        Returns:
+            GCS path like "gs://bucket/users/{userid}/"
+        """
+        return gcs.get_user_path(userid, self.config)
+
+    # Job management
+
+    def list_jobs(self, userid: str) -> List[str]:
+        """List all jobs for a user.
+
+        Args:
+            userid: User identifier
+
+        Returns:
+            List of job IDs
+        """
+        return gcs.list_user_jobs(userid, self.config)
+
+    def job_exists(self, userid: str, jobid: str) -> bool:
+        """Check if a job exists.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+
+        Returns:
+            True if job exists
+        """
+        return gcs.job_exists(userid, jobid, self.config)
+
+    def create_job(self, userid: str, jobid: str, overwrite: bool = False) -> str:
+        """Create a new job directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            overwrite: If True, don't raise error if job exists
+
+        Returns:
+            GCS path to created job directory
+        """
+        return gcs.create_job_directory(userid, jobid, self.config, overwrite)
+
+    def delete_job(self, userid: str, jobid: str) -> None:
+        """Delete a job directory and all contents.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+        """
+        gcs.delete_job_directory(userid, jobid, self.config)
+
+    def get_job_path(self, userid: str, jobid: str) -> str:
+        """Get GCS path for a job.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+
+        Returns:
+            GCS path like "gs://bucket/users/{userid}/jobs/{jobid}/"
+        """
+        return gcs.get_job_path(userid, jobid, self.config)
+
+    # Data operations
+
+    def upload_dataset(
+        self, userid: str, jobid: str, local_path: Path, remote_name: Optional[str] = None
+    ) -> str:
+        """Upload dataset to job's data directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            local_path: Local file or directory path
+            remote_name: Optional remote filename (for single files only)
+
+        Returns:
+            GCS path where data was uploaded
+        """
+        return gcs.upload_dataset(userid, jobid, local_path, self.config, remote_name)
+
+    def upload_metadata(self, userid: str, jobid: str, metadata: Dict[str, Any]) -> str:
+        """Upload metadata to job directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            metadata: Metadata dictionary
+
+        Returns:
+            GCS path to uploaded metadata
+        """
+        return gcs.upload_metadata(userid, jobid, metadata, self.config)
+
+    # Job execution
+
+    def run_job(
+        self,
+        userid: str,
+        jobid: str,
+        n_experiments: int = 4,
+        model: str = "gpt-4o",
+        belief_model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        belief_temperature: Optional[float] = None,
+        k_experiments: Optional[int] = None,
+        mcts_selection: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        exploration_weight: Optional[float] = None,
+        code_timeout: Optional[int] = None,
+        n_warmstart: Optional[int] = None,
+        **kwargs,
+    ) -> str:
+        """Execute a Cloud Run job.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            n_experiments: Number of experiments to run
+            model: Model to use (e.g., "gpt-4o", "o4-mini")
+            belief_model: Model for belief distribution (optional)
+            temperature: Temperature for agents (optional)
+            belief_temperature: Temperature for belief agent (optional)
+            k_experiments: Branching factor for experiments (optional)
+            mcts_selection: Selection method (optional)
+            reasoning_effort: Reasoning effort for o-series models (optional)
+            exploration_weight: Exploration weight for UCB1 (optional)
+            code_timeout: Timeout for code execution in seconds (optional)
+            n_warmstart: Number of warmstart experiments (optional)
+            **kwargs: Additional arguments
+
+        Returns:
+            Execution ID
+        """
+        return cloudrun.run_job(
+            userid,
+            jobid,
+            self.config,
+            n_experiments,
+            model,
+            belief_model,
+            temperature,
+            belief_temperature,
+            k_experiments,
+            mcts_selection,
+            reasoning_effort,
+            exploration_weight,
+            code_timeout,
+            n_warmstart,
+            **kwargs,
+        )
+
+    def get_job_status(self, execution_id: str) -> Dict[str, Any]:
+        """Get status of a job execution.
+
+        Args:
+            execution_id: Execution ID from run_job()
+
+        Returns:
+            Dictionary with status information
+        """
+        return cloudrun.get_job_status(execution_id, self.config)
+
+    def cancel_job(self, execution_id: str) -> None:
+        """Cancel a running job execution.
+
+        Args:
+            execution_id: Execution ID from run_job()
+        """
+        cloudrun.cancel_job(execution_id, self.config)
+
+    def get_job_logs(self, execution_id: Optional[str] = None, limit: int = 50) -> List[str]:
+        """Get logs for a job execution.
+
+        Args:
+            execution_id: Optional execution ID to filter logs
+            limit: Maximum number of log entries to return
+
+        Returns:
+            List of log entries
+        """
+        return cloudrun.get_job_logs(execution_id, self.config, limit)
+
+    # Results
+
+    def get_results(self, userid: str, jobid: str) -> List[str]:
+        """List all result files from a job.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+
+        Returns:
+            List of GCS paths to result files
+        """
+        return gcs.get_job_results(userid, jobid, self.config)
+
+    def download_results(self, userid: str, jobid: str, local_dir: Path) -> List[Path]:
+        """Download all job results to local directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            local_dir: Local directory to download to
+
+        Returns:
+            List of local file paths that were downloaded
+        """
+        return gcs.download_job_results(userid, jobid, local_dir, self.config)
+
+    # Convenience methods
+
+    def setup_and_run(
+        self,
+        userid: str,
+        jobid: str,
+        dataset_path: Path,
+        metadata: Dict[str, Any],
+        n_experiments: int = 4,
+        model: str = "gpt-4o",
+        **kwargs,
+    ) -> str:
+        """Create job, upload data, and execute in one call.
+
+        This is a convenience method that combines multiple operations:
+        1. Create job directory
+        2. Upload dataset
+        3. Upload metadata
+        4. Run job
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            dataset_path: Local path to dataset file or directory
+            metadata: Metadata dictionary
+            n_experiments: Number of experiments to run
+            model: Model to use
+            **kwargs: Additional arguments for run_job()
+
+        Returns:
+            Execution ID
+
+        Example:
+            >>> manager = JobManager()
+            >>> execution_id = manager.setup_and_run(
+            ...     "exampleuser", "quick_test",
+            ...     Path("./data/"),
+            ...     {"datasets": [{"name": "data.csv", "description": "Test"}]},
+            ...     n_experiments=4
+            ... )
+        """
+        # Create job (overwrite if exists)
+        self.create_job(userid, jobid, overwrite=True)
+
+        # Upload data and metadata
+        self.upload_dataset(userid, jobid, dataset_path)
+        self.upload_metadata(userid, jobid, metadata)
+
+        # Run job
+        return self.run_job(userid, jobid, n_experiments, model, **kwargs)

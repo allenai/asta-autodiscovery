@@ -1,4 +1,5 @@
 from demo import api, glog, error
+from admin import jobs_api, admin_ui
 from flask import Flask
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
@@ -17,6 +18,8 @@ def create_app() -> ProxyFix:
     app = Flask("demo")
     CORS(app)  # Enable CORS for all routes
     app.register_blueprint(api.create(), url_prefix="/")
+    app.register_blueprint(jobs_api.create(), url_prefix="/")
+    app.register_blueprint(admin_ui.create(), url_prefix="/")
     app.register_error_handler(HTTPException, error.handle)
 
     # Use the X-Forwarded-* headers to set the request IP, host and port. Technically there

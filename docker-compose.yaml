@@ -8,9 +8,12 @@ services:
       - autods-viz
       - proxy
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
     volumes:
       - ./api:/api
+      - ${GOOGLE_APPLICATION_CREDENTIALS}:/secrets/gcp-key.json:ro
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
@@ -19,6 +22,12 @@ services:
       - AUTH0_DOMAIN=auth.example.com
       - AUTH0_AUDIENCE=https://autodiscovery.example.com
       - AUTH0_REQUIRED_PERMISSION=enroll:autodiscovery_v0
+      # GCS and Google Cloud credentials
+      - GCS_BUCKET=${GCS_BUCKET}
+      - GCP_PROJECT_ID=${GCP_PROJECT}
+      - GOOGLE_ACCESS_KEY_ID=${GOOGLE_ACCESS_KEY_ID}
+      - GOOGLE_ACCESS_KEY_SECRET=${GOOGLE_ACCESS_KEY_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
   ui:
     build:
       context: ./ui

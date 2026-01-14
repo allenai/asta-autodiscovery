@@ -57,36 +57,50 @@ def verify_token(token, auth0_domain, auth0_audience):
         raise ValueError(f"Invalid token: {str(e)}")
 
 
-def requires_auth(f):
-    """Decorator to require authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth0_domain = os.environ.get("AUTH0_DOMAIN")
-        auth0_audience = os.environ.get("AUTH0_AUDIENCE")
+def requires_auth(required_permission=None):
+    """Decorator to require authentication and optionally a specific permission"""
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            auth0_domain = os.environ.get("AUTH0_DOMAIN")
+            auth0_audience = os.environ.get("AUTH0_AUDIENCE")
 
-        if not auth0_domain or not auth0_audience:
-            return jsonify({"error": "Auth0 configuration missing"}), 500
+            if not auth0_domain or not auth0_audience:
+                return jsonify({"error": "Auth0 configuration missing"}), 500
 
-        auth_header = request.headers.get("Authorization", None)
+            auth_header = request.headers.get("Authorization", None)
 
-        if not auth_header:
-            return jsonify({"error": "Authorization header is missing"}), 401
+            if not auth_header:
+                return jsonify({"error": "Authorization header is missing"}), 401
 
-        parts = auth_header.split()
-        if parts[0].lower() != "bearer":
-            return jsonify({"error": "Authorization header must start with Bearer"}), 401
-        elif len(parts) == 1:
-            return jsonify({"error": "Token not found"}), 401
-        elif len(parts) > 2:
-            return jsonify({"error": "Authorization header must be Bearer token"}), 401
+            parts = auth_header.split()
+            if parts[0].lower() != "bearer":
+                return jsonify({"error": "Authorization header must start with Bearer"}), 401
+            elif len(parts) == 1:
+                return jsonify({"error": "Token not found"}), 401
+            elif len(parts) > 2:
+                return jsonify({"error": "Authorization header must be Bearer token"}), 401
 
-        token = parts[1]
+            token = parts[1]
 
-        try:
-            payload = verify_token(token, auth0_domain, auth0_audience)
-            request.user = payload
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 401
+            try:
+                payload = verify_token(token, auth0_domain, auth0_audience)
+                request.user = payload
 
-        return f(*args, **kwargs)
-    return decorated
+                # Check for required permission if specified
+                if required_permission:
+                    # Permissions are typically in the "permissions" claim as an array
+                    permissions = payload.get("permissions", [])
+
+                    if not isinstance(permissions, list):
+                        permissions = [permissions]
+
+                    if required_permission not in permissions:
+                        return jsonify({"error": f"Access denied. Required permission: {required_permission}"}), 403
+
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 401
+
+            return f(*args, **kwargs)
+        return decorated
+    return decorator

@@ -50,7 +50,7 @@ def create() -> Blueprint:
 
     # API endpoint - returns user info if authenticated
     @api.route("/api/user")
-    @requires_auth
+    @requires_auth(required_permission=os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0"))
     def api_user(): # pyright: ignore reportUnusedFunction
         auth0_domain = os.environ.get("AUTH0_DOMAIN")
 

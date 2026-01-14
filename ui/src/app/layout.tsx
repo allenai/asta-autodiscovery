@@ -12,6 +12,7 @@ import '@fontsource/lato/700.css';
 
 import Header from './components/Header';
 import ClientProviders from './components/ClientProviders';
+import AuthErrorDialog from './components/AuthErrorDialog';
 
 export const metadata: Metadata = {
     title: 'Next Skiff Template',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                             <Content main>{children}</Content>
                             <Footer />
                         </VarnishApp>
+                        <AuthErrorDialog />
                     </ClientProviders>
                 </AppRouterCacheProvider>
             </body>

@@ -36,13 +36,45 @@ jobs:
       - name: Build project
         run: yarn build
 
-      - name: Notify Slack on failure
-        if: failure() && github.ref == 'refs/heads/main'
+  notify:
+    runs-on: ubuntu-latest
+    needs: build
+    if: always() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Check previous run status
+        id: check_previous
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: context.workflow,
+              branch: 'main',
+              per_page: 2
+            });
+
+            // Current run is first, previous is second
+            const currentStatus = '${{ needs.build.result }}';
+            const previousStatus = runs.workflow_runs[1]?.conclusion || 'success';
+
+            const statusChanged = currentStatus !== previousStatus;
+
+            console.log(`Current: ${currentStatus}, Previous: ${previousStatus}, Changed: ${statusChanged}`);
+
+            return {
+              statusChanged,
+              currentStatus,
+              previousStatus
+            };
+
+      - name: Notify Slack on status change
+        if: fromJSON(steps.check_previous.outputs.result).statusChanged
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
             {
-              "text": "🚨 UI Build Failed on main branch\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "${{ fromJSON(steps.check_previous.outputs.result).currentStatus == 'success' && '✅ UI Build Fixed on main branch' || '🚨 UI Build Failed on main branch' }}\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

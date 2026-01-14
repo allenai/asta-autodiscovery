@@ -1,6 +1,13 @@
 'use client';
 
-import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
+    Button,
+} from '@mui/material';
 
 import { useAuth0 } from '../contexts/Auth0Context';
 
@@ -25,9 +32,7 @@ export default function AuthErrorDialog() {
         <Dialog open={!!authError} onClose={handleClose} disableEscapeKeyDown>
             <DialogTitle>Access Denied</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    You must be approved to access this app.
-                </DialogContentText>
+                <DialogContentText>You must be approved to access this app.</DialogContentText>
                 <DialogContentText sx={{ mt: 2, fontSize: '0.875rem', color: 'text.secondary' }}>
                     Please contact your administrator to request access.
                 </DialogContentText>

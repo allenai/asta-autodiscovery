@@ -87,11 +87,15 @@ export function Auth0Provider({
                             // Permissions are typically in the "permissions" claim
                             const permissions = payload.permissions || [];
 
-                            const hasPermission = Array.isArray(permissions) && permissions.includes(requiredPermission);
+                            const hasPermission =
+                                Array.isArray(permissions) &&
+                                permissions.includes(requiredPermission);
                             setHasRequiredPermission(hasPermission);
 
                             if (!hasPermission) {
-                                setAuthError(`Access denied. Required permission: ${requiredPermission}`);
+                                setAuthError(
+                                    `Access denied. Required permission: ${requiredPermission}`
+                                );
                                 // Don't auto-logout - let the dialog handle user action
                             }
                         } catch (error) {

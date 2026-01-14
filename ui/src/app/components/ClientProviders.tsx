@@ -14,7 +14,8 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
         domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || 'auth0.allenai.org',
         clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || '6EQ7FtDfVFMdGCWa8SMnGGX3W7p6XVNa',
         audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://ai2-autodiscovery.allen.ai',
-        requiredPermission: process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || 'enroll:autodiscovery_v0',
+        requiredPermission:
+            process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || 'enroll:autodiscovery_v0',
     };
 
     return (

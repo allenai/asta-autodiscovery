@@ -24,7 +24,7 @@ services:
       - AUTH0_REQUIRED_PERMISSION=enroll:autodiscovery_v0
       # GCS and Google Cloud credentials
       - GCS_BUCKET=${GCS_BUCKET}
-      - GCP_PROJECT_ID=${GCP_PROJECT}
+      - GCP_PROJECT=${GCP_PROJECT}
       - GOOGLE_ACCESS_KEY_ID=${GOOGLE_ACCESS_KEY_ID}
       - GOOGLE_ACCESS_KEY_SECRET=${GOOGLE_ACCESS_KEY_SECRET}
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json

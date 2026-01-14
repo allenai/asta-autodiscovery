@@ -395,11 +395,11 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                     }
                                 },
                                 {
-                                    name: 'GCP_PROJECT_ID',
+                                    name: 'GCP_PROJECT',
                                     valueFrom: {
                                         secretKeyRef: {
                                             name: 'autodiscovery-gcp-project',
-                                            key: 'GCP_PROJECT_ID'
+                                            key: 'GCP_PROJECT'
                                         }
                                     }
                                 },

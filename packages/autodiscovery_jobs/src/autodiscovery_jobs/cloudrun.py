@@ -116,7 +116,7 @@ def run_job(
     if not project_id:
         raise CloudRunError(
             "project_id must be set in config. Set it via config.project_id or "
-            "GCP_PROJECT_ID environment variable."
+            "GCP_PROJECT environment variable."
         )
 
     # Build job resource name
@@ -181,7 +181,7 @@ def get_job_status(execution_id: str, config: JobConfig | None = None) -> dict[s
     if not project_id:
         raise CloudRunError(
             "project_id must be set in config. Set it via config.project_id or "
-            "GCP_PROJECT_ID environment variable."
+            "GCP_PROJECT environment variable."
         )
 
     # Build execution resource name
@@ -263,7 +263,7 @@ def cancel_job(execution_id: str, config: JobConfig | None = None) -> None:
     if not project_id:
         raise CloudRunError(
             "project_id must be set in config. Set it via config.project_id or "
-            "GCP_PROJECT_ID environment variable."
+            "GCP_PROJECT environment variable."
         )
 
     # Build execution resource name
@@ -308,7 +308,7 @@ def get_job_logs(
     if not project_id:
         raise CloudRunError(
             "project_id must be set in config. Set it via config.project_id or "
-            "GCP_PROJECT_ID environment variable."
+            "GCP_PROJECT environment variable."
         )
 
     try:

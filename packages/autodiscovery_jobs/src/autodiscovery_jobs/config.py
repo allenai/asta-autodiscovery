@@ -38,7 +38,7 @@ class JobConfig:
         config = cls(
             bucket=os.environ.get("GCS_BUCKET")
             or os.environ.get("AUTODISCOVERY_BUCKET", cls.bucket),
-            project_id=os.environ.get("GCP_PROJECT_ID"),
+            project_id=os.environ.get("GCP_PROJECT"),
             region=os.environ.get("GCP_REGION", cls.region),
             job_name=os.environ.get("CLOUDRUN_JOB_NAME", cls.job_name),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),

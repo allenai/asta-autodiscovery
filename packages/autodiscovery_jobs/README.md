@@ -12,7 +12,7 @@ Python package for managing Cloud Run jobs with GCS integration for the autodisc
 ```bash
 # GCS and GCP Configuration
 export AUTODISCOVERY_BUCKET="your-bucket"  # or GCS_BUCKET
-export GCP_PROJECT_ID="your-project-id"
+export GCP_PROJECT="your-project-id"
 export GCP_REGION="us-west1"
 export CLOUDRUN_JOB_NAME="autodiscovery-job"
 

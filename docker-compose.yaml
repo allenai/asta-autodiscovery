@@ -16,8 +16,9 @@ services:
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=DEBUG
-      - AUTH0_DOMAIN=allenai-public.us.auth0.com
+      - AUTH0_DOMAIN=auth0.allenai.org
       - AUTH0_AUDIENCE=https://ai2-autodiscovery.allen.ai
+      - AUTH0_REQUIRED_PERMISSION=enroll:autodiscovery_v0
   ui:
     build:
       context: ./ui

@@ -10,6 +10,8 @@ interface Auth0ContextType {
     loginWithRedirect: () => Promise<void>;
     logout: () => void;
     getAccessToken: () => Promise<string>;
+    hasRequiredPermission: boolean;
+    authError: string | null;
 }
 
 const Auth0Context = createContext<Auth0ContextType | undefined>(undefined);
@@ -20,6 +22,7 @@ interface Auth0ProviderProps {
     clientId: string;
     audience: string;
     redirectUri?: string;
+    requiredPermission?: string;
 }
 
 export function Auth0Provider({
@@ -28,11 +31,14 @@ export function Auth0Provider({
     clientId,
     audience,
     redirectUri,
+    requiredPermission,
 }: Auth0ProviderProps) {
     const [auth0Client, setAuth0Client] = useState<Auth0Client | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | undefined>(undefined);
+    const [hasRequiredPermission, setHasRequiredPermission] = useState(false);
+    const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
         const initAuth0 = async () => {
@@ -67,6 +73,34 @@ export function Auth0Provider({
                 if (authenticated) {
                     const userProfile = await client.getUser();
                     setUser(userProfile);
+
+                    // Check for required permission if specified
+                    if (requiredPermission) {
+                        try {
+                            const token = await client.getTokenSilently();
+
+                            // Decode the access token to get permissions
+                            // Note: This is a simple decode, not validation (validation happens on backend)
+                            const tokenParts = token.split('.');
+                            const payload = JSON.parse(atob(tokenParts[1]));
+
+                            // Permissions are typically in the "permissions" claim
+                            const permissions = payload.permissions || [];
+
+                            const hasPermission = Array.isArray(permissions) && permissions.includes(requiredPermission);
+                            setHasRequiredPermission(hasPermission);
+
+                            if (!hasPermission) {
+                                setAuthError(`Access denied. Required permission: ${requiredPermission}`);
+                                // Don't auto-logout - let the dialog handle user action
+                            }
+                        } catch (error) {
+                            console.error('Error checking permissions:', error);
+                            setAuthError('Failed to verify user permissions');
+                        }
+                    } else {
+                        setHasRequiredPermission(true);
+                    }
                 }
 
                 setIsLoading(false);
@@ -77,7 +111,7 @@ export function Auth0Provider({
         };
 
         initAuth0();
-    }, [domain, clientId, audience, redirectUri]);
+    }, [domain, clientId, audience, redirectUri, requiredPermission]);
 
     const loginWithRedirect = async () => {
         if (auth0Client) {
@@ -111,6 +145,8 @@ export function Auth0Provider({
                 loginWithRedirect,
                 logout,
                 getAccessToken,
+                hasRequiredPermission,
+                authError,
             }}>
             {children}
         </Auth0Context.Provider>

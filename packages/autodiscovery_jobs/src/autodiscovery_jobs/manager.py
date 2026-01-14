@@ -1,11 +1,10 @@
 """High-level interface for managing Cloud Run jobs."""
 
-from typing import Optional, List, Dict, Any
 from pathlib import Path
+from typing import Any
 
+from . import cloudrun, gcs
 from .config import JobConfig
-from . import gcs
-from . import cloudrun
 
 
 class JobManager:
@@ -22,7 +21,7 @@ class JobManager:
         >>> execution_id = manager.run_job("exampleuser", "experiment_1", n_experiments=4)
     """
 
-    def __init__(self, config: Optional[JobConfig] = None):
+    def __init__(self, config: JobConfig | None = None):
         """Initialize JobManager.
 
         Args:
@@ -45,7 +44,7 @@ class JobManager:
 
     # Job management
 
-    def list_jobs(self, userid: str) -> List[str]:
+    def list_jobs(self, userid: str) -> list[str]:
         """List all jobs for a user.
 
         Args:
@@ -105,7 +104,7 @@ class JobManager:
     # Data operations
 
     def upload_dataset(
-        self, userid: str, jobid: str, local_path: Path, remote_name: Optional[str] = None
+        self, userid: str, jobid: str, local_path: Path, remote_name: str | None = None
     ) -> str:
         """Upload dataset to job's data directory.
 
@@ -120,7 +119,7 @@ class JobManager:
         """
         return gcs.upload_dataset(userid, jobid, local_path, self.config, remote_name)
 
-    def upload_metadata(self, userid: str, jobid: str, metadata: Dict[str, Any]) -> str:
+    def upload_metadata(self, userid: str, jobid: str, metadata: dict[str, Any]) -> str:
         """Upload metadata to job directory.
 
         Args:
@@ -141,15 +140,15 @@ class JobManager:
         jobid: str,
         n_experiments: int = 4,
         model: str = "gpt-4o",
-        belief_model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        belief_temperature: Optional[float] = None,
-        k_experiments: Optional[int] = None,
-        mcts_selection: Optional[str] = None,
-        reasoning_effort: Optional[str] = None,
-        exploration_weight: Optional[float] = None,
-        code_timeout: Optional[int] = None,
-        n_warmstart: Optional[int] = None,
+        belief_model: str | None = None,
+        temperature: float | None = None,
+        belief_temperature: float | None = None,
+        k_experiments: int | None = None,
+        mcts_selection: str | None = None,
+        reasoning_effort: str | None = None,
+        exploration_weight: float | None = None,
+        code_timeout: int | None = None,
+        n_warmstart: int | None = None,
         **kwargs,
     ) -> str:
         """Execute a Cloud Run job.
@@ -191,7 +190,7 @@ class JobManager:
             **kwargs,
         )
 
-    def get_job_status(self, execution_id: str) -> Dict[str, Any]:
+    def get_job_status(self, execution_id: str) -> dict[str, Any]:
         """Get status of a job execution.
 
         Args:
@@ -210,7 +209,7 @@ class JobManager:
         """
         cloudrun.cancel_job(execution_id, self.config)
 
-    def get_job_logs(self, execution_id: Optional[str] = None, limit: int = 50) -> List[str]:
+    def get_job_logs(self, execution_id: str | None = None, limit: int = 50) -> list[str]:
         """Get logs for a job execution.
 
         Args:
@@ -224,7 +223,7 @@ class JobManager:
 
     # Results
 
-    def get_results(self, userid: str, jobid: str) -> List[str]:
+    def get_results(self, userid: str, jobid: str) -> list[str]:
         """List all result files from a job.
 
         Args:
@@ -236,7 +235,7 @@ class JobManager:
         """
         return gcs.get_job_results(userid, jobid, self.config)
 
-    def download_results(self, userid: str, jobid: str, local_dir: Path) -> List[Path]:
+    def download_results(self, userid: str, jobid: str, local_dir: Path) -> list[Path]:
         """Download all job results to local directory.
 
         Args:
@@ -256,7 +255,7 @@ class JobManager:
         userid: str,
         jobid: str,
         dataset_path: Path,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         n_experiments: int = 4,
         model: str = "gpt-4o",
         **kwargs,

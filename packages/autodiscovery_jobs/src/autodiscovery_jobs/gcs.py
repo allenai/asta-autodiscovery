@@ -1,12 +1,13 @@
 """GCS operations for managing job data and results."""
 
-from typing import List, Optional, Dict, Any
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import Any
+
 from google.cloud import storage
 
 from .config import JobConfig
-from .exceptions import GCSError, JobNotFoundError, JobAlreadyExistsError
+from .exceptions import GCSError, JobAlreadyExistsError, JobNotFoundError
 
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
@@ -37,7 +38,7 @@ def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
     return bucket_name, key_prefix
 
 
-def get_user_path(userid: str, config: Optional[JobConfig] = None) -> str:
+def get_user_path(userid: str, config: JobConfig | None = None) -> str:
     """Get GCS path for a user.
 
     Args:
@@ -51,7 +52,7 @@ def get_user_path(userid: str, config: Optional[JobConfig] = None) -> str:
     return f"gs://{config.bucket}/users/{userid}/"
 
 
-def get_job_path(userid: str, jobid: str, config: Optional[JobConfig] = None) -> str:
+def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> str:
     """Get GCS path for a specific job.
 
     Args:
@@ -66,7 +67,7 @@ def get_job_path(userid: str, jobid: str, config: Optional[JobConfig] = None) ->
     return f"gs://{config.bucket}/users/{userid}/jobs/{jobid}/"
 
 
-def list_user_jobs(userid: str, config: Optional[JobConfig] = None) -> List[str]:
+def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
     """List all jobs for a user.
 
     Args:
@@ -103,7 +104,7 @@ def list_user_jobs(userid: str, config: Optional[JobConfig] = None) -> List[str]
         raise GCSError(f"Failed to list jobs for user {userid}: {e}")
 
 
-def job_exists(userid: str, jobid: str, config: Optional[JobConfig] = None) -> bool:
+def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool:
     """Check if a job directory exists.
 
     Args:
@@ -129,7 +130,7 @@ def job_exists(userid: str, jobid: str, config: Optional[JobConfig] = None) -> b
 
 
 def create_job_directory(
-    userid: str, jobid: str, config: Optional[JobConfig] = None, overwrite: bool = False
+    userid: str, jobid: str, config: JobConfig | None = None, overwrite: bool = False
 ) -> str:
     """Create a new job directory structure in GCS.
 
@@ -171,9 +172,7 @@ def create_job_directory(
         raise GCSError(f"Failed to create job directory: {e}")
 
 
-def delete_job_directory(
-    userid: str, jobid: str, config: Optional[JobConfig] = None
-) -> None:
+def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = None) -> None:
     """Delete a job directory and all its contents.
 
     Args:
@@ -208,8 +207,8 @@ def upload_dataset(
     userid: str,
     jobid: str,
     local_path: Path,
-    config: Optional[JobConfig] = None,
-    remote_name: Optional[str] = None,
+    config: JobConfig | None = None,
+    remote_name: str | None = None,
 ) -> str:
     """Upload dataset file(s) to job's data directory.
 
@@ -260,7 +259,7 @@ def upload_dataset(
 
 
 def upload_metadata(
-    userid: str, jobid: str, metadata: Dict[str, Any], config: Optional[JobConfig] = None
+    userid: str, jobid: str, metadata: dict[str, Any], config: JobConfig | None = None
 ) -> str:
     """Upload metadata.json to job directory.
 
@@ -295,7 +294,7 @@ def upload_metadata(
         raise GCSError(f"Failed to upload metadata: {e}")
 
 
-def get_job_results(userid: str, jobid: str, config: Optional[JobConfig] = None) -> List[str]:
+def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
     """List all result files from a job's output directory.
 
     Args:
@@ -333,8 +332,8 @@ def get_job_results(userid: str, jobid: str, config: Optional[JobConfig] = None)
 
 
 def download_job_results(
-    userid: str, jobid: str, local_dir: Path, config: Optional[JobConfig] = None
-) -> List[Path]:
+    userid: str, jobid: str, local_dir: Path, config: JobConfig | None = None
+) -> list[Path]:
     """Download all job results to a local directory.
 
     Args:

@@ -1,7 +1,8 @@
 """Tests for Cloud Run operations."""
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from autodiscovery_jobs import cloudrun
 from autodiscovery_jobs.exceptions import CloudRunError
 
@@ -15,7 +16,9 @@ def test_run_job_basic(mock_config):
 
         mock_operation = Mock()
         # Mock the metadata.name attribute that the code actually uses
-        mock_operation.metadata.name = "projects/test-project/locations/us-west1/jobs/test-job/executions/test-job-abc123"
+        mock_operation.metadata.name = (
+            "projects/test-project/locations/us-west1/jobs/test-job/executions/test-job-abc123"
+        )
         mock_client.run_job.return_value = mock_operation
 
         execution_id = cloudrun.run_job(
@@ -43,7 +46,9 @@ def test_run_job_with_optional_params(mock_config):
 
         mock_operation = Mock()
         # Mock the metadata.name attribute that the code actually uses
-        mock_operation.metadata.name = "projects/test-project/locations/us-west1/jobs/test-job/executions/test-job-xyz"
+        mock_operation.metadata.name = (
+            "projects/test-project/locations/us-west1/jobs/test-job/executions/test-job-xyz"
+        )
         mock_client.run_job.return_value = mock_operation
 
         execution_id = cloudrun.run_job(
@@ -87,7 +92,9 @@ def test_get_job_status(mock_config):
         mock_executions_client.return_value = mock_client
 
         mock_execution = Mock()
-        mock_execution.name = "projects/test-project/locations/us-west1/jobs/test-job/executions/test-execution"
+        mock_execution.name = (
+            "projects/test-project/locations/us-west1/jobs/test-job/executions/test-execution"
+        )
         mock_execution.uid = "abc-123"
         mock_execution.create_time = None
         mock_execution.start_time = None

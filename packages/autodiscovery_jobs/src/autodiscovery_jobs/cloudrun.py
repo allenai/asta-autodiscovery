@@ -1,9 +1,9 @@
 """Cloud Run operations for executing and managing jobs."""
 
-from typing import Optional, Dict, Any, List
+from typing import Any
 
-from google.cloud import run_v2
 from google.cloud import logging as cloud_logging
+from google.cloud import run_v2
 
 from .config import JobConfig
 from .exceptions import CloudRunError
@@ -12,18 +12,18 @@ from .exceptions import CloudRunError
 def run_job(
     userid: str,
     jobid: str,
-    config: Optional[JobConfig] = None,
+    config: JobConfig | None = None,
     n_experiments: int = 4,
     model: str = "gpt-4o",
-    belief_model: Optional[str] = None,
-    temperature: Optional[float] = None,
-    belief_temperature: Optional[float] = None,
-    k_experiments: Optional[int] = None,
-    mcts_selection: Optional[str] = None,
-    reasoning_effort: Optional[str] = None,
-    exploration_weight: Optional[float] = None,
-    code_timeout: Optional[int] = None,
-    n_warmstart: Optional[int] = None,
+    belief_model: str | None = None,
+    temperature: float | None = None,
+    belief_temperature: float | None = None,
+    k_experiments: int | None = None,
+    mcts_selection: str | None = None,
+    reasoning_effort: str | None = None,
+    exploration_weight: float | None = None,
+    code_timeout: int | None = None,
+    n_warmstart: int | None = None,
     **kwargs,
 ) -> str:
     """Execute a Cloud Run job.
@@ -154,9 +154,7 @@ def run_job(
         raise CloudRunError(f"Failed to execute job: {e}")
 
 
-def get_job_status(
-    execution_id: str, config: Optional[JobConfig] = None
-) -> Dict[str, Any]:
+def get_job_status(execution_id: str, config: JobConfig | None = None) -> dict[str, Any]:
     """Get status of a Cloud Run job execution.
 
     Args:
@@ -248,7 +246,7 @@ def _get_execution_phase(execution: run_v2.Execution) -> str:
         return "PENDING"
 
 
-def cancel_job(execution_id: str, config: Optional[JobConfig] = None) -> None:
+def cancel_job(execution_id: str, config: JobConfig | None = None) -> None:
     """Cancel a running Cloud Run job execution.
 
     Args:
@@ -283,8 +281,8 @@ def cancel_job(execution_id: str, config: Optional[JobConfig] = None) -> None:
 
 
 def get_job_logs(
-    execution_id: Optional[str] = None, config: Optional[JobConfig] = None, limit: int = 50
-) -> List[str]:
+    execution_id: str | None = None, config: JobConfig | None = None, limit: int = 50
+) -> list[str]:
     """Get logs for a Cloud Run job execution.
 
     Args:
@@ -318,7 +316,9 @@ def get_job_logs(
         logging_client = cloud_logging.Client(project=project_id)
 
         # Build the filter query
-        filter_str = f'resource.type="cloud_run_job" AND resource.labels.job_name="{config.job_name}"'
+        filter_str = (
+            f'resource.type="cloud_run_job" AND resource.labels.job_name="{config.job_name}"'
+        )
         if execution_id:
             filter_str += f' AND labels.execution_name="{execution_id}"'
 

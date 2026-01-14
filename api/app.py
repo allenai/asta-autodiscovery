@@ -1,12 +1,13 @@
-from demo import api, glog, error
-from admin import jobs_api, admin_ui
+import logging
+import os
+
+from admin import admin_ui, jobs_api
+from demo import api, error, glog
 from flask import Flask
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-import os
-import logging
 
 def create_app() -> ProxyFix:
     # If LOG_FORMAT is "google:json" emit log message as JSON in a format Google Cloud can parse.
@@ -26,4 +27,3 @@ def create_app() -> ProxyFix:
     # are two reverse proxies in deployed environments, but we "hide" the reverse proxy deployed
     # as a sibling of the API by forwarding the X-Forwarded-* headers rather than chaining them.
     return ProxyFix(app, x_for=1, x_proto=1, x_host=1, x_port=1)
-

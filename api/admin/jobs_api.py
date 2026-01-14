@@ -1,19 +1,18 @@
 """Admin API for managing autodiscovery jobs."""
 
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
-from typing import Dict, Any
-import os
 
 # Import autodiscovery_jobs when available
 try:
-    from autodiscovery_jobs import JobManager, JobConfig
+    from autodiscovery_jobs import JobConfig, JobManager
     from autodiscovery_jobs.exceptions import (
-        JobNotFoundError,
-        JobAlreadyExistsError,
-        GCSError,
         CloudRunError,
+        GCSError,
+        JobAlreadyExistsError,
+        JobNotFoundError,
     )
+
     JOBS_AVAILABLE = True
 except ImportError:
     JOBS_AVAILABLE = False
@@ -36,10 +35,7 @@ def create() -> Blueprint:
     @api.route("/api/admin/jobs/health")
     def health():
         """Health check endpoint."""
-        return jsonify({
-            "status": "ok",
-            "jobs_available": JOBS_AVAILABLE
-        })
+        return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
     @api.route("/api/admin/jobs/list/<userid>")
     def list_jobs(userid: str):
@@ -113,15 +109,15 @@ def create() -> Blueprint:
     def upload_dataset():
         """Upload a dataset file for a job."""
         # Check if file is in request
-        if 'file' not in request.files:
+        if "file" not in request.files:
             raise BadRequest("No file provided")
 
-        file = request.files['file']
-        if file.filename == '':
+        file = request.files["file"]
+        if file.filename == "":
             raise BadRequest("No file selected")
 
-        userid = request.form.get('userid')
-        jobid = request.form.get('jobid')
+        userid = request.form.get("userid")
+        jobid = request.form.get("jobid")
 
         if not userid or not jobid:
             raise BadRequest("userid and jobid are required")
@@ -130,22 +126,26 @@ def create() -> Blueprint:
             manager = get_job_manager()
 
             # Save file temporarily
-            import tempfile
             import os
+            import tempfile
             from pathlib import Path
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=Path(file.filename).suffix
+            ) as tmp:
                 file.save(tmp.name)
                 tmp_path = Path(tmp.name)
 
             try:
                 # Upload to GCS with original filename
                 path = manager.upload_dataset(userid, jobid, tmp_path, remote_name=file.filename)
-                return jsonify({
-                    "path": path,
-                    "filename": file.filename,
-                    "message": "Dataset uploaded successfully"
-                })
+                return jsonify(
+                    {
+                        "path": path,
+                        "filename": file.filename,
+                        "message": "Dataset uploaded successfully",
+                    }
+                )
             finally:
                 # Clean up temp file
                 if tmp_path.exists():
@@ -201,13 +201,13 @@ def create() -> Blueprint:
                 jobid,
                 n_experiments=n_experiments,
                 model=model,
-                **{k: v for k, v in data.items()
-                   if k not in ["userid", "jobid", "n_experiments", "model"]}
+                **{
+                    k: v
+                    for k, v in data.items()
+                    if k not in ["userid", "jobid", "n_experiments", "model"]
+                },
             )
-            return jsonify({
-                "execution_id": execution_id,
-                "message": "Job started successfully"
-            })
+            return jsonify({"execution_id": execution_id, "message": "Job started successfully"})
         except Exception as e:
             current_app.logger.error(f"Failed to run job: {e}")
             return jsonify({"error": str(e)}), 500

@@ -1,8 +1,9 @@
 """Configuration management for autodiscovery_jobs package."""
 
-from dataclasses import dataclass
-from typing import Optional
+from __future__ import annotations
+
 import os
+from dataclasses import dataclass
 
 
 @dataclass
@@ -11,7 +12,7 @@ class JobConfig:
 
     # GCS Configuration
     bucket: str = "example-gcp-project"
-    project_id: Optional[str] = None  # Auto-detect from gcloud if None
+    project_id: str | None = None  # Auto-detect from gcloud if None
 
     # Cloud Run Configuration
     region: str = "us-west1"
@@ -22,7 +23,7 @@ class JobConfig:
     modal_bucket_secret: str = "example-bucket-secret"
 
     @classmethod
-    def from_env(cls, **overrides) -> "JobConfig":
+    def from_env(cls, **overrides) -> JobConfig:
         """Create configuration from environment variables with optional overrides.
 
         Args:
@@ -35,14 +36,13 @@ class JobConfig:
             config = JobConfig.from_env(bucket="my-custom-bucket")
         """
         config = cls(
-            bucket=os.environ.get("GCS_BUCKET") or os.environ.get("AUTODISCOVERY_BUCKET", cls.bucket),
+            bucket=os.environ.get("GCS_BUCKET")
+            or os.environ.get("AUTODISCOVERY_BUCKET", cls.bucket),
             project_id=os.environ.get("GCP_PROJECT_ID"),
             region=os.environ.get("GCP_REGION", cls.region),
             job_name=os.environ.get("CLOUDRUN_JOB_NAME", cls.job_name),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),
-            modal_bucket_secret=os.environ.get(
-                "MODAL_BUCKET_SECRET", cls.modal_bucket_secret
-            ),
+            modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
         )
 
         # Apply overrides

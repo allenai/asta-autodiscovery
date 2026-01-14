@@ -1,7 +1,8 @@
 """Pytest fixtures for autodiscovery_jobs tests."""
 
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
 from autodiscovery_jobs.config import JobConfig
 
 

@@ -34,7 +34,7 @@ export default function EnrollmentStatus() {
 
             try {
                 const token = await getAccessToken();
-                const response = await fetch('/api/enrollment-status', {
+                const response = await fetch('/api/user/me/enrollment-status', {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },

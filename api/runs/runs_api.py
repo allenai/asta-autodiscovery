@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from demo.auth import requires_auth
+from utils.auth import requires_auth
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from werkzeug.exceptions import BadRequest

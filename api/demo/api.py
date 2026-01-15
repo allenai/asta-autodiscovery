@@ -72,11 +72,9 @@ def create() -> Blueprint:
         current_app.logger.info(f"Enrollment status requested by user: {user.get('sub')}")
         return jsonify(enrollment_data)
 
-    # API endpoint - returns user info if authenticated
+    # API endpoint - returns user info if authenticated (no special permission required)
     @api.route("/api/user")
-    @requires_auth(
-        required_permission=os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
-    )
+    @requires_auth()
     def api_user():  # pyright: ignore reportUnusedFunction
         auth0_domain = os.environ.get("AUTH0_DOMAIN")
 

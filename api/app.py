@@ -4,6 +4,7 @@ import os
 from admin import admin_ui, jobs_api
 from demo import api, error, glog
 from flask import Flask
+from runs import runs_api
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -18,6 +19,7 @@ def create_app() -> ProxyFix:
     app = Flask("demo")
     app.register_blueprint(api.create(), url_prefix="/")
     app.register_blueprint(jobs_api.create(), url_prefix="/")
+    app.register_blueprint(runs_api.create(), url_prefix="/")
     app.register_blueprint(admin_ui.create(), url_prefix="/")
     app.register_error_handler(HTTPException, error.handle)
 

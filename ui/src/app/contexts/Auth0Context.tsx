@@ -119,7 +119,11 @@ export function Auth0Provider({
 
     const loginWithRedirect = async () => {
         if (auth0Client) {
-            await auth0Client.loginWithRedirect();
+            await auth0Client.loginWithRedirect({
+                authorizationParams: {
+                    redirect_uri: redirectUri || window.location.origin,
+                },
+            });
         }
     };
 

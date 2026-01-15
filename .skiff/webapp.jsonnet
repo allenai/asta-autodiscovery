@@ -386,6 +386,18 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                     value: 'google:json'
                                 },
                                 {
+                                    name: 'AUTH0_DOMAIN',
+                                    value: 'auth0.allenai.org'
+                                },
+                                {
+                                    name: 'AUTH0_AUDIENCE',
+                                    value: 'https://ai2-autodiscovery.allen.ai'
+                                },
+                                {
+                                    name: 'AUTH0_REQUIRED_PERMISSION',
+                                    value: 'enroll:autodiscovery_v0'
+                                },
+                                {
                                     name: 'GCS_BUCKET',
                                     valueFrom: {
                                         secretKeyRef: {
@@ -458,6 +470,22 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                 {
                                     name: 'API_ORIGIN',
                                     value: 'http://localhost:8000'
+                                },
+                                {
+                                    name: 'NEXT_PUBLIC_AUTH0_DOMAIN',
+                                    value: 'auth0.allenai.org'
+                                },
+                                {
+                                    name: 'NEXT_PUBLIC_AUTH0_CLIENT_ID',
+                                    value: '6EQ7FtDfVFMdGCWa8SMnGGX3W7p6XVNa'
+                                },
+                                {
+                                    name: 'NEXT_PUBLIC_AUTH0_AUDIENCE',
+                                    value: 'https://ai2-autodiscovery.allen.ai'
+                                },
+                                {
+                                    name: 'NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION',
+                                    value: 'enroll:autodiscovery_v0'
                                 }
                             ]
                         },

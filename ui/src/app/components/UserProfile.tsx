@@ -30,7 +30,7 @@ export default function UserProfile() {
 
             try {
                 const token = await getAccessToken();
-                const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:8000';
+                const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:8080';
                 const response = await fetch(`${apiOrigin}/api/user`, {
                     headers: {
                         Authorization: `Bearer ${token}`,

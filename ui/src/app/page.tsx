@@ -1,5 +1,6 @@
 import { Typography } from '@mui/material';
 
+import EnrollmentStatus from './components/EnrollmentStatus';
 import QuestionAndAnswer from './components/QuestionAndAnswer';
 import UserProfile from './components/UserProfile';
 
@@ -12,6 +13,7 @@ export default function Home() {
                 <a href="https://nextjs.org">NextJS</a>.
             </Typography>
             <UserProfile />
+            <EnrollmentStatus />
             <QuestionAndAnswer />
         </>
     );

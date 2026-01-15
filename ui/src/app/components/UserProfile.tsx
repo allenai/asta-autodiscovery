@@ -30,7 +30,7 @@ export default function UserProfile() {
 
             try {
                 const token = await getAccessToken();
-                const response = await fetch('/api/user', {
+                const response = await fetch('/api/user/me', {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },

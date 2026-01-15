@@ -48,6 +48,30 @@ def create() -> Blueprint:
 
         return jsonify(answer)
 
+    # Example protected endpoint - requires special permission
+    @api.route("/api/enrollment-status")
+    @requires_auth(
+        required_permission=os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
+    )
+    def enrollment_status():  # pyright: ignore reportUnusedFunction
+        """
+        Example endpoint that requires the enroll:autodiscovery_v0 permission.
+        Returns enrollment status for the authenticated user.
+        """
+        user = request.user
+
+        # Example data - in real implementation, this would query a database
+        enrollment_data = {
+            "enrolled": True,
+            "enrollment_date": "2024-01-15",
+            "status": "active",
+            "experiments_count": 12,
+            "user_id": user.get("sub"),
+        }
+
+        current_app.logger.info(f"Enrollment status requested by user: {user.get('sub')}")
+        return jsonify(enrollment_data)
+
     # API endpoint - returns user info if authenticated
     @api.route("/api/user")
     @requires_auth(

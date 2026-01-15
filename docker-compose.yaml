@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 services:
   sonar:
     build: ./sonar
@@ -11,6 +11,8 @@ services:
     build:
       context: .
       dockerfile: ./api/Dockerfile
+    env_file:
+      - .env
     volumes:
       - ./api:/api
       - ${GOOGLE_APPLICATION_CREDENTIALS}:/secrets/gcp-key.json:ro

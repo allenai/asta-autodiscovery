@@ -345,9 +345,7 @@ def create() -> Blueprint:
 
             try:
                 # Upload to GCS with original filename
-                path = manager.upload_dataset(
-                    userid, runid, tmp_path, remote_name=file.filename
-                )
+                path = manager.upload_dataset(userid, runid, tmp_path, remote_name=file.filename)
                 return jsonify(
                     {
                         "path": path,
@@ -464,9 +462,7 @@ def create() -> Blueprint:
                 },
             )
 
-            return jsonify(
-                {"execution_id": execution_id, "message": "Run submitted successfully"}
-            )
+            return jsonify({"execution_id": execution_id, "message": "Run submitted successfully"})
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500

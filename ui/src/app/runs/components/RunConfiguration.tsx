@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+
 import { useAuth0 } from '@/app/contexts/Auth0Context';
 import { saveMetadata, submitRun } from '../actions';
 import type { Dataset } from './DatasetUpload';
@@ -118,7 +119,7 @@ export default function RunConfiguration({
                 runid,
                 {
                     n_experiments: nExperiments,
-                    model: model,
+                    model,
                     belief_model: beliefModel,
                 },
                 token
@@ -201,9 +202,7 @@ export default function RunConfiguration({
                                 </MenuItem>
                             ))}
                         </Select>
-                        <FormHelperText>
-                            LLM to use for belief distribution agent.
-                        </FormHelperText>
+                        <FormHelperText>LLM to use for belief distribution agent.</FormHelperText>
                     </FormControl>
 
                     {error && <Alert severity="error">{error}</Alert>}
@@ -236,7 +235,7 @@ export default function RunConfiguration({
             <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                 <Typography variant="caption" color="text.secondary">
                     <strong>Note:</strong> Once submitted, your run will be queued for execution.
-                    You'll receive an execution ID to track the progress of your run.
+                    You&apos;ll receive an execution ID to track the progress of your run.
                 </Typography>
             </Paper>
         </Box>

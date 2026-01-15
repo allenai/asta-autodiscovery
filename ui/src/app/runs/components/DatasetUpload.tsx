@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+
 import { useAuth0 } from '@/app/contexts/Auth0Context';
 import { uploadDataset } from '../actions';
 
@@ -121,8 +122,8 @@ export default function DatasetUpload({
                 Upload Datasets
             </Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
-                Upload one or more datasets with descriptions. You'll configure run parameters in
-                the next step.
+                Upload one or more datasets with descriptions. You&apos;ll configure run parameters
+                in the next step.
             </Typography>
 
             <Paper sx={{ p: 3, mb: 3 }}>

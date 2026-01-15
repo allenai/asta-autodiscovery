@@ -24,6 +24,4 @@ wheels/
 .idea/
 
 secrets/
-
 .env
-.gcp-key.json

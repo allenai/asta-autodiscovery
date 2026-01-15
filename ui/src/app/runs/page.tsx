@@ -1,20 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import {
-    Box,
-    Grid,
-    Typography,
-    CircularProgress,
-    Alert,
-    Button,
-    Paper,
-} from '@mui/material';
+import { Box, Grid, Typography, CircularProgress, Alert, Paper } from '@mui/material';
+
 import { useAuth0 } from '@/app/contexts/Auth0Context';
 import RunsList from './components/RunsList';
 import RunSetup from './components/RunSetup';
 import RunStatus from './components/RunStatus';
-import { getRun, type RunDetails } from './actions';
+import { getRun } from './actions';
 
 type Step = 'idle' | 'setup' | 'submitted';
 
@@ -34,14 +27,12 @@ export default function RunsPage() {
 
     const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
     const [currentStep, setCurrentStep] = useState<Step>('idle');
-    const [runDetails, setRunDetails] = useState<RunDetails | null>(null);
     const [checkingRun, setCheckingRun] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleRunCreated = (runid: string) => {
         setSelectedRunId(runid);
         setCurrentStep('setup');
-        setRunDetails(null);
     };
 
     const handleSelectRun = async (runid: string) => {
@@ -52,8 +43,6 @@ export default function RunsPage() {
         try {
             const token = await getAccessToken();
             const runData = await getRun(runid, token);
-
-            setRunDetails(runData.run_details || null);
 
             // Check if run has been submitted
             if (
@@ -76,22 +65,13 @@ export default function RunsPage() {
         }
     };
 
-    const handleSubmitSuccess = async () => {
-        // Fetch the updated run details to get execution_id
-        try {
-            const token = await getAccessToken();
-            const runData = await getRun(selectedRunId!, token);
-            setRunDetails(runData.run_details || null);
-        } catch (err) {
-            console.error('Error fetching run details after submission:', err);
-        }
+    const handleSubmitSuccess = () => {
         setCurrentStep('submitted');
     };
 
     const handleStartNewRun = () => {
         setSelectedRunId(null);
         setCurrentStep('idle');
-        setRunDetails(null);
     };
 
     if (isLoading) {
@@ -111,9 +91,7 @@ export default function RunsPage() {
     if (!isAuthenticated) {
         return (
             <Box sx={{ p: 3 }}>
-                <Alert severity="warning">
-                    Please log in to create and manage runs.
-                </Alert>
+                <Alert severity="warning">Please log in to create and manage runs.</Alert>
             </Box>
         );
     }

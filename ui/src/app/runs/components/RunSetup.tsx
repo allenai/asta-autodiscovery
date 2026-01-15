@@ -25,6 +25,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+
 import { useAuth0 } from '@/app/contexts/Auth0Context';
 import { uploadDataset, saveMetadata, submitRun } from '../actions';
 
@@ -194,7 +195,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 runid,
                 {
                     n_experiments: nExperiments,
-                    model: model,
+                    model,
                     belief_model: beliefModel,
                 },
                 token
@@ -284,7 +285,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                                                 <ListItemText
                                                     primary={dataset.filename}
                                                     secondary={dataset.description}
-                                                    primaryTypographyProps={{ fontWeight: 'medium' }}
+                                                    primaryTypographyProps={{
+                                                        fontWeight: 'medium',
+                                                    }}
                                                 />
                                                 <ListItemSecondaryAction>
                                                     <IconButton
@@ -400,7 +403,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
             <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                 <Typography variant="caption" color="text.secondary">
                     <strong>Note:</strong> Once submitted, your run will be queued for execution.
-                    You'll be able to monitor its progress and stop it if needed.
+                    You&apos;ll be able to monitor its progress and stop it if needed.
                 </Typography>
             </Paper>
         </Box>

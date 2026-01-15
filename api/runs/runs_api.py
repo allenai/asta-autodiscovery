@@ -8,14 +8,13 @@ import json
 import os
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
+from demo.auth import requires_auth
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from werkzeug.exceptions import BadRequest
-
-from demo.auth import requires_auth
 
 # Import autodiscovery_jobs when available
 try:
@@ -86,7 +85,7 @@ def create() -> Blueprint:
 
         run_details = {
             "execution_id": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "status": "CREATED",
             "status_checked_at": None,
         }
@@ -149,7 +148,7 @@ def create() -> Blueprint:
         if not run_details:
             run_details = {
                 "execution_id": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "status": "CREATED",
                 "status_checked_at": None,
             }
@@ -461,7 +460,7 @@ def create() -> Blueprint:
                 {
                     "execution_id": execution_id,
                     "status": "RUNNING",
-                    "status_checked_at": datetime.now(timezone.utc).isoformat(),
+                    "status_checked_at": datetime.now(UTC).isoformat(),
                 },
             )
 
@@ -514,7 +513,7 @@ def create() -> Blueprint:
                         runid,
                         {
                             "status": phase,
-                            "status_checked_at": datetime.now(timezone.utc).isoformat(),
+                            "status_checked_at": datetime.now(UTC).isoformat(),
                         },
                     )
 
@@ -579,7 +578,7 @@ def create() -> Blueprint:
                 runid,
                 {
                     "status": "CANCELLED",
-                    "status_checked_at": datetime.now(timezone.utc).isoformat(),
+                    "status_checked_at": datetime.now(UTC).isoformat(),
                 },
             )
 

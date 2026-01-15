@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CancelIcon from '@mui/icons-material/Cancel';
+
 import { useAuth0 } from '@/app/contexts/Auth0Context';
 import { getRunStatus, cancelRun, type RunDetails } from '../actions';
 
@@ -79,7 +80,6 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         }, 30000);
 
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [runid]);
 
     const handleRefresh = () => {
@@ -220,7 +220,9 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                     <Stack direction="row" spacing={2}>
                         <Button
                             variant="outlined"
-                            startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
+                            startIcon={
+                                refreshing ? <CircularProgress size={16} /> : <RefreshIcon />
+                            }
                             onClick={handleRefresh}
                             disabled={refreshing || cancelling}
                             sx={{ flex: 1 }}>

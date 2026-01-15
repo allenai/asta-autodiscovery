@@ -54,8 +54,7 @@ def create() -> Blueprint:
         required_permission=os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
     )
     def enrollment_status():  # pyright: ignore reportUnusedFunction
-        """
-        Example endpoint that requires the enroll:autodiscovery_v0 permission.
+        """Example endpoint that requires the enroll:autodiscovery_v0 permission.
         Returns enrollment status for the authenticated user.
         """
         user = request.user

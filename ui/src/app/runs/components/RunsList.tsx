@@ -14,6 +14,7 @@ import {
     Divider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+
 import { useAuth0 } from '@/app/contexts/Auth0Context';
 import { listRuns, createRun } from '../actions';
 
@@ -59,7 +60,6 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
 
     useEffect(() => {
         fetchRuns();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAuthenticated]);
 
     const handleCreateRun = async () => {

@@ -17,7 +17,7 @@ def create() -> Blueprint:
     # This tells the machinery that powers Skiff (Kubernetes) that your application
     # is ready to receive traffic. Returning a non 200 response code will prevent the
     # application from receiving live requests.
-    @api.route("/api/user")
+    @api.route("/")
     def index() -> tuple[str, int]:  # pyright: ignore reportUnusedFunction
         return "", 204
 

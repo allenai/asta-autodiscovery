@@ -3,9 +3,24 @@ import random
 
 import requests
 from flask import Blueprint, current_app, jsonify, request
+from google.cloud import storage
 from werkzeug.exceptions import BadRequest
 
 from utils.auth import requires_auth, requires_enrollment
+
+# Import autodiscovery_jobs when available
+try:
+    from autodiscovery_jobs import JobConfig, JobManager
+    from autodiscovery_jobs.exceptions import (
+        CloudRunError,
+        GCSError,
+        JobAlreadyExistsError,
+        JobNotFoundError,
+    )
+
+    JOBS_AVAILABLE = True
+except ImportError:
+    JOBS_AVAILABLE = False
 
 
 def create() -> Blueprint:
@@ -13,6 +28,22 @@ def create() -> Blueprint:
     code to initialize things at startup here.
     """
     api = Blueprint("user_api", __name__)
+
+
+    def get_job_manager() -> JobManager:
+        """Get a configured JobManager instance."""
+        if not JOBS_AVAILABLE:
+            raise RuntimeError("autodiscovery_jobs package not available")
+
+        # Get config from environment or use defaults
+        config = JobConfig.from_env()
+        return JobManager(config)
+
+    def get_bucket() -> storage.Bucket:
+        config = JobConfig.from_env()
+        client = storage.Client(project=config.project_id)
+        bucket = client.bucket(config.bucket)
+        return bucket
 
     # This tells the machinery that powers Skiff (Kubernetes) that your application
     # is ready to receive traffic. Returning a non 200 response code will prevent the
@@ -51,16 +82,45 @@ def create() -> Blueprint:
             return jsonify({"error": f"Failed to fetch user info: {str(e)}"}), 500
 
     @api.route("/me/credits", methods=["GET"])
+    @requires_enrollment
     def get_viewer_credits():
         """Get the number of credits for the authenticated user."""
 
+        user = request.user
+        user_id = user.get("sub")
+
+        job_manager = get_job_manager()
+        bucket = get_bucket()
+
+        # Calculate the total credits used by the user across all their jobs
+        total_credits_used = 0
+        total_credits_pending = 0
+        viewer_job_ids = job_manager.list_jobs(userid=user_id)
+        print(f"Viewer job IDs for user {user_id}: {viewer_job_ids}")
+        for job_id in viewer_job_ids:
+            result_files = job_manager.get_results(userid=user_id, jobid=job_id)
+            print(f"Result files for job {job_id}: {result_files}")
+            for result_file in result_files:
+                # Fetch file metadata to get the credits used
+                blob = bucket.get_blob(result_file)
+                print(f"Metadata for result file {result_file}: {blob.metadata if blob else 'None'}")
+                print(blob)
+                # if blob is not None:
+                #     job_credits_used = int(blob.metadata.get("credits_used", 0))
+                # else:
+                #     job_credits_used = 0
+                # total_credits_used += job_credits_used
+
+        credits_granted = 1000 # TODO: Pull this from some config or DB
+        credits_available = max(0, credits_granted - total_credits_used - total_credits_pending)
+        credits_remaining = max(0, credits_granted - total_credits_used)
         return jsonify({
             "credits": {
-                "granted": 0,
-                "used": 0,
-                "pending": 0,
-                "available": 0,
-                "remaining": 0,
+                "granted": credits_granted,
+                "used": total_credits_used,
+                "pending": total_credits_pending,
+                "available": credits_available,
+                "remaining": credits_remaining,
             }
         }), 200
 

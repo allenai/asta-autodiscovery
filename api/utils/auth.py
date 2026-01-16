@@ -59,7 +59,7 @@ def verify_token(token, auth0_domain, auth0_audience):
         raise ValueError(f"Invalid token: {str(e)}")
 
 
-def requires_auth(required_permission=None, required_role=None):
+def requires_auth(required_permission=None):
     """Decorator to require authentication and optionally a specific permission"""
 
     def decorator(f):
@@ -101,18 +101,6 @@ def requires_auth(required_permission=None, required_role=None):
                     if required_permission not in permissions:
                         return jsonify(
                             {"error": f"Access denied. Required permission: {required_permission}"}
-                        ), 403
-
-                # Check for required role if specified
-                if required_role:
-                    roles = payload.get("roles", [])
-
-                    if not isinstance(roles, list):
-                        roles = [roles]
-
-                    if required_role not in roles:
-                        return jsonify(
-                            {"error": f"Access denied. Required role: {required_role}"}
                         ), 403
 
             except ValueError as e:

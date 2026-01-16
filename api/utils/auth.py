@@ -47,7 +47,6 @@ def verify_token(token, auth0_domain, auth0_audience):
             audience=auth0_audience,
             issuer=f"https://{auth0_domain}/",
         )
-        print(json.dumps(payload, indent=2))
         return payload
     except jwt.ExpiredSignatureError:
         raise ValueError("Token has expired")

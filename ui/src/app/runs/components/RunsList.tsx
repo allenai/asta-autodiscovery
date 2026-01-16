@@ -12,8 +12,9 @@ import {
     CircularProgress,
     Alert,
     Divider,
+    styled,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import AddBoxIcon from '@mui/icons-material/AddBox';
 
 import Link from 'next/link';
 
@@ -101,22 +102,16 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                borderRight: 1,
-                borderColor: 'divider',
             }}>
             <Box sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    Runs
-                </Typography>
-                <Button
+                <CreateRunButton
                     variant="contained"
-                    color="primary"
                     fullWidth
-                    startIcon={creating ? <CircularProgress size={16} /> : <AddIcon />}
+                    startIcon={creating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />}
                     onClick={handleCreateRun}
                     disabled={creating}>
-                    {creating ? 'Creating...' : 'Create New Run'}
-                </Button>
+                    {creating ? 'Creating...' : 'New exploration'}
+                </CreateRunButton>
             </Box>
 
             <Divider />
@@ -150,7 +145,7 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
                                     color: 'inherit',
                                     width: '100%',
                                 }}>
-                                <ListItemButton
+                                <RunItemButton
                                     selected={selectedRunId === runid}
                                     onClick={() => onSelectRun(runid)}>
                                     <ListItemText
@@ -164,7 +159,7 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
                                             },
                                         }}
                                     />
-                                </ListItemButton>
+                                </RunItemButton>
                             </Link>
                         </ListItem>
                     ))}
@@ -173,3 +168,24 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
         </Box>
     );
 }
+
+const RunItemButton = styled(ListItemButton)`
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+
+    &.Mui-selected {
+        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
+
+    &:hover {
+        background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    }
+`;
+
+const CreateRunButton = styled(Button)`
+    background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+`;
+
+const StyledAddBoxIcon = styled(AddBoxIcon)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+`;

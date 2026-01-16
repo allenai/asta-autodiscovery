@@ -1,10 +1,12 @@
 'use client';
 
-import { Box, Grid } from '@mui/material';
+import { Box, Grid, styled } from '@mui/material';
 
 import { useRouter, usePathname } from 'next/navigation';
 
 import RunsList from './components/RunsList';
+import { IconAutoDSLogo } from '@/icons/Logo';
+import Header from '@/components/Header';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -26,39 +28,58 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     };
 
     return (
-        <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        <Wrapper>
             <Grid container sx={{ height: '100%' }}>
                 {/* Sidebar - RunsList */}
-                <Grid
-                    item
-                    xs={12}
-                    md={3}
-                    sx={{
-                        height: '100%',
-                        overflow: 'auto',
-                        borderRight: 1,
-                        borderColor: 'divider',
-                    }}>
+                <Sidebar item xs={12} md={2}>
+                    <Logo>
+                        <IconAutoDSLogo />
+                    </Logo>
                     <RunsList
                         selectedRunId={selectedRunId}
                         onSelectRun={handleSelectRun}
                         onRunCreated={handleRunCreated}
                     />
-                </Grid>
+                </Sidebar>
 
                 {/* Main content */}
-                <Grid
+                <MainContent
                     item
                     xs={12}
-                    md={9}
+                    md={10}
                     sx={{
                         height: '100%',
                         overflow: 'auto',
-                        bgcolor: 'grey.50',
                     }}>
+                    <Header />
                     {children}
-                </Grid>
+                </MainContent>
             </Grid>
-        </Box>
+        </Wrapper>
     );
 }
+
+const Wrapper = styled(Box)`
+    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+`;
+
+const Sidebar = styled(Grid)`
+    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    border-right: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: auto;
+`;
+
+const MainContent = styled(Grid)`
+    height: 100%;
+    overflow: auto;
+`;
+
+const Logo = styled('div')`
+    padding: ${({ theme }) => theme.spacing(2)};
+`;

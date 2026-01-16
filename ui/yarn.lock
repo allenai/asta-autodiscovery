@@ -12,17 +12,17 @@
   resolved "https://registry.npmjs.org/@allenai/eslint-config-varnish/-/eslint-config-varnish-1.2.9.tgz"
   integrity sha512-wFWxUEaMKZI0pcT+Ve9hiFiEvIxWDGVqEcZ8zgcISyGE8HYW1nkBWhNZNjtD69T4fZVMV+NTRhZogyu7maCMhA==
 
-"@allenai/varnish-theme@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/@allenai/varnish-theme/-/varnish-theme-1.0.0.tgz"
-  integrity sha512-WqjbpM7nvJpc4mor2V6Qi2xu+0VD2o6G56trGx8CXyLAuxU2417GAEdlE06OFbNH0U8Phcup8qxyhUAW28gh4w==
+"@allenai/varnish-theme@^3.0.8-alpha.0":
+  version "3.0.8-alpha.0"
+  resolved "https://registry.yarnpkg.com/@allenai/varnish-theme/-/varnish-theme-3.0.8-alpha.0.tgz#2184e582615eb2afa9dfeb609cc2d57f6de44eea"
+  integrity sha512-YiyVLr+b50F2jurjQLIOOZ7l8SXihie45OsfVH0bXeQpWHSR2WCSJ2t2U1DO+8efevO2Sy/oP4nNp4P0e9ZoSQ==
 
-"@allenai/varnish2@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/@allenai/varnish2/-/varnish2-1.0.0.tgz"
-  integrity sha512-xRgl1CN0w0OLlOH7+fnKHpvNaaC/xkhrPOBL9zVMhsmN81mNT/SOrtotO3eEZ7ufpJ4w7vvs1rgaxI3OtS95ZA==
+"@allenai/varnish2@^3.0.8-alpha.0":
+  version "3.0.8-alpha.0"
+  resolved "https://registry.yarnpkg.com/@allenai/varnish2/-/varnish2-3.0.8-alpha.0.tgz#25626978fa1d778bc0ec446bb96bfba10dedc955"
+  integrity sha512-SaETW27qYfTo8Uu8ibfvb8RR9l+nqjwGgjBjGLEK5T95zULrrhJ4kxM54rXbHmPHiFH9x/sYYwOKZK9nLndH/w==
   dependencies:
-    "@allenai/varnish-theme" "^1.0.0"
+    "@allenai/varnish-theme" "^3.0.8-alpha.0"
     react-markdown "^9.0.1"
     remark-gfm "^4.0.0"
 
@@ -3494,6 +3494,7 @@ streamsearch@^1.1.0:
   integrity sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==
 
 "string-width-cjs@npm:string-width@^4.2.0", string-width@^4.1.0:
+  name string-width-cjs
   version "4.2.3"
   resolved "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz"
   integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==

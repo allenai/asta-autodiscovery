@@ -9,10 +9,15 @@
 
 const API_ORIGIN = process.env.API_ORIGIN ?? 'http://api:8000';
 
+export interface GetViewerCreditsResponse {
+    credits: ViewerCredits;
+}
 export interface ViewerCredits {
-    credits_granted: number;
-    credits_used: number;
-    credits_remaining: number;
+    granted: number; // Total credits granted to the user
+    used: number; // Credits used on completed jobs
+    pending: number; // Credits in started jobs which have yet to complete
+    available: number; // Credits available for new jobs, assuming pending jobs are cancelled
+    remaining: number; // Credits available for new jobs, assuming pending jobs are completed
 }
 
 /**
@@ -35,5 +40,6 @@ export async function getViewerCredits(token: string): Promise<ViewerCredits> {
         throw new Error(`Failed to fetch viewer credits: ${response.statusText}`);
     }
 
-    return response.json() as Promise<ViewerCredits>;
+    const result: GetViewerCreditsResponse = await response.json();
+    return result.credits;
 }

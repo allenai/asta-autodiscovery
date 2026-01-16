@@ -5,7 +5,7 @@ import requests
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
-from utils.auth import requires_auth
+from utils.auth import requires_auth, requires_enrollment
 
 
 def create() -> Blueprint:
@@ -52,9 +52,7 @@ def create() -> Blueprint:
 
     # Example protected endpoint - requires special permission
     @api.route("/me/enrollment-status")
-    @requires_auth(
-        required_permission=os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
-    )
+    @requires_enrollment
     def enrollment_status():  # pyright: ignore reportUnusedFunction
         """Example endpoint that requires the enroll:autodiscovery_v0 permission.
         Returns enrollment status for the authenticated user.

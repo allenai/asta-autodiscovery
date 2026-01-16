@@ -55,9 +55,13 @@ def create() -> Blueprint:
         """Get the number of credits for the authenticated user."""
 
         return jsonify({
-            "credits_granted": 0,
-            "credits_used": 0,
-            "credits_remaining": 0,
+            "credits": {
+                "granted": 0,
+                "used": 0,
+                "pending": 0,
+                "available": 0,
+                "remaining": 0,
+            }
         }), 200
 
     # Example protected endpoint - requires special permission

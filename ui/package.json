@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@allenai/varnish2": "^1.0.0",
+    "@allenai/varnish2": "^3.0.8-alpha.0",
     "@auth0/auth0-react": "^2.11.0",
     "@emotion/cache": "^11.11.0",
     "@emotion/react": "^11.11.3",

@@ -2,17 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import {
-    Box,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemText,
-    Typography,
-    Button,
-    CircularProgress,
-    Alert,
-    Divider,
+  Box,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Typography,
+  Button,
+  CircularProgress,
+  Alert,
+  Divider,
+  styled,
 } from '@mui/material';
+import AddBoxIcon from '@mui/icons-material/AddBox';
 import AddIcon from '@mui/icons-material/Add';
 
 import Link from 'next/link';
@@ -21,9 +23,9 @@ import { useAuth0 } from '@/contexts/Auth0Context';
 import { listRuns, createRun } from '../actions';
 
 interface RunsListProps {
-    selectedRunId: string | null;
-    onSelectRun: (runid: string) => void;
-    onRunCreated: (runid: string) => void;
+  selectedRunId: string | null;
+  onSelectRun: (runid: string) => void;
+  onRunCreated: (runid: string) => void;
 }
 
 /**
@@ -35,141 +37,166 @@ interface RunsListProps {
  * - Highlights currently selected run
  * - Loading and error states
  */
-export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: RunsListProps) {
-    const { isAuthenticated, getAccessToken } = useAuth0();
-    const [runs, setRuns] = useState<string[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [creating, setCreating] = useState(false);
+export default function RunsList({
+  selectedRunId,
+  onSelectRun,
+  onRunCreated,
+}: RunsListProps) {
+  const { isAuthenticated, getAccessToken } = useAuth0();
+  const [runs, setRuns] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
-    const fetchRuns = async () => {
-        if (!isAuthenticated) return;
+  const fetchRuns = async () => {
+    if (!isAuthenticated) return;
 
-        setLoading(true);
-        setError(null);
+    setLoading(true);
+    setError(null);
 
-        try {
-            const token = await getAccessToken();
-            const runsList = await listRuns(token);
-            setRuns(runsList);
-        } catch (err) {
-            console.error('Error fetching runs:', err);
-            setError(err instanceof Error ? err.message : 'Failed to load runs');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchRuns();
-    }, [isAuthenticated]);
-
-    const handleCreateRun = async () => {
-        setCreating(true);
-        setError(null);
-
-        try {
-            const token = await getAccessToken();
-            const response = await createRun(token);
-
-            // Add new run to list
-            setRuns([response.runid, ...runs]);
-
-            // Notify parent component
-            onRunCreated(response.runid);
-        } catch (err) {
-            console.error('Error creating run:', err);
-            setError(err instanceof Error ? err.message : 'Failed to create run');
-        } finally {
-            setCreating(false);
-        }
-    };
-
-    if (!isAuthenticated) {
-        return (
-            <Box sx={{ p: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                    Please log in to view runs
-                </Typography>
-            </Box>
-        );
+    try {
+      const token = await getAccessToken();
+      const runsList = await listRuns(token);
+      setRuns(runsList);
+    } catch (err) {
+      console.error('Error fetching runs:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load runs');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
+    fetchRuns();
+  }, [isAuthenticated]);
+
+  const handleCreateRun = async () => {
+    setCreating(true);
+    setError(null);
+
+    try {
+      const token = await getAccessToken();
+      const response = await createRun(token);
+
+      // Add new run to list
+      setRuns([response.runid, ...runs]);
+
+      // Notify parent component
+      onRunCreated(response.runid);
+    } catch (err) {
+      console.error('Error creating run:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create run');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (!isAuthenticated) {
     return (
-        <Box
-            sx={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                borderRight: 1,
-                borderColor: 'divider',
-            }}>
-            <Box sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    Runs
-                </Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    startIcon={creating ? <CircularProgress size={16} /> : <AddIcon />}
-                    onClick={handleCreateRun}
-                    disabled={creating}>
-                    {creating ? 'Creating...' : 'Create New Run'}
-                </Button>
-            </Box>
-
-            <Divider />
-
-            {error && (
-                <Box sx={{ p: 2 }}>
-                    <Alert severity="error" onClose={() => setError(null)}>
-                        {error}
-                    </Alert>
-                </Box>
-            )}
-
-            {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                    <CircularProgress />
-                </Box>
-            ) : runs.length === 0 ? (
-                <Box sx={{ p: 2 }}>
-                    <Typography variant="body2" color="text.secondary" align="center">
-                        No runs yet. Create your first run to get started.
-                    </Typography>
-                </Box>
-            ) : (
-                <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-                    {runs.map((runid) => (
-                        <ListItem key={runid} disablePadding>
-                            <Link
-                                href={`/runs/${runid}`}
-                                style={{
-                                    textDecoration: 'none',
-                                    color: 'inherit',
-                                    width: '100%',
-                                }}>
-                                <ListItemButton
-                                    selected={selectedRunId === runid}
-                                    onClick={() => onSelectRun(runid)}>
-                                    <ListItemText
-                                        primary={runid}
-                                        primaryTypographyProps={{
-                                            variant: 'body2',
-                                            noWrap: true,
-                                            sx: {
-                                                fontFamily: 'monospace',
-                                                fontSize: '0.85rem',
-                                            },
-                                        }}
-                                    />
-                                </ListItemButton>
-                            </Link>
-                        </ListItem>
-                    ))}
-                </List>
-            )}
-        </Box>
+      <Box sx={{ p: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          Please log in to view runs
+        </Typography>
+      </Box>
     );
+  }
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <CreateRunButton
+          variant="contained"
+          fullWidth
+          startIcon={
+            creating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />
+          }
+          onClick={handleCreateRun}
+          disabled={creating}
+        >
+          {creating ? 'Creating...' : 'New exploration'}
+        </CreateRunButton>
+      </Box>
+
+      <Divider />
+
+      {error && (
+        <Box sx={{ p: 2 }}>
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </Box>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      ) : runs.length === 0 ? (
+        <Box sx={{ p: 2 }}>
+          <Typography variant="body2" color="text.secondary" align="center">
+            No runs yet. Create your first run to get started.
+          </Typography>
+        </Box>
+      ) : (
+        <List sx={{ flexGrow: 1, overflow: 'auto' }}>
+          {runs.map((runid) => (
+            <ListItem key={runid} disablePadding>
+              <Link
+                href={`/runs/${runid}`}
+                style={{
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  width: '100%',
+                }}
+              >
+                <RunItemButton
+                  selected={selectedRunId === runid}
+                  onClick={() => onSelectRun(runid)}
+                >
+                  <ListItemText
+                    primary={runid}
+                    primaryTypographyProps={{
+                      variant: 'body2',
+                      noWrap: true,
+                      sx: {
+                        fontFamily: 'monospace',
+                        fontSize: '0.85rem',
+                      },
+                    }}
+                  />
+                </RunItemButton>
+              </Link>
+            </ListItem>
+          ))}
+        </List>
+      )}
+    </Box>
+  );
 }
+
+const RunItemButton = styled(ListItemButton)`
+  color: ${({ theme }) => theme.color['cream-100'].hex};
+
+  &.Mui-selected {
+    background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+  }
+
+  &:hover {
+    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+  }
+`;
+
+const CreateRunButton = styled(Button)`
+  background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+  color: ${({ theme }) => theme.color['cream-100'].hex};
+`;
+
+const StyledAddBoxIcon = styled(AddBoxIcon)`
+  color: ${({ theme }) => theme.color['green-100'].hex};
+`;

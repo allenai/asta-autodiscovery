@@ -1,72 +1,49 @@
 'use client';
 
-import { Button, Avatar, Box, Typography, Menu, MenuItem } from '@mui/material';
+import { useAuth0 } from '@/contexts/Auth0Context';
 
-import { useState } from 'react';
-
-import { useAuth0 } from '../contexts/Auth0Context';
+import { Button, styled } from '@mui/material';
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 
 export default function AuthButton() {
-    const { isAuthenticated, isLoading, user, loginWithRedirect, logout } = useAuth0();
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const open = Boolean(anchorEl);
+  const { isAuthenticated, isLoading, loginWithRedirect, logout } = useAuth0();
 
-    const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-        setAnchorEl(event.currentTarget);
-    };
+  const handleLogout = () => {
+    logout();
+  };
 
-    const handleClose = () => {
-        setAnchorEl(null);
-    };
+  if (isLoading) {
+    return null;
+  }
 
-    const handleLogout = () => {
-        handleClose();
-        logout();
-    };
-
-    if (isLoading) {
-        return null;
-    }
-
-    if (!isAuthenticated) {
-        return (
-            <Button variant="contained" color="primary" onClick={loginWithRedirect}>
-                Log In
-            </Button>
-        );
-    }
-
-    return (
-        <>
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    '&:hover': { opacity: 0.8 },
-                }}
-                onClick={handleClick}>
-                <Avatar
-                    src={user?.picture}
-                    alt={user?.name}
-                    sx={{ width: 32, height: 32, mr: 1 }}
-                />
-                <Typography variant="body2">{user?.name}</Typography>
-            </Box>
-            <Menu
-                anchorEl={anchorEl}
-                open={open}
-                onClose={handleClose}
-                anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'right',
-                }}
-                transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'right',
-                }}>
-                <MenuItem onClick={handleLogout}>Log Out</MenuItem>
-            </Menu>
-        </>
-    );
+  return (
+    <StyledButton
+      onClick={isAuthenticated ? handleLogout : loginWithRedirect}
+      variant="outlined"
+      endIcon={isAuthenticated ? <LogoutOutlinedIcon /> : <LoginOutlinedIcon />}
+    >
+      {isAuthenticated ? 'Logout' : 'Login'}
+    </StyledButton>
+  );
 }
+
+const StyledButton = styled(Button)`
+  &.MuiButton-root {
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    padding: ${({ theme }) => theme.spacing(0, 2)};
+
+    & .MuiButton-endIcon {
+      margin: 0 0 0 ${({ theme }) => theme.spacing(0.75)};
+    }
+  }
+
+  &.MuiButton-outlined {
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+
+    &:hover {
+      border: 1px solid
+        ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
+  }
+`;

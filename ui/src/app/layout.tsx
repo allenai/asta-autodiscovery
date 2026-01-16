@@ -1,4 +1,4 @@
-import { Content, Footer, VarnishApp } from '@allenai/varnish2/components';
+import { Footer, VarnishApp } from '@allenai/varnish2/components';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
@@ -10,32 +10,29 @@ import '@fontsource/lato/400.css';
 import '@fontsource/lato/700-italic.css';
 import '@fontsource/lato/700.css';
 
-import Header from './components/Header';
 import ClientProviders from './components/ClientProviders';
 import AuthErrorDialog from './components/AuthErrorDialog';
 
 export const metadata: Metadata = {
-    title: 'Next Skiff Template',
-    description: 'An AI2 Skiff template to bootstrap a NextJS application',
+  title: 'AutoDiscovery',
 };
 
 // This layout will be applied to every page in the app.
 // To learn more about layouts in NextJS, see their docs: https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts#layouts
 export default function RootLayout({ children }: { children: ReactNode }) {
-    return (
-        <html lang="en">
-            <body>
-                <AppRouterCacheProvider>
-                    <ClientProviders>
-                        <VarnishApp>
-                            <Header />
-                            <Content main>{children}</Content>
-                            <Footer />
-                        </VarnishApp>
-                        <AuthErrorDialog />
-                    </ClientProviders>
-                </AppRouterCacheProvider>
-            </body>
-        </html>
-    );
+  return (
+    <html lang="en">
+      <body>
+        <AppRouterCacheProvider>
+          <ClientProviders>
+            <VarnishApp>
+              {children}
+              <Footer />
+            </VarnishApp>
+            <AuthErrorDialog />
+          </ClientProviders>
+        </AppRouterCacheProvider>
+      </body>
+    </html>
+  );
 }

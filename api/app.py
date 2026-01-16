@@ -3,6 +3,7 @@ import os
 
 from admin import admin_ui, jobs_api
 from flask import Flask
+from root import root_api
 from runs import runs_api
 from user import user_api
 from utils import error, glog
@@ -18,6 +19,7 @@ def create_app() -> ProxyFix:
     logging.basicConfig(level=level, handlers=handlers)
 
     app = Flask("api")
+    app.register_blueprint(root_api.create(), url_prefix="/api")
     app.register_blueprint(user_api.create(), url_prefix="/api/user")
     app.register_blueprint(runs_api.create(), url_prefix="/api/runs")
     app.register_blueprint(admin_ui.create(), url_prefix="/api/admin")

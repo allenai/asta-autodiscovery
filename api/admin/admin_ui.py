@@ -12,8 +12,7 @@ def create() -> Blueprint:
     # Get the directory where this file is located, then go to parent/static
     static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-    @ui.route("/api/admin")
-    @ui.route("/api/admin/")
+    @ui.route("/")
     def admin_page():
         """Serve the admin HTML page."""
         return send_from_directory(static_dir, "admin.html")

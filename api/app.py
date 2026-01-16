@@ -17,11 +17,11 @@ def create_app() -> ProxyFix:
     level = os.environ.get("LOG_LEVEL", default=logging.INFO)
     logging.basicConfig(level=level, handlers=handlers)
 
-    app = Flask("demo")
-    app.register_blueprint(user_api.create(), url_prefix="/")
-    app.register_blueprint(jobs_api.create(), url_prefix="/")
-    app.register_blueprint(runs_api.create(), url_prefix="/")
-    app.register_blueprint(admin_ui.create(), url_prefix="/")
+    app = Flask("api")
+    app.register_blueprint(user_api.create(), url_prefix="/api/user")
+    app.register_blueprint(runs_api.create(), url_prefix="/api/runs")
+    app.register_blueprint(admin_ui.create(), url_prefix="/api/admin")
+    app.register_blueprint(jobs_api.create(), url_prefix="/api/admin/jobs")
     app.register_error_handler(HTTPException, error.handle)
 
     # Use the X-Forwarded-* headers to set the request IP, host and port. Technically there

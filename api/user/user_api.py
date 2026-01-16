@@ -22,7 +22,7 @@ def create() -> Blueprint:
         return "", 204
 
     # API endpoint - returns user info if authenticated (no special permission required)
-    @api.route("/api/user/me")
+    @api.route("/me")
     @requires_auth()
     def api_user():  # pyright: ignore reportUnusedFunction
         auth0_domain = os.environ.get("AUTH0_DOMAIN")
@@ -51,7 +51,7 @@ def create() -> Blueprint:
             return jsonify({"error": f"Failed to fetch user info: {str(e)}"}), 500
 
     # Example protected endpoint - requires special permission
-    @api.route("/api/user/me/enrollment-status")
+    @api.route("/me/enrollment-status")
     @requires_auth(
         required_permission=os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
     )

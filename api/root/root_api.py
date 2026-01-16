@@ -11,6 +11,7 @@ def create() -> Blueprint:
     # is ready to receive traffic. Returning a non 200 response code will prevent the
     # application from receiving live requests.
     @api.route("/")
+    @api.route("/api")
     def index() -> tuple[str, int]:  # pyright: ignore reportUnusedFunction
         return "", 204
 

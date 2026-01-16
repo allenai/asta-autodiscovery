@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
-import { useAuth0 } from '@/app/contexts/Auth0Context';
+import { useAuth0 } from '@/contexts/Auth0Context';
 import { getRun } from '../actions';
 import RunSetup from '../components/RunSetup';
 import RunStatus from '../components/RunStatus';
@@ -40,7 +40,8 @@ export default function RunPage({ params }: RunPageProps) {
         // Check if run has been submitted
         if (
           runData.run_details?.execution_id ||
-          (runData.run_details?.status && runData.run_details.status.toUpperCase() !== 'CREATED')
+          (runData.run_details?.status &&
+            runData.run_details.status.toUpperCase() !== 'CREATED')
         ) {
           setRunState('submitted');
         } else {
@@ -117,8 +118,12 @@ export default function RunPage({ params }: RunPageProps) {
 
   return (
     <>
-      {runState === 'setup' && <RunSetup runid={runId} onSubmitSuccess={handleSubmitSuccess} />}
-      {runState === 'submitted' && <RunStatus runid={runId} onRunCancelled={handleRunCancelled} />}
+      {runState === 'setup' && (
+        <RunSetup runid={runId} onSubmitSuccess={handleSubmitSuccess} />
+      )}
+      {runState === 'submitted' && (
+        <RunStatus runid={runId} onRunCancelled={handleRunCancelled} />
+      )}
     </>
   );
 }

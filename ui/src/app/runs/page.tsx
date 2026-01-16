@@ -1,7 +1,7 @@
 'use client';
 
 import { Box, Typography, Paper, CircularProgress, Alert } from '@mui/material';
-import { useAuth0 } from '@/app/contexts/Auth0Context';
+import { useAuth0 } from '@/contexts/Auth0Context';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
@@ -27,7 +27,9 @@ export default function RunsPage() {
   if (!isAuthenticated) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="warning">Please log in to create and manage runs.</Alert>
+        <Alert severity="warning">
+          Please log in to create and manage runs.
+        </Alert>
       </Box>
     );
   }
@@ -47,7 +49,8 @@ export default function RunsPage() {
           Welcome to Autodiscovery Runs
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          Create a new run or select an existing run from the sidebar to get started.
+          Create a new run or select an existing run from the sidebar to get
+          started.
         </Typography>
         <Typography variant="body2" color="text.secondary">
           {user?.name && `Logged in as: ${user.name}`}

@@ -19,7 +19,7 @@ def create_app() -> ProxyFix:
     logging.basicConfig(level=level, handlers=handlers)
 
     app = Flask("api")
-    app.register_blueprint(root_api.create(), url_prefix="/api")
+    app.register_blueprint(root_api.create(), url_prefix="/")
     app.register_blueprint(user_api.create(), url_prefix="/api/user")
     app.register_blueprint(runs_api.create(), url_prefix="/api/runs")
     app.register_blueprint(admin_ui.create(), url_prefix="/api/admin")

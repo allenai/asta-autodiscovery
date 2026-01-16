@@ -47,6 +47,7 @@ def verify_token(token, auth0_domain, auth0_audience):
             audience=auth0_audience,
             issuer=f"https://{auth0_domain}/",
         )
+        print(json.dumps(payload, indent=2))
         return payload
     except jwt.ExpiredSignatureError:
         raise ValueError("Token has expired")
@@ -58,7 +59,7 @@ def verify_token(token, auth0_domain, auth0_audience):
         raise ValueError(f"Invalid token: {str(e)}")
 
 
-def requires_auth(required_permission=None):
+def requires_auth(required_permission=None, required_role=None):
     """Decorator to require authentication and optionally a specific permission"""
 
     def decorator(f):
@@ -102,6 +103,18 @@ def requires_auth(required_permission=None):
                             {"error": f"Access denied. Required permission: {required_permission}"}
                         ), 403
 
+                # Check for required role if specified
+                if required_role:
+                    roles = payload.get("roles", [])
+
+                    if not isinstance(roles, list):
+                        roles = [roles]
+
+                    if required_role not in roles:
+                        return jsonify(
+                            {"error": f"Access denied. Required role: {required_role}"}
+                        ), 403
+
             except ValueError as e:
                 return jsonify({"error": str(e)}), 401
 
@@ -110,3 +123,18 @@ def requires_auth(required_permission=None):
         return decorated
 
     return decorator
+
+
+def requires_enrollment(f):
+    """Decorator that requires authentication with the default permission from AUTH0_REQUIRED_PERMISSION env var.
+
+    This is a convenience wrapper around requires_auth that automatically uses the
+    AUTH0_REQUIRED_PERMISSION environment variable (defaulting to "enroll:autodiscovery_v0").
+
+    Usage:
+        @requires_default_permission
+        def my_route():
+            ...
+    """
+    default_permission = os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
+    return requires_auth(required_permission=default_permission)(f)

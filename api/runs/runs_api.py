@@ -163,7 +163,7 @@ def create() -> Blueprint:
 
         return run_details
 
-    @api.route("/api/runs/health")
+    @api.route("/health")
     def health():
         """Health check endpoint.
 
@@ -176,7 +176,7 @@ def create() -> Blueprint:
             )
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
-    @api.route("/api/runs/create", methods=["POST"])
+    @api.route("/create", methods=["POST"])
     @requires_auth()
     def create_run():
         """Create a new run with auto-generated UUID.
@@ -219,7 +219,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/list")
+    @api.route("/list")
     @requires_auth()
     def list_runs():
         """List all runs for the authenticated user.
@@ -239,7 +239,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to list runs: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/<runid>")
+    @api.route("/<runid>")
     @requires_auth()
     def get_run(runid: str):
         """Get details for a specific run.
@@ -277,7 +277,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run details: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/<runid>", methods=["DELETE"])
+    @api.route("/<runid>", methods=["DELETE"])
     @requires_auth()
     def delete_run(runid: str):
         """Delete a run and all its contents.
@@ -302,7 +302,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to delete run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/upload-dataset", methods=["POST"])
+    @api.route("/upload-dataset", methods=["POST"])
     @requires_auth()
     def upload_dataset():
         """Upload a dataset file for a run.
@@ -362,7 +362,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to upload dataset: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/metadata", methods=["POST"])
+    @api.route("/metadata", methods=["POST"])
     @requires_auth()
     def save_metadata():
         """Save or update metadata for a run.
@@ -399,7 +399,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to save metadata: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/submit", methods=["POST"])
+    @api.route("/submit", methods=["POST"])
     @requires_auth()
     def submit_run():
         """Submit a run for execution.
@@ -467,7 +467,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/<runid>/status")
+    @api.route("/<runid>/status")
     @requires_auth()
     def get_run_status(runid: str):
         """Get the current status of a run.
@@ -538,7 +538,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/runs/<runid>/cancel", methods=["POST"])
+    @api.route("/<runid>/cancel", methods=["POST"])
     @requires_auth()
     def cancel_run(runid: str):
         """Cancel a running job.

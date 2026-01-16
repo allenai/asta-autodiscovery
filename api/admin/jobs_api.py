@@ -33,7 +33,7 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
-    @api.route("/api/admin/jobs/health")
+    @api.route("/health")
     def health():
         """Health check endpoint."""
         if not JOBS_AVAILABLE:
@@ -42,7 +42,7 @@ def create() -> Blueprint:
             )
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
-    @api.route("/api/admin/jobs/list/<userid>")
+    @api.route("/list/<userid>")
     def list_jobs(userid: str):
         """List all jobs for a user."""
         try:
@@ -53,7 +53,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to list jobs: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/create", methods=["POST"])
+    @api.route("/create", methods=["POST"])
     def create_job():
         """Create a new job."""
         data = request.json
@@ -76,7 +76,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create job: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/exists/<userid>/<jobid>")
+    @api.route("/exists/<userid>/<jobid>")
     def job_exists(userid: str, jobid: str):
         """Check if a job exists."""
         try:
@@ -87,7 +87,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to check job existence: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/delete", methods=["POST"])
+    @api.route("/delete", methods=["POST"])
     def delete_job():
         """Delete a job."""
         data = request.json
@@ -110,7 +110,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to delete job: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/upload-dataset", methods=["POST"])
+    @api.route("/upload-dataset", methods=["POST"])
     def upload_dataset():
         """Upload a dataset file for a job."""
         # Check if file is in request
@@ -160,7 +160,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to upload dataset: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/upload-metadata", methods=["POST"])
+    @api.route("/upload-metadata", methods=["POST"])
     def upload_metadata():
         """Upload metadata for a job."""
         data = request.json
@@ -182,7 +182,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to upload metadata: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/run", methods=["POST"])
+    @api.route("/run", methods=["POST"])
     def run_job():
         """Run a Cloud Run job."""
         data = request.json
@@ -217,7 +217,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to run job: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/status/<execution_id>")
+    @api.route("/status/<execution_id>")
     def get_status(execution_id: str):
         """Get job execution status."""
         try:
@@ -228,7 +228,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get job status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/logs/<execution_id>")
+    @api.route("/logs/<execution_id>")
     def get_logs(execution_id: str):
         """Get job logs."""
         limit = request.args.get("limit", default=50, type=int)
@@ -241,7 +241,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get job logs: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/api/admin/jobs/cancel", methods=["POST"])
+    @api.route("/cancel", methods=["POST"])
     def cancel_job():
         """Cancel a running job."""
         data = request.json

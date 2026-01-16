@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils.auth import requires_auth
+from utils.auth import requires_auth, requires_enrollment
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from werkzeug.exceptions import BadRequest
@@ -177,7 +177,7 @@ def create() -> Blueprint:
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
     @api.route("/create", methods=["POST"])
-    @requires_auth()
+    @requires_enrollment
     def create_run():
         """Create a new run with auto-generated UUID.
 
@@ -220,7 +220,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/list")
-    @requires_auth()
+    @requires_enrollment
     def list_runs():
         """List all runs for the authenticated user.
 
@@ -240,7 +240,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>")
-    @requires_auth()
+    @requires_enrollment
     def get_run(runid: str):
         """Get details for a specific run.
 
@@ -278,7 +278,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>", methods=["DELETE"])
-    @requires_auth()
+    @requires_enrollment
     def delete_run(runid: str):
         """Delete a run and all its contents.
 
@@ -303,7 +303,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-dataset", methods=["POST"])
-    @requires_auth()
+    @requires_enrollment
     def upload_dataset():
         """Upload a dataset file for a run.
 
@@ -363,7 +363,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/metadata", methods=["POST"])
-    @requires_auth()
+    @requires_enrollment
     def save_metadata():
         """Save or update metadata for a run.
 
@@ -400,7 +400,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/submit", methods=["POST"])
-    @requires_auth()
+    @requires_enrollment
     def submit_run():
         """Submit a run for execution.
 
@@ -468,7 +468,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>/status")
-    @requires_auth()
+    @requires_enrollment
     def get_run_status(runid: str):
         """Get the current status of a run.
 
@@ -539,7 +539,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>/cancel", methods=["POST"])
-    @requires_auth()
+    @requires_enrollment
     def cancel_run(runid: str):
         """Cancel a running job.
 

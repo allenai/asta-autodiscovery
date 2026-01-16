@@ -50,6 +50,16 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to fetch user info: {str(e)}")
             return jsonify({"error": f"Failed to fetch user info: {str(e)}"}), 500
 
+    @api.route("/me/credits", methods=["GET"])
+    def get_viewer_credits():
+        """Get the number of credits for the authenticated user."""
+
+        return jsonify({
+            "credits_granted": 0,
+            "credits_used": 0,
+            "credits_remaining": 0,
+        }), 200
+
     # Example protected endpoint - requires special permission
     @api.route("/me/enrollment-status")
     @requires_enrollment

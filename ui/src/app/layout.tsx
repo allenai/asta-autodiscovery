@@ -14,25 +14,25 @@ import ClientProviders from './components/ClientProviders';
 import AuthErrorDialog from './components/AuthErrorDialog';
 
 export const metadata: Metadata = {
-  title: 'AutoDiscovery',
+    title: 'AutoDiscovery',
 };
 
 // This layout will be applied to every page in the app.
 // To learn more about layouts in NextJS, see their docs: https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts#layouts
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <AppRouterCacheProvider>
-          <ClientProviders>
-            <VarnishApp>
-              {children}
-              <Footer />
-            </VarnishApp>
-            <AuthErrorDialog />
-          </ClientProviders>
-        </AppRouterCacheProvider>
-      </body>
-    </html>
-  );
+    return (
+        <html lang="en">
+            <body>
+                <AppRouterCacheProvider>
+                    <ClientProviders>
+                        <VarnishApp>
+                            {children}
+                            <Footer />
+                        </VarnishApp>
+                        <AuthErrorDialog />
+                    </ClientProviders>
+                </AppRouterCacheProvider>
+            </body>
+        </html>
+    );
 }

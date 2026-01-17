@@ -1,10 +1,10 @@
 'use client';
 
-import { getViewerCredits, ViewerCredits } from '@/user/actions';
-import { useAuth0 } from '@/contexts/Auth0Context';
-
+import { useEffect, useRef, useState } from 'react';
 import { Chip, Popover, styled } from '@mui/material';
-import { useContext, useEffect, useRef, useState } from 'react';
+
+import { useAuth0 } from '@/contexts/Auth0Context';
+import { getViewerCredits, ViewerCredits } from '@/user/actions';
 
 export default function CreditsChip() {
     const [credits, setCredits] = useState<ViewerCredits | null>(null);

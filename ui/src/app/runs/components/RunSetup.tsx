@@ -28,6 +28,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { uploadDataset, saveMetadata, submitRun } from '../actions';
+import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 
 export interface Dataset {
     filename: string;
@@ -65,7 +66,10 @@ const BELIEF_MODEL_OPTIONS = [
  */
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const { getAccessToken } = useAuth0();
+    const { credits } = useViewerCredits();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const creditsRemaining = credits?.remaining ?? 500;
 
     // Dataset upload state
     const [datasets, setDatasets] = useState<Dataset[]>([]);
@@ -151,8 +155,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
             return;
         }
 
-        if (isNaN(num) || num < 1 || num > 500) {
-            setExperimentsError('Must be between 1 and 500');
+        if (isNaN(num) || num < 1 || num > creditsRemaining) {
+            setExperimentsError(`Must be between 1 and ${creditsRemaining}`);
         } else {
             setExperimentsError(null);
         }
@@ -167,8 +171,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
             return;
         }
 
-        if (nExperiments < 1 || nExperiments > 500) {
-            setError('Number of experiments must be between 1 and 500');
+        if (nExperiments < 1 || nExperiments > creditsRemaining) {
+            setError(`Number of experiments must be between 1 and ${creditsRemaining}`);
             return;
         }
 
@@ -331,14 +335,17 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                                 onChange={(e) => handleExperimentsChange(e.target.value)}
                                 inputProps={{
                                     min: 1,
-                                    max: 500,
+                                    max: creditsRemaining,
                                     step: 1,
                                 }}
                                 disabled={submitting}
                                 fullWidth
                                 required
                                 error={!!experimentsError}
-                                helperText={experimentsError || 'Enter a number between 1 and 500'}
+                                helperText={
+                                    experimentsError ||
+                                    `Enter a number between 1 and ${creditsRemaining}`
+                                }
                             />
 
                             <FormControl fullWidth disabled={submitting}>

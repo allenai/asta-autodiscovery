@@ -1,12 +1,7 @@
-import json
 import os
-import random
 
 import requests
 from flask import Blueprint, current_app, jsonify, request
-from google.cloud import storage
-from werkzeug.exceptions import BadRequest
-
 from utils.auth import requires_auth, requires_enrollment
 
 # Import autodiscovery_jobs when available
@@ -82,7 +77,6 @@ def create() -> Blueprint:
     @requires_enrollment
     def get_viewer_credits():
         """Get the number of credits for the authenticated user."""
-
         user = request.user
         user_id = user.get("sub")
 

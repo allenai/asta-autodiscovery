@@ -1,6 +1,7 @@
 
 from flask import Blueprint
 
+
 def create() -> Blueprint:
     """This function is called by Skiff to create your application's API. You can
     code to initialize things at startup here.

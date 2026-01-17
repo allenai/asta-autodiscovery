@@ -1,3 +1,4 @@
+import json
 import os
 import random
 
@@ -17,6 +18,7 @@ try:
         JobAlreadyExistsError,
         JobNotFoundError,
     )
+    from autodiscovery_jobs.gcs import calculate_job_credits
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -39,11 +41,6 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
-    def get_bucket() -> storage.Bucket:
-        config = JobConfig.from_env()
-        client = storage.Client(project=config.project_id)
-        bucket = client.bucket(config.bucket)
-        return bucket
 
     # This tells the machinery that powers Skiff (Kubernetes) that your application
     # is ready to receive traffic. Returning a non 200 response code will prevent the
@@ -59,7 +56,7 @@ def create() -> Blueprint:
         auth0_domain = os.environ.get("AUTH0_DOMAIN")
 
         # The access token only has basic claims, so fetch full user info from /userinfo endpoint
-        token = request.headers.get("Authorization").split()[1]
+        token = request.headers.get("Authorization", "").split()[1]
 
         try:
             userinfo_url = f"https://{auth0_domain}/userinfo"
@@ -90,39 +87,39 @@ def create() -> Blueprint:
         user_id = user.get("sub")
 
         job_manager = get_job_manager()
-        bucket = get_bucket()
 
-        # Calculate the total credits used by the user across all their jobs
         total_credits_used = 0
         total_credits_pending = 0
         viewer_job_ids = job_manager.list_jobs(userid=user_id)
-        print(f"Viewer job IDs for user {user_id}: {viewer_job_ids}")
-        for job_id in viewer_job_ids:
-            result_files = job_manager.get_results(userid=user_id, jobid=job_id)
-            print(f"Result files for job {job_id}: {result_files}")
-            for result_file in result_files:
-                # Fetch file metadata to get the credits used
-                blob = bucket.get_blob(result_file)
-                print(f"Metadata for result file {result_file}: {blob.metadata if blob else 'None'}")
-                print(blob)
-                # if blob is not None:
-                #     job_credits_used = int(blob.metadata.get("credits_used", 0))
-                # else:
-                #     job_credits_used = 0
-                # total_credits_used += job_credits_used
 
-        credits_granted = 1000 # TODO: Pull this from some config or DB
+        # Calculate the total credits used by the user across all their jobs
+        for job_id in viewer_job_ids:
+            try:
+                # Calculate credits for this job
+                used, pending = calculate_job_credits(userid=user_id,
+                                                      jobid=job_id,
+                                                      config=job_manager.config)
+                total_credits_used += used
+                total_credits_pending += pending
+                print(f"Job {job_id}: used={used}, pending={pending}")
+            except Exception as e:
+                current_app.logger.error(f"Failed to calculate credits for job {job_id}: {e}")
+                # Continue processing other jobs
+
+        credits_granted = 1000  # TODO: Pull this from some config or DB
         credits_available = max(0, credits_granted - total_credits_used - total_credits_pending)
         credits_remaining = max(0, credits_granted - total_credits_used)
-        return jsonify({
-            "credits": {
-                "granted": credits_granted,
-                "used": total_credits_used,
-                "pending": total_credits_pending,
-                "available": credits_available,
-                "remaining": credits_remaining,
+        return jsonify(
+            {
+                "credits": {
+                    "granted": credits_granted,
+                    "used": total_credits_used,
+                    "pending": total_credits_pending,
+                    "available": credits_available,
+                    "remaining": credits_remaining,
+                }
             }
-        }), 200
+        ), 200
 
     # Example protected endpoint - requires special permission
     @api.route("/me/enrollment-status")

@@ -1,29 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Chip, Popover, styled } from '@mui/material';
 
-import { useAuth0 } from '@/contexts/Auth0Context';
-import { getViewerCredits, ViewerCredits } from '@/user/actions';
+import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 
 export default function CreditsChip() {
-    const [credits, setCredits] = useState<ViewerCredits | null>(null);
-    const [lastError, setLastError] = useState<string | null>(null);
+    const { credits, lastError } = useViewerCredits();
     const [isOpen, setIsOpen] = useState(false);
 
     const anchorRef = useRef<HTMLDivElement | null>(null);
-
-    const { isAuthenticated, getAccessToken } = useAuth0();
-    useEffect(() => {
-        if (!isAuthenticated) {
-            return;
-        }
-        setLastError(null);
-        getAccessToken()
-            .then((token) => getViewerCredits({ token }))
-            .then((credits) => setCredits(credits))
-            .catch((error) => setLastError(error.message));
-    }, [isAuthenticated]);
 
     return (
         <>

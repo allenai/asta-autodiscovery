@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Auth0Client, User } from '@auth0/auth0-spa-js';
 
-interface Auth0ContextType {
+export interface Auth0ContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     user: User | undefined;
@@ -161,7 +161,7 @@ export function Auth0Provider({
     );
 }
 
-export function useAuth0() {
+export function useAuth0(): Auth0ContextType {
     const context = useContext(Auth0Context);
     if (context === undefined) {
         throw new Error('useAuth0 must be used within an Auth0Provider');

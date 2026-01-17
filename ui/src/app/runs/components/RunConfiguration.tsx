@@ -20,6 +20,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { saveMetadata, submitRun } from '../actions';
 import type { Dataset } from './DatasetUpload';
 
@@ -62,6 +63,7 @@ export default function RunConfiguration({
     onSubmitSuccess,
 }: RunConfigurationProps) {
     const { getAccessToken } = useAuth0();
+    const { credits } = useViewerCredits();
 
     const [title, setTitle] = useState('');
     const [nExperiments, setNExperiments] = useState(4);
@@ -162,13 +164,16 @@ export default function RunConfiguration({
                         onChange={(e) => handleExperimentsChange(e.target.value)}
                         inputProps={{
                             min: 1,
-                            max: 500,
+                            max: credits?.remaining ?? 500,
                             step: 1,
                         }}
                         fullWidth
                         required
                         error={!!experimentsError}
-                        helperText={experimentsError || 'Enter a number between 1 and 500'}
+                        helperText={
+                            experimentsError ||
+                            `Enter a number between 1 and ${credits?.remaining ?? 500}`
+                        }
                     />
 
                     <FormControl fullWidth>

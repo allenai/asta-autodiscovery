@@ -1,6 +1,7 @@
 """GCS operations for managing job data and results."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -384,3 +385,116 @@ def download_job_results(
         return downloaded
     except Exception as e:
         raise GCSError(f"Failed to download job results: {e}")
+
+
+def count_experiment_results(userid: str, jobid: str, config: JobConfig | None = None) -> int:
+    """Count completed experiment result files in a job's output directory.
+
+    Counts files matching the pattern: mcts_node_{level}_{index}.json
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Number of experiment result files found (0 if error or none found)
+
+    Example:
+        >>> count_experiment_results("user123", "job456")
+        5
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    prefix = f"users/{userid}/jobs/{jobid}/output/"
+    pattern = re.compile(r"mcts_node_\d+_\d+\.json$")
+
+    try:
+        blobs = bucket.list_blobs(prefix=prefix, max_results=1000)
+        count = 0
+        for blob in blobs:
+            filename = blob.name.split("/")[-1]
+            if pattern.match(filename):
+                count += 1
+        return count
+    except Exception as e:
+        # Log error but return 0 to allow graceful degradation
+        import logging
+
+        logging.error(f"Failed to count experiment results for job {jobid}: {e}")
+        return 0
+
+
+def get_job_args(userid: str, jobid: str, config: JobConfig | None = None) -> dict | None:
+    """Read and parse args.json from a job's output directory.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Dictionary containing job arguments, or None if file doesn't exist or parsing fails
+
+    Example:
+        >>> args = get_job_args("user123", "job456")
+        >>> args.get("n_experiments", 0)
+        10
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    blob_path = f"users/{userid}/jobs/{jobid}/output/args.json"
+
+    try:
+        blob = bucket.blob(blob_path)
+        if not blob.exists():
+            import logging
+
+            logging.warning(f"args.json not found for job {jobid}")
+            return None
+
+        content = blob.download_as_text()
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        import logging
+
+        logging.warning(f"Invalid JSON in args.json for job {jobid}: {e}")
+        return None
+    except Exception as e:
+        import logging
+
+        logging.error(f"Failed to read args.json for job {jobid}: {e}")
+        return None
+
+
+def calculate_job_credits(
+    userid: str, jobid: str, config: JobConfig | None = None
+) -> tuple[int, int]:
+    """Calculate used and pending credits for a single job.
+
+    Credit calculation logic:
+    - SUCCEEDED: Count completed experiments as used credits
+    - RUNNING: Estimate pending credits (n_experiments - completed)
+    - FAILED/CANCELLED/CREATED: No credits charged (treat as free retry)
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Tuple of (used_credits, pending_credits)
+    """
+    config = config or JobConfig()
+
+    args = get_job_args(userid, jobid, config)
+    completed = count_experiment_results(userid, jobid, config)
+    requested = args.get("n_experiments", 0) if args else 0
+    used = completed
+    pending = max(0, requested - completed)
+
+    return (used, pending)

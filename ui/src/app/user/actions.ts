@@ -27,8 +27,8 @@ export interface ViewerCredits {
  * @returns Viewer credits for the authenticated user
  * @throws Error if request fails
  */
-export async function getViewerCredits(token: string): Promise<ViewerCredits> {
-    const response = await fetch(`${API_ORIGIN}/me/credits`, {
+export async function getViewerCredits({ token }: { token: string }): Promise<ViewerCredits> {
+    const response = await fetch(`${API_ORIGIN}/api/user/me/credits`, {
         method: 'GET',
         headers: {
             Authorization: `Bearer ${token}`,

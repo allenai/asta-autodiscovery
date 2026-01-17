@@ -3,6 +3,7 @@
 import { ReactNode } from 'react';
 
 import { Auth0Provider } from '../contexts/Auth0Context';
+import { ViewerCreditsProvider } from '@/contexts/ViewerCreditsContext';
 
 interface ClientProvidersProps {
     children: ReactNode;
@@ -24,7 +25,7 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
             clientId={auth0Config.clientId}
             audience={auth0Config.audience}
             requiredPermission={auth0Config.requiredPermission}>
-            {children}
+            <ViewerCreditsProvider>{children}</ViewerCreditsProvider>
         </Auth0Provider>
     );
 }

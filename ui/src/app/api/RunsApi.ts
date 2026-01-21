@@ -27,6 +27,7 @@ export interface ExperimentSummaryFromApi {
     child_ids: string[] | null;
     status: string;
     is_surprising: boolean;
+    surprise: number | null;
 }
 export interface GetRunExperimentsResponseBody {
     runid: string;
@@ -41,6 +42,7 @@ export interface ExperimentDetailedFromApi {
     creation_idx: number;
     status: string;
     is_surprising: boolean;
+    surprise: number | null;
     runtime_ms: number | null;
     hypothesis: string | null;
     experiment_plan: Record<string, any> | null;

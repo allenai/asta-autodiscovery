@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Auth0Client, User } from '@auth0/auth0-spa-js';
+import { User } from '@auth0/auth0-spa-js';
+import { auth0Client, auth0Config } from '@/auth/Auth0Client';
 
 export interface Auth0ContextType {
     isAuthenticated: boolean;
@@ -18,22 +19,9 @@ const Auth0Context = createContext<Auth0ContextType | undefined>(undefined);
 
 interface Auth0ProviderProps {
     children: ReactNode;
-    domain: string;
-    clientId: string;
-    audience: string;
-    redirectUri?: string;
-    requiredPermission?: string;
 }
 
-export function Auth0Provider({
-    children,
-    domain,
-    clientId,
-    audience,
-    redirectUri,
-    requiredPermission,
-}: Auth0ProviderProps) {
-    const [auth0Client, setAuth0Client] = useState<Auth0Client | null>(null);
+export function Auth0Provider({ children }: Auth0ProviderProps) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | undefined>(undefined);
@@ -43,41 +31,32 @@ export function Auth0Provider({
     useEffect(() => {
         const initAuth0 = async () => {
             try {
-                const client = new Auth0Client({
-                    domain,
-                    clientId,
-                    cacheLocation: 'localstorage',
-                    useRefreshTokens: true,
-                    authorizationParams: {
-                        redirect_uri: redirectUri || window.location.origin,
-                        audience,
-                        scope: 'openid profile email offline_access',
-                    },
-                });
-
-                setAuth0Client(client);
+                if (!auth0Client) {
+                    setIsLoading(false);
+                    return;
+                }
 
                 // Handle redirect callback
                 if (
                     window.location.search.includes('code=') &&
                     window.location.search.includes('state=')
                 ) {
-                    await client.handleRedirectCallback();
+                    await auth0Client.handleRedirectCallback();
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
                 // Check if user is authenticated
-                const authenticated = await client.isAuthenticated();
+                const authenticated = await auth0Client.isAuthenticated();
                 setIsAuthenticated(authenticated);
 
                 if (authenticated) {
-                    const userProfile = await client.getUser();
+                    const userProfile = await auth0Client.getUser();
                     setUser(userProfile);
 
                     // Check for required permission if specified
-                    if (requiredPermission) {
+                    if (auth0Config.requiredPermission) {
                         try {
-                            const token = await client.getTokenSilently();
+                            const token = await auth0Client.getTokenSilently();
 
                             // Decode the access token to get permissions
                             // Note: This is a simple decode, not validation (validation happens on backend)
@@ -89,12 +68,12 @@ export function Auth0Provider({
 
                             const hasPermission =
                                 Array.isArray(permissions) &&
-                                permissions.includes(requiredPermission);
+                                permissions.includes(auth0Config.requiredPermission);
                             setHasRequiredPermission(hasPermission);
 
                             if (!hasPermission) {
                                 setAuthError(
-                                    `Access denied. Required permission: ${requiredPermission}`
+                                    `Access denied. Required permission: ${auth0Config.requiredPermission}`
                                 );
                                 // Don't auto-logout - let the dialog handle user action
                             }
@@ -115,13 +94,13 @@ export function Auth0Provider({
         };
 
         initAuth0();
-    }, [domain, clientId, audience, redirectUri, requiredPermission]);
+    }, [auth0Client]);
 
     const loginWithRedirect = async () => {
         if (auth0Client) {
             await auth0Client.loginWithRedirect({
                 authorizationParams: {
-                    redirect_uri: redirectUri || window.location.origin,
+                    redirect_uri: window.location.origin,
                 },
             });
         }

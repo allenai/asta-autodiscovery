@@ -1,3 +1,6 @@
+# .dockerignore - Used by api/Dockerfile and scripts/Dockerfile
+# Note: Must work for both the API build and maintenance scripts build
+
 # Ignore common development files
 .git
 .github
@@ -10,14 +13,13 @@
 **/*.pyc
 **/.DS_Store
 
-# Ignore other service directories when building API
+# Ignore other service directories
 ui
 proxy
 sonar
 autods-viz
 devtools
 docs
-scripts
 
 # Ignore markdown and config files
 *.md
@@ -26,11 +28,12 @@ scripts
 justfile
 mkdocs.yml
 ruff.toml
-pyproject.toml
-uv.lock
 docker-compose.yaml
 mcpdoc.json
 
 # Keep what we need
 !packages/
 !api/
+!scripts/
+!pyproject.toml
+!uv.lock

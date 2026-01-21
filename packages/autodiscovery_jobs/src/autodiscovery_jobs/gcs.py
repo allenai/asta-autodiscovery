@@ -69,6 +69,42 @@ def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> st
     return f"gs://{config.bucket}/users/{userid}/jobs/{jobid}/"
 
 
+def list_user_ids(config: JobConfig | None = None) -> list[str]:
+    """List all user IDs in the system.
+
+    Args:
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of user IDs
+
+    Raises:
+        GCSError: If listing fails
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    prefix = "users/"
+
+    try:
+        # List all "directories" (common prefixes) under the users prefix
+        blobs = bucket.list_blobs(prefix=prefix, delimiter="/")
+        # Consume the iterator to get prefixes
+        list(blobs)
+
+        # Extract user IDs from prefixes
+        users = []
+        for prefix_path in blobs.prefixes:
+            # prefix looks like: "users/{userid}/"
+            userid = prefix_path.rstrip("/").split("/")[-1]
+            users.append(userid)
+
+        return sorted(users)
+    except Exception as e:
+        raise GCSError(f"Failed to list users: {e}")
+
+
 def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
     """List all jobs for a user.
 
@@ -258,6 +294,87 @@ def upload_dataset(
         return f"gs://{config.bucket}/{base_path}/"
     except Exception as e:
         raise GCSError(f"Failed to upload dataset: {e}")
+
+
+def _list_dataset_blobs(userid: str, jobid: str, config: JobConfig):
+    """Internal helper to list dataset blob objects.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration
+
+    Returns:
+        Iterator of blob objects in the data/ directory (excluding placeholders)
+
+    Raises:
+        GCSError: If listing fails
+    """
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    prefix = f"users/{userid}/jobs/{jobid}/data/"
+
+    try:
+        blobs = bucket.list_blobs(prefix=prefix)
+        # Filter out placeholder files
+        for blob in blobs:
+            if not blob.name.endswith(".placeholder"):
+                yield blob
+    except Exception as e:
+        raise GCSError(f"Failed to list dataset blobs: {e}")
+
+
+def list_datasets(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
+    """List all dataset files in a job's data directory.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of GCS paths to dataset files
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If listing fails
+    """
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    datasets = []
+    for blob in _list_dataset_blobs(userid, jobid, config):
+        datasets.append(f"gs://{config.bucket}/{blob.name}")
+    return datasets
+
+
+def expire_datasets(userid: str, jobid: str, config: JobConfig | None = None) -> None:
+    """Delete uploaded dataset files from job's data directory.
+
+    This removes all files in the data/ directory to comply with data retention
+    policies. Job metadata, results, and other files are preserved.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If deletion fails
+    """
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    try:
+        for blob in _list_dataset_blobs(userid, jobid, config):
+            blob.delete()
+    except Exception as e:
+        raise GCSError(f"Failed to expire datasets: {e}")
 
 
 def upload_metadata(

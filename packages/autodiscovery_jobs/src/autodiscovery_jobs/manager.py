@@ -42,6 +42,14 @@ class JobManager:
         """
         return gcs.get_user_path(userid, self.config)
 
+    def list_user_ids(self) -> list[str]:
+        """List all user IDs with job data.
+
+        Returns:
+            List of user IDs
+        """
+        return gcs.list_user_ids(self.config)
+
     # Job management
 
     def list_jobs(self, userid: str) -> list[str]:
@@ -118,6 +126,30 @@ class JobManager:
             GCS path where data was uploaded
         """
         return gcs.upload_dataset(userid, jobid, local_path, self.config, remote_name)
+
+    def list_datasets(self, userid: str, jobid: str) -> list[str]:
+        """List all dataset files in a job's data directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+
+        Returns:
+            List of GCS paths to dataset files
+        """
+        return gcs.list_datasets(userid, jobid, self.config)
+
+    def expire_datasets(self, userid: str, jobid: str) -> None:
+        """Delete uploaded dataset files from job's data directory.
+
+        This removes all files in the data/ directory to comply with data retention
+        policies. Job metadata, results, and other files are preserved.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+        """
+        gcs.expire_datasets(userid, jobid, self.config)
 
     def upload_metadata(self, userid: str, jobid: str, metadata: dict[str, Any]) -> str:
         """Upload metadata to job directory.

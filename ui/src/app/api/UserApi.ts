@@ -48,6 +48,7 @@ export class UserApi extends BaseApi {
             method: 'GET',
         });
     }
+
     async getViewerCredits() {
         return this.request<GetViewerCreditsResponseBody>({
             url: `${USER_URL_PREFIX}/me/credits`,

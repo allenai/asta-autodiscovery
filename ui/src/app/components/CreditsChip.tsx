@@ -21,7 +21,7 @@ export default function CreditsChip() {
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
                         ) : credits !== null ? (
-                            credits.remaining.toLocaleString()
+                            credits?.remaining.toLocaleString()
                         ) : (
                             <LoadingShimmer />
                         )}

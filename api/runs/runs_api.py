@@ -7,6 +7,7 @@ their own autodiscovery experiment runs.
 import json
 import os
 import tempfile
+from urllib import response
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,8 @@ from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from utils.auth import requires_enrollment
 from werkzeug.exceptions import BadRequest
+
+from runs.models import ExperimentModel, GetExperimentStatusResponseModel, GetRunExperimentsResponseModel
 
 # Import autodiscovery_jobs when available
 try:
@@ -540,14 +543,22 @@ def create() -> Blueprint:
 
     @api.route("/<runid>/experiments/status", methods=["GET"])
     @requires_enrollment
-    def get_experiments_status(runid: str):
+    def get_experiments_status(runid: str, after_experiment_id: str | None = None):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
+
+        Args:
+            runid: Run identifier
+            after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
         """
         # userid = request.user.get("sub")
 
-
-        return jsonify({"runid": runid})
+        resp = GetRunExperimentsResponseModel(
+            run_id=runid,
+            after_experiment_id=after_experiment_id,
+            experiments=[],
+        )
+        return jsonify(resp.model_dump())
 
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
@@ -555,8 +566,14 @@ def create() -> Blueprint:
         """Fetch details about a specific experiment within a run."""
         # userid = request.user.get("sub")
 
+        experiment = None  # TODO: Replace with actual fetching logic
 
-        return jsonify({"runid": runid, "experiment_id": experiment_id})
+        resp = GetExperimentStatusResponseModel(
+            run_id=runid,
+            experiment_id=experiment_id,
+            experiment=experiment,
+        )
+        return jsonify(resp.model_dump())
 
     @api.route("/<runid>/cancel", methods=["POST"])
     @requires_enrollment

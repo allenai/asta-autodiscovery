@@ -121,7 +121,7 @@ class ExperimentTree:
             self._build_tree_relationships()
 
     @classmethod
-    def load(cls, userid: str, jobid: str, config: JobConfig | None = None) -> "ExperimentTree":
+    def load(cls, userid: str, jobid: str, config: JobConfig | None = None) -> ExperimentTree:
         """Factory method to load tree from GCS.
 
         Args:

@@ -7,7 +7,6 @@ their own autodiscovery experiment runs.
 import json
 import os
 import tempfile
-from urllib import response
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,7 +17,10 @@ from utils.auth import requires_enrollment
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
-from runs.models import ExperimentModel, GetExperimentStatusResponseModel, GetRunExperimentsResponseModel
+from runs.models import (
+    GetExperimentStatusResponseModel,
+    GetRunExperimentsResponseModel,
+)
 
 # Import autodiscovery_jobs when available
 try:
@@ -542,9 +544,9 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/experiments/status", methods=["GET"])
+    @api.route("/<runid>/experiments", methods=["GET"])
     @requires_enrollment
-    def get_experiments_status(runid: str, after_experiment_id: str | None = None):
+    def get_run_experiments(runid: str, after_experiment_id: str | None = None):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
 
@@ -555,7 +557,8 @@ def create() -> Blueprint:
         userid = request.user.get("sub")
 
         try:
-            tree = ExperimentTree.load(userid, runid)
+            job_manager = get_job_manager()
+            tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
             experiments = tree.to_experiment_models(after_experiment_id=after_experiment_id)
 
             resp = GetRunExperimentsResponseModel(
@@ -576,12 +579,13 @@ def create() -> Blueprint:
 
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
-    def get_experiment_details(runid: str, experiment_id: str):
+    def get_run_experiment_details(runid: str, experiment_id: str):
         """Fetch details about a specific experiment within a run."""
         userid = request.user.get("sub")
 
         try:
-            tree = ExperimentTree.load(userid, runid)
+            job_manager = get_job_manager()
+            tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
             node = tree.get_node(experiment_id)
 
             experiment = node.to_experiment_model() if node else None

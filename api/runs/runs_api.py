@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from utils.auth import requires_enrollment
+from utils.credits import InsufficientCreditsError, check_sufficient_credits
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
@@ -445,6 +446,11 @@ def create() -> Blueprint:
         try:
             manager = get_job_manager()
 
+            # Validate sufficient credits before submission
+            check_sufficient_credits(
+                n_experiments=n_experiments, userid=userid, config=manager.config
+            )
+
             # Pass all additional parameters to run_job
             execution_id = manager.run_job(
                 userid,
@@ -471,6 +477,12 @@ def create() -> Blueprint:
             )
 
             return jsonify({"execution_id": execution_id, "message": "Run submitted successfully"})
+
+        except InsufficientCreditsError as e:
+            return jsonify(
+                {"error": e.message, "requested": e.requested, "available": e.available}
+            ), 402  # Payment Required
+
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500

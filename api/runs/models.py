@@ -37,7 +37,7 @@ class ExperimentDetailedModel(BaseModel):
         None, description="Results of the experiment in human-readable format"
     )
 
-    def to_summary(self) -> "ExperimentSummaryModel":
+    def to_summary(self) -> ExperimentSummaryModel:
         """Convert to ExperimentSummaryModel for API response.
 
         Returns:

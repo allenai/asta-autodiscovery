@@ -1,7 +1,6 @@
 'use client';
 
-import { Box, Typography, CircularProgress, Alert } from '@mui/material';
-import { styled } from '@mui/system';
+import { Box, Typography, CircularProgress, Alert, styled } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 

@@ -6,9 +6,9 @@ import { Box, CircularProgress, Alert } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getRun } from '../actions';
-import RunSetup from '../components/RunSetup';
-import RunStatus from '../components/RunStatus';
+import { getRun } from '@/runs/actions';
+import RunSetup from '@/runs/components/RunSetup';
+import RunStatus from '@/runs/components/RunStatus';
 
 interface RunPageProps {
     params: {

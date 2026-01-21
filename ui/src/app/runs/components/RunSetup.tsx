@@ -1,59 +1,34 @@
 'use client';
 
-import { useState, useRef } from 'react';
 import {
     Box,
-    Stack,
     TextField,
     Button,
     Typography,
-    Paper,
     FormControl,
-    InputLabel,
     Select,
     MenuItem,
     CircularProgress,
     Alert,
     FormHelperText,
-    IconButton,
-    List,
-    ListItem,
-    ListItemText,
-    ListItemSecondaryAction,
-    Divider,
+    styled,
+    Switch,
+    Chip,
+    FormLabel,
+    Accordion,
+    AccordionSummary,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
 
-import { useAuth0 } from '@/contexts/Auth0Context';
-import { uploadDataset, saveMetadata, submitRun } from '../actions';
-import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
-
-export interface Dataset {
-    filename: string;
-    description: string;
-    path?: string;
-}
+import { BELIEF_MODES, MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
+import DatasetUpload from '@/runs/components/DatasetUpload';
 
 interface RunSetupProps {
     runid: string;
     onSubmitSuccess: () => void;
 }
-
-const MODEL_OPTIONS = [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'o4-mini', label: 'o4-mini' },
-    { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
-    { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
-];
-
-const BELIEF_MODEL_OPTIONS = [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'o4-mini', label: 'o4-mini' },
-    { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
-    { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
-];
 
 /**
  * Combined component for dataset upload and run configuration.
@@ -65,354 +40,412 @@ const BELIEF_MODEL_OPTIONS = [
  * - Submit run when ready
  */
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
-    const { getAccessToken } = useAuth0();
-    const { credits } = useViewerCredits();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const creditsRemaining = credits?.remaining ?? 500;
-
-    // Dataset upload state
-    const [datasets, setDatasets] = useState<Dataset[]>([]);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [description, setDescription] = useState('');
-    const [uploading, setUploading] = useState(false);
-    const [uploadError, setUploadError] = useState<string | null>(null);
-
-    // Run configuration state
-    const [title, setTitle] = useState('');
-    const [nExperiments, setNExperiments] = useState(4);
-    const [model, setModel] = useState('gpt-4o');
-    const [beliefModel, setBeliefModel] = useState('gpt-4o');
-    const [experimentsError, setExperimentsError] = useState<string | null>(null);
-
-    // Submission state
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            setUploadError(null);
-        }
-    };
-
-    const handleUploadDataset = async () => {
-        if (!selectedFile || !description.trim()) {
-            setUploadError('Please select a file and provide a description');
-            return;
-        }
-
-        setUploading(true);
-        setUploadError(null);
-
-        try {
-            const token = await getAccessToken();
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            formData.append('runid', runid);
-
-            const response = await uploadDataset(formData, token);
-
-            // Add to datasets list
-            const newDataset: Dataset = {
-                filename: response.filename,
-                description: description.trim(),
-                path: response.path,
-            };
-
-            setDatasets([...datasets, newDataset]);
-
-            // Reset form
-            setSelectedFile(null);
-            setDescription('');
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        } catch (err) {
-            console.error('Error uploading dataset:', err);
-            setUploadError(err instanceof Error ? err.message : 'Failed to upload dataset');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleRemoveDataset = (index: number) => {
-        const newDatasets = datasets.filter((_, i) => i !== index);
-        setDatasets(newDatasets);
-    };
-
-    const handleBrowseClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleExperimentsChange = (value: string) => {
-        const num = parseInt(value, 10);
-
-        if (value === '') {
-            setNExperiments(0);
-            setExperimentsError('Number of experiments is required');
-            return;
-        }
-
-        if (isNaN(num) || num < 1 || num > creditsRemaining) {
-            setExperimentsError(`Must be between 1 and ${creditsRemaining}`);
-        } else {
-            setExperimentsError(null);
-        }
-
-        setNExperiments(num);
-    };
-
-    const handleSubmit = async () => {
-        // Validate
-        if (datasets.length === 0) {
-            setError('Please upload at least one dataset');
-            return;
-        }
-
-        if (nExperiments < 1 || nExperiments > creditsRemaining) {
-            setError(`Number of experiments must be between 1 and ${creditsRemaining}`);
-            return;
-        }
-
-        setSubmitting(true);
-        setError(null);
-
-        try {
-            const token = await getAccessToken();
-
-            // Prepare metadata
-            const metadata = {
-                title: title.trim() || undefined,
-                datasets: datasets.map((ds) => ({
-                    name: ds.filename,
-                    description: ds.description,
-                })),
-            };
-
-            // Save metadata
-            await saveMetadata(runid, metadata, token);
-
-            // Submit run
-            await submitRun(
-                runid,
-                {
-                    n_experiments: nExperiments,
-                    model,
-                    belief_model: beliefModel,
-                },
-                token
-            );
-
-            // Notify parent of success
-            onSubmitSuccess();
-        } catch (err) {
-            console.error('Error submitting run:', err);
-            setError(err instanceof Error ? err.message : 'Failed to submit run');
-            setSubmitting(false);
-        }
-    };
+    const {
+        creditsRemaining,
+        datasets,
+        selectedFiles,
+        uploading,
+        uploadError,
+        metadata,
+        experimentsError,
+        fieldErrors,
+        submitting,
+        error,
+        updateMetadata,
+        handleFileSelect,
+        handleUploadDataset,
+        handleRemoveDataset,
+        handleRemoveSelectedFile,
+        handleExperimentsChange,
+        handleSubmit,
+    } = useRunSetup({ runid, onSubmitSuccess });
 
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-                Setup Run
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-                Upload your datasets and configure run parameters below.
-            </Typography>
+            <SectionHeader>
+                <SectionHeaderTitle>Configure a new run</SectionHeaderTitle>
+                Provide datasets and describe your discovery context. The system will autonomously
+                explore these datasets to find surprising patterns and hypotheses based on Bayesian
+                surprise.
+            </SectionHeader>
 
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Stack spacing={3}>
-                    {/* Dataset Upload Section */}
-                    <Box>
-                        <Typography variant="h6" gutterBottom>
-                            Datasets
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" paragraph>
-                            Upload one or more datasets with descriptions.
-                        </Typography>
+            <ConfigurationBox>
+                <FormControl fullWidth>
+                    <StyledFormLabel>Run Name</StyledFormLabel>
+                    <HelperText>
+                        A name to help you identify this run later. This doesn't affect the
+                        exploration results.
+                    </HelperText>
+                    <TextField
+                        value={metadata.name}
+                        onChange={(e) => updateMetadata('name', e.target.value)}
+                        placeholder="Name"
+                        disabled={uploading || submitting}
+                        required
+                        error={!!fieldErrors.name}
+                        helperText={fieldErrors.name}
+                    />
+                </FormControl>
 
-                        <Stack spacing={2}>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                onChange={handleFileSelect}
-                                style={{ display: 'none' }}
-                                accept=".csv,.json,.txt,.tsv"
-                            />
+                <FormControl fullWidth>
+                    <StyledFormLabel>Intent</StyledFormLabel>
+                    <HelperText>
+                        Provide high-level guidance to loosely condition the exploration without
+                        specifying exact hypotheses. The system will still autonomously navigate the
+                        hypothesis space, but can consider your areas of interest during generation.
+                    </HelperText>
+                    <TextField
+                        multiline
+                        rows={3}
+                        value={metadata.intent}
+                        onChange={(e) => updateMetadata('intent', e.target.value)}
+                        placeholder="e.g., Focus on relationships between demographic factors and outcomes"
+                        disabled={uploading || submitting}
+                        required
+                        error={!!fieldErrors.intent}
+                        helperText={fieldErrors.intent}
+                    />
+                </FormControl>
 
-                            <Button
-                                variant="outlined"
-                                onClick={handleBrowseClick}
-                                startIcon={<CloudUploadIcon />}
-                                disabled={uploading || submitting}
-                                fullWidth>
-                                {selectedFile ? selectedFile.name : 'Select File'}
-                            </Button>
+                <FormControl fullWidth>
+                    <StyledFormLabel>Domain (Optional)</StyledFormLabel>
+                    <HelperText>
+                        Specify the research domain to help contextualize hypothesis generation.
+                        This guides the system's understanding of your data.
+                    </HelperText>
+                    <TextField
+                        value={metadata.domain}
+                        onChange={(e) => updateMetadata('domain', e.target.value)}
+                        placeholder="Example: Computer Science"
+                        disabled={uploading || submitting}
+                        required
+                    />
+                </FormControl>
 
-                            <TextField
-                                label="Description"
-                                multiline
-                                rows={3}
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Describe this dataset..."
-                                disabled={uploading || submitting}
-                                fullWidth
-                            />
+                <FormControl fullWidth>
+                    <StyledFormLabel>Description of datasets</StyledFormLabel>
+                    <HelperText>
+                        Describe what your datasets contain. This context helps the system generate
+                        more meaningful hypotheses.
+                    </HelperText>
+                    <TextField
+                        value={metadata.datasetDescription}
+                        onChange={(e) => updateMetadata('datasetDescription', e.target.value)}
+                        placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023
 
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleUploadDataset}
-                                disabled={
-                                    !selectedFile || !description.trim() || uploading || submitting
-                                }
-                                startIcon={uploading ? <CircularProgress size={16} /> : null}>
-                                {uploading ? 'Uploading...' : 'Add Dataset'}
-                            </Button>
+"
+                        disabled={uploading || submitting}
+                        required
+                        error={!!fieldErrors.datasetDescription}
+                        helperText={fieldErrors.datasetDescription}
+                    />
+                </FormControl>
 
-                            {uploadError && <Alert severity="error">{uploadError}</Alert>}
-                        </Stack>
+                <FormControl fullWidth>
+                    <StyledFormLabel>Datasets</StyledFormLabel>
+                    <DatasetUpload
+                        datasets={datasets.map((ds) => ({
+                            filename: ds.filename,
+                            description: ds.description,
+                            path: ds.path,
+                        }))}
+                        selectedFiles={selectedFiles}
+                        onFileSelect={handleFileSelect}
+                        onRemove={handleRemoveDataset}
+                        onRemoveSelectedFile={handleRemoveSelectedFile}
+                        disabled={uploading || submitting}
+                        error={fieldErrors.datasets}
+                    />
+                    {selectedFiles.length > 0 && (
+                        <Button
+                            variant="contained"
+                            onClick={handleUploadDataset}
+                            disabled={uploading || submitting || !metadata.intent.trim()}
+                            startIcon={
+                                uploading ? <CircularProgress size={16} /> : <CloudUploadIcon />
+                            }
+                            sx={{ mt: 2 }}>
+                            {uploading
+                                ? 'Uploading...'
+                                : `Upload ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}`}
+                        </Button>
+                    )}
+                    {uploadError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {uploadError}
+                        </Alert>
+                    )}
+                    {fieldErrors.datasets && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {fieldErrors.datasets}
+                        </Alert>
+                    )}
+                </FormControl>
+            </ConfigurationBox>
 
-                        {datasets.length > 0 && (
-                            <Box sx={{ mt: 3 }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Uploaded Datasets ({datasets.length})
-                                </Typography>
-                                <List>
-                                    {datasets.map((dataset, index) => (
-                                        <Paper key={index} sx={{ mb: 1 }}>
-                                            <ListItem>
-                                                <ListItemText
-                                                    primary={dataset.filename}
-                                                    secondary={dataset.description}
-                                                    primaryTypographyProps={{
-                                                        fontWeight: 'medium',
-                                                    }}
-                                                />
-                                                <ListItemSecondaryAction>
-                                                    <IconButton
-                                                        edge="end"
-                                                        onClick={() => handleRemoveDataset(index)}
-                                                        disabled={uploading || submitting}>
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </ListItemSecondaryAction>
-                                            </ListItem>
-                                        </Paper>
-                                    ))}
-                                </List>
-                            </Box>
-                        )}
-                    </Box>
+            <SectionHeader sx={{ mt: 3 }}>
+                <SectionHeaderTitle>Run Settings</SectionHeaderTitle>
+                Configure how AutoDiscovery explores the hypothesis space. If this is your first
+                run, we suggest starting with a smaller test run to learn how the system works.
+            </SectionHeader>
+            <ConfigurationBox>
+                <FormControl>
+                    <StyledFormLabel>Experiment Budget</StyledFormLabel>
+                    <HelperText>
+                        Maximum number of experiments to execute during this run. Each experiment
+                        costs 1 experiment credit.
+                    </HelperText>
+                    <TextField
+                        type="number"
+                        value={metadata.nExperiments}
+                        onChange={(e) => handleExperimentsChange(e.target.value)}
+                        inputProps={{
+                            min: 1,
+                            max: creditsRemaining,
+                            step: 1,
+                        }}
+                        disabled={submitting}
+                        required
+                        error={!!experimentsError}
+                        helperText={experimentsError}
+                        fullWidth
+                    />
+                    <RemainingCreditsChip
+                        label={`Your credits after this run: ${creditsRemaining - metadata.nExperiments}`}
+                    />
+                </FormControl>
 
-                    <Divider />
+                <StyledAccordian>
+                    <AccordionSummary
+                        expandIcon={<ExpandMoreIcon />}
+                        aria-controls="panel1-content"
+                        id="panel1-header">
+                        <Typography component="span">Advanced settings</Typography>
+                    </AccordionSummary>
+                    <FormControl fullWidth>
+                        <StyledFormLabel>Exploration Weight</StyledFormLabel>
+                        <HelperText>Exploration weight for UCB1 selection method</HelperText>
+                        <TextField
+                            value={metadata.explorationWeight}
+                            onChange={(e) =>
+                                updateMetadata('explorationWeight', parseFloat(e.target.value))
+                            }
+                            disabled={uploading || submitting}
+                        />
+                    </FormControl>
 
-                    {/* Run Configuration Section */}
-                    <Box>
-                        <Typography variant="h6" gutterBottom>
-                            Run Configuration
-                        </Typography>
+                    <FormControl fullWidth>
+                        <StyledFormLabel>Use Beam Search</StyledFormLabel>
+                        <HelperText>Use beam search selection method</HelperText>
+                        <Switch
+                            checked={metadata.useBeamSearch}
+                            onChange={(e) => updateMetadata('useBeamSearch', e.target.checked)}
+                            disabled={uploading || submitting}
+                        />
+                    </FormControl>
 
-                        <Stack spacing={3}>
-                            <TextField
-                                label="Title (optional)"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Give your run a descriptive name..."
-                                disabled={submitting}
-                                fullWidth
-                                helperText="Optional. This helps you identify the run later."
-                            />
+                    <FormControl fullWidth>
+                        <StyledFormLabel>MCTS Selection</StyledFormLabel>
+                        <HelperText>
+                            Selection method to use in MCTS (UCB1 beam search progressive widening
+                            progressive widening with all nodes)
+                        </HelperText>
+                        <Select
+                            value={metadata.mctsSelection}
+                            onChange={(e) => updateMetadata('mctsSelection', e.target.value)}>
+                            {Object.values(MCTS_SELECTION).map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
 
-                            <TextField
-                                label="Number of Experiments"
-                                type="number"
-                                value={nExperiments}
-                                onChange={(e) => handleExperimentsChange(e.target.value)}
-                                inputProps={{
-                                    min: 1,
-                                    max: creditsRemaining,
-                                    step: 1,
-                                }}
-                                disabled={submitting}
-                                fullWidth
-                                required
-                                error={!!experimentsError}
-                                helperText={
-                                    experimentsError ||
-                                    `Enter a number between 1 and ${creditsRemaining}`
-                                }
-                            />
+                    <FormControl fullWidth>
+                        <StyledFormLabel>Surprisal Width</StyledFormLabel>
+                        <HelperText>
+                            Minimum difference in mean prior and posterior probabilities required to
+                            count as a surprisal.
+                        </HelperText>
+                        <TextField
+                            value={metadata.surprisalWidth}
+                            onChange={(e) =>
+                                updateMetadata('surprisalWidth', parseFloat(e.target.value))
+                            }
+                            disabled={uploading || submitting}
+                        />
+                    </FormControl>
 
-                            <FormControl fullWidth disabled={submitting}>
-                                <InputLabel id="model-label">Model</InputLabel>
-                                <Select
-                                    labelId="model-label"
-                                    value={model}
-                                    label="Model"
-                                    onChange={(e) => setModel(e.target.value)}>
-                                    {MODEL_OPTIONS.map((option) => (
-                                        <MenuItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                <FormHelperText>
-                                    LLM to use for all agents (except belief distribution agent).
-                                </FormHelperText>
-                            </FormControl>
+                    <FormControl fullWidth>
+                        <StyledFormLabel>Belief Mode</StyledFormLabel>
+                        <HelperText>
+                            Minimum difference in mean prior and posterior probabilities required to
+                            count as a surprisal.
+                        </HelperText>
+                        <Select
+                            value={metadata.beliefMode}
+                            onChange={(e) => updateMetadata('beliefMode', e.target.value)}>
+                            {Object.values(BELIEF_MODES).map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
 
-                            <FormControl fullWidth disabled={submitting}>
-                                <InputLabel id="belief-model-label">Belief Model</InputLabel>
-                                <Select
-                                    labelId="belief-model-label"
-                                    value={beliefModel}
-                                    label="Belief Model"
-                                    onChange={(e) => setBeliefModel(e.target.value)}>
-                                    {BELIEF_MODEL_OPTIONS.map((option) => (
-                                        <MenuItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                <FormHelperText>
-                                    LLM to use for belief distribution agent.
-                                </FormHelperText>
-                            </FormControl>
-                        </Stack>
-                    </Box>
+                    <FormControl fullWidth>
+                        <StyledFormLabel>Evidence Weight</StyledFormLabel>
+                        <HelperText>
+                            Weight for the experimental evidence when computing posterior beliefs
+                        </HelperText>
+                        <TextField
+                            value={metadata.evidenceWeight}
+                            onChange={(e) =>
+                                updateMetadata('evidenceWeight', parseFloat(e.target.value))
+                            }
+                            disabled={uploading || submitting}
+                        />
+                    </FormControl>
 
-                    {error && <Alert severity="error">{error}</Alert>}
+                    <FormControl fullWidth>
+                        <StyledFormLabel>Warmstart Experiments</StyledFormLabel>
+                        <HelperText>A list of warmstart experiments to run before MCTS</HelperText>
+                        <TextField
+                            value={metadata.warmstartExperiments}
+                            onChange={(e) => updateMetadata('warmstartExperiments', e.target.value)}
+                            disabled={uploading || submitting}
+                        />
+                    </FormControl>
+                </StyledAccordian>
+            </ConfigurationBox>
 
-                    <Button
-                        variant="contained"
-                        color="success"
-                        size="large"
-                        startIcon={submitting ? <CircularProgress size={16} /> : <PlayArrowIcon />}
-                        onClick={handleSubmit}
-                        disabled={
-                            submitting ||
-                            uploading ||
-                            datasets.length === 0 ||
-                            !!experimentsError ||
-                            nExperiments < 1
-                        }
-                        fullWidth>
-                        {submitting ? 'Submitting...' : 'Submit Run'}
-                    </Button>
-                </Stack>
-            </Paper>
+            {error && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                    {error}
+                </Alert>
+            )}
 
-            <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                <Typography variant="caption" color="text.secondary">
-                    <strong>Note:</strong> Once submitted, your run will be queued for execution.
-                    You&apos;ll be able to monitor its progress and stop it if needed.
-                </Typography>
-            </Paper>
+            <SubmitButton
+                variant="contained"
+                size="large"
+                startIcon={
+                    submitting ? (
+                        <CircularProgress size={16} />
+                    ) : (
+                        <PlayCircleFilledWhiteOutlinedIcon />
+                    )
+                }
+                onClick={handleSubmit}
+                disabled={
+                    submitting ||
+                    uploading ||
+                    datasets.length === 0 ||
+                    !!experimentsError ||
+                    metadata.nExperiments < 1
+                }>
+                {submitting ? 'Starting...' : 'Start Run'}
+            </SubmitButton>
+            <TimeEstimate>Estimated time: 60 min</TimeEstimate>
         </Box>
     );
 }
+
+const SectionHeader = styled(Box)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    margin: theme.spacing(1, 0),
+}));
+
+const SectionHeaderTitle = styled(Typography)(({ theme }) => ({
+    color: theme.color['green-100'].hex,
+    fontSize: '1.25rem',
+    fontWeight: 700,
+}));
+
+const ConfigurationBox = styled(Box)(({ theme }) => ({
+    backgroundColor: theme.color['cream-4'].rgba.toString(),
+    borderRadius: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(3),
+    padding: theme.spacing(3),
+
+    '.MuiInputBase-input': {
+        border: '1px solid ' + theme.color['cream-20'].rgba.toString(),
+        borderRadius: theme.shape.borderRadius,
+        color: theme.color['cream-100'].hex,
+        padding: theme.spacing(2.25),
+
+        '&:hover, &:focus': {
+            border: '1px solid ' + theme.color['green-100'].hex,
+            transition: 'all 250ms ease-in-out',
+        },
+    },
+
+    '.MuiOutlinedInput-notchedOutline': {
+        border: 'none',
+    },
+
+    '.MuiInputBase-multiline': {
+        padding: 0,
+    },
+}));
+
+const StyledFormLabel = styled(FormLabel)(({ theme }) => ({
+    color: theme.color['green-40'].hex,
+}));
+
+const HelperText = styled(FormHelperText)(({ theme }) => ({
+    color: theme.color['cream-80'].rgba.toString(),
+    margin: theme.spacing(0.5, 0, 1, 0),
+}));
+
+const SubmitButton = styled(Button)(({ theme }) => ({
+    '&.MuiButton-root': {
+        backgroundColor: theme.color['green-100'].hex,
+        color: theme.color['teal-100'].hex,
+        marginTop: theme.spacing(3),
+    },
+}));
+
+const StyledAccordian = styled(Accordion)(({ theme }) => ({
+    backgroundColor: 'transparent',
+    color: theme.color['green-100'].hex,
+
+    '&:before': {
+        content: 'none',
+    },
+
+    '.MuiAccordionSummary-root': {
+        justifyContent: 'flex-start',
+        padding: 0,
+    },
+
+    '.MuiAccordionSummary-content, .Mui-expanded': {
+        flexGrow: 0,
+        marginRight: theme.spacing(0.75),
+    },
+
+    '.MuiAccordionSummary-expandIconWrapper': {
+        backgroundColor: theme.color['cream-10'].rgba.toString(),
+        color: theme.color['green-100'].rgba.toString(),
+    },
+
+    '.MuiAccordion-region': {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: theme.spacing(3),
+    },
+}));
+
+const RemainingCreditsChip = styled(Chip)(({ theme }) => ({
+    alignSelf: 'flex-start',
+    backgroundColor: theme.color['cream-10'].rgba.toString(),
+    borderRadius: theme.shape.borderRadius,
+    color: theme.color['cream-100'].hex,
+    marginTop: theme.spacing(1),
+}));
+
+const TimeEstimate = styled(Typography)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    marginTop: theme.spacing(1),
+}));

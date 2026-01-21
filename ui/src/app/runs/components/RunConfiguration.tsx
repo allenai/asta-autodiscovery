@@ -38,7 +38,7 @@ const MODEL_OPTIONS = [
     { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
 ];
 
-const BELIEF_MODEL_OPTIONS = [
+const BELIEF_MODES = [
     { value: 'gpt-4o', label: 'GPT-4o' },
     { value: 'o4-mini', label: 'o4-mini' },
     { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
@@ -68,7 +68,7 @@ export default function RunConfiguration({
     const [title, setTitle] = useState('');
     const [nExperiments, setNExperiments] = useState(4);
     const [model, setModel] = useState('gpt-4o');
-    const [beliefModel, setBeliefModel] = useState('gpt-4o');
+    const [beliefMode, setBeliefModel] = useState('gpt-4o');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [experimentsError, setExperimentsError] = useState<string | null>(null);
@@ -122,7 +122,7 @@ export default function RunConfiguration({
                 {
                     n_experiments: nExperiments,
                     model,
-                    belief_model: beliefModel,
+                    belief_model: beliefMode,
                 },
                 token
             );
@@ -198,10 +198,10 @@ export default function RunConfiguration({
                         <InputLabel id="belief-model-label">Belief Model</InputLabel>
                         <Select
                             labelId="belief-model-label"
-                            value={beliefModel}
+                            value={beliefMode}
                             label="Belief Model"
                             onChange={(e) => setBeliefModel(e.target.value)}>
-                            {BELIEF_MODEL_OPTIONS.map((option) => (
+                            {BELIEF_MODES.map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
                                     {option.label}
                                 </MenuItem>

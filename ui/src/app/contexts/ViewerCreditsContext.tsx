@@ -11,10 +11,10 @@ import {
 } from 'react';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getUserApi, ViewerCredits } from '@/api/UserApi';
+import { getUserApi, ViewerCreditsFromApi } from '@/api/UserApi';
 
 export interface ViewerCreditsState {
-    credits: ViewerCredits | null;
+    credits: ViewerCreditsFromApi | null;
     lastError: string | null;
     updateViewerCredits: () => Promise<void>;
 }
@@ -42,7 +42,7 @@ export type ViewerCreditsProviderProps = PropsWithChildren<{}>;
 export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) => {
     const userApi = getUserApi();
 
-    const [credits, setCredits] = useState<ViewerCredits | null>(null);
+    const [credits, setCredits] = useState<ViewerCreditsFromApi | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
 
     const { isAuthenticated } = useAuth0();

@@ -1,4 +1,4 @@
-import { GetViewerEnrollmentResponseBody, User as ApiUser } from '@/api/UserApi';
+import { GetViewerEnrollmentResponseBody, UserFromApi } from '@/api/UserApi';
 
 export type User = {
     sub: string;
@@ -16,7 +16,7 @@ export type EnrollmentState = {
     userId: string | null;
 };
 
-export function getUserFromApi(userFromApi: ApiUser): User {
+export function getUserFromApi(userFromApi: UserFromApi): User {
     return {
         sub: userFromApi.sub,
         name: userFromApi.name,

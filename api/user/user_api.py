@@ -78,8 +78,6 @@ def create() -> Blueprint:
         user_id = request.user.get("sub")
 
         job_manager = get_job_manager()
-
-        # Get all credit metrics in one call
         user_credits = get_user_credits(userid=user_id, config=job_manager.config)
 
         return jsonify(

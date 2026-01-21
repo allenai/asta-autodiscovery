@@ -22,7 +22,6 @@ Example usage:
     print(f"Available: {credits.available}")
 """
 
-from dataclasses import dataclass
 from typing import Any, NamedTuple
 
 from autodiscovery_jobs import JobConfig
@@ -33,11 +32,10 @@ from autodiscovery_jobs.gcs import (
 )
 
 # Credit configuration
-DEFAULT_CREDITS_GRANTED = 9
+DEFAULT_CREDITS_GRANTED = 1000
 
 
-@dataclass
-class JobStats:
+class JobStats(NamedTuple):
     """Statistics about a job's experiments.
 
     Attributes:

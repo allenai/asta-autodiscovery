@@ -447,14 +447,9 @@ def create() -> Blueprint:
             manager = get_job_manager()
 
             # Validate sufficient credits before submission
-            try:
-                check_sufficient_credits(
-                    n_experiments=n_experiments, userid=userid, config=manager.config
-                )
-            except InsufficientCreditsError as e:
-                return jsonify(
-                    {"error": e.message, "requested": e.requested, "available": e.available}
-                ), 402  # Payment Required
+            check_sufficient_credits(
+                n_experiments=n_experiments, userid=userid, config=manager.config
+            )
 
             # Pass all additional parameters to run_job
             execution_id = manager.run_job(
@@ -482,6 +477,12 @@ def create() -> Blueprint:
             )
 
             return jsonify({"execution_id": execution_id, "message": "Run submitted successfully"})
+
+        except InsufficientCreditsError as e:
+            return jsonify(
+                {"error": e.message, "requested": e.requested, "available": e.available}
+            ), 402  # Payment Required
+
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500

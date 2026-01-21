@@ -33,7 +33,7 @@ from autodiscovery_jobs.gcs import (
 )
 
 # Credit configuration
-DEFAULT_CREDITS_GRANTED = 1000
+DEFAULT_CREDITS_GRANTED = 9
 
 
 @dataclass

@@ -1,8 +1,4 @@
-import {
-    RunDetailsFromApi,
-    PostCreateRunResponseBody,
-    GetAllRunsResponseBody,
-} from '@/api/RunsApi';
+import { RunDetailsFromApi, PostCreateRunResponseBody } from '@/api/RunsApi';
 
 export type Run = {
     id: string;

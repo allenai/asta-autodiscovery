@@ -593,7 +593,9 @@ def create() -> Blueprint:
             node = tree.get_node(experiment_id)
 
             experiment_node = node.to_dict() if node else None
-            experiment_model = ExperimentDetailedModel(**experiment_node) if experiment_node else None
+            experiment_model = (
+                ExperimentDetailedModel(**experiment_node) if experiment_node else None
+            )
 
             resp = GetExperimentStatusResponseModel(
                 run_id=runid,
@@ -602,7 +604,9 @@ def create() -> Blueprint:
             )
             return jsonify(resp.model_dump())
         except Exception as e:
-            current_app.logger.error(f"Failed to load experiment {experiment_id} for run {runid}: {e}")
+            current_app.logger.error(
+                f"Failed to load experiment {experiment_id} for run {runid}: {e}"
+            )
             resp = GetExperimentStatusResponseModel(
                 run_id=runid,
                 experiment_id=experiment_id,

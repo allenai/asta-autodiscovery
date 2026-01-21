@@ -26,7 +26,6 @@ def create() -> Blueprint:
     """
     api = Blueprint("user_api", __name__)
 
-
     def get_job_manager() -> JobManager:
         """Get a configured JobManager instance."""
         if not JOBS_AVAILABLE:
@@ -35,7 +34,6 @@ def create() -> Blueprint:
         # Get config from environment or use defaults
         config = JobConfig.from_env()
         return JobManager(config)
-
 
     # This tells the machinery that powers Skiff (Kubernetes) that your application
     # is ready to receive traffic. Returning a non 200 response code will prevent the
@@ -90,9 +88,9 @@ def create() -> Blueprint:
         for job_id in viewer_job_ids:
             try:
                 # Calculate credits for this job
-                used, pending = calculate_job_credits(userid=user_id,
-                                                      jobid=job_id,
-                                                      config=job_manager.config)
+                used, pending = calculate_job_credits(
+                    userid=user_id, jobid=job_id, config=job_manager.config
+                )
                 total_credits_used += used
                 total_credits_pending += pending
                 print(f"Job {job_id}: used={used}, pending={pending}")

@@ -479,9 +479,8 @@ class JobStats:
     num_experiments_completed: int
     num_experiments_pending: int
 
-def get_job_stats(
-    userid: str, jobid: str, config: JobConfig | None = None
-) -> JobStats | None:
+
+def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> JobStats | None:
     """Get statistics about a job's experiments.
 
     Args:
@@ -510,6 +509,7 @@ def get_job_stats(
         num_experiments_pending=pending,
     )
     return job_stats
+
 
 def calculate_job_credits(
     userid: str, jobid: str, config: JobConfig | None = None

@@ -191,9 +191,7 @@ class ExperimentTree:
                     node.parent = parent
                     parent.children.append(node)
                 else:
-                    logging.warning(
-                        f"Node {node_id} references missing parent {node.parent_id}"
-                    )
+                    logging.warning(f"Node {node_id} references missing parent {node.parent_id}")
 
         # Sort children by creation index for consistent ordering
         for node in self._nodes.values():
@@ -249,9 +247,7 @@ class ExperimentTree:
         """Access root node directly."""
         return self._root
 
-    def to_experiment_models(
-        self, after_experiment_id: str | None = None
-    ) -> list[dict[str, Any]]:
+    def to_experiment_models(self, after_experiment_id: str | None = None) -> list[dict[str, Any]]:
         """Convert to list of ExperimentModel dicts for API response.
 
         Args:

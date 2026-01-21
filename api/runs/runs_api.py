@@ -7,7 +7,6 @@ their own autodiscovery experiment runs.
 import json
 import os
 import tempfile
-from urllib import response
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,9 +14,15 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from utils.auth import requires_enrollment
+from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
-from runs.models import ExperimentModel, GetExperimentStatusResponseModel, GetRunExperimentsResponseModel
+from runs.models import (
+    ExperimentDetailedModel,
+    ExperimentSummaryModel,
+    GetExperimentStatusResponseModel,
+    GetRunExperimentsResponseModel,
+)
 
 # Import autodiscovery_jobs when available
 try:
@@ -541,9 +546,9 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/experiments/status", methods=["GET"])
+    @api.route("/<runid>/experiments", methods=["GET"])
     @requires_enrollment
-    def get_experiments_status(runid: str, after_experiment_id: str | None = None):
+    def get_run_experiments(runid: str):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
 
@@ -551,29 +556,59 @@ def create() -> Blueprint:
             runid: Run identifier
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
         """
-        # userid = request.user.get("sub")
+        userid = request.user.get("sub")
+        after_experiment_id = request.args.get("after_experiment_id", None)
 
-        resp = GetRunExperimentsResponseModel(
-            run_id=runid,
-            after_experiment_id=after_experiment_id,
-            experiments=[],
-        )
-        return jsonify(resp.model_dump())
+        try:
+            job_manager = get_job_manager()
+            tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
+            experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+            experiment_models = [ExperimentSummaryModel(**node) for node in experiment_nodes]
+
+            resp = GetRunExperimentsResponseModel(
+                run_id=runid,
+                after_experiment_id=after_experiment_id,
+                experiments=experiment_models,
+            )
+            return jsonify(resp.model_dump())
+        except Exception as e:
+            current_app.logger.error(f"Failed to load experiments for run {runid}: {e}")
+            # Return empty list on error to gracefully handle missing/incomplete runs
+            resp = GetRunExperimentsResponseModel(
+                run_id=runid,
+                after_experiment_id=after_experiment_id,
+                experiments=[],
+            )
+            return jsonify(resp.model_dump())
 
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
-    def get_experiment_details(runid: str, experiment_id: str):
+    def get_run_experiment_details(runid: str, experiment_id: str):
         """Fetch details about a specific experiment within a run."""
-        # userid = request.user.get("sub")
+        userid = request.user.get("sub")
 
-        experiment = None  # TODO: Replace with actual fetching logic
+        try:
+            job_manager = get_job_manager()
+            tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
+            node = tree.get_node(experiment_id)
 
-        resp = GetExperimentStatusResponseModel(
-            run_id=runid,
-            experiment_id=experiment_id,
-            experiment=experiment,
-        )
-        return jsonify(resp.model_dump())
+            experiment_node = node.to_dict() if node else None
+            experiment_model = ExperimentDetailedModel(**experiment_node) if experiment_node else None
+
+            resp = GetExperimentStatusResponseModel(
+                run_id=runid,
+                experiment_id=experiment_id,
+                experiment=experiment_model,
+            )
+            return jsonify(resp.model_dump())
+        except Exception as e:
+            current_app.logger.error(f"Failed to load experiment {experiment_id} for run {runid}: {e}")
+            resp = GetExperimentStatusResponseModel(
+                run_id=runid,
+                experiment_id=experiment_id,
+                experiment=None,
+            )
+            return jsonify(resp.model_dump())
 
     @api.route("/<runid>/cancel", methods=["POST"])
     @requires_enrollment

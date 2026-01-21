@@ -13,7 +13,7 @@ try:
         JobAlreadyExistsError,
         JobNotFoundError,
     )
-    from autodiscovery_jobs.gcs import calculate_job_credits
+    from utils.credits import get_user_credits
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -75,40 +75,19 @@ def create() -> Blueprint:
     @requires_enrollment
     def get_viewer_credits():
         """Get the number of credits for the authenticated user."""
-        user = request.user
-        user_id = user.get("sub")
+        user_id = request.user.get("sub")
 
         job_manager = get_job_manager()
+        user_credits = get_user_credits(userid=user_id, config=job_manager.config)
 
-        total_credits_used = 0
-        total_credits_pending = 0
-        viewer_job_ids = job_manager.list_jobs(userid=user_id)
-
-        # Calculate the total credits used by the user across all their jobs
-        for job_id in viewer_job_ids:
-            try:
-                # Calculate credits for this job
-                used, pending = calculate_job_credits(
-                    userid=user_id, jobid=job_id, config=job_manager.config
-                )
-                total_credits_used += used
-                total_credits_pending += pending
-                print(f"Job {job_id}: used={used}, pending={pending}")
-            except Exception as e:
-                current_app.logger.error(f"Failed to calculate credits for job {job_id}: {e}")
-                # Continue processing other jobs
-
-        credits_granted = 1000  # TODO: Pull this from some config or DB
-        credits_available = max(0, credits_granted - total_credits_used - total_credits_pending)
-        credits_remaining = max(0, credits_granted - total_credits_used)
         return jsonify(
             {
                 "credits": {
-                    "granted": credits_granted,
-                    "used": total_credits_used,
-                    "pending": total_credits_pending,
-                    "available": credits_available,
-                    "remaining": credits_remaining,
+                    "granted": user_credits.granted,
+                    "used": user_credits.used,
+                    "pending": user_credits.pending,
+                    "available": user_credits.available,
+                    "remaining": user_credits.remaining,
                 }
             }
         ), 200
@@ -120,7 +99,7 @@ def create() -> Blueprint:
         """Example endpoint that requires the enroll:autodiscovery_v0 permission.
         Returns enrollment status for the authenticated user.
         """
-        user = request.user
+        user_id = request.user.get("sub")
 
         # Example data - in real implementation, this would query a database
         enrollment_data = {
@@ -128,10 +107,10 @@ def create() -> Blueprint:
             "enrollment_date": "2024-01-15",
             "status": "active",
             "experiments_count": 12,
-            "user_id": user.get("sub"),
+            "user_id": user_id,
         }
 
-        current_app.logger.info(f"Enrollment status requested by user: {user.get('sub')}")
+        current_app.logger.info(f"Enrollment status requested by user: {user_id}")
         return jsonify(enrollment_data)
 
     return api

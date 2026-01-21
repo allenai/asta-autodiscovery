@@ -55,7 +55,7 @@ class ExperimentDetailedModel(BaseModel):
 class GetRunExperimentsResponseModel(BaseModel):
     """Model for the response containing a list of experiments within a run"""
 
-    run_id: str = Field(..., description="Identifier of the run")
+    runid: str = Field(..., description="Identifier of the run")
     after_experiment_id: str | None = Field(
         None, description="Experiment ID after which experiments are fetched"
     )
@@ -67,6 +67,6 @@ class GetRunExperimentsResponseModel(BaseModel):
 class GetExperimentStatusResponseModel(BaseModel):
     """Model for the response containing experiment status and related info"""
 
-    run_id: str | None = Field(None, description="Identifier of the run containing the experiment")
+    runid: str | None = Field(None, description="Identifier of the run containing the experiment")
     experiment_id: str = Field(..., description="Unique identifier for the experiment")
     experiment: ExperimentDetailedModel | None = Field(..., description="Details of the experiment")

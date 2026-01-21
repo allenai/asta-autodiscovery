@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/ai2-aristo/autodiscovery-dataset-cleanup'
+      - '-f'
+      - 'scripts/Dockerfile'
+      - '.'
+images:
+  - 'gcr.io/ai2-aristo/autodiscovery-dataset-cleanup'

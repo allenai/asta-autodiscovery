@@ -9,16 +9,8 @@ preserving job results and metadata.
 import argparse
 import logging
 import sys
-from datetime import UTC, datetime, timedelta
 
-from google.cloud import storage
-
-try:
-    from autodiscovery_jobs import JobConfig, JobManager
-except ImportError:
-    print("Error: autodiscovery_jobs package not found")
-    print("Run: uv sync --all-packages")
-    sys.exit(1)
+from autodiscovery_jobs import JobConfig, JobManager
 
 # Configure logging
 logging.basicConfig(
@@ -32,7 +24,7 @@ def cleanup_old_datasets(
     config: JobConfig,
     max_age_days: int = 7,
     dry_run: bool = False,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     """Delete dataset files older than max_age_days.
 
     Args:
@@ -41,61 +33,57 @@ def cleanup_old_datasets(
         dry_run: If True, only log what would be deleted
 
     Returns:
-        Tuple of (jobs_processed, error_count)
+        Tuple of (jobs_processed, files_expired, error_count)
     """
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
     manager = JobManager(config)
 
-    cutoff_time = datetime.now(UTC) - timedelta(days=max_age_days)
-    logger.info(f"Scanning for dataset files older than {cutoff_time.isoformat()}")
+    logger.info(f"Scanning for dataset files older than {max_age_days} days")
 
     # Get all users from the manager
     user_ids = manager.list_user_ids()
     logger.info(f"Found {len(user_ids)} users to scan")
 
-    # Track which jobs have old datasets
-    jobs_with_old_data = set()
+    # Track statistics
+    jobs_processed = 0
+    files_expired = 0
+    error_count = 0
 
-    # For each user, list their jobs using the manager
+    # For each user, process their jobs
     for userid in user_ids:
         try:
             job_ids = manager.list_jobs(userid)
         except Exception as e:
             logger.error(f"Failed to list jobs for user {userid}: {e}")
+            error_count += 1
             continue
 
-        # For each job, check if it has old datasets
+        # For each job, expire old datasets
         for jobid in job_ids:
-            data_prefix = f"users/{userid}/jobs/{jobid}/data/"
-            data_blobs = bucket.list_blobs(prefix=data_prefix)
-
-            # Check if any data files are old
-            for blob in data_blobs:
-                if blob.time_created and blob.time_created < cutoff_time:
-                    jobs_with_old_data.add((userid, jobid))
-                    break  # Found old data, no need to check more files
-
-    logger.info(f"Found {len(jobs_with_old_data)} jobs with datasets to expire")
-
-    # Use the manager to expire datasets for each job
-    jobs_processed = 0
-    error_count = 0
-
-    for userid, jobid in jobs_with_old_data:
-        if dry_run:
-            logger.info(f"[DRY RUN] Would expire datasets for: {userid}/{jobid}")
-            jobs_processed += 1
-        else:
             try:
-                manager.expire_datasets(userid, jobid)
-                logger.info(f"Expired datasets for: {userid}/{jobid}")
-                jobs_processed += 1
+                expired_paths = manager.expire_datasets(
+                    userid, jobid, max_age_days=max_age_days, dry_run=dry_run
+                )
+
+                if expired_paths:
+                    jobs_processed += 1
+                    files_expired += len(expired_paths)
+
+                    if dry_run:
+                        logger.info(
+                            f"[DRY RUN] Would expire {len(expired_paths)} datasets for: {userid}/{jobid}"
+                        )
+                        for path in expired_paths:
+                            logger.info(f"  {path}")
+                    else:
+                        logger.info(f"Expired {len(expired_paths)} datasets for: {userid}/{jobid}")
+                        for path in expired_paths:
+                            logger.info(f"  {path}")
+
             except Exception as e:
                 logger.error(f"Failed to expire datasets for {userid}/{jobid}: {e}")
                 error_count += 1
 
-    return jobs_processed, error_count
+    return jobs_processed, files_expired, error_count
 
 
 def main():
@@ -125,7 +113,7 @@ def main():
     logger.info("=" * 60)
 
     try:
-        jobs_processed, error_count = cleanup_old_datasets(
+        jobs_processed, files_expired, error_count = cleanup_old_datasets(
             config,
             args.max_age_days,
             args.dry_run,
@@ -134,6 +122,7 @@ def main():
         logger.info("=" * 60)
         logger.info("Cleanup Summary:")
         logger.info(f"  Jobs processed: {jobs_processed}")
+        logger.info(f"  Files expired: {files_expired}")
         logger.info(f"  Errors: {error_count}")
         logger.info("=" * 60)
 

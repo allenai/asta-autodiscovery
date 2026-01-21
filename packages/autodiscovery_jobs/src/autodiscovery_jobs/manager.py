@@ -127,19 +127,13 @@ class JobManager:
         """
         return gcs.upload_dataset(userid, jobid, local_path, self.config, remote_name)
 
-    def list_datasets(self, userid: str, jobid: str) -> list[str]:
-        """List all dataset files in a job's data directory.
-
-        Args:
-            userid: User identifier
-            jobid: Job identifier
-
-        Returns:
-            List of GCS paths to dataset files
-        """
-        return gcs.list_datasets(userid, jobid, self.config)
-
-    def expire_datasets(self, userid: str, jobid: str) -> None:
+    def expire_datasets(
+        self,
+        userid: str,
+        jobid: str,
+        max_age_days: int,
+        dry_run: bool,
+    ) -> list[str]:
         """Delete uploaded dataset files from job's data directory.
 
         This removes all files in the data/ directory to comply with data retention
@@ -148,8 +142,13 @@ class JobManager:
         Args:
             userid: User identifier
             jobid: Job identifier
+            max_age_days: Only delete files older than this many days
+            dry_run: If True, don't delete files, just return what would be deleted
+
+        Returns:
+            List of GCS paths that were deleted (or would be deleted if dry_run=True)
         """
-        gcs.expire_datasets(userid, jobid, self.config)
+        return gcs.expire_datasets(userid, jobid, max_age_days, dry_run, self.config)
 
     def upload_metadata(self, userid: str, jobid: str, metadata: dict[str, Any]) -> str:
         """Upload metadata to job directory.

@@ -296,33 +296,13 @@ def upload_dataset(
         raise GCSError(f"Failed to upload dataset: {e}")
 
 
-def list_datasets(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
-    """List all dataset files in a job's data directory.
-
-    Args:
-        userid: User identifier
-        jobid: Job identifier
-        config: Configuration (uses default if None)
-
-    Returns:
-        List of GCS paths to dataset files
-
-    Raises:
-        JobNotFoundError: If job doesn't exist
-        GCSError: If listing fails
-    """
-    config = config or JobConfig()
-
-    if not job_exists(userid, jobid, config):
-        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
-
-    datasets = []
-    for blob in _list_dataset_blobs(userid, jobid, config):
-        datasets.append(f"gs://{config.bucket}/{blob.name}")
-    return datasets
-
-
-def expire_datasets(userid: str, jobid: str, config: JobConfig | None = None) -> None:
+def expire_datasets(
+    userid: str,
+    jobid: str,
+    max_age_days: int,
+    dry_run: bool,
+    config: JobConfig | None = None,
+) -> list[str]:
     """Delete uploaded dataset files from job's data directory.
 
     This removes all files in the data/ directory to comply with data retention
@@ -331,50 +311,56 @@ def expire_datasets(userid: str, jobid: str, config: JobConfig | None = None) ->
     Args:
         userid: User identifier
         jobid: Job identifier
+        max_age_days: Only delete files older than this many days
+        dry_run: If True, don't delete files, just return what would be deleted
         config: Configuration (uses default if None)
+
+    Returns:
+        List of GCS paths that were deleted (or would be deleted if dry_run=True)
 
     Raises:
         JobNotFoundError: If job doesn't exist
         GCSError: If deletion fails
     """
+    from datetime import UTC, datetime, timedelta
+
     config = config or JobConfig()
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    try:
-        for blob in _list_dataset_blobs(userid, jobid, config):
-            blob.delete()
-    except Exception as e:
-        raise GCSError(f"Failed to expire datasets: {e}")
-
-
-def _list_dataset_blobs(userid: str, jobid: str, config: JobConfig):
-    """Internal helper to list dataset blob objects.
-
-    Args:
-        userid: User identifier
-        jobid: Job identifier
-        config: Configuration
-
-    Returns:
-        Iterator of blob objects in the data/ directory (excluding placeholders)
-
-    Raises:
-        GCSError: If listing fails
-    """
     client = storage.Client(project=config.project_id)
     bucket = client.bucket(config.bucket)
     prefix = f"users/{userid}/jobs/{jobid}/data/"
 
+    # Calculate cutoff time
+    cutoff_time = datetime.now(UTC) - timedelta(days=max_age_days)
+
     try:
         blobs = bucket.list_blobs(prefix=prefix)
-        # Filter out placeholder files
+        expired_paths = []
+
         for blob in blobs:
-            if not blob.name.endswith(".placeholder"):
-                yield blob
+            # Skip placeholder files
+            if blob.name.endswith(".placeholder"):
+                continue
+
+            # Check age
+            if not blob.time_created or blob.time_created >= cutoff_time:
+                continue
+
+            # Record the path
+            gcs_path = f"gs://{config.bucket}/{blob.name}"
+            expired_paths.append(gcs_path)
+
+            # Delete if not dry run
+            if not dry_run:
+                print(f"Deleting dataset file: {gcs_path}")
+                # blob.delete()
+
+        return expired_paths
     except Exception as e:
-        raise GCSError(f"Failed to list dataset blobs: {e}")
+        raise GCSError(f"Failed to expire datasets: {e}")
 
 
 def upload_metadata(

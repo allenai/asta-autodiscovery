@@ -25,6 +25,7 @@ try:
         JobAlreadyExistsError,
         JobNotFoundError,
     )
+    from autodiscovery_jobs.gcs import get_job_stats
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -513,11 +514,19 @@ def create() -> Blueprint:
                         },
                     )
 
+                    # Also get job stats
+                    job_stats = get_job_stats(userid, runid, config=manager.config)
+
                     return jsonify(
                         {
                             "runid": runid,
                             "run_details": run_details,
                             "execution_status": status_response,
+                            "job_stats": {
+                                "num_experiments_requested": job_stats.num_experiments_requested,
+                                "num_experiments_completed": job_stats.num_experiments_completed,
+                                "num_experiments_pending": job_stats.num_experiments_pending,
+                            },
                         }
                     )
                 except Exception as e:

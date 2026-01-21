@@ -33,10 +33,10 @@ This script is deployed as a Cloud Run Job triggered by Cloud Scheduler.
 
 1. **Build and push container:**
    ```bash
-   gcloud builds submit --tag gcr.io/example-legacy-project/autodiscovery-dataset-cleanup --file scripts/Dockerfile .
+   gcloud builds submit .
    ```
 
-   This builds from the repo root using the Dockerfile in scripts/.
+   This uses `cloudbuild.yaml` (at repo root) which builds from the Dockerfile in `scripts/Dockerfile`.
 
 2. **Create Cloud Run Job:**
    ```bash
@@ -67,9 +67,9 @@ This script is deployed as a Cloud Run Job triggered by Cloud Scheduler.
 To update the script:
 ```bash
 # Rebuild and push
-gcloud builds submit --tag gcr.io/example-legacy-project/autodiscovery-dataset-cleanup --file scripts/Dockerfile .
+gcloud builds submit .
 
-# Update the job to use the new image
+# Cloud Run jobs automatically pull the latest image, but you can force an update:
 gcloud run jobs update autodiscovery-dataset-cleanup \
   --image gcr.io/example-legacy-project/autodiscovery-dataset-cleanup \
   --region us-west1

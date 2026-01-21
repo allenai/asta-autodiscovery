@@ -79,7 +79,7 @@ class ExperimentNode:
         return {
             "experiment_id": self.id,
             "parent_id": self.parent_id,
-            "child_ids": [child.id for child in self.children] if self.children else None,
+            "child_ids": [child.id for child in self.children],
             "creation_idx": self.creation_idx,
             "status": self.status,
             "is_surprising": self.is_surprising,

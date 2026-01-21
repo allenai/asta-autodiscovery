@@ -1,3 +1,9 @@
+import {
+    RunDetailsFromApi,
+    PostCreateRunResponseBody,
+    GetAllRunsResponseBody,
+} from '@/api/RunsApi';
+
 export type Run = {
     id: string;
     name: string;
@@ -12,26 +18,12 @@ export type RunDetails = {
     statusCheckedAt: string | null;
 };
 
-export type RunFromApi = {
-    runid: string;
-    title?: string;
-    path?: string;
-    run_details?: RunDetailsFromApi;
-};
-
-export type RunDetailsFromApi = {
-    execution_id: string | null;
-    created_at: string;
-    status: string;
-    status_checked_at: string | null;
-};
-
-export const getRunFromApi = (runFromApi: RunFromApi): Run => {
+export const getRunFromApi = (responseBody: PostCreateRunResponseBody): Run => {
     return {
-        id: runFromApi.runid,
-        name: runFromApi.title || '',
-        path: runFromApi.path || '',
-        details: getRunDetailsFromApi(runFromApi.run_details),
+        id: responseBody.runid,
+        name: '', // TODO: Populate name when available from API
+        path: responseBody.path || '',
+        details: getRunDetailsFromApi(responseBody.run_details),
     };
 };
 

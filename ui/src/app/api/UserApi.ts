@@ -2,7 +2,7 @@ import { BaseApi } from '@/api/BaseApi';
 
 const USER_URL_PREFIX = '/api/user';
 
-export interface User {
+export interface UserFromApi {
     sub: string;
     name: string;
     email: string;
@@ -11,10 +11,10 @@ export interface User {
 }
 
 export interface GetViewerUserResponseBody {
-    user: User;
+    user: UserFromApi;
 }
 
-export interface ViewerCredits {
+export interface ViewerCreditsFromApi {
     granted: number; // Total credits granted to the user
     used: number; // Credits used on completed jobs
     pending: number; // Credits in started jobs which have yet to complete
@@ -23,7 +23,7 @@ export interface ViewerCredits {
 }
 
 export interface GetViewerCreditsResponseBody {
-    credits: ViewerCredits;
+    credits: ViewerCreditsFromApi;
 }
 
 export interface GetViewerEnrollmentResponseBody {

@@ -1,8 +1,9 @@
 'use client';
 
-import { Box, Typography, Paper, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { styled } from '@mui/system';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
@@ -41,17 +42,26 @@ export default function RunsPage() {
                 height: '100%',
                 p: 3,
             }}>
-            <Paper sx={{ p: 4, maxWidth: 'sm', textAlign: 'center' }}>
-                <Typography variant="h5" gutterBottom>
-                    Welcome to Autodiscovery Runs
-                </Typography>
-                <Typography variant="body1" color="text.secondary" paragraph>
-                    Create a new run or select an existing run from the sidebar to get started.
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                    {user?.name && `Logged in as: ${user.name}`}
-                </Typography>
-            </Paper>
+            <IntroBox>
+                <IntroTitle>AutoDiscovery</IntroTitle>
+                Uncover surprising insights hidden in your data. AutoDiscovery uses Bayesian
+                surprise (a measure of how much a finding shifts our beliefs) to autonomously
+                explore your datasets and identify discoveries that genuinely change what we know,
+                not just what's obvious or diverse.
+            </IntroBox>
         </Box>
     );
 }
+
+const IntroBox = styled(Box)(({ theme }) => ({
+    backgroundColor: theme.color['cream-4'].rgba.toString(),
+    color: theme.color['cream-100'].hex,
+    fontSize: '1.125rem',
+    padding: theme.spacing(3),
+}));
+
+const IntroTitle = styled(Typography)(({ theme }) => ({
+    color: theme.color['green-100'].hex,
+    fontSize: '2.5rem',
+    fontWeight: 'bold',
+}));

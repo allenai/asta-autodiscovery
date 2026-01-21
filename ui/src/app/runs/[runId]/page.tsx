@@ -6,9 +6,10 @@ import { Box, CircularProgress, Alert } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getRun } from '@/runs/actions';
 import RunSetup from '@/runs/components/RunSetup';
 import RunStatus from '@/runs/components/RunStatus';
+import { getRunsApi } from '@/api/RunsApi';
+import { getRunFromApi } from '@/types/Run';
 
 interface RunPageProps {
     params: {
@@ -23,6 +24,7 @@ export default function RunPage({ params }: RunPageProps) {
     const { isAuthenticated, isLoading, getAccessToken } = useAuth0();
     const router = useRouter();
     const runId = params.runId;
+    const api = getRunsApi();
 
     const [checkingRun, setCheckingRun] = useState(true);
     const [runState, setRunState] = useState<'setup' | 'submitted'>('setup');
@@ -36,14 +38,13 @@ export default function RunPage({ params }: RunPageProps) {
             setError(null);
 
             try {
-                const token = await getAccessToken();
-                const runData = await getRun(runId, token);
+                const response = await api.getRun(runId);
+                const run = getRunFromApi(response.data);
 
                 // Check if run has been submitted
                 if (
-                    runData.run_details?.execution_id ||
-                    (runData.run_details?.status &&
-                        runData.run_details.status.toUpperCase() !== 'CREATED')
+                    run.details?.executionId ||
+                    (run.details?.status && run.details.status.toUpperCase() !== 'CREATED')
                 ) {
                     setRunState('submitted');
                 } else {

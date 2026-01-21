@@ -4,9 +4,10 @@ from pydantic import BaseModel, Field
 class ExperimentModel(BaseModel):
     """Model representing an experiment with its attributes"""
     experiment_id: str = Field(..., description="Unique identifier for the experiment")
-    status: str = Field(..., description="Current status of the experiment")
     parent_id: str | None = Field(None, description="Identifier of the parent experiment, if any")
+    child_ids: list[str] | None = Field(None, description="Identifiers of the child experiments, if any")
     creation_idx: int = Field(..., description="Index representing the creation order of the experiment")
+    status: str = Field(..., description="Current status of the experiment")
     is_surprising: bool | None = Field(..., description="Flag indicating if the experiment is surprising")
     runtime_ms: float | None = Field(None, description="Runtime of the experiment in milliseconds")
     hypothesis: str | None = Field(None, description="Hypothesis associated with the experiment")

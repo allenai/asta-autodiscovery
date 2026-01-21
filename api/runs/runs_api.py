@@ -18,6 +18,7 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    ExperimentModel,
     GetExperimentStatusResponseModel,
     GetRunExperimentsResponseModel,
 )
@@ -546,7 +547,7 @@ def create() -> Blueprint:
 
     @api.route("/<runid>/experiments", methods=["GET"])
     @requires_enrollment
-    def get_run_experiments(runid: str, after_experiment_id: str | None = None):
+    def get_run_experiments(runid: str):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
 
@@ -555,16 +556,18 @@ def create() -> Blueprint:
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
         """
         userid = request.user.get("sub")
+        after_experiment_id = request.args.get("after_experiment_id", None)
 
         try:
             job_manager = get_job_manager()
             tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-            experiments = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+            experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+            experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
             resp = GetRunExperimentsResponseModel(
                 run_id=runid,
                 after_experiment_id=after_experiment_id,
-                experiments=experiments,
+                experiments=experiment_models,
             )
             return jsonify(resp.model_dump())
         except Exception as e:
@@ -588,12 +591,14 @@ def create() -> Blueprint:
             tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
             node = tree.get_node(experiment_id)
 
-            experiment = node.to_experiment_model() if node else None
+            experiment_node = node.to_experiment_model() if node else None
+            experiment_model = ExperimentModel(**experiment_node) if experiment_node else None
+
 
             resp = GetExperimentStatusResponseModel(
                 run_id=runid,
                 experiment_id=experiment_id,
-                experiment=experiment,
+                experiment=experiment_model,
             )
             return jsonify(resp.model_dump())
         except Exception as e:

@@ -79,7 +79,7 @@ export default function UserProfile() {
                     <Typography variant="body2" color="text.secondary">
                         {userData.email}
                     </Typography>
-                    {userData.email_verified && (
+                    {userData.emailVerified && (
                         <Typography variant="caption" color="success.main">
                             ✓ Verified
                         </Typography>

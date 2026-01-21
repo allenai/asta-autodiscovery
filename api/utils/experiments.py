@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
+import threading
 from typing import Any
 
 from autodiscovery_jobs import JobConfig
@@ -99,6 +101,7 @@ class ExperimentTree:
         jobid: str,
         config: JobConfig | None = None,
         nodes: list[ExperimentNode] | None = None,
+        max_workers: int = 10,
     ):
         """Initialize experiment tree.
 
@@ -107,10 +110,12 @@ class ExperimentTree:
             jobid: Job identifier
             config: Optional configuration
             nodes: Optional pre-loaded nodes (for testing)
+            max_workers: Maximum number of parallel workers for fetching nodes (default: 10)
         """
         self.userid = userid
         self.jobid = jobid
         self.config = config or JobConfig()
+        self.max_workers = max_workers
         self._nodes: dict[str, ExperimentNode] = {}
         self._root: ExperimentNode | None = None
         self._list_cache: list[ExperimentNode] | None = None
@@ -121,39 +126,54 @@ class ExperimentTree:
             self._build_tree_relationships()
 
     @classmethod
-    def load(cls, userid: str, jobid: str, config: JobConfig | None = None) -> ExperimentTree:
+    def load(
+        cls,
+        userid: str,
+        jobid: str,
+        config: JobConfig | None = None,
+        max_workers: int = 10,
+    ) -> ExperimentTree:
         """Factory method to load tree from GCS.
 
         Args:
             userid: User identifier
             jobid: Job identifier
             config: Optional configuration
+            max_workers: Maximum number of parallel workers for fetching nodes (default: 10)
 
         Returns:
             ExperimentTree instance with loaded nodes
         """
         config = config or JobConfig()
-        tree = cls(userid, jobid, config)
+        tree = cls(userid, jobid, config, max_workers=max_workers)
         tree._load_from_gcs()
         return tree
 
     def _load_from_gcs(self) -> None:
-        """Load all experiment nodes from GCS."""
+        """Load all experiment nodes from GCS in parallel."""
         try:
             filenames = list_experiment_files(self.userid, self.jobid, self.config)
         except Exception as e:
             logging.warning(f"Failed to list experiment files: {e}")
             filenames = []
 
-        for filename in filenames:
+        # Thread-safe lock for dictionary writes
+        nodes_lock = threading.Lock()
+
+        def fetch_and_parse_node(filename: str) -> None:
+            """Fetch and parse a single experiment node."""
             node_data = read_experiment_node(self.userid, self.jobid, filename, self.config)
             if node_data:
                 try:
                     node = ExperimentNode(node_data, filename)
-                    self._nodes[node.id] = node
+                    with nodes_lock:
+                        self._nodes[node.id] = node
                 except Exception as e:
                     logging.warning(f"Failed to parse experiment node {filename}: {e}")
-                    continue
+
+        # Execute fetches in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            executor.map(fetch_and_parse_node, filenames)
 
         self._build_tree_relationships()
 

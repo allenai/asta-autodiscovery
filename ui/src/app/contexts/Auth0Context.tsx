@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@auth0/auth0-spa-js';
+
 import { auth0Client, auth0Config } from '@/auth/Auth0Client';
 
 export interface Auth0ContextType {

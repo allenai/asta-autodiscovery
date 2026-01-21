@@ -17,8 +17,6 @@ export default function EnrollmentStatus() {
     const [error, setError] = useState<string | null>(null);
     const [permissionDenied, setPermissionDenied] = useState(false);
 
-    console.log({ enrollmentData });
-
     useEffect(() => {
         const fetchEnrollmentStatus = async () => {
             if (!isAuthenticated) {

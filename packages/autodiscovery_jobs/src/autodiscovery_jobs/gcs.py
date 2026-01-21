@@ -1,5 +1,6 @@
 """GCS operations for managing job data and results."""
 
+from dataclasses import dataclass
 import json
 import re
 from pathlib import Path
@@ -471,15 +472,49 @@ def get_job_args(userid: str, jobid: str, config: JobConfig | None = None) -> di
         return None
 
 
+@dataclass
+class JobStats:
+    job_args: dict[str, Any]
+    num_experiments_requested: int
+    num_experiments_completed: int
+    num_experiments_pending: int
+
+def get_job_stats(
+    userid: str, jobid: str, config: JobConfig | None = None
+) -> JobStats | None:
+    """Get statistics about a job's experiments.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        JobStats object containing job arguments and experiment counts,
+        or None if args.json is missing or invalid.
+    """
+    config = config or JobConfig()
+
+    args = get_job_args(userid, jobid, config)
+    if args is None:
+        return None
+
+    completed = count_experiment_results(userid, jobid, config)
+    requested = args.get("n_experiments", 0)
+    pending = max(0, requested - completed)
+
+    job_stats = JobStats(
+        job_args=args,
+        num_experiments_requested=requested,
+        num_experiments_completed=completed,
+        num_experiments_pending=pending,
+    )
+    return job_stats
+
 def calculate_job_credits(
     userid: str, jobid: str, config: JobConfig | None = None
 ) -> tuple[int, int]:
     """Calculate used and pending credits for a single job.
-
-    Credit calculation logic:
-    - SUCCEEDED: Count completed experiments as used credits
-    - RUNNING: Estimate pending credits (n_experiments - completed)
-    - FAILED/CANCELLED/CREATED: No credits charged (treat as free retry)
 
     Args:
         userid: User identifier
@@ -489,12 +524,9 @@ def calculate_job_credits(
     Returns:
         Tuple of (used_credits, pending_credits)
     """
-    config = config or JobConfig()
-
-    args = get_job_args(userid, jobid, config)
-    completed = count_experiment_results(userid, jobid, config)
-    requested = args.get("n_experiments", 0) if args else 0
-    used = completed
-    pending = max(0, requested - completed)
-
+    job_stats = get_job_stats(userid=userid, jobid=jobid, config=config)
+    if job_stats is None:
+        return (0, 0)
+    used = job_stats.num_experiments_completed
+    pending = job_stats.num_experiments_pending
     return (used, pending)

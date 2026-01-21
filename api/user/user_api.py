@@ -3,17 +3,11 @@ import os
 import requests
 from flask import Blueprint, current_app, jsonify, request
 from utils.auth import requires_auth, requires_enrollment
+from utils.credits import get_user_credits
 
 # Import autodiscovery_jobs when available
 try:
     from autodiscovery_jobs import JobConfig, JobManager
-    from autodiscovery_jobs.exceptions import (
-        CloudRunError,
-        GCSError,
-        JobAlreadyExistsError,
-        JobNotFoundError,
-    )
-    from utils.credits import get_user_credits
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -60,11 +54,13 @@ def create() -> Blueprint:
 
             return jsonify(
                 {
-                    "sub": user.get("sub"),
-                    "name": user.get("name"),
-                    "email": user.get("email"),
-                    "picture": user.get("picture"),
-                    "email_verified": user.get("email_verified"),
+                    "user": {
+                        "sub": user.get("sub"),
+                        "name": user.get("name"),
+                        "email": user.get("email"),
+                        "picture": user.get("picture"),
+                        "email_verified": user.get("email_verified"),
+                    },
                 }
             )
         except Exception as e:

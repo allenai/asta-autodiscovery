@@ -3,19 +3,15 @@
 import { useEffect, useState } from 'react';
 import { Box, Typography, Avatar, CircularProgress, Alert } from '@mui/material';
 
-import { useAuth0 } from '../contexts/Auth0Context';
-
-interface UserData {
-    sub: string;
-    name: string;
-    email: string;
-    picture: string;
-    email_verified: boolean;
-}
+import { getUserApi } from '@/api/UserApi';
+import { useAuth0 } from '@/contexts/Auth0Context';
+import { User, getUserFromApi } from '@/types/User';
 
 export default function UserProfile() {
-    const { isAuthenticated, isLoading, getAccessToken } = useAuth0();
-    const [userData, setUserData] = useState<UserData | null>(null);
+    const userApi = getUserApi();
+
+    const { isAuthenticated, isLoading } = useAuth0();
+    const [userData, setUserData] = useState<User | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loadingUser, setLoadingUser] = useState(false);
 
@@ -29,19 +25,8 @@ export default function UserProfile() {
             setError(null);
 
             try {
-                const token = await getAccessToken();
-                const response = await fetch('/api/user/me', {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch user data');
-                }
-
-                const data = await response.json();
-                setUserData(data);
+                const { data } = await userApi.getViewer();
+                setUserData(getUserFromApi(data.user));
             } catch (err) {
                 console.error('Error fetching user data:', err);
                 setError(err instanceof Error ? err.message : 'Failed to load user data');
@@ -51,7 +36,7 @@ export default function UserProfile() {
         };
 
         fetchUserData();
-    }, [isAuthenticated, getAccessToken]);
+    }, [isAuthenticated]);
 
     if (isLoading || loadingUser) {
         return (
@@ -94,7 +79,7 @@ export default function UserProfile() {
                     <Typography variant="body2" color="text.secondary">
                         {userData.email}
                     </Typography>
-                    {userData.email_verified && (
+                    {userData.emailVerified && (
                         <Typography variant="caption" color="success.main">
                             ✓ Verified
                         </Typography>

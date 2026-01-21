@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class ExperimentModel(BaseModel):
     """Model representing an experiment with its attributes"""
     experiment_id: str = Field(..., description="Unique identifier for the experiment")

@@ -13,7 +13,7 @@ try:
         JobAlreadyExistsError,
         JobNotFoundError,
     )
-    from autodiscovery_jobs.gcs import calculate_job_credits
+    from utils.credits import get_user_credits
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -80,35 +80,17 @@ def create() -> Blueprint:
 
         job_manager = get_job_manager()
 
-        total_credits_used = 0
-        total_credits_pending = 0
-        viewer_job_ids = job_manager.list_jobs(userid=user_id)
+        # Get all credit metrics in one call
+        credits = get_user_credits(userid=user_id, config=job_manager.config)
 
-        # Calculate the total credits used by the user across all their jobs
-        for job_id in viewer_job_ids:
-            try:
-                # Calculate credits for this job
-                used, pending = calculate_job_credits(
-                    userid=user_id, jobid=job_id, config=job_manager.config
-                )
-                total_credits_used += used
-                total_credits_pending += pending
-                print(f"Job {job_id}: used={used}, pending={pending}")
-            except Exception as e:
-                current_app.logger.error(f"Failed to calculate credits for job {job_id}: {e}")
-                # Continue processing other jobs
-
-        credits_granted = 1000  # TODO: Pull this from some config or DB
-        credits_available = max(0, credits_granted - total_credits_used - total_credits_pending)
-        credits_remaining = max(0, credits_granted - total_credits_used)
         return jsonify(
             {
                 "credits": {
-                    "granted": credits_granted,
-                    "used": total_credits_used,
-                    "pending": total_credits_pending,
-                    "available": credits_available,
-                    "remaining": credits_remaining,
+                    "granted": credits.granted,
+                    "used": credits.used,
+                    "pending": credits.pending,
+                    "available": credits.available,
+                    "remaining": credits.remaining,
                 }
             }
         ), 200

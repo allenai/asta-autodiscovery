@@ -76,7 +76,7 @@ export class RunsApi extends BaseApi {
     }) {
         const query: Record<string, string> = {};
         if (afterExperimentId) {
-            query['after_experiment_id'] = afterExperimentId;
+            query.after_experiment_id = afterExperimentId;
         }
 
         return this.request<GetRunExperimentsResponseBody>({

@@ -75,22 +75,21 @@ def create() -> Blueprint:
     @requires_enrollment
     def get_viewer_credits():
         """Get the number of credits for the authenticated user."""
-        user = request.user
-        user_id = user.get("sub")
+        user_id = request.user.get("sub")
 
         job_manager = get_job_manager()
 
         # Get all credit metrics in one call
-        credits = get_user_credits(userid=user_id, config=job_manager.config)
+        user_credits = get_user_credits(userid=user_id, config=job_manager.config)
 
         return jsonify(
             {
                 "credits": {
-                    "granted": credits.granted,
-                    "used": credits.used,
-                    "pending": credits.pending,
-                    "available": credits.available,
-                    "remaining": credits.remaining,
+                    "granted": user_credits.granted,
+                    "used": user_credits.used,
+                    "pending": user_credits.pending,
+                    "available": user_credits.available,
+                    "remaining": user_credits.remaining,
                 }
             }
         ), 200
@@ -102,7 +101,7 @@ def create() -> Blueprint:
         """Example endpoint that requires the enroll:autodiscovery_v0 permission.
         Returns enrollment status for the authenticated user.
         """
-        user = request.user
+        user_id = request.user.get("sub")
 
         # Example data - in real implementation, this would query a database
         enrollment_data = {
@@ -110,10 +109,10 @@ def create() -> Blueprint:
             "enrollment_date": "2024-01-15",
             "status": "active",
             "experiments_count": 12,
-            "user_id": user.get("sub"),
+            "user_id": user_id,
         }
 
-        current_app.logger.info(f"Enrollment status requested by user: {user.get('sub')}")
+        current_app.logger.info(f"Enrollment status requested by user: {user_id}")
         return jsonify(enrollment_data)
 
     return api

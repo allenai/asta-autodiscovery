@@ -70,7 +70,7 @@ def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> st
 
 
 def list_user_ids(config: JobConfig | None = None) -> list[str]:
-    """List all user IDs in the system.
+    """List all user IDs with job data.
 
     Args:
         config: Configuration (uses default if None)

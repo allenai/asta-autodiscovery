@@ -1,0 +1,279 @@
+"""Credit management and validation for autodiscovery experiments.
+
+This module centralizes all credit-related logic including:
+- Credit calculation for individual jobs
+- User-level credit aggregation
+- Credit validation (boolean and exception-based)
+
+Example usage:
+    # Check credits with boolean
+    if can_start_experiments(10, userid, config):
+        manager.run_job(...)
+
+    # Check credits with exception
+    try:
+        check_sufficient_credits(10, userid, config)
+        manager.run_job(...)
+    except InsufficientCreditsError as e:
+        return jsonify({"error": e.message}), 402
+
+    # Get full credit details
+    credits = get_user_credits(userid, config)
+    print(f"Available: {credits.available}")
+"""
+
+from dataclasses import dataclass
+from typing import Any, NamedTuple
+
+from autodiscovery_jobs import JobConfig
+from autodiscovery_jobs.gcs import (
+    count_experiment_results,
+    get_job_args,
+    list_user_jobs,
+)
+
+# Credit configuration
+DEFAULT_CREDITS_GRANTED = 1000
+
+
+@dataclass
+class JobStats:
+    """Statistics about a job's experiments.
+
+    Attributes:
+        job_args: Job arguments dictionary
+        num_experiments_requested: Number of experiments requested
+        num_experiments_completed: Number of experiments completed
+        num_experiments_pending: Number of experiments pending
+    """
+
+    job_args: dict[str, Any]
+    num_experiments_requested: int
+    num_experiments_completed: int
+    num_experiments_pending: int
+
+
+class UserCredits(NamedTuple):
+    """Complete credit information for a user.
+
+    Attributes:
+        granted: Total credits granted to user
+        used: Credits already consumed (completed experiments)
+        pending: Credits reserved for running experiments
+        available: Credits available for new experiments (granted - used - pending)
+        remaining: Credits not yet consumed (granted - used)
+    """
+
+    granted: int
+    used: int
+    pending: int
+    available: int
+    remaining: int
+
+
+class InsufficientCreditsError(Exception):
+    """Raised when user does not have sufficient credits for an operation.
+
+    Attributes:
+        requested: Number of credits requested
+        available: Number of credits available
+        message: Descriptive error message
+    """
+
+    def __init__(self, requested: int, available: int):
+        self.requested = requested
+        self.available = available
+        self.message = (
+            f"Insufficient credits: requested {requested}, but only {available} available"
+        )
+        super().__init__(self.message)
+
+
+def get_user_credits_granted(userid: str) -> int:  # pylint: disable=unused-argument
+    """Get the number of credits granted to a user.
+
+    Currently returns a constant, but designed to support future
+    per-user credit allocation from database or configuration.
+
+    Args:
+        userid: User identifier
+
+    Returns:
+        Number of credits granted to user
+
+    Example:
+        >>> credits_granted = get_user_credits_granted("user123")
+        >>> print(f"User has {credits_granted} total credits")
+    """
+    # TODO: Query database or config service for per-user credit allocation
+    # return db.query_user_credits(userid)
+    return DEFAULT_CREDITS_GRANTED
+
+
+def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> JobStats | None:
+    """Get statistics about a job's experiments.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        JobStats object containing job arguments and experiment counts,
+        or None if args.json is missing or invalid.
+    """
+    config = config or JobConfig()
+
+    args = get_job_args(userid, jobid, config)
+    if args is None:
+        return None
+
+    completed = count_experiment_results(userid, jobid, config)
+    requested = args.get("n_experiments", 0)
+    pending = max(0, requested - completed)
+
+    job_stats = JobStats(
+        job_args=args,
+        num_experiments_requested=requested,
+        num_experiments_completed=completed,
+        num_experiments_pending=pending,
+    )
+    return job_stats
+
+
+def calculate_job_credits(
+    userid: str, jobid: str, config: JobConfig | None = None
+) -> tuple[int, int]:
+    """Calculate used and pending credits for a single job.
+
+    This function is migrated from autodiscovery_jobs.gcs module to
+    centralize credit logic in the API layer.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Tuple of (used_credits, pending_credits)
+
+    Example:
+        >>> used, pending = calculate_job_credits("user123", "job456")
+        >>> print(f"Job has used {used} and pending {pending} credits")
+    """
+    job_stats = get_job_stats(userid=userid, jobid=jobid, config=config)
+    if job_stats is None:
+        return (0, 0)
+
+    used = job_stats.num_experiments_completed
+    pending = job_stats.num_experiments_pending
+    return (used, pending)
+
+
+def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredits:
+    """Calculate complete credit information for a user across all jobs.
+
+    This function aggregates credit usage across all jobs owned by the user
+    and calculates all relevant credit metrics.
+
+    Args:
+        userid: User identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        UserCredits object with all credit metrics
+
+    Example:
+        >>> credits = get_user_credits("user123")
+        >>> print(f"Available: {credits.available}, Used: {credits.used}")
+    """
+    total_used = 0
+    total_pending = 0
+
+    # Get all jobs for the user
+    job_ids = list_user_jobs(userid=userid, config=config)
+
+    # Aggregate credits across all jobs
+    for job_id in job_ids:
+        try:
+            used, pending = calculate_job_credits(userid=userid, jobid=job_id, config=config)
+            total_used += used
+            total_pending += pending
+        except Exception:
+            # Continue processing other jobs if one fails
+            # This matches the error handling in user_api.py line 100
+            pass
+
+    # Get credits granted for this user
+    credits_granted = get_user_credits_granted(userid)
+
+    # Calculate derived metrics
+    available = max(0, credits_granted - total_used - total_pending)
+    remaining = max(0, credits_granted - total_used)
+
+    return UserCredits(
+        granted=credits_granted,
+        used=total_used,
+        pending=total_pending,
+        available=available,
+        remaining=remaining,
+    )
+
+
+def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | None = None) -> bool:
+    """Check if user has sufficient credits to start N experiments.
+
+    Uses the conservative 'available' metric (granted - used - pending)
+    which accounts for both completed and pending experiments.
+
+    Args:
+        n_experiments: Number of experiments to check
+        userid: User identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        True if user has sufficient available credits, False otherwise
+
+    Example:
+        >>> if can_start_experiments(10, "user123"):
+        ...     print("User can start 10 experiments")
+        ... else:
+        ...     print("Insufficient credits")
+    """
+    credits = get_user_credits(userid=userid, config=config)
+    return credits.available >= n_experiments
+
+
+def check_sufficient_credits(
+    n_experiments: int, userid: str, config: JobConfig | None = None
+) -> UserCredits:
+    """Verify user has sufficient credits or raise exception.
+
+    Uses the conservative 'available' metric (granted - used - pending).
+    This function is useful in API endpoints where you want to fail fast
+    with a descriptive exception.
+
+    Args:
+        n_experiments: Number of experiments to check
+        userid: User identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        UserCredits object if check passes
+
+    Raises:
+        InsufficientCreditsError: If user does not have enough available credits
+
+    Example:
+        >>> try:
+        ...     credits = check_sufficient_credits(10, "user123")
+        ...     print(f"Check passed, user has {credits.available} available")
+        ... except InsufficientCreditsError as e:
+        ...     print(f"Error: {e.message}")
+    """
+    credits = get_user_credits(userid=userid, config=config)
+
+    if credits.available < n_experiments:
+        raise InsufficientCreditsError(requested=n_experiments, available=credits.available)
+
+    return credits

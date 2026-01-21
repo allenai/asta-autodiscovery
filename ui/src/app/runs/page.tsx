@@ -1,15 +1,15 @@
 'use client';
 
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
+import { styled } from '@mui/system';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { styled } from '@mui/system';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
  */
 export default function RunsPage() {
-    const { isAuthenticated, isLoading, user } = useAuth0();
+    const { isAuthenticated, isLoading } = useAuth0();
 
     if (isLoading) {
         return (

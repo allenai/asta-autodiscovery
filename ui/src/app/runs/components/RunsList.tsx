@@ -19,7 +19,7 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 import Link from 'next/link';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getApi } from '@/api/Api';
+import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
 
 interface RunsListProps {
@@ -43,7 +43,7 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
-    const api = getApi();
+    const api = getRunsApi();
 
     const fetchRuns = async () => {
         if (!isAuthenticated) return;
@@ -52,8 +52,8 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
         setError(null);
 
         try {
-            const runsList = await api.listRuns();
-            setRuns(runsList.data.runs);
+            const { data } = await api.listRuns();
+            setRuns(data.runs);
         } catch (err) {
             console.error('Error fetching runs:', err);
             setError(err instanceof Error ? err.message : 'Failed to load runs');
@@ -71,8 +71,8 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
         setError(null);
 
         try {
-            const response = await api.createRun();
-            const run = getRunFromApi(response.data);
+            const { data } = await api.createRun();
+            const run = getRunFromApi(data);
 
             // Add new run to list
             setRuns([run.id, ...runs]);

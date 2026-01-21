@@ -296,34 +296,6 @@ def upload_dataset(
         raise GCSError(f"Failed to upload dataset: {e}")
 
 
-def _list_dataset_blobs(userid: str, jobid: str, config: JobConfig):
-    """Internal helper to list dataset blob objects.
-
-    Args:
-        userid: User identifier
-        jobid: Job identifier
-        config: Configuration
-
-    Returns:
-        Iterator of blob objects in the data/ directory (excluding placeholders)
-
-    Raises:
-        GCSError: If listing fails
-    """
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
-    prefix = f"users/{userid}/jobs/{jobid}/data/"
-
-    try:
-        blobs = bucket.list_blobs(prefix=prefix)
-        # Filter out placeholder files
-        for blob in blobs:
-            if not blob.name.endswith(".placeholder"):
-                yield blob
-    except Exception as e:
-        raise GCSError(f"Failed to list dataset blobs: {e}")
-
-
 def list_datasets(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
     """List all dataset files in a job's data directory.
 
@@ -375,6 +347,34 @@ def expire_datasets(userid: str, jobid: str, config: JobConfig | None = None) ->
             blob.delete()
     except Exception as e:
         raise GCSError(f"Failed to expire datasets: {e}")
+
+
+def _list_dataset_blobs(userid: str, jobid: str, config: JobConfig):
+    """Internal helper to list dataset blob objects.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration
+
+    Returns:
+        Iterator of blob objects in the data/ directory (excluding placeholders)
+
+    Raises:
+        GCSError: If listing fails
+    """
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    prefix = f"users/{userid}/jobs/{jobid}/data/"
+
+    try:
+        blobs = bucket.list_blobs(prefix=prefix)
+        # Filter out placeholder files
+        for blob in blobs:
+            if not blob.name.endswith(".placeholder"):
+                yield blob
+    except Exception as e:
+        raise GCSError(f"Failed to list dataset blobs: {e}")
 
 
 def upload_metadata(

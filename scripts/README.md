@@ -54,7 +54,7 @@ export CLOUDSDK_CORE_PROJECT=example-legacy-project
      --args "run,python,scripts/cleanup_old_datasets.py,--dry-run"
    ```
 
-   Note: Currently configured with `--dry-run` for safety. Remove `--dry-run` from args once validated. Uses the default compute service account. Add `--service-account <email>` if you need a specific service account.
+   Note: Currently configured with `--dry-run` for safety. Remove `--dry-run` from args once validated. Uses the default compute service account.
 
 3. **Schedule with Cloud Scheduler:**
    ```bash

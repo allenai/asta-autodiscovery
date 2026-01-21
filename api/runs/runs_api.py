@@ -18,7 +18,8 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
-    ExperimentModel,
+    ExperimentDetailedModel,
+    ExperimentSummaryModel,
     GetExperimentStatusResponseModel,
     GetRunExperimentsResponseModel,
 )
@@ -562,7 +563,7 @@ def create() -> Blueprint:
             job_manager = get_job_manager()
             tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
             experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
-            experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
+            experiment_models = [ExperimentSummaryModel(**node) for node in experiment_nodes]
 
             resp = GetRunExperimentsResponseModel(
                 run_id=runid,
@@ -591,9 +592,8 @@ def create() -> Blueprint:
             tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
             node = tree.get_node(experiment_id)
 
-            experiment_node = node.to_experiment_model() if node else None
-            experiment_model = ExperimentModel(**experiment_node) if experiment_node else None
-
+            experiment_node = node.to_dict() if node else None
+            experiment_model = ExperimentDetailedModel(**experiment_node) if experiment_node else None
 
             resp = GetExperimentStatusResponseModel(
                 run_id=runid,

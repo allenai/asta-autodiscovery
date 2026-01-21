@@ -52,11 +52,6 @@ export interface GetRunExperimentDetailsResponseBody {
     experiment_id: string;
     experiment: ExperimentDetailedFromApi;
 }
-export interface GetRunStatusResponseBody {
-    runid: string;
-    run_details: RunDetailsFromApi;
-    execution_status?: Record<string, unknown>; // TODO: Type this properly
-}
 
 export class RunsApi extends BaseApi {
     async createRun() {

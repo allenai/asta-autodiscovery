@@ -250,11 +250,6 @@ export async function getRunStatus(
     runid: string;
     run_details: RunDetails;
     execution_status?: Record<string, unknown>;
-    job_stats?: {
-        num_experiments_requested: number;
-        num_experiments_completed: number;
-        num_experiments_pending: number;
-    };
 }> {
     const response = await fetch(`${API_ORIGIN}/api/runs/${runid}/status`, {
         method: 'GET',

@@ -11,7 +11,7 @@ import {
 } from 'react';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getViewerCredits, ViewerCredits } from '@/user/actions';
+import { getUserApi, ViewerCredits } from '@/api/UserApi';
 
 export interface ViewerCreditsState {
     credits: ViewerCredits | null;
@@ -40,10 +40,12 @@ export const useViewerCredits = (): ViewerCreditsState => {
 export type ViewerCreditsProviderProps = PropsWithChildren<{}>;
 
 export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) => {
+    const userApi = getUserApi();
+
     const [credits, setCredits] = useState<ViewerCredits | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
 
-    const { isAuthenticated, getAccessToken } = useAuth0();
+    const { isAuthenticated } = useAuth0();
 
     const updateViewerCredits = useCallback(async () => {
         if (lastError) {
@@ -53,13 +55,12 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
             return;
         }
         try {
-            const token = await getAccessToken();
-            const credits = await getViewerCredits({ token });
-            setCredits(credits);
+            const { data } = await userApi.getViewerCredits();
+            setCredits(data.credits);
         } catch (error: any) {
             setLastError(error.message);
         }
-    }, [isAuthenticated, getAccessToken, lastError]);
+    }, [isAuthenticated]);
 
     useEffect(() => {
         if (!isAuthenticated) {

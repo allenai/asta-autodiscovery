@@ -571,27 +571,17 @@ def create() -> Blueprint:
         userid = request.user.get("sub")
         after_experiment_id = request.args.get("after_experiment_id", None)
 
-        try:
-            job_manager = get_job_manager()
-            tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-            experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
-            experiment_models = [ExperimentSummaryModel(**node) for node in experiment_nodes]
+        job_manager = get_job_manager()
+        tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
+        experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+        experiment_models = [ExperimentSummaryModel(**node) for node in experiment_nodes]
 
-            resp = GetRunExperimentsResponseModel(
-                run_id=runid,
-                after_experiment_id=after_experiment_id,
-                experiments=experiment_models,
-            )
-            return jsonify(resp.model_dump())
-        except Exception as e:
-            current_app.logger.error(f"Failed to load experiments for run {runid}: {e}")
-            # Return empty list on error to gracefully handle missing/incomplete runs
-            resp = GetRunExperimentsResponseModel(
-                run_id=runid,
-                after_experiment_id=after_experiment_id,
-                experiments=[],
-            )
-            return jsonify(resp.model_dump())
+        resp = GetRunExperimentsResponseModel(
+            runid=runid,
+            after_experiment_id=after_experiment_id,
+            experiments=experiment_models,
+        )
+        return jsonify(resp.model_dump()), 200
 
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
@@ -599,32 +589,21 @@ def create() -> Blueprint:
         """Fetch details about a specific experiment within a run."""
         userid = request.user.get("sub")
 
-        try:
-            job_manager = get_job_manager()
-            tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-            node = tree.get_node(experiment_id)
+        job_manager = get_job_manager()
+        tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
+        node = tree.get_node(experiment_id)
 
-            experiment_node = node.to_dict() if node else None
-            experiment_model = (
-                ExperimentDetailedModel(**experiment_node) if experiment_node else None
-            )
+        experiment_node = node.to_dict() if node else None
+        experiment_model = (
+            ExperimentDetailedModel(**experiment_node) if experiment_node else None
+        )
 
-            resp = GetExperimentStatusResponseModel(
-                run_id=runid,
-                experiment_id=experiment_id,
-                experiment=experiment_model,
-            )
-            return jsonify(resp.model_dump())
-        except Exception as e:
-            current_app.logger.error(
-                f"Failed to load experiment {experiment_id} for run {runid}: {e}"
-            )
-            resp = GetExperimentStatusResponseModel(
-                run_id=runid,
-                experiment_id=experiment_id,
-                experiment=None,
-            )
-            return jsonify(resp.model_dump())
+        resp = GetExperimentStatusResponseModel(
+            runid=runid,
+            experiment_id=experiment_id,
+            experiment=experiment_model,
+        )
+        return jsonify(resp.model_dump()), 200
 
     @api.route("/<runid>/cancel", methods=["POST"])
     @requires_enrollment

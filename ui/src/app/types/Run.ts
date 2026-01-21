@@ -1,4 +1,9 @@
-import { RunDetailsFromApi, PostCreateRunResponseBody } from '@/api/RunsApi';
+import {
+    RunDetailsFromApi,
+    PostCreateRunResponseBody,
+    ExperimentSummaryFromApi,
+    ExperimentDetailedFromApi,
+} from '@/api/RunsApi';
 
 export type Run = {
     id: string;
@@ -12,6 +17,27 @@ export type RunDetails = {
     createdAt: string;
     status: string;
     statusCheckedAt: string | null;
+};
+
+export type ExperimentSummary = {
+    experimentId: string;
+    parentId: string | null;
+    childIds: string[] | null;
+    status: string;
+    isSurprising: boolean;
+};
+
+export type ExperimentDetailed = {
+    experimentId: string;
+    parentId: string | null;
+    childIds: string[] | null;
+    creationIdx: number;
+    status: string;
+    isSurprising: boolean;
+    runtimeMs: number | null;
+    hypothesis: string | null;
+    experimentPlan: Record<string, any> | null;
+    review: string | null;
 };
 
 export const getRunFromApi = (responseBody: PostCreateRunResponseBody): Run => {
@@ -32,5 +58,34 @@ export const getRunDetailsFromApi = (detailsFromApi?: RunDetailsFromApi): RunDet
         createdAt: detailsFromApi.created_at,
         status: detailsFromApi.status,
         statusCheckedAt: detailsFromApi.status_checked_at,
+    };
+};
+
+export const getExperimentSummaryFromApi = (
+    experimentFromApi: ExperimentSummaryFromApi
+): ExperimentSummary => {
+    return {
+        experimentId: experimentFromApi.experiment_id,
+        parentId: experimentFromApi.parent_id,
+        childIds: experimentFromApi.child_ids,
+        status: experimentFromApi.status,
+        isSurprising: experimentFromApi.is_surprising,
+    };
+};
+
+export const getExperimentDetailedFromApi = (
+    experimentFromApi: ExperimentDetailedFromApi
+): ExperimentDetailed => {
+    return {
+        experimentId: experimentFromApi.experiment_id,
+        parentId: experimentFromApi.parent_id,
+        childIds: experimentFromApi.child_ids,
+        creationIdx: experimentFromApi.creation_idx,
+        status: experimentFromApi.status,
+        isSurprising: experimentFromApi.is_surprising,
+        runtimeMs: experimentFromApi.runtime_ms,
+        hypothesis: experimentFromApi.hypothesis,
+        experimentPlan: experimentFromApi.experiment_plan,
+        review: experimentFromApi.review,
     };
 };

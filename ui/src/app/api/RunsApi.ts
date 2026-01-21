@@ -46,7 +46,7 @@ export interface ExperimentDetailedFromApi {
     review: string | null;
 }
 
-export interface GetExperimentStatusResponseBody {
+export interface GetRunExperimentDetailsResponseBody {
     runid: string | null;
     experiment_id: string;
     experiment: ExperimentDetailedFromApi;
@@ -86,8 +86,14 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async getExperimentStatus({ runid, experimentId }: { runid: string; experimentId: string }) {
-        return this.request<GetExperimentStatusResponseBody>({
+    async getRunExperimentDetails({
+        runid,
+        experimentId,
+    }: {
+        runid: string;
+        experimentId: string;
+    }) {
+        return this.request<GetRunExperimentDetailsResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,

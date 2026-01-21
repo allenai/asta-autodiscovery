@@ -26,6 +26,7 @@ export type ExperimentSummary = {
     childIds: string[] | null;
     status: string;
     isSurprising: boolean;
+    surprise: number | null;
 };
 
 export type ExperimentDetailed = {
@@ -35,6 +36,7 @@ export type ExperimentDetailed = {
     creationIdx: number;
     status: string;
     isSurprising: boolean;
+    surprise: number | null;
     runtimeMs: number | null;
     hypothesis: string | null;
     experimentPlan: Record<string, any> | null;
@@ -72,6 +74,7 @@ export const getExperimentSummaryFromApi = (
         childIds: experimentFromApi.child_ids,
         status: experimentFromApi.status,
         isSurprising: experimentFromApi.is_surprising,
+        surprise: experimentFromApi.surprise,
     };
 };
 
@@ -85,6 +88,7 @@ export const getExperimentDetailedFromApi = (
         creationIdx: experimentFromApi.creation_idx,
         status: experimentFromApi.status,
         isSurprising: experimentFromApi.is_surprising,
+        surprise: experimentFromApi.surprise,
         runtimeMs: experimentFromApi.runtime_ms,
         hypothesis: experimentFromApi.hypothesis,
         experimentPlan: experimentFromApi.experiment_plan,

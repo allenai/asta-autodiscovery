@@ -13,6 +13,9 @@ class ExperimentSummaryModel(BaseModel):
     is_surprising: bool | None = Field(
         ..., description="Flag indicating if the experiment is surprising"
     )
+    surprise: float | None = Field(
+        None, description="Numerical value representing the surprise level of the experiment"
+    )
 
 
 class ExperimentDetailedModel(BaseModel):
@@ -29,6 +32,9 @@ class ExperimentDetailedModel(BaseModel):
     status: str = Field(..., description="Current status of the experiment")
     is_surprising: bool | None = Field(
         ..., description="Flag indicating if the experiment is surprising"
+    )
+    surprise: float | None = Field(
+        None, description="Numerical value representing the surprise level of the experiment"
     )
     runtime_ms: float | None = Field(None, description="Runtime of the experiment in milliseconds")
     hypothesis: str | None = Field(None, description="Hypothesis associated with the experiment")
@@ -49,6 +55,7 @@ class ExperimentDetailedModel(BaseModel):
             child_ids=self.child_ids,
             status=self.status,
             is_surprising=self.is_surprising,
+            surprise=self.surprise,
         )
 
 

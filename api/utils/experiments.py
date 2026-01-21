@@ -61,6 +61,9 @@ class ExperimentNode:
 
         # Metrics
         self.is_surprising: bool | None = node_data.get("surprising")
+        # NOTE: Surprise might be posterior.mean - prior.mean instead
+        self.surprise: float | None = node_data.get("belief_change")
+
 
         # Convert time_elapsed (seconds) to runtime_ms (milliseconds)
         time_elapsed = node_data.get("time_elapsed")
@@ -83,6 +86,7 @@ class ExperimentNode:
             "creation_idx": self.creation_idx,
             "status": self.status,
             "is_surprising": self.is_surprising,
+            "surprise": self.surprise,
             "runtime_ms": self.runtime_ms,
             "hypothesis": self.hypothesis,
             "experiment_plan": self.experiment_plan,
@@ -190,7 +194,7 @@ class ExperimentTree:
                 if parent:
                     node.parent = parent
                     parent.children.append(node)
-                else:
+                elif node.parent_id != "node_0_0":
                     logging.warning(f"Node {node_id} references missing parent {node.parent_id}")
 
         # Sort children by creation index for consistent ordering

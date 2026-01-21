@@ -19,7 +19,8 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 import Link from 'next/link';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { listRuns, createRun } from '../actions';
+import { getApi } from '@/api/Api';
+import { getRunFromApi } from '@/types/Run';
 
 interface RunsListProps {
     selectedRunId: string | null;
@@ -37,11 +38,12 @@ interface RunsListProps {
  * - Loading and error states
  */
 export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: RunsListProps) {
-    const { isAuthenticated, getAccessToken } = useAuth0();
+    const { isAuthenticated } = useAuth0();
     const [runs, setRuns] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
+    const api = getApi();
 
     const fetchRuns = async () => {
         if (!isAuthenticated) return;
@@ -50,9 +52,8 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
         setError(null);
 
         try {
-            const token = await getAccessToken();
-            const runsList = await listRuns(token);
-            setRuns(runsList);
+            const runsList = await api.listRuns();
+            setRuns(runsList.data.runs);
         } catch (err) {
             console.error('Error fetching runs:', err);
             setError(err instanceof Error ? err.message : 'Failed to load runs');
@@ -70,14 +71,14 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
         setError(null);
 
         try {
-            const token = await getAccessToken();
-            const response = await createRun(token);
+            const response = await api.createRun();
+            const run = getRunFromApi(response.data);
 
             // Add new run to list
-            setRuns([response.runid, ...runs]);
+            setRuns([run.id, ...runs]);
 
             // Notify parent component
-            onRunCreated(response.runid);
+            onRunCreated(run.id);
         } catch (err) {
             console.error('Error creating run:', err);
             setError(err instanceof Error ? err.message : 'Failed to create run');

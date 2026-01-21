@@ -5,22 +5,19 @@ import { Box, Typography, Card, CardContent, CircularProgress, Alert, Chip } fro
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
-import { useAuth0 } from '../contexts/Auth0Context';
-
-interface EnrollmentData {
-    enrolled: boolean;
-    enrollment_date: string;
-    status: string;
-    experiments_count: number;
-    user_id: string;
-}
+import { getUserApi } from '@/api/UserApi';
+import { useAuth0 } from '@/contexts/Auth0Context';
+import { EnrollmentState, getEnrollmentStateFromApi } from '@/types/User';
 
 export default function EnrollmentStatus() {
-    const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth0();
-    const [enrollmentData, setEnrollmentData] = useState<EnrollmentData | null>(null);
+    const userApi = getUserApi();
+    const { isAuthenticated, isLoading: authLoading } = useAuth0();
+    const [enrollmentData, setEnrollmentData] = useState<EnrollmentState | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [permissionDenied, setPermissionDenied] = useState(false);
+
+    console.log({ enrollmentData });
 
     useEffect(() => {
         const fetchEnrollmentStatus = async () => {
@@ -33,13 +30,7 @@ export default function EnrollmentStatus() {
             setPermissionDenied(false);
 
             try {
-                const token = await getAccessToken();
-                const response = await fetch('/api/user/me/enrollment-status', {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
+                const { response, data } = await userApi.getViewerEnrollmentStatus();
                 if (response.status === 403) {
                     // Permission denied
                     setPermissionDenied(true);
@@ -47,9 +38,8 @@ export default function EnrollmentStatus() {
                     setError(errorData.error || 'Access denied');
                 } else if (!response.ok) {
                     throw new Error('Failed to fetch enrollment status');
-                } else {
-                    const data = await response.json();
-                    setEnrollmentData(data);
+                } else if (data) {
+                    setEnrollmentData(getEnrollmentStateFromApi(data));
                 }
             } catch (err) {
                 console.error('Error fetching enrollment status:', err);
@@ -60,7 +50,7 @@ export default function EnrollmentStatus() {
         };
 
         fetchEnrollmentStatus();
-    }, [isAuthenticated, getAccessToken]);
+    }, [isAuthenticated]);
 
     if (authLoading || loading) {
         return (
@@ -123,7 +113,7 @@ export default function EnrollmentStatus() {
                         <CheckCircleIcon sx={{ mr: 1, color: 'success.main' }} />
                         <Typography variant="h6">Enrollment Status</Typography>
                         <Chip
-                            label={enrollmentData.status.toUpperCase()}
+                            label={enrollmentData.status?.toUpperCase()}
                             color="success"
                             size="small"
                             sx={{ ml: 2 }}
@@ -144,9 +134,7 @@ export default function EnrollmentStatus() {
                             <Typography variant="body2" color="text.secondary">
                                 Enrollment Date:
                             </Typography>
-                            <Typography variant="body2">
-                                {enrollmentData.enrollment_date}
-                            </Typography>
+                            <Typography variant="body2">{enrollmentData.enrollmentDate}</Typography>
                         </Box>
 
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -154,7 +142,7 @@ export default function EnrollmentStatus() {
                                 Experiments Completed:
                             </Typography>
                             <Typography variant="body2">
-                                {enrollmentData.experiments_count}
+                                {enrollmentData.experimentsCount}
                             </Typography>
                         </Box>
 
@@ -165,7 +153,7 @@ export default function EnrollmentStatus() {
                             <Typography
                                 variant="body2"
                                 sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                                {enrollmentData.user_id}
+                                {enrollmentData.userId}
                             </Typography>
                         </Box>
                     </Box>

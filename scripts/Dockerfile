@@ -13,5 +13,5 @@ COPY scripts/ scripts/
 # Install dependencies
 RUN uv sync --no-dev
 
-# Default command runs the cleanup script
-CMD ["uv", "run", "python", "scripts/cleanup_old_datasets.py"]
+# No default CMD - specify the maintenance script when running the container
+# Example: docker run <image> uv run python scripts/cleanup_old_datasets.py --dry-run

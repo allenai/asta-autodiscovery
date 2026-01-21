@@ -8,11 +8,6 @@ Deletes user-uploaded dataset files older than 7 days from GCS to comply with da
 - Files matching: `gs://example-gcp-project/users/*/jobs/*/data/*`
 - Older than 7 days (based on GCS creation time)
 
-**What it preserves:**
-- Job results: `users/*/jobs/*/output/*`
-- Metadata: `users/*/jobs/*/metadata.json`
-- Run details: `users/*/jobs/*/run_details.json`
-
 ### Usage
 
 **Test with dry run:**
@@ -25,51 +20,59 @@ uv run python scripts/cleanup_old_datasets.py --dry-run
 uv run python scripts/cleanup_old_datasets.py
 ```
 
-**Custom bucket or age:**
+**Custom age:**
 ```bash
-uv run python scripts/cleanup_old_datasets.py --bucket my-bucket --max-age-days 3
+uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 ```
 
-### Deployment Options
+### Deployment
 
-#### Option 1: Cloud Scheduler + Cloud Run Job (Recommended)
+This script is deployed as a Cloud Run Job triggered by Cloud Scheduler.
+
+#### Setup
 
 1. **Build and push container:**
    ```bash
-   gcloud builds submit --tag gcr.io/PROJECT_ID/dataset-cleanup
+   gcloud builds submit --tag gcr.io/example-legacy-project/autodiscovery-dataset-cleanup --file scripts/Dockerfile .
    ```
+
+   This builds from the repo root using the Dockerfile in scripts/.
 
 2. **Create Cloud Run Job:**
    ```bash
-   gcloud run jobs create dataset-cleanup \
-     --image gcr.io/PROJECT_ID/dataset-cleanup \
+   gcloud run jobs create autodiscovery-dataset-cleanup \
+     --image gcr.io/example-legacy-project/autodiscovery-dataset-cleanup \
      --region us-west1 \
-     --service-account autodiscovery-sa@PROJECT_ID.iam.gserviceaccount.com \
-     --command "python" \
-     --args "scripts/cleanup_old_datasets.py"
+     --command "uv" \
+     --args "run,python,scripts/cleanup_old_datasets.py,--dry-run"
    ```
+
+   Note: Currently configured with `--dry-run` for safety. Remove `--dry-run` from args once validated. Uses the default compute service account. Add `--service-account <email>` if you need a specific service account.
 
 3. **Schedule with Cloud Scheduler:**
    ```bash
-   gcloud scheduler jobs create http dataset-cleanup-schedule \
+   project_number=$(gcloud projects describe example-legacy-project --format="value(projectNumber)")
+   gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule \
      --location us-west1 \
      --schedule "0 2 * * *" \
-     --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/PROJECT_ID/jobs/dataset-cleanup:run" \
+     --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup:run" \
      --http-method POST \
-     --oauth-service-account-email autodiscovery-sa@PROJECT_ID.iam.gserviceaccount.com
+     --oidc-service-account-email ${project_number}-compute@developer.gserviceaccount.com
    ```
 
-   This runs daily at 2 AM.
+   This runs daily at 2 AM. Replace `<PROJECT_NUMBER>` with your GCP project number (find with ``).
 
-#### Option 2: Cloud Function
+#### Updating
 
-Deploy as a Cloud Function triggered by Cloud Scheduler (simpler but less flexible).
-
-#### Option 3: Manual/Cron
-
-Run manually or via cron on a VM:
+To update the script:
 ```bash
-0 2 * * * cd /path/to/repo && uv run python scripts/cleanup_old_datasets.py
+# Rebuild and push
+gcloud builds submit --tag gcr.io/example-legacy-project/autodiscovery-dataset-cleanup --file scripts/Dockerfile .
+
+# Update the job to use the new image
+gcloud run jobs update autodiscovery-dataset-cleanup \
+  --image gcr.io/example-legacy-project/autodiscovery-dataset-cleanup \
+  --region us-west1
 ```
 
 ### Required Permissions

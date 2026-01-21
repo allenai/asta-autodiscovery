@@ -530,3 +530,90 @@ def calculate_job_credits(
     used = job_stats.num_experiments_completed
     pending = job_stats.num_experiments_pending
     return (used, pending)
+
+
+def list_experiment_files(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
+    """List all experiment node files in a job's output directory.
+
+    Lists files matching the pattern: mcts_node_{level}_{index}.json
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of filenames (not full paths)
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If listing fails
+    """
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    prefix = f"users/{userid}/jobs/{jobid}/output/"
+    pattern = re.compile(r"mcts_node_\d+_\d+\.json$")
+
+    try:
+        blobs = bucket.list_blobs(prefix=prefix)
+        filenames = []
+        for blob in blobs:
+            filename = blob.name.split("/")[-1]
+            if pattern.match(filename):
+                filenames.append(filename)
+        return sorted(filenames)
+    except Exception as e:
+        raise GCSError(f"Failed to list experiment files for job {jobid}: {e}")
+
+
+def read_experiment_node(
+    userid: str, jobid: str, filename: str, config: JobConfig | None = None
+) -> dict | None:
+    """Read and parse a single experiment node JSON file.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        filename: Experiment node filename (e.g., "mcts_node_0_0.json")
+        config: Configuration (uses default if None)
+
+    Returns:
+        Dictionary containing parsed node data, or None if file doesn't exist or parsing fails
+
+    Example:
+        >>> node = read_experiment_node("user123", "job456", "mcts_node_0_0.json")
+        >>> node.get("id")
+        "node_0_0"
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    blob_path = f"users/{userid}/jobs/{jobid}/output/{filename}"
+
+    try:
+        blob = bucket.blob(blob_path)
+        if not blob.exists():
+            import logging
+
+            logging.warning(f"Experiment node file not found: {filename} for job {jobid}")
+            return None
+
+        content = blob.download_as_text()
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        import logging
+
+        logging.warning(f"Invalid JSON in {filename} for job {jobid}: {e}")
+        return None
+    except Exception as e:
+        import logging
+
+        logging.error(f"Failed to read experiment node {filename} for job {jobid}: {e}")
+        return None

@@ -15,6 +15,7 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from utils.auth import requires_enrollment
+from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import ExperimentModel, GetExperimentStatusResponseModel, GetRunExperimentsResponseModel
@@ -551,29 +552,54 @@ def create() -> Blueprint:
             runid: Run identifier
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
         """
-        # userid = request.user.get("sub")
+        userid = request.user.get("sub")
 
-        resp = GetRunExperimentsResponseModel(
-            run_id=runid,
-            after_experiment_id=after_experiment_id,
-            experiments=[],
-        )
-        return jsonify(resp.model_dump())
+        try:
+            tree = ExperimentTree.load(userid, runid)
+            experiments = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+
+            resp = GetRunExperimentsResponseModel(
+                run_id=runid,
+                after_experiment_id=after_experiment_id,
+                experiments=experiments,
+            )
+            return jsonify(resp.model_dump())
+        except Exception as e:
+            current_app.logger.error(f"Failed to load experiments for run {runid}: {e}")
+            # Return empty list on error to gracefully handle missing/incomplete runs
+            resp = GetRunExperimentsResponseModel(
+                run_id=runid,
+                after_experiment_id=after_experiment_id,
+                experiments=[],
+            )
+            return jsonify(resp.model_dump())
 
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
     def get_experiment_details(runid: str, experiment_id: str):
         """Fetch details about a specific experiment within a run."""
-        # userid = request.user.get("sub")
+        userid = request.user.get("sub")
 
-        experiment = None  # TODO: Replace with actual fetching logic
+        try:
+            tree = ExperimentTree.load(userid, runid)
+            node = tree.get_node(experiment_id)
 
-        resp = GetExperimentStatusResponseModel(
-            run_id=runid,
-            experiment_id=experiment_id,
-            experiment=experiment,
-        )
-        return jsonify(resp.model_dump())
+            experiment = node.to_experiment_model() if node else None
+
+            resp = GetExperimentStatusResponseModel(
+                run_id=runid,
+                experiment_id=experiment_id,
+                experiment=experiment,
+            )
+            return jsonify(resp.model_dump())
+        except Exception as e:
+            current_app.logger.error(f"Failed to load experiment {experiment_id} for run {runid}: {e}")
+            resp = GetExperimentStatusResponseModel(
+                run_id=runid,
+                experiment_id=experiment_id,
+                experiment=None,
+            )
+            return jsonify(resp.model_dump())
 
     @api.route("/<runid>/cancel", methods=["POST"])
     @requires_enrollment

@@ -2,10 +2,16 @@ import { BaseApi } from '@/api/BaseApi';
 
 const USER_URL_PREFIX = '/api/user';
 
-export interface GetViewerUserResponseBody {
-    userid: string;
-    email: string;
+export interface User {
+    sub: string;
     name: string;
+    email: string;
+    picture: string;
+    email_verified: boolean;
+}
+
+export interface GetViewerUserResponseBody {
+    user: User;
 }
 
 export interface ViewerCredits {
@@ -20,6 +26,14 @@ export interface GetViewerCreditsResponseBody {
     credits: ViewerCredits;
 }
 
+export interface GetViewerEnrollmentResponseBody {
+    enrolled: boolean;
+    enrollment_date: string | null;
+    status: string | null;
+    experiments_count: number | null;
+    user_id: string | null;
+}
+
 export class UserApi extends BaseApi {
     async getViewer() {
         return this.request<GetViewerUserResponseBody>({
@@ -28,6 +42,12 @@ export class UserApi extends BaseApi {
         });
     }
 
+    async getViewerEnrollmentStatus() {
+        return this.request<GetViewerEnrollmentResponseBody>({
+            url: `${USER_URL_PREFIX}/me/enrollment-status`,
+            method: 'GET',
+        });
+    }
     async getViewerCredits() {
         return this.request<GetViewerCreditsResponseBody>({
             url: `${USER_URL_PREFIX}/me/credits`,

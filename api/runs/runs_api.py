@@ -538,6 +538,26 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @api.route("/<runid>/experiments/status", methods=["GET"])
+    @requires_enrollment
+    def get_experiments_status(runid: str):
+        """Fetch details about the experiments within a run. This is used to build
+        the experiments table in the UI.
+        """
+        # userid = request.user.get("sub")
+
+
+        return jsonify({"runid": runid})
+
+    @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
+    @requires_enrollment
+    def get_experiment_details(runid: str, experiment_id: str):
+        """Fetch details about a specific experiment within a run."""
+        # userid = request.user.get("sub")
+
+
+        return jsonify({"runid": runid, "experiment_id": experiment_id})
+
     @api.route("/<runid>/cancel", methods=["POST"])
     @requires_enrollment
     def cancel_run(runid: str):

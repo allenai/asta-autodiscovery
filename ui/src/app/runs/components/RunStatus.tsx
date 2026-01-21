@@ -15,8 +15,8 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CancelIcon from '@mui/icons-material/Cancel';
 
-import { useAuth0 } from '@/contexts/Auth0Context';
-import { getRunStatus, cancelRun, type RunDetails } from '../actions';
+import { getRunsApi } from '@/api/RunsApi';
+import { RunDetails, getRunFromApi } from '@/types/Run';
 
 interface RunStatusProps {
     runid: string;
@@ -33,7 +33,7 @@ interface RunStatusProps {
  * - Auto-refresh every 30 seconds for active runs
  */
 export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
-    const { getAccessToken } = useAuth0();
+    const api = getRunsApi();
 
     const [runDetails, setRunDetails] = useState<RunDetails | null>(null);
     const [executionStatus, setExecutionStatus] = useState<Record<string, unknown> | null>(null);
@@ -51,11 +51,11 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         setError(null);
 
         try {
-            const token = await getAccessToken();
-            const response = await getRunStatus(runid, token);
+            const response = await api.getRunStatus(runid);
+            const run = getRunFromApi(response.data);
 
-            setRunDetails(response.run_details);
-            setExecutionStatus(response.execution_status || null);
+            setRunDetails(run.details);
+            setExecutionStatus(run.executionStatus || null);
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
@@ -95,8 +95,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         setError(null);
 
         try {
-            const token = await getAccessToken();
-            await cancelRun(runid, token);
+            await api.cancelRun(runid);
 
             // Refresh status
             await fetchStatus(true);
@@ -191,7 +190,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                         <Typography
                             variant="body2"
                             sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mt: 0.5 }}>
-                            {runDetails.execution_id || 'Not submitted yet'}
+                            {runDetails.executionId || 'Not submitted yet'}
                         </Typography>
                     </Box>
 
@@ -200,17 +199,17 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                             Created At
                         </Typography>
                         <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {new Date(runDetails.created_at).toLocaleString()}
+                            {new Date(runDetails.createdAt).toLocaleString()}
                         </Typography>
                     </Box>
 
-                    {runDetails.status_checked_at && (
+                    {runDetails.statusCheckedAt && (
                         <Box>
                             <Typography variant="caption" color="text.secondary">
                                 Last Checked
                             </Typography>
                             <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                {new Date(runDetails.status_checked_at).toLocaleString()}
+                                {new Date(runDetails.statusCheckedAt).toLocaleString()}
                             </Typography>
                         </Box>
                     )}

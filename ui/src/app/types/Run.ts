@@ -1,8 +1,8 @@
 import {
     RunDetailsFromApi,
-    PostCreateRunResponseBody,
     ExperimentSummaryFromApi,
     ExperimentDetailedFromApi,
+    RunResponseBody,
 } from '@/api/RunsApi';
 
 export type Run = {
@@ -10,6 +10,7 @@ export type Run = {
     name: string;
     path: string;
     details: RunDetails | null;
+    executionStatus?: Record<string, unknown> | null;
 };
 
 export type RunDetails = {
@@ -40,12 +41,13 @@ export type ExperimentDetailed = {
     review: string | null;
 };
 
-export const getRunFromApi = (responseBody: PostCreateRunResponseBody): Run => {
+export const getRunFromApi = (responseBody: RunResponseBody): Run => {
     return {
         id: responseBody.runid,
         name: '', // TODO: Populate name when available from API
         path: responseBody.path || '',
         details: getRunDetailsFromApi(responseBody.run_details),
+        executionStatus: responseBody.execution_status || null,
     };
 };
 

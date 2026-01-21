@@ -27,16 +27,23 @@ uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 
 ### Deployment
 
-This script is deployed as a Cloud Run Job triggered by Cloud Scheduler.
+This script is deployed as a Cloud Run Job triggered by Cloud Scheduler in the `example-legacy-project` GCP project.
+
+**Setup your environment:**
+```bash
+# Set the default GCP project (or add to .envrc for direnv)
+export CLOUDSDK_CORE_PROJECT=example-legacy-project
+```
 
 #### Setup
 
 1. **Build and push container:**
    ```bash
-   gcloud builds submit .
+   docker build --platform linux/amd64 -t gcr.io/example-legacy-project/autodiscovery-dataset-cleanup -f scripts/Dockerfile .
+   docker push gcr.io/example-legacy-project/autodiscovery-dataset-cleanup
    ```
 
-   This uses `cloudbuild.yaml` (at repo root) which builds from the Dockerfile in `scripts/Dockerfile`.
+   Note: `--platform linux/amd64` is required for Cloud Run compatibility (especially when building on Apple Silicon).
 
 2. **Create Cloud Run Job:**
    ```bash
@@ -67,7 +74,8 @@ This script is deployed as a Cloud Run Job triggered by Cloud Scheduler.
 To update the script:
 ```bash
 # Rebuild and push
-gcloud builds submit .
+docker build --platform linux/amd64 -t gcr.io/example-legacy-project/autodiscovery-dataset-cleanup -f scripts/Dockerfile .
+docker push gcr.io/example-legacy-project/autodiscovery-dataset-cleanup
 
 # Cloud Run jobs automatically pull the latest image, but you can force an update:
 gcloud run jobs update autodiscovery-dataset-cleanup \

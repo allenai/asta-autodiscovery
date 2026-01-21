@@ -10,8 +10,8 @@ COPY pyproject.toml .
 COPY packages/ packages/
 COPY scripts/ scripts/
 
-# Install dependencies
-RUN uv sync --no-dev
+# Install dependencies (including workspace packages)
+RUN uv sync --all-packages --no-dev
 
 # No default CMD - specify the maintenance script when running the container
 # Example: docker run <image> uv run python scripts/cleanup_old_datasets.py --dry-run

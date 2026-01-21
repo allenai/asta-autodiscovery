@@ -9,11 +9,12 @@ export interface RunDetailsFromApi {
     status_checked_at: string | null;
 }
 
-export interface PostCreateRunResponseBody {
+export interface RunResponseBody {
     runid: string;
     path: string;
     message: string;
     run_details?: RunDetailsFromApi;
+    execution_status?: Record<string, unknown>;
 }
 
 export interface GetAllRunsResponseBody {
@@ -54,7 +55,7 @@ export interface GetRunExperimentDetailsResponseBody {
 
 export class RunsApi extends BaseApi {
     async createRun() {
-        return this.request<PostCreateRunResponseBody>({
+        return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/create`,
             method: 'POST',
         });
@@ -100,7 +101,27 @@ export class RunsApi extends BaseApi {
             method: 'GET',
         });
     }
-}
 
+    async getRun(runId: string) {
+        return this.request<RunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${runId}`,
+            method: 'GET',
+        });
+    }
+
+    async getRunStatus(runId: string) {
+        return this.request<RunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${runId}/status`,
+            method: 'GET',
+        });
+    }
+
+    async cancelRun(runId: string) {
+        return this.request<void>({
+            url: `${RUNS_URL_PREFIX}/${runId}/cancel`,
+            method: 'POST',
+        });
+    }
+}
 const api = new RunsApi();
 export const getRunsApi = () => api;

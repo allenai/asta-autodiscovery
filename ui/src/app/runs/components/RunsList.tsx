@@ -52,8 +52,8 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
         setError(null);
 
         try {
-            const runsList = await api.listRuns();
-            setRuns(runsList.data.runs);
+            const { data } = await api.listRuns();
+            setRuns(data.runs);
         } catch (err) {
             console.error('Error fetching runs:', err);
             setError(err instanceof Error ? err.message : 'Failed to load runs');

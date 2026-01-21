@@ -70,7 +70,7 @@ class ExperimentNode:
         self.parent: ExperimentNode | None = None
         self.children: list[ExperimentNode] = []
 
-    def to_experiment_model(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert node to ExperimentModel dict for API response.
 
         Returns:
@@ -261,7 +261,7 @@ class ExperimentTree:
             List of dictionaries matching ExperimentModel schema
         """
         nodes = self.as_list(after_experiment_id=after_experiment_id)
-        return [node.to_experiment_model() for node in nodes]
+        return [node.to_dict() for node in nodes]
 
     def __len__(self) -> int:
         """Return number of nodes in tree."""

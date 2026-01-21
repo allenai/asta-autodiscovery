@@ -103,7 +103,7 @@ def get_user_credits_granted(userid: str) -> int:  # pylint: disable=unused-argu
         >>> credits_granted = get_user_credits_granted("user123")
         >>> print(f"User has {credits_granted} total credits")
     """
-    # TODO: Query database or config service for per-user credit allocation
+    # TODO: (#2316) Query database or config service for per-user credit allocation
     # return db.query_user_credits(userid)
     return DEFAULT_CREDITS_GRANTED
 

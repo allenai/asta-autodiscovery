@@ -17,6 +17,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { RunDetails, getRunFromApi } from '@/types/Run';
+import RunExperiments from './RunExperiments';
 
 interface RunStatusProps {
     runid: string;
@@ -159,6 +160,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
 
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
+            <RunExperiments runId={runid} />
             <Typography variant="h5" gutterBottom>
                 Run Status
             </Typography>

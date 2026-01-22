@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field
 
 
-
 class ExperimentModel(BaseModel):
     """Model representing an experiment with its attributes"""
 
@@ -35,10 +34,10 @@ class GetRunExperimentsResponseModel(BaseModel):
     after_experiment_id: str | None = Field(
         None, description="Experiment ID after which experiments are fetched"
     )
-    has_job_completed: bool = Field(..., description="Flag indicating if the job has completed, polling can stop")
-    experiments: list[ExperimentModel] = Field(
-        ..., description="List of experiments in the run"
+    has_job_completed: bool = Field(
+        ..., description="Flag indicating if the job has completed, polling can stop"
     )
+    experiments: list[ExperimentModel] = Field(..., description="List of experiments in the run")
 
 
 class GetExperimentStatusResponseModel(BaseModel):

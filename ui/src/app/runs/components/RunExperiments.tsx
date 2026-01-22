@@ -22,7 +22,7 @@ const columns: GridColDef[] = [
 
 export default function RunExperiments({ runId }: RunExperimentsProps) {
     const api = getRunsApi();
-    const [experiments, setExperiments] = useState<Experiment[]>([]);
+    const [experiments, setExperiments] = useState<Experiment[]>([]); // eslint-disable-line @typescript-eslint/no-unused-vars
     const [rows, setRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -45,7 +45,9 @@ export default function RunExperiments({ runId }: RunExperimentsProps) {
             const newExperiments = data.experiments.map((experimentFromApi) =>
                 getExperimentFromApi(experimentFromApi)
             );
+            setExperiments((prevExperiments) => [...prevExperiments, ...newExperiments]);
 
+            // Convert to rows for DataGrid
             const newRows = newExperiments.map((experiment) => ({
                 id: experiment.experimentId,
                 hypothesis: experiment.hypothesis ?? 'N/A',
@@ -54,12 +56,11 @@ export default function RunExperiments({ runId }: RunExperimentsProps) {
                 creationIdx: experiment.creationIdx,
                 runtimeMs: experiment.runtimeMs ?? 'N/A',
             }));
+            setRows((prevRows) => [...prevRows, ...newRows]);
 
-            setExperiments((prevExperiments) => [...prevExperiments, ...newExperiments]);
+            // Update the last known experiment ID for the next poll
             pollingStateRef.current.lastKnownExperimentId =
                 newExperiments.at(-1)?.experimentId ?? null;
-
-            setRows((prevRows) => [...prevRows, ...newRows]);
             if (data.has_job_completed) {
                 pollingStateRef.current.hasRunCompleted = true;
             }

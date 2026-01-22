@@ -13,6 +13,10 @@ WORKDIR /api
 COPY packages/autodiscovery_jobs /tmp/autodiscovery_jobs
 RUN pip install /tmp/autodiscovery_jobs
 
+# Copy and install devtools package (for replay functionality)
+COPY packages/devtools /tmp/devtools
+RUN pip install /tmp/devtools
+
 # Install Python dependencies
 COPY api/requirements.txt .
 RUN pip install -r requirements.txt

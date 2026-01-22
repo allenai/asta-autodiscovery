@@ -54,6 +54,11 @@ interface UseRunSetupProps {
     onSubmitSuccess: () => void;
 }
 
+export interface SelectedFile {
+    file: File;
+    description: string;
+}
+
 export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const { getAccessToken } = useAuth0();
     const { credits } = useViewerCredits();
@@ -62,7 +67,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     // Dataset upload state
     const [datasets, setDatasets] = useState<Dataset[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -97,16 +102,23 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const [error, setError] = useState<string | null>(null);
 
     const handleFileSelect = (file: File) => {
-        console.log(file);
         if (file) {
-            setSelectedFiles((prev) => [...prev, file]);
+            setSelectedFiles((prev) => [...prev, { file, description: '' }]);
             setUploadError(null);
         }
     };
 
+    const handleFileDescriptionChange = (index: number, description: string) => {
+        setSelectedFiles((prev) =>
+            prev.map((selectedFile, i) =>
+                i === index ? { ...selectedFile, description } : selectedFile
+            )
+        );
+    };
+
     const handleUploadDataset = async () => {
         if (selectedFiles.length === 0 || !metadata.datasetDescription.trim()) {
-            setUploadError('Please select files and provide an intent');
+            setUploadError('Please select files and provide a description');
             return;
         }
 
@@ -117,9 +129,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             const token = await getAccessToken();
 
             // Upload all selected files
-            for (const file of selectedFiles) {
+            for (const selectedFile of selectedFiles) {
                 const formData = new FormData();
-                formData.append('file', file);
+                formData.append('file', selectedFile.file);
                 formData.append('runid', runid);
 
                 const response = await uploadDataset(formData, token);
@@ -127,7 +139,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                 // Add to datasets list
                 const newDataset: Dataset = {
                     filename: response.filename,
-                    description: metadata.datasetDescription.trim(),
+                    description: selectedFile.description.trim(),
                     path: response.path,
                 };
 
@@ -201,7 +213,17 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             errors.datasets = 'Please upload at least one dataset';
         }
 
-        if (Object.keys(errors).length > 0) {
+        // Validate that all selected files have descriptions
+        if (selectedFiles.length > 0) {
+            const filesWithoutDescription = selectedFiles.filter(
+                (file) => !file.description.trim()
+            );
+            if (filesWithoutDescription.length > 0) {
+                setUploadError('Please provide a description for all selected files');
+            }
+        }
+
+        if (Object.keys(errors).length > 0 || uploadError) {
             setFieldErrors(errors);
             setError('Please fill in all required fields');
             return;
@@ -218,6 +240,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         try {
             const token = await getAccessToken();
+            // upload files
+            handleUploadDataset();
 
             // Prepare metadata
             const submissionMetadata = {
@@ -286,6 +310,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         // Handlers
         handleFileSelect,
+        handleFileDescriptionChange,
         handleUploadDataset,
         handleRemoveDataset,
         handleRemoveSelectedFile,

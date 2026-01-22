@@ -3,7 +3,7 @@ import { Box, CircularProgress, Typography, styled } from '@mui/material';
 import { RunSummary } from '@/runs/components/RunSummary';
 import { useRuns } from '@/contexts/RunsContext';
 
-export const ExamplesBox = () => {
+export const ExamplesRunsBox = () => {
     const { exampleRuns, isExampleRunsLoading } = useRuns();
     return (
         <>

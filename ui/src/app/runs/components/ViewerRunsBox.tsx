@@ -4,7 +4,7 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 import { useRuns } from '@/contexts/RunsContext';
 import { RunSummary } from '@/runs/components/RunSummary';
 
-export const RunsBox = () => {
+export const ViewerRunsBox = () => {
     const { viewerRuns, isViewerRunsLoading } = useRuns();
     return (
         <>

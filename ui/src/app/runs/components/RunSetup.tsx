@@ -407,7 +407,7 @@ const StyledAccordian = styled(Accordion)(({ theme }) => ({
         padding: 0,
     },
 
-    '.MuiAccordionSummary-content, .Mui-expanded': {
+    '.MuiAccordionSummary-content, .MuiAccordionSummary-content.Mui-expanded': {
         flexGrow: 0,
         marginRight: theme.spacing(0.75),
     },

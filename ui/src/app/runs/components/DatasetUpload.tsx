@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useRef, DragEvent } from 'react';
-import { Box, Chip, Stack, Typography, styled, alpha } from '@mui/material';
+import { Box, Stack, Typography, styled, alpha, TextField, IconButton } from '@mui/material';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
-import DescriptionIcon from '@mui/icons-material/Description';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import CloseIcon from '@mui/icons-material/Close';
+
+import { SelectedFile } from '../hooks/useRunSetup';
 
 export interface Dataset {
     filename: string;
@@ -13,10 +16,11 @@ export interface Dataset {
 
 interface DatasetUploadProps {
     datasets: Dataset[];
-    selectedFiles: File[];
+    selectedFiles: SelectedFile[];
     onFileSelect: (file: File) => void;
     onRemove: (index: number) => void;
     onRemoveSelectedFile: (index: number) => void;
+    onDescriptionChange: (index: number, description: string) => void;
     disabled?: boolean;
     error?: string;
 }
@@ -34,8 +38,8 @@ export default function DatasetUpload({
     datasets,
     selectedFiles,
     onFileSelect,
-    onRemove,
     onRemoveSelectedFile,
+    onDescriptionChange,
     disabled = false,
     error,
 }: DatasetUploadProps) {
@@ -118,33 +122,52 @@ export default function DatasetUpload({
                         ? 'Drop file here'
                         : 'Click, or drag & drop to add datasets to explore'}
                 </Typography>
-                <Typography variant="caption" sx={{ mt: 1, opacity: 0.5 }}>
+                <Typography variant="caption" sx={{ mt: 1, opacity: 0.6 }}>
                     Supported formats: CSV, JSON, TXT, TSV
                 </Typography>
             </DropZone>
 
             {(selectedFiles.length > 0 || datasets.length > 0) && (
-                <ChipsContainer>
-                    {selectedFiles.map((file, index) => (
-                        <StyledChip
-                            key={`selected-${index}`}
-                            icon={<DescriptionIcon />}
-                            label={file.name}
-                            onDelete={disabled ? undefined : () => onRemoveSelectedFile(index)}
-                            disabled={disabled}
-                            color="default"
-                        />
-                    ))}
-                    {datasets.map((dataset, index) => (
-                        <UploadedChip
-                            key={`dataset-${index}`}
-                            icon={<DescriptionIcon />}
-                            label={dataset.filename}
-                            onDelete={disabled ? undefined : () => onRemove(index)}
-                            disabled={disabled}
-                        />
-                    ))}
-                </ChipsContainer>
+                <FilesContainer>
+                    {selectedFiles.map((selectedFile, index) => {
+                        const fileSizeMB = (selectedFile.file.size / (1024 * 1024)).toFixed(2);
+                        const fileType = selectedFile.file.type || 'Unknown';
+
+                        return (
+                            <File key={`selected-${index}`}>
+                                <FileHeader>
+                                    <DescriptionOutlinedIcon />
+                                    <Typography variant="subtitle2">
+                                        {selectedFile.file.name}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        {fileType} • {fileSizeMB} MB
+                                    </Typography>
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => onRemoveSelectedFile(index)}
+                                        sx={{ ml: 'auto' }}>
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                </FileHeader>
+                                <FileDescription>
+                                    <DatasetSchemaTitle>Dataset Schema</DatasetSchemaTitle>
+                                    Describe the structure of your dataset including column names
+                                    and what each field represents. The more information the better.
+                                    <TextField
+                                        multiline
+                                        maxRows={3}
+                                        fullWidth
+                                        value={selectedFile.description}
+                                        onChange={(e) => onDescriptionChange(index, e.target.value)}
+                                        sx={{ mt: 1 }}
+                                        placeholder='e.g., "patient_id" - unique patient identifier, "age" - patient age in years'
+                                    />
+                                </FileDescription>
+                            </File>
+                        );
+                    })}
+                </FilesContainer>
             )}
         </Box>
     );
@@ -179,43 +202,51 @@ const DropZone = styled(Box)<{ isDragging: boolean; disabled: boolean; hasError:
     })
 );
 
-const ChipsContainer = styled(Stack)(({ theme }) => ({
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+const FilesContainer = styled(Stack)(({ theme }) => ({
+    flexDirection: 'column',
     gap: theme.spacing(1),
     marginTop: theme.spacing(2),
 }));
 
-const StyledChip = styled(Chip)(({ theme }) => ({
+const File = styled(Box)(({ theme }) => ({
     backgroundColor: theme.color['cream-10'].rgba.toString(),
-    color: theme.color['cream-100'].hex,
     borderRadius: theme.shape.borderRadius,
+    color: theme.color['cream-100'].hex,
+}));
 
-    '& .MuiChip-icon': {
-        color: theme.color['cream-60'].rgba.toString(),
+const FileHeader = styled(Box)(({ theme }) => ({
+    alignItems: 'center',
+    borderBottom: `1px solid ${theme.color['cream-10'].rgba.toString()}`,
+    color: theme.color['cream-60'].rgba.toString(),
+    display: 'flex',
+    gap: theme.spacing(1),
+    padding: theme.spacing(2),
+
+    h6: {
+        fontSize: '1rem',
+        fontWeight: 'bold',
     },
 
-    '& .MuiChip-deleteIcon': {
-        color: theme.color['cream-60'].rgba.toString(),
+    '.MuiSvgIcon-root': {
+        color: theme.color['cream-50'].rgba.toString(),
+    },
+
+    '.MuiIconButton-root': {
+        color: theme.color['cream-50'].rgba.toString(),
         '&:hover': {
+            backgroundColor: alpha(theme.color['cream-50'].rgba.toString(), 0.1),
             color: theme.color['cream-100'].hex,
         },
     },
 }));
 
-const UploadedChip = styled(Chip)(({ theme }) => ({
-    backgroundColor: alpha(theme.color['green-100'].hex, 0.15),
-    color: theme.color['green-100'].hex,
-    borderRadius: theme.shape.borderRadius,
+const FileDescription = styled(Box)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    fontSize: '0.875rem',
+    padding: theme.spacing(2),
+}));
 
-    '& .MuiChip-icon': {
-        color: theme.color['green-100'].hex,
-    },
-
-    '& .MuiChip-deleteIcon': {
-        color: theme.color['green-100'].hex,
-        '&:hover': {
-            color: theme.color['green-60'].hex,
-        },
-    },
+const DatasetSchemaTitle = styled(Typography)(({ theme }) => ({
+    color: theme.color['green-40'].hex,
+    fontWeight: 'bold',
 }));

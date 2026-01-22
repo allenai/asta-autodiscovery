@@ -19,7 +19,6 @@ import {
     AccordionSummary,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
 
 import { BELIEF_MODES, MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
@@ -53,7 +52,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         error,
         updateMetadata,
         handleFileSelect,
-        handleUploadDataset,
+        handleFileDescriptionChange,
         handleRemoveDataset,
         handleRemoveSelectedFile,
         handleExperimentsChange,
@@ -153,23 +152,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         onFileSelect={handleFileSelect}
                         onRemove={handleRemoveDataset}
                         onRemoveSelectedFile={handleRemoveSelectedFile}
+                        onDescriptionChange={handleFileDescriptionChange}
                         disabled={uploading || submitting}
                         error={fieldErrors.datasets}
                     />
-                    {selectedFiles.length > 0 && (
-                        <Button
-                            variant="contained"
-                            onClick={handleUploadDataset}
-                            disabled={uploading || submitting || !metadata.intent.trim()}
-                            startIcon={
-                                uploading ? <CircularProgress size={16} /> : <CloudUploadIcon />
-                            }
-                            sx={{ mt: 2 }}>
-                            {uploading
-                                ? 'Uploading...'
-                                : `Upload ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}`}
-                        </Button>
-                    )}
+
                     {uploadError && (
                         <Alert severity="error" sx={{ mt: 2 }}>
                             {uploadError}
@@ -339,7 +326,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 disabled={
                     submitting ||
                     uploading ||
-                    datasets.length === 0 ||
+                    selectedFiles.length === 0 ||
                     !!experimentsError ||
                     metadata.nExperiments < 1
                 }>

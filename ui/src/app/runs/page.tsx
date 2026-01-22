@@ -4,8 +4,8 @@ import { Box, CircularProgress, Alert, styled } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { IntroBox } from '@/runs/components/IntroBox';
-import { ExamplesBox } from '@/runs/components/ExamplesBox';
-import { RunsBox } from '@/runs/components/RunsBox';
+import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
+import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
@@ -41,10 +41,10 @@ export default function RunsPage() {
                 <IntroBox />
             </Section>
             <Section>
-                <RunsBox />
+                <ViewerRunsBox />
             </Section>
             <Section>
-                <ExamplesBox />
+                <ExamplesRunsBox />
             </Section>
         </Layout>
     );

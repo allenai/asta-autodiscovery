@@ -82,4 +82,9 @@ const MainContent = styled(Grid)`
 
 const Logo = styled('div')`
     padding: ${({ theme }) => theme.spacing(2)};
+
+    svg {
+        width: 100%;
+        height: auto;
+    }
 `;

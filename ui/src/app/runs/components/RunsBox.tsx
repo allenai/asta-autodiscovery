@@ -22,6 +22,7 @@ export const RunsBox = () => {
     );
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Header = styled('div')(({ theme }) => ({
     display: 'flex',
     alignItems: 'center',
@@ -37,6 +38,7 @@ const Wrapper = styled(Box)(({ theme }) => ({
     marginTop: theme.spacing(1),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Headline = styled(Typography)(({ theme }) => ({
     color: '#0FCB8C',
     fontSize: 24,
@@ -45,9 +47,9 @@ const Headline = styled(Typography)(({ theme }) => ({
     lineHeight: '115%',
 }));
 
-const RunItem = styled('div')(({ theme }) => ({
-    marginBottom: theme.spacing(2),
-}));
+// const RunItem = styled('div')(({ theme }) => ({
+//     marginBottom: theme.spacing(2),
+// }));
 
 const CreateRunButton = styled(Button)`
     background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};

@@ -2,9 +2,6 @@
 
 import { Box, Grid, styled } from '@mui/material';
 
-import { IconAutoDSLogo } from '@/icons/Logo';
-import Header from '@/components/Header';
-
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
  */
@@ -35,20 +32,7 @@ const Wrapper = styled(Box)`
     overflow: hidden;
 `;
 
-const Sidebar = styled(Grid)`
-    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
-    border-right: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: auto;
-`;
-
 const MainContent = styled(Grid)`
     height: 100%;
     overflow: auto;
-`;
-
-const Logo = styled('div')`
-    padding: ${({ theme }) => theme.spacing(2)};
 `;

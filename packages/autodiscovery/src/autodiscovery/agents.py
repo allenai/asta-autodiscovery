@@ -550,7 +550,7 @@ def install(package):
         if not bucket_path:
             raise ValueError("bucket_path is required when use_modal_sandbox is True")
 
-        from autodiscovery_modal import ModalSandboxIPythonBackend
+        from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
         import modal
 
         # Parse bucket path
@@ -570,6 +570,19 @@ def install(package):
 
         # Create Modal backend
         bucket_secret = modal.Secret.from_name(secret_name)
+        sandbox_image = build_sandbox_image(
+            extra_packages=[
+                "numpy",
+                "pandas",
+                "matplotlib",
+                "matplotlib-inline",
+                "seaborn",
+                "scikit-learn",
+                "scipy",
+                "statsmodels",
+            ]
+        )
+
         backend = ModalSandboxIPythonBackend.for_bucket_prefix(
             app_name=app_name,
             bucket=bucket_name,
@@ -578,6 +591,7 @@ def install(package):
             read_only=True,
             bucket_endpoint_url=bucket_endpoint_url,
             bucket_secret=bucket_secret,
+            image=sandbox_image,
             env={"DATASET_ROOT": modal_working_dir},
         )
 

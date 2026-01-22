@@ -1,10 +1,11 @@
 import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
 import AddBoxIcon from '@mui/icons-material/AddBox';
+
 import { useRuns } from '@/contexts/RunsContext';
 import { RunSummary } from '@/runs/components/RunSummary';
 
 export const RunsBox = () => {
-    const { viewerRuns, isViewerRunsLoading, addViewerRun } = useRuns();
+    const { viewerRuns, isViewerRunsLoading } = useRuns();
     return (
         <>
             <Header>

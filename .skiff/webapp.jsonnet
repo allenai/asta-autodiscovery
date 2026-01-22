@@ -434,6 +434,15 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                     }
                                 },
                                 {
+                                    name: 'GOOGLE_GEMINI_API_KEY',
+                                    valueFrom: {
+                                        secretKeyRef: {
+                                            name: 'autodiscovery-google-gemini-api-key',
+                                            key: 'GOOGLE_GEMINI_API_KEY'
+                                        }
+                                    }
+                                },
+                                {
                                     name: 'GOOGLE_APPLICATION_CREDENTIALS',
                                     value: '/secret/autodiscovery-gcp-service-account'
                                 }

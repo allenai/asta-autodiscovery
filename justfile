@@ -27,3 +27,6 @@ adk-web:
 
 serve-docs:
   uv run mkdocs serve
+
+deploy-autodiscovery:
+  cd packages/autodiscovery && ./scripts/rebuild_and_deploy.sh

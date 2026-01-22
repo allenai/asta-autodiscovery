@@ -99,12 +99,7 @@ def discover_files(source_path: str, project_id: str | None = None) -> list[Blob
         if not filename or filename.endswith("/"):
             continue
 
-        # Only include recognized output files
-        if (filename == "args.json" or
-            filename in ["mcts_nodes.json", "mcts_nodes_all.json", "mcts_nodes.csv"] or
-            filename.startswith("mcts_node_") or
-            filename.startswith("node_")):
-            blob_infos.append(BlobInfo(filename, blob.time_created))
+        blob_infos.append(BlobInfo(filename, blob.time_created))
 
     if not blob_infos:
         raise ValueError(f"No valid output files found in {source_path}")
@@ -202,18 +197,42 @@ def replay_autodiscovery(
 
 
 if __name__ == "__main__":
-    # Example usage for testing
-    import sys
+    import argparse
 
-    if len(sys.argv) < 3:
-        print("Usage: python -m autodiscovery.replay <source_gcs_path> <target_gcs_path>")
-        print("\nExample:")
-        print("  python -m autodiscovery.replay \\")
-        print("    gs://my-bucket/users/alice/jobs/melanoma/output \\")
-        print("    gs://my-bucket/users/alice/jobs/test-123/output")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Replay an AutoDiscovery run by copying files with original timing"
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        required=True,
+        help="Source GCS path (e.g., gs://bucket/users/alice/jobs/123/output)",
+    )
+    parser.add_argument(
+        "--target",
+        type=str,
+        required=True,
+        help="Target GCS path (e.g., gs://bucket/users/bob/jobs/456/output)",
+    )
+    parser.add_argument(
+        "--time-scale",
+        type=float,
+        default=1.0,
+        help="Time scale multiplier (0.1 = 10x faster, 2.0 = 2x slower)",
+    )
+    parser.add_argument(
+        "--project-id",
+        type=str,
+        default=None,
+        help="GCP project ID (auto-detected if not provided)",
+    )
 
-    source = sys.argv[1]
-    target = sys.argv[2]
+    args = parser.parse_args()
 
-    replay_autodiscovery(source, target, verbose=True)
+    replay_autodiscovery(
+        source_path=args.source,
+        target_path=args.target,
+        project_id=args.project_id,
+        time_scale=args.time_scale,
+        verbose=True,
+    )

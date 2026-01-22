@@ -1,8 +1,11 @@
 'use client';
 
-import { Box, Typography, CircularProgress, Alert, styled } from '@mui/material';
+import { Box, CircularProgress, Alert, styled } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { IntroBox } from '@/runs/components/IntroBox';
+import { ExamplesBox } from '@/runs/components/ExamplesBox';
+import { RunsBox } from '@/runs/components/RunsBox';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
@@ -33,34 +36,29 @@ export default function RunsPage() {
     }
 
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: '100%',
-                p: 3,
-            }}>
-            <IntroBox>
-                <IntroTitle>AutoDiscovery</IntroTitle>
-                Uncover surprising insights hidden in your data. AutoDiscovery uses Bayesian
-                surprise (a measure of how much a finding shifts our beliefs) to autonomously
-                explore your datasets and identify discoveries that genuinely change what we know,
-                not just what's obvious or diverse.
-            </IntroBox>
-        </Box>
+        <Layout>
+            <Section>
+                <IntroBox />
+            </Section>
+            <Section>
+                <RunsBox />
+            </Section>
+            <Section>
+                <ExamplesBox />
+            </Section>
+        </Layout>
     );
 }
 
-const IntroBox = styled(Box)(({ theme }) => ({
-    backgroundColor: theme.color['cream-4'].rgba.toString(),
-    color: theme.color['cream-100'].hex,
-    fontSize: '1.125rem',
-    padding: theme.spacing(3),
+const Layout = styled(Box)(({ theme }) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(4),
+    padding: theme.spacing(4),
+    maxWidth: '900px',
+    margin: '0 auto',
 }));
 
-const IntroTitle = styled(Typography)(({ theme }) => ({
-    color: theme.color['green-100'].hex,
-    fontSize: '2.5rem',
-    fontWeight: 'bold',
+const Section = styled(Box)(({ theme }) => ({
+    padding: theme.spacing(3),
 }));

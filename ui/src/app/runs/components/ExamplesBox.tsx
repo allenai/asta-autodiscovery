@@ -1,22 +1,7 @@
 import { Box, Typography, styled } from '@mui/material';
-import { RunSummary } from './RunSummary';
 
-// import { Run } from '@/types/Run';
-
-export type Run = {
-    id: string;
-    name: string;
-    path: string;
-    details: RunDetails | null;
-    executionStatus?: Record<string, unknown> | null;
-};
-
-export type RunDetails = {
-    executionId: string | null;
-    createdAt: string;
-    status: string;
-    statusCheckedAt: string | null;
-};
+import { RunSummary } from '@/runs/components/RunSummary';
+import { Run } from '@/types/Run';
 
 const EXAMPLE_RUNS: Run[] = [
     {
@@ -90,6 +75,7 @@ const Wrapper = styled(Box)(({ theme }) => ({
     marginTop: theme.spacing(1),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Headline = styled(Typography)(({ theme }) => ({
     color: '#0FCB8C',
     fontSize: 24,

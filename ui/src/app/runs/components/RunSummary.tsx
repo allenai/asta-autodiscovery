@@ -1,10 +1,10 @@
 import { styled } from '@mui/material';
 import IconHub from '@mui/icons-material/HubOutlined';
 import IconError from '@mui/icons-material/Error';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { Run } from '@/types/Run';
-import Link from 'next/link';
 
 export type RunSummaryProps = {
     run: Run;
@@ -43,10 +43,13 @@ const Layout = styled('div')(({ theme }) => ({
     gap: theme.spacing(1),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const LayoutIcon = styled('div')(({ theme }) => ({}));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const LayoutContent = styled('div')(({ theme }) => ({}));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TitleLink = styled(Link)(({ theme }) => ({
     textDecoration: 'none',
     cursor: 'pointer',
@@ -56,6 +59,7 @@ const TitleLink = styled(Link)(({ theme }) => ({
     },
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Title = styled('h3')(({ theme }) => ({
     color: '#9FEAD1',
     margin: 0,
@@ -65,6 +69,7 @@ const Title = styled('h3')(({ theme }) => ({
     marginTop: '-.25em',
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const IconWrapper = styled('div')(({ theme }) => ({
     width: '20px',
     height: '20px',

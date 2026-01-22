@@ -1,13 +1,13 @@
-import { getRunsApi } from '@/api/RunsApi';
+import { Paper } from '@mui/material';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { useEffect, useState } from 'react';
+
 import {
-    ExperimentSummary,
     ExperimentDetailed,
     getExperimentSummaryFromApi,
     getExperimentDetailedFromApi,
 } from '@/types/Run';
-import { Paper } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useEffect, useState } from 'react';
+import { getRunsApi } from '@/api/RunsApi';
 
 type RunExperimentsProps = {
     runId: string;
@@ -24,8 +24,8 @@ const columns: GridColDef[] = [
 
 export default function RunExperiments({ runId }: RunExperimentsProps) {
     const api = getRunsApi();
-    const [lastExperimentIdFetched, setLastExperimentIdFetched] = useState<string | null>(null);
-    const [experiments, setExperiments] = useState<ExperimentDetailed[]>([]);
+    const [_lastExperimentIdFetched, setLastExperimentIdFetched] = useState<string | null>(null);
+    const [_experiments, setExperiments] = useState<ExperimentDetailed[]>([]);
     const [rows, setRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 

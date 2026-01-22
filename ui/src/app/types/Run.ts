@@ -1,9 +1,4 @@
-import {
-    RunDetailsFromApi,
-    ExperimentSummaryFromApi,
-    ExperimentDetailedFromApi,
-    RunResponseBody,
-} from '@/api/RunsApi';
+import { ExperimentFromApi, RunDetailsFromApi, RunResponseBody } from '@/api/RunsApi';
 
 export type Run = {
     id: string;
@@ -20,16 +15,7 @@ export type RunDetails = {
     statusCheckedAt: string | null;
 };
 
-export type ExperimentSummary = {
-    experimentId: string;
-    parentId: string | null;
-    childIds: string[] | null;
-    status: string;
-    isSurprising: boolean;
-    surprise: number | null;
-};
-
-export type ExperimentDetailed = {
+export type Experiment = {
     experimentId: string;
     parentId: string | null;
     childIds: string[] | null;
@@ -65,22 +51,7 @@ export const getRunDetailsFromApi = (detailsFromApi?: RunDetailsFromApi): RunDet
     };
 };
 
-export const getExperimentSummaryFromApi = (
-    experimentFromApi: ExperimentSummaryFromApi
-): ExperimentSummary => {
-    return {
-        experimentId: experimentFromApi.experiment_id,
-        parentId: experimentFromApi.parent_id,
-        childIds: experimentFromApi.child_ids,
-        status: experimentFromApi.status,
-        isSurprising: experimentFromApi.is_surprising,
-        surprise: experimentFromApi.surprise,
-    };
-};
-
-export const getExperimentDetailedFromApi = (
-    experimentFromApi: ExperimentDetailedFromApi
-): ExperimentDetailed => {
+export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Experiment => {
     return {
         experimentId: experimentFromApi.experiment_id,
         parentId: experimentFromApi.parent_id,

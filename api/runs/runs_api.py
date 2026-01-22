@@ -19,8 +19,7 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
-    ExperimentDetailedModel,
-    ExperimentSummaryModel,
+    ExperimentModel,
     GetExperimentStatusResponseModel,
     GetRunExperimentsResponseModel,
 )
@@ -571,15 +570,21 @@ def create() -> Blueprint:
         userid = request.user.get("sub")
         after_experiment_id = request.args.get("after_experiment_id", None)
 
+        # Get job status to determine if polling can stop
         job_manager = get_job_manager()
+        run_details = _get_run_details(userid, runid) or {}
+        has_job_completed = run_details.get("status") in ["SUCCEEDED", "FAILED", "CANCELLED"]
+
+        # Load experiment tree and convert to models
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
         experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
-        experiment_models = [ExperimentSummaryModel(**node) for node in experiment_nodes]
+        experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
         resp = GetRunExperimentsResponseModel(
             runid=runid,
             after_experiment_id=after_experiment_id,
             experiments=experiment_models,
+            has_job_completed=has_job_completed,
         )
         return jsonify(resp.model_dump()), 200
 
@@ -594,9 +599,7 @@ def create() -> Blueprint:
         node = tree.get_node(experiment_id)
 
         experiment_node = node.to_dict() if node else None
-        experiment_model = (
-            ExperimentDetailedModel(**experiment_node) if experiment_node else None
-        )
+        experiment_model = ExperimentModel(**experiment_node) if experiment_node else None
 
         resp = GetExperimentStatusResponseModel(
             runid=runid,

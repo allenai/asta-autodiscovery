@@ -21,21 +21,7 @@ export interface GetAllRunsResponseBody {
     runs: string[];
 }
 
-export interface ExperimentSummaryFromApi {
-    experiment_id: string;
-    parent_id: string | null;
-    child_ids: string[] | null;
-    status: string;
-    is_surprising: boolean;
-    surprise: number | null;
-}
-export interface GetRunExperimentsResponseBody {
-    runid: string;
-    after_experiment_id: string | null;
-    experiments: ExperimentSummaryFromApi[];
-}
-
-export interface ExperimentDetailedFromApi {
+export interface ExperimentFromApi {
     experiment_id: string;
     parent_id: string | null;
     child_ids: string[] | null;
@@ -49,10 +35,17 @@ export interface ExperimentDetailedFromApi {
     review: string | null;
 }
 
+export interface GetRunExperimentsResponseBody {
+    runid: string;
+    after_experiment_id: string | null;
+    has_job_completed: boolean;
+    experiments: ExperimentFromApi[];
+}
+
 export interface GetRunExperimentDetailsResponseBody {
     runid: string | null;
     experiment_id: string;
-    experiment: ExperimentDetailedFromApi;
+    experiment: ExperimentFromApi;
 }
 
 export class RunsApi extends BaseApi {

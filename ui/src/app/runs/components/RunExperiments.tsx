@@ -1,17 +1,15 @@
 import { Paper } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import {
-    ExperimentDetailed,
-    getExperimentSummaryFromApi,
-    getExperimentDetailedFromApi,
-} from '@/types/Run';
+import { Experiment, getExperimentFromApi } from '@/types/Run';
 import { getRunsApi } from '@/api/RunsApi';
 
 type RunExperimentsProps = {
     runId: string;
 };
+
+const DEFAULT_UPDATE_INTERVAL_MS = 15000;
 
 const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 130 },
@@ -24,46 +22,33 @@ const columns: GridColDef[] = [
 
 export default function RunExperiments({ runId }: RunExperimentsProps) {
     const api = getRunsApi();
-    const [_lastExperimentIdFetched, setLastExperimentIdFetched] = useState<string | null>(null);
-    const [_experiments, setExperiments] = useState<ExperimentDetailed[]>([]);
+    const [experiments, setExperiments] = useState<Experiment[]>([]); // eslint-disable-line @typescript-eslint/no-unused-vars
     const [rows, setRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const fetchRunExperiments = async () => {
-        setLoading(true);
+    // Keep track of details needed for polling that shouldn't trigger re-renders
+    const pollingStateRef = useRef({
+        lastKnownExperimentId: null as string | null,
+        hasRunCompleted: false,
+    });
+
+    const fetchLatestRunExperiments = async (runId: string) => {
+        if (pollingStateRef.current.hasRunCompleted) {
+            return;
+        }
         try {
-            // First, get the list of experiments
-            const { data } = await api.getRunExperiments({ runid: runId });
-            const experimentSummaries = data.experiments.map((experimentFromApi) =>
-                getExperimentSummaryFromApi(experimentFromApi)
+            // Get the list of experiments since the last one we know about
+            const { data } = await api.getRunExperiments({
+                runid: runId,
+                afterExperimentId: pollingStateRef.current.lastKnownExperimentId ?? undefined,
+            });
+            const newExperiments = data.experiments.map((experimentFromApi) =>
+                getExperimentFromApi(experimentFromApi)
             );
+            setExperiments((prevExperiments) => [...prevExperiments, ...newExperiments]);
 
-            // Then fetch detailed info for each experiment
-            const detailedExperiments = await Promise.all(
-                experimentSummaries.map(async (summary) => {
-                    try {
-                        const { data: detailData } = await api.getRunExperimentDetails({
-                            runid: runId,
-                            experimentId: summary.experimentId,
-                        });
-                        return getExperimentDetailedFromApi(detailData.experiment);
-                    } catch (error) {
-                        console.error(
-                            `Error fetching details for experiment ${summary.experimentId}:`,
-                            error
-                        );
-                        // Return null for failed fetches
-                        return null;
-                    }
-                })
-            );
-
-            // Filter out any null values from failed fetches
-            const validExperiments = detailedExperiments.filter(
-                (exp): exp is ExperimentDetailed => exp !== null
-            );
-
-            const rows = validExperiments.map((experiment) => ({
+            // Convert to rows for DataGrid
+            const newRows = newExperiments.map((experiment) => ({
                 id: experiment.experimentId,
                 hypothesis: experiment.hypothesis ?? 'N/A',
                 isSurprising: experiment.isSurprising ? 'Yes' : 'No',
@@ -71,19 +56,35 @@ export default function RunExperiments({ runId }: RunExperimentsProps) {
                 creationIdx: experiment.creationIdx,
                 runtimeMs: experiment.runtimeMs ?? 'N/A',
             }));
+            setRows((prevRows) => [...prevRows, ...newRows]);
 
-            setLastExperimentIdFetched(data.after_experiment_id);
-            setExperiments(validExperiments);
-            setRows(rows);
+            // Update the last known experiment ID for the next poll
+            pollingStateRef.current.lastKnownExperimentId =
+                newExperiments.at(-1)?.experimentId ?? null;
+            if (data.has_job_completed) {
+                pollingStateRef.current.hasRunCompleted = true;
+            }
         } catch (error) {
             console.error('Error fetching experiments:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchRunExperiments();
+        if (!runId) {
+            return;
+        }
+        if (!pollingStateRef.current.lastKnownExperimentId) {
+            // First time running since mounting
+            setLoading(true);
+            fetchLatestRunExperiments(runId).finally(() => setLoading(false));
+        }
+        const intervalId = setInterval(() => {
+            console.log('setInterval()', { runId, ...pollingStateRef.current });
+            fetchLatestRunExperiments(runId);
+        }, DEFAULT_UPDATE_INTERVAL_MS);
+        return () => {
+            clearInterval(intervalId);
+        };
     }, [runId]);
 
     const paginationModel = { page: 0, pageSize: 5 };

@@ -64,7 +64,6 @@ class ExperimentNode:
         # NOTE: Surprise might be posterior.mean - prior.mean instead
         self.surprise: float | None = node_data.get("belief_change")
 
-
         # Convert time_elapsed (seconds) to runtime_ms (milliseconds)
         time_elapsed = node_data.get("time_elapsed")
         self.runtime_ms: float | None = time_elapsed * 1000.0 if time_elapsed is not None else None

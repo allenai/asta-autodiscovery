@@ -1,6 +1,14 @@
 # AutoDiscovery Replay Module
 
-The replay module simulates AutoDiscovery runs by progressively copying output files from a completed run in GCS. This is useful for testing webapp integration and polling behavior without running expensive LLM calls.
+The replay module simulates AutoDiscovery runs by progressively copying output files from a completed run in GCS with the **same timing as the original run**. This is useful for testing webapp integration and polling behavior without running expensive LLM calls.
+
+## How It Works
+
+The replay module:
+1. Discovers all output files from the source GCS path
+2. Reads the GCS blob creation timestamps for each file
+3. Copies files to the target path with delays matching the original timing
+4. Uses the actual timestamps from the template run - no synthetic timing needed!
 
 ## Usage
 
@@ -9,29 +17,23 @@ The replay module simulates AutoDiscovery runs by progressively copying output f
 ```python
 from autodiscovery.replay import replay_autodiscovery
 
+# Replay at original speed (1x)
 replay_autodiscovery(
     source_path="gs://my-bucket/users/alice/jobs/melanoma/output",
     target_path="gs://my-bucket/users/alice/jobs/test-123/output"
 )
 ```
 
-### Custom Timing
+### Accelerated Replay
 
 ```python
 from autodiscovery.replay import replay_autodiscovery
 
-# Adjust timing delays (all values in seconds)
-custom_timing = {
-    "args_delay": 0,           # Delay before args.json (immediate)
-    "node_delay_min": 30,      # Min delay between nodes
-    "node_delay_max": 90,      # Max delay between nodes
-    "finalization_delay": 10,  # Delay before final summary files
-}
-
+# Replay 10x faster
 replay_autodiscovery(
     source_path="gs://my-bucket/users/alice/jobs/melanoma/output",
     target_path="gs://my-bucket/users/bob/jobs/replay-456/output",
-    timing_config=custom_timing,
+    time_scale=0.1,  # 0.1 = 10x faster, 2.0 = 2x slower
     project_id="my-gcp-project",  # Optional, auto-detected if not provided
     verbose=True
 )
@@ -40,31 +42,32 @@ replay_autodiscovery(
 ### Command Line
 
 ```bash
-# Run from the autodiscovery package directory
+# Replay at original speed
 python -m autodiscovery.replay \
   gs://my-bucket/users/alice/jobs/melanoma/output \
   gs://my-bucket/users/bob/jobs/test-789/output
 ```
 
-## File Write Sequence
+## How Timing Works
 
-The replay module copies files in the same order as a real AutoDiscovery run:
+The module reads GCS blob creation timestamps to determine the exact timing of the original run:
 
-1. **Startup Phase**
-   - `args.json` - Run configuration
+```python
+# For each file after the first:
+delay = (current_file.time_created - previous_file.time_created) * time_scale
+time.sleep(delay)
+copy_file()
+```
 
-2. **Iteration Phase** (repeated for each experiment)
-   - `mcts_node_{level}_{idx}.json` - Node state with experiment details
-   - `node_{level}_{idx}.json` - Chat messages and execution logs
-
-3. **Finalization Phase**
-   - `mcts_nodes.json` - Deduplicated summary
-   - `mcts_nodes_all.json` - Complete node list
-   - `mcts_nodes.csv` - CSV export
+This means:
+- **No hardcoded delays** - timing comes from the actual run
+- **Perfect fidelity** - replays match the original exactly (at 1x speed)
+- **Flexible speed** - use `time_scale` to speed up (0.1 = 10x faster) or slow down (2.0 = 2x slower)
+- **No AutoDiscovery knowledge** - module is completely agnostic to file meanings
 
 ## Integration with Cloud Run Jobs
 
-To use replay mode in the job execution flow, you can add a `test_mode` or `replay_source` parameter to the job configuration:
+To use replay mode in the job execution flow, you can add a `test_mode` or `replay_source` parameter:
 
 ```python
 from autodiscovery_jobs import JobManager
@@ -78,36 +81,51 @@ execution_id = manager.run_job(userid, jobid, n_experiments=100)
 execution_id = manager.run_job(
     userid, jobid,
     test_mode=True,
-    replay_source="gs://example-gcp-project/users/template/jobs/melanoma/output"
+    replay_source="gs://example-gcp-project/users/template/jobs/melanoma/output",
+    time_scale=0.1  # 10x faster for testing
 )
 ```
 
 ## Testing
 
 ```python
-# Quick test with fast timing
+# Quick test with 10x speed
 from autodiscovery.replay import replay_autodiscovery
-
-fast_timing = {
-    "args_delay": 0,
-    "node_delay_min": 0.1,
-    "node_delay_max": 0.5,
-    "finalization_delay": 1,
-}
 
 replay_autodiscovery(
     source_path="gs://example-gcp-project/users/alice/jobs/melanoma/output",
     target_path="gs://example-gcp-project/users/alice/jobs/test-run-123/output",
-    timing_config=fast_timing,
+    time_scale=0.1,  # 10x faster
     verbose=True
 )
 ```
 
+## Example Output
+
+```
+Replay AutoDiscovery Run
+  Source: gs://example-gcp-project/users/alice/jobs/melanoma/output
+  Target: gs://example-gcp-project/users/bob/jobs/test-123/output
+  Files: 206
+  Time scale: 0.1x
+
+[t=0.0s] args.json
+[t=0.3s] mcts_node_1_0.json
+[t=0.3s] node_1_0.json
+[t=0.8s] mcts_node_2_0.json
+[t=0.8s] node_2_0.json
+...
+[t=18.2s] mcts_nodes.json
+[t=18.2s] mcts_nodes_all.json
+[t=18.2s] mcts_nodes.csv
+
+[t=18.2s] Replay complete! 206 files copied.
+```
+
 ## Notes
 
-- The replay module discovers all node files from the source GCS path automatically
-- Both source and target must be GCS paths (start with `gs://`)
-- Node files are sorted by (level, index) to maintain correct execution order
-- Random delays between `node_delay_min` and `node_delay_max` add realism
-- The module handles varying numbers of experiments (not hardcoded)
-- GCS client uses Application Default Credentials (ADC) or project-specific credentials
+- **Timestamp-based**: Delays are computed from GCS blob creation timestamps
+- **No configuration needed**: Works with any AutoDiscovery run automatically
+- **Time scale**: Speed up or slow down the replay as needed
+- **GCS paths**: Both source and target must be GCS paths (start with `gs://`)
+- **Authentication**: Uses Application Default Credentials (ADC) or project-specific credentials

@@ -1,34 +1,15 @@
 """Replay module for simulating AutoDiscovery runs.
 
 This module provides functionality to replay a completed AutoDiscovery run by
-progressively copying output files from GCS with realistic timing delays. This is
-useful for testing the webapp integration and polling behavior without running
-expensive LLM calls.
+progressively copying output files from GCS with the same timing as the original
+run. This is useful for testing the webapp integration and polling behavior without
+running expensive LLM calls.
 """
 
-import re
 import time
-from typing import TypedDict
+from datetime import datetime
 
 from google.cloud import storage
-
-
-class TimingConfig(TypedDict):
-    """Configuration for replay timing delays (in seconds)."""
-
-    args_delay: float  # Delay before writing args.json (usually 0)
-    node_delay_min: float  # Minimum delay between nodes
-    node_delay_max: float  # Maximum delay between nodes
-    finalization_delay: float  # Delay before writing final summary files
-
-
-# Default timing configuration (in seconds)
-DEFAULT_TIMING = TimingConfig(
-    args_delay=0,  # Immediate
-    node_delay_min=0.5,  # Nodes vary in complexity
-    node_delay_max=2,
-    finalization_delay=3,  # Final summary generation
-)
 
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
@@ -64,38 +45,24 @@ def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
     return bucket_name, blob_prefix
 
 
-class NodeFile:
-    """Represents a node file with its metadata."""
+class BlobInfo:
+    """Represents a GCS blob with its metadata."""
 
-    def __init__(self, filename: str):
-        """Parse node filename to extract level and index.
+    def __init__(self, filename: str, time_created: datetime):
+        """Create blob info.
 
         Args:
-            filename: Filename like "mcts_node_2_3.json" or "node_2_3.json"
+            filename: Blob filename
+            time_created: GCS blob creation timestamp
         """
         self.filename = filename
-        self.is_mcts = filename.startswith("mcts_")
-
-        # Extract level and node_idx from filename
-        # Patterns: "mcts_node_{level}_{idx}.json" or "node_{level}_{idx}.json"
-        pattern = r"(?:mcts_)?node_(\d+)_(\d+)\.json"
-        match = re.match(pattern, filename)
-        if match:
-            self.level = int(match.group(1))
-            self.node_idx = int(match.group(2))
-        else:
-            raise ValueError(f"Invalid node filename: {filename}")
+        self.time_created = time_created
 
     def __repr__(self):
-        return f"NodeFile({self.filename}, level={self.level}, idx={self.node_idx})"
-
-    @property
-    def sort_key(self):
-        """Key for sorting nodes in execution order."""
-        return (self.level, self.node_idx, 0 if self.is_mcts else 1)
+        return f"BlobInfo({self.filename}, created={self.time_created})"
 
 
-def discover_files(source_path: str, project_id: str | None = None) -> dict[str, list[NodeFile]]:
+def discover_files(source_path: str, project_id: str | None = None) -> list[BlobInfo]:
     """Discover all output files from a completed AutoDiscovery run in GCS.
 
     Args:
@@ -103,17 +70,14 @@ def discover_files(source_path: str, project_id: str | None = None) -> dict[str,
         project_id: Optional GCP project ID (auto-detected if None)
 
     Returns:
-        Dictionary with keys:
-            - "args": List containing args.json (if exists)
-            - "nodes": List of NodeFile objects sorted by execution order
-            - "final": List of finalization files (mcts_nodes.json, etc.)
+        List of BlobInfo objects sorted by creation timestamp
 
     Raises:
         ValueError: If source_path is invalid or contains no valid output files
 
     Example:
         >>> files = discover_files("gs://my-bucket/users/alice/jobs/123/output")
-        >>> print(f"Found {len(files['nodes'])} node files")
+        >>> print(f"Found {len(files)} files")
     """
     bucket_name, blob_prefix = parse_gcs_path(source_path)
 
@@ -121,10 +85,8 @@ def discover_files(source_path: str, project_id: str | None = None) -> dict[str,
     client = storage.Client(project=project_id)
     bucket = client.bucket(bucket_name)
 
-    # Discover files by category
-    args_file = []
-    node_files = []
-    final_files = []
+    # Discover all files with timestamps
+    blob_infos = []
 
     # List all blobs with the given prefix
     blobs = bucket.list_blobs(prefix=blob_prefix)
@@ -137,46 +99,40 @@ def discover_files(source_path: str, project_id: str | None = None) -> dict[str,
         if not filename or filename.endswith("/"):
             continue
 
-        if filename == "args.json":
-            args_file.append(filename)
-        elif filename in ["mcts_nodes.json", "mcts_nodes_all.json", "mcts_nodes.csv"]:
-            final_files.append(filename)
-        elif re.match(r"(?:mcts_)?node_\d+_\d+\.json", filename):
-            try:
-                node_files.append(NodeFile(filename))
-            except ValueError:
-                print(f"Warning: Skipping invalid node file: {filename}")
+        # Only include recognized output files
+        if (filename == "args.json" or
+            filename in ["mcts_nodes.json", "mcts_nodes_all.json", "mcts_nodes.csv"] or
+            filename.startswith("mcts_node_") or
+            filename.startswith("node_")):
+            blob_infos.append(BlobInfo(filename, blob.time_created))
 
-    # Sort nodes by execution order (level, idx, mcts-before-node)
-    node_files.sort(key=lambda n: n.sort_key)
+    if not blob_infos:
+        raise ValueError(f"No valid output files found in {source_path}")
 
-    if not node_files:
-        raise ValueError(f"No valid node files found in {source_path}")
+    # Sort by creation timestamp
+    blob_infos.sort(key=lambda b: b.time_created)
 
-    return {
-        "args": args_file,
-        "nodes": node_files,
-        "final": sorted(final_files),  # Alphabetical order
-    }
+    return blob_infos
 
 
 def replay_autodiscovery(
     source_path: str,
     target_path: str,
-    timing_config: TimingConfig | None = None,
     project_id: str | None = None,
+    time_scale: float = 1.0,
     verbose: bool = True,
 ) -> None:
-    """Replay an AutoDiscovery run by progressively copying files from GCS.
+    """Replay an AutoDiscovery run by copying files with the same timing as the original.
 
     This simulates a real AutoDiscovery run by copying output files from a
-    completed run in GCS to a target GCS location with realistic timing delays.
+    completed run in GCS to a target GCS location, preserving the original timing
+    delays between file writes based on GCS blob creation timestamps.
 
     Args:
         source_path: GCS path like "gs://bucket/users/alice/jobs/123/output"
         target_path: GCS path like "gs://bucket/users/alice/jobs/456/output"
-        timing_config: Custom timing configuration (uses defaults if None)
         project_id: Optional GCP project ID (auto-detected if None)
+        time_scale: Multiply all delays by this factor (e.g., 0.1 for 10x faster, 2.0 for 2x slower)
         verbose: Print progress messages
 
     Raises:
@@ -186,13 +142,9 @@ def replay_autodiscovery(
         >>> replay_autodiscovery(
         ...     source_path="gs://my-bucket/users/alice/jobs/melanoma/output",
         ...     target_path="gs://my-bucket/users/alice/jobs/test-123/output",
-        ...     timing_config={"node_delay_min": 10, "node_delay_max": 20}
+        ...     time_scale=0.1  # 10x faster replay
         ... )
     """
-    import random
-
-    timing = timing_config or DEFAULT_TIMING
-
     # Track actual elapsed time
     start_time = time.time()
 
@@ -205,15 +157,15 @@ def replay_autodiscovery(
     source_bucket = client.bucket(source_bucket_name)
     target_bucket = client.bucket(target_bucket_name)
 
-    # Discover all files from source
-    files = discover_files(source_path, project_id)
+    # Discover all files from source (sorted by creation timestamp)
+    blob_infos = discover_files(source_path, project_id)
 
     if verbose:
         print(f"Replay AutoDiscovery Run")
         print(f"  Source: {source_path}")
         print(f"  Target: {target_path}")
-        print(f"  Nodes: {len(files['nodes'])} files")
-        print(f"  Finalization: {len(files['final'])} files")
+        print(f"  Files: {len(blob_infos)}")
+        print(f"  Time scale: {time_scale}x")
         print()
 
     def copy_blob(filename: str):
@@ -224,60 +176,29 @@ def replay_autodiscovery(
         # Copy blob content
         target_blob.upload_from_string(source_blob.download_as_bytes())
 
-    # Phase 1: Copy args.json
-    if files["args"]:
-        if timing["args_delay"] > 0:
-            time.sleep(timing["args_delay"])
+    # Copy files with delays based on original timestamps
+    for i, blob_info in enumerate(blob_infos):
+        if i > 0:
+            # Calculate delay from previous file's timestamp
+            prev_timestamp = blob_infos[i - 1].time_created
+            curr_timestamp = blob_info.time_created
+            delay_seconds = (curr_timestamp - prev_timestamp).total_seconds()
+
+            # Apply time scale
+            delay_seconds *= time_scale
+
+            if delay_seconds > 0:
+                time.sleep(delay_seconds)
 
         if verbose:
             elapsed = time.time() - start_time
-            print(f"[t={elapsed:.1f}s] Copying args.json...")
+            print(f"[t={elapsed:.1f}s] {blob_info.filename}")
 
-        for filename in files["args"]:
-            copy_blob(filename)
-
-    # Phase 2: Copy node files with delays
-    for i, node in enumerate(files["nodes"]):
-        # Determine delay between nodes
-        if i == 0:
-            # First node gets a random delay
-            delay = random.uniform(timing["node_delay_min"], timing["node_delay_max"])
-        else:
-            # Check if this is the second file of a node pair (mcts_node_X_Y -> node_X_Y)
-            prev_node = files["nodes"][i - 1]
-            if node.level == prev_node.level and node.node_idx == prev_node.node_idx:
-                # Same node pair, no delay
-                delay = 0
-            else:
-                # Different node, add random delay
-                delay = random.uniform(timing["node_delay_min"], timing["node_delay_max"])
-
-        if delay > 0:
-            time.sleep(delay)
-
-        if verbose and delay > 0:
-            elapsed = time.time() - start_time
-            print(f"[t={elapsed:.1f}s] Node {node.level}_{node.node_idx}: {node.filename}")
-
-        copy_blob(node.filename)
-
-    # Phase 3: Copy finalization files
-    if files["final"]:
-        time.sleep(timing["finalization_delay"])
-
-        if verbose:
-            elapsed = time.time() - start_time
-            print(f"\n[t={elapsed:.1f}s] Finalizing: Writing summary files...")
-
-        for filename in files["final"]:
-            if verbose:
-                print(f"  - {filename}")
-            copy_blob(filename)
+        copy_blob(blob_info.filename)
 
     if verbose:
         total_elapsed = time.time() - start_time
-        total_files = len(files['nodes']) + len(files['args']) + len(files['final'])
-        print(f"\n[t={total_elapsed:.1f}s] Replay complete! {total_files} files copied.")
+        print(f"\n[t={total_elapsed:.1f}s] Replay complete! {len(blob_infos)} files copied.")
 
 
 if __name__ == "__main__":

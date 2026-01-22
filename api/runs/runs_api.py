@@ -445,24 +445,40 @@ def create() -> Blueprint:
         try:
             manager = get_job_manager()
 
-            # Validate sufficient credits before submission
-            check_sufficient_credits(
-                n_experiments=n_experiments, userid=userid, config=manager.config
-            )
+            # Check if this is a simulated run (replay mode)
+            intent = data.get("intent", "")
+            is_simulated = "asta.simulate_outputs" in intent
 
-            # Pass all additional parameters to run_job
-            execution_id = manager.run_job(
-                userid,
-                runid,
-                n_experiments=n_experiments,
-                model=model,
-                belief_model=belief_model,
-                **{
-                    k: v
-                    for k, v in data.items()
-                    if k not in ["runid", "n_experiments", "model", "belief_model"]
-                },
-            )
+            if is_simulated:
+                # Run replay job instead of actual AutoDiscovery job
+                current_app.logger.info(f"Running replay job for {userid}/{runid}")
+                source_path = "gs://example-gcp-project/users/test/jobs/melanoma/output"
+                time_scale = data.get("time_scale", 0.1)
+                execution_id = manager.run_replay_job(
+                    userid=userid,
+                    jobid=runid,
+                    source_path=source_path,
+                    time_scale=time_scale,
+                )
+            else:
+                # Validate sufficient credits before submission
+                check_sufficient_credits(
+                    n_experiments=n_experiments, userid=userid, config=manager.config
+                )
+
+                # Pass all additional parameters to run_job
+                execution_id = manager.run_job(
+                    userid,
+                    runid,
+                    n_experiments=n_experiments,
+                    model=model,
+                    belief_model=belief_model,
+                    **{
+                        k: v
+                        for k, v in data.items()
+                        if k not in ["runid", "n_experiments", "model", "belief_model"]
+                    },
+                )
 
             # Update run_details.json with execution_id and status
             _update_run_details(

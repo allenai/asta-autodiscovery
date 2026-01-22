@@ -280,6 +280,90 @@ def cancel_job(execution_id: str, config: JobConfig | None = None) -> None:
         raise CloudRunError(f"Failed to cancel job: {e}")
 
 
+def run_replay_job(
+    userid: str,
+    jobid: str,
+    source_path: str,
+    time_scale: float = 0.1,
+    config: JobConfig | None = None,
+) -> str:
+    """Execute the replay Cloud Run job to simulate an AutoDiscovery run.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        source_path: Source GCS path containing template run files (e.g., gs://bucket/users/test/jobs/melanoma/output)
+        time_scale: Time multiplier (0.1 = 10x faster, default=0.1)
+        config: Configuration (uses default if None)
+
+    Returns:
+        Execution ID from Cloud Run
+
+    Raises:
+        CloudRunError: If job execution fails
+
+    Example:
+        >>> execution_id = run_replay_job(
+        ...     userid="alice",
+        ...     jobid="test-123",
+        ...     source_path="gs://example-gcp-project/users/test/jobs/melanoma/output",
+        ...     time_scale=0.1
+        ... )
+    """
+    config = config or JobConfig()
+
+    # Construct target path
+    target_path = f"gs://{config.bucket}/users/{userid}/jobs/{jobid}/output"
+
+    # Build arguments for replay job
+    args = [
+        f"--source={source_path}",
+        f"--target={target_path}",
+        f"--time-scale={time_scale}",
+    ]
+
+    # Get project ID (required for Cloud Run API)
+    project_id = config.project_id
+    if not project_id:
+        raise CloudRunError(
+            "project_id must be set in config. Set it via config.project_id or "
+            "GCP_PROJECT environment variable."
+        )
+
+    # Build job resource name for replay job
+    replay_job_name = f"projects/{project_id}/locations/{config.region}/jobs/autodiscovery-replay"
+
+    try:
+        # Create JobsClient and run the job
+        client = run_v2.JobsClient()
+
+        # Create request with container argument overrides
+        request = run_v2.RunJobRequest(
+            name=replay_job_name,
+            overrides=run_v2.RunJobRequest.Overrides(
+                container_overrides=[
+                    run_v2.RunJobRequest.Overrides.ContainerOverride(
+                        args=args,
+                    )
+                ]
+            ),
+        )
+
+        # Execute the job (don't wait for completion)
+        operation = client.run_job(request=request)
+
+        # Get the execution name from operation metadata without waiting
+        execution_name = operation.metadata.name
+
+        # Extract just the execution ID from the full resource path
+        # Format: projects/{project}/locations/{location}/jobs/{job}/executions/{execution}
+        execution_id = execution_name.split("/")[-1]
+        return execution_id
+
+    except Exception as e:
+        raise CloudRunError(f"Failed to execute replay job: {e}")
+
+
 def get_job_logs(
     execution_id: str | None = None, config: JobConfig | None = None, limit: int = 50
 ) -> list[str]:

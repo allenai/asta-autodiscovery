@@ -34,3 +34,5 @@ mcpdoc.json
 # Keep what we need
 !packages/
 !api/
+!pyproject.toml
+!uv.lock

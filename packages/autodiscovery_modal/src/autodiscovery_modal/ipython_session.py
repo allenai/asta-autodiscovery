@@ -11,11 +11,31 @@ APP_NAME = "autodiscovery"
 RUN_IPYTHON_CELL_FUNCTION_NAME = "run_ipython_cell"
 
 app = modal.App(APP_NAME)
-image = (
-    modal.Image.debian_slim(python_version="3.13")
-    .uv_pip_install("ipython>=9.8.0")
-    .add_local_python_source("code_execution")
-)
+def build_sandbox_image(
+    extra_packages: Iterable[str] | None = None,
+    *,
+    python_version: str = "3.13",
+) -> modal.Image:
+    """Build a Modal image for IPython-based execution.
+
+    Args:
+        extra_packages: Optional additional packages to install via uv.
+        python_version: Python version for the base image.
+
+    Returns:
+        A Modal image with IPython and local code_execution sources.
+    """
+    packages = ["ipython>=9.8.0"]
+    if extra_packages:
+        packages.extend(extra_packages)
+    return (
+        modal.Image.debian_slim(python_version=python_version)
+        .uv_pip_install(*packages)
+        .add_local_python_source("code_execution")
+    )
+
+
+image = build_sandbox_image()
 
 
 def _parse_allow_mime(allow_mime: str | None) -> list[str] | None:

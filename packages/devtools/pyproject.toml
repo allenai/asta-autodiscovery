@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "code-execution",
     "google-cloud-storage",
+    "google-cloud-run",
 ]
 
 [project.scripts]

@@ -452,13 +452,20 @@ def create() -> Blueprint:
             if is_simulated:
                 # Run replay job instead of actual AutoDiscovery job
                 current_app.logger.info(f"Running replay job for {userid}/{runid}")
+
+                # Import devtools cloudrun module
+                from devtools.cloudrun import run_replay_job
+
                 source_path = "gs://example-gcp-project/users/test/jobs/melanoma/output"
                 time_scale = data.get("time_scale", 0.1)
-                execution_id = manager.run_replay_job(
+                execution_id = run_replay_job(
                     userid=userid,
                     jobid=runid,
                     source_path=source_path,
+                    target_bucket=manager.config.bucket,
                     time_scale=time_scale,
+                    project_id=manager.config.project_id,
+                    region=manager.config.region,
                 )
             else:
                 # Validate sufficient credits before submission

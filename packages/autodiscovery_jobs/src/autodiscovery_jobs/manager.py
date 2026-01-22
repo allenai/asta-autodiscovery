@@ -190,26 +190,6 @@ class JobManager:
             **kwargs,
         )
 
-    def run_replay_job(
-        self,
-        userid: str,
-        jobid: str,
-        source_path: str,
-        time_scale: float = 0.1,
-    ) -> str:
-        """Execute a replay Cloud Run job to simulate an AutoDiscovery run.
-
-        Args:
-            userid: User identifier
-            jobid: Job identifier
-            source_path: Source GCS path containing template run files
-            time_scale: Time multiplier (0.1 = 10x faster)
-
-        Returns:
-            Execution ID
-        """
-        return cloudrun.run_replay_job(userid, jobid, source_path, time_scale, self.config)
-
     def get_job_status(self, execution_id: str) -> dict[str, Any]:
         """Get status of a job execution.
 

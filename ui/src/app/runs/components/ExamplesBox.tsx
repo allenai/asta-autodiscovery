@@ -1,67 +1,27 @@
-import { Box, Typography, styled } from '@mui/material';
+import { Box, CircularProgress, Typography, styled } from '@mui/material';
 
 import { RunSummary } from '@/runs/components/RunSummary';
-import { Run } from '@/types/Run';
-
-const EXAMPLE_RUNS: Run[] = [
-    {
-        id: 'run-1',
-        name: 'Melanoma',
-        path: '/path/to/run-1',
-        details: {
-            executionId: 'exec-1',
-            createdAt: '2024-01-01T12:00:00Z',
-            status: 'completed',
-            statusCheckedAt: '2024-01-01T14:00:00Z',
-        },
-        executionStatus: {
-            accuracy: 0.95,
-            loss: 0.05,
-        },
-    },
-    {
-        id: 'run-2',
-        name: 'Breast Cancer',
-        path: '/path/to/run-2',
-        details: {
-            executionId: 'exec-2',
-            createdAt: '2024-01-02T12:00:00Z',
-            status: 'completed',
-            statusCheckedAt: '2024-01-02T14:00:00Z',
-        },
-        executionStatus: {
-            accuracy: 0.9,
-            loss: 0.1,
-        },
-    },
-    {
-        id: 'run-3',
-        name: 'Reef Notes',
-        path: '/path/to/run-3',
-        details: {
-            executionId: 'exec-3',
-            createdAt: '2024-01-03T12:00:00Z',
-            status: 'completed',
-            statusCheckedAt: '2024-01-03T14:00:00Z',
-        },
-        executionStatus: {
-            accuracy: 0.85,
-            loss: 0.15,
-        },
-    },
-];
+import { useRuns } from '@/contexts/RunsContext';
 
 export const ExamplesBox = () => {
+    const { exampleRuns, isExampleRunsLoading } = useRuns();
     return (
         <>
             <Headline variant="h5">Example Sessions</Headline>
-            <Wrapper>
-                {EXAMPLE_RUNS.map((run) => (
-                    <RunItem key={run.id}>
-                        <RunSummary run={run} startExpanded />
-                    </RunItem>
-                ))}
-            </Wrapper>
+            {exampleRuns && exampleRuns.length > 0 && (
+                <Wrapper>
+                    {exampleRuns.map((run) => (
+                        <RunItem key={run.id}>
+                            <RunSummary run={run} startExpanded />
+                        </RunItem>
+                    ))}
+                </Wrapper>
+            )}
+            {isExampleRunsLoading && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                    <CircularProgress />
+                </Box>
+            )}
         </>
     );
 };

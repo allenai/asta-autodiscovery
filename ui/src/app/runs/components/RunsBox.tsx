@@ -1,12 +1,15 @@
-import { Box, Button, Typography, styled } from '@mui/material';
+import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
 import AddBoxIcon from '@mui/icons-material/AddBox';
+import { useRuns } from '@/contexts/RunsContext';
+import { RunSummary } from '@/runs/components/RunSummary';
 
 export const RunsBox = () => {
+    const { viewerRuns, isViewerRunsLoading, addViewerRun } = useRuns();
     return (
         <>
             <Header>
                 <Headline variant="h5">Your Sessions</Headline>
-                <div>
+                <div style={{ opacity: 0.3, cursor: 'not-allowed' }}>
                     <CreateRunButton
                         variant="contained"
                         fullWidth
@@ -17,7 +20,20 @@ export const RunsBox = () => {
                     </CreateRunButton>
                 </div>
             </Header>
-            <Wrapper>[Runs go here]</Wrapper>
+            {viewerRuns && viewerRuns.length > 0 && (
+                <Wrapper>
+                    {viewerRuns.map((run) => (
+                        <RunItem key={run.id}>
+                            <RunSummary run={run} />
+                        </RunItem>
+                    ))}
+                </Wrapper>
+            )}
+            {isViewerRunsLoading && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                    <CircularProgress />
+                </Box>
+            )}
         </>
     );
 };
@@ -47,9 +63,9 @@ const Headline = styled(Typography)(({ theme }) => ({
     lineHeight: '115%',
 }));
 
-// const RunItem = styled('div')(({ theme }) => ({
-//     marginBottom: theme.spacing(2),
-// }));
+const RunItem = styled('div')(({ theme }) => ({
+    marginBottom: theme.spacing(2),
+}));
 
 const CreateRunButton = styled(Button)`
     background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};

@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';
 import Header from '@/components/Header';
+import { RunsContextProvider } from '@/contexts/RunsContext';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -28,34 +29,36 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     };
 
     return (
-        <Wrapper>
-            <Grid container sx={{ height: '100%' }}>
-                {/* Sidebar - RunsList */}
-                <Sidebar item xs={12} md={2}>
-                    <Logo>
-                        <IconAutoDSLogo />
-                    </Logo>
-                    <RunsList
-                        selectedRunId={selectedRunId}
-                        onSelectRun={handleSelectRun}
-                        onRunCreated={handleRunCreated}
-                    />
-                </Sidebar>
+        <RunsContextProvider>
+            <Wrapper>
+                <Grid container sx={{ height: '100%' }}>
+                    {/* Sidebar - RunsList */}
+                    <Sidebar item xs={12} md={2}>
+                        <Logo>
+                            <IconAutoDSLogo />
+                        </Logo>
+                        <RunsList
+                            selectedRunId={selectedRunId}
+                            onSelectRun={handleSelectRun}
+                            onRunCreated={handleRunCreated}
+                        />
+                    </Sidebar>
 
-                {/* Main content */}
-                <MainContent
-                    item
-                    xs={12}
-                    md={10}
-                    sx={{
-                        height: '100%',
-                        overflow: 'auto',
-                    }}>
-                    <Header />
-                    {children}
-                </MainContent>
-            </Grid>
-        </Wrapper>
+                    {/* Main content */}
+                    <MainContent
+                        item
+                        xs={12}
+                        md={10}
+                        sx={{
+                            height: '100%',
+                            overflow: 'auto',
+                        }}>
+                        <Header />
+                        {children}
+                    </MainContent>
+                </Grid>
+            </Wrapper>
+        </RunsContextProvider>
     );
 }
 

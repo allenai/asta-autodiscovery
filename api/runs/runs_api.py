@@ -599,9 +599,7 @@ def create() -> Blueprint:
         node = tree.get_node(experiment_id)
 
         experiment_node = node.to_dict() if node else None
-        experiment_model = (
-            ExperimentModel(**experiment_node) if experiment_node else None
-        )
+        experiment_model = ExperimentModel(**experiment_node) if experiment_node else None
 
         resp = GetExperimentStatusResponseModel(
             runid=runid,

@@ -2,9 +2,9 @@ import { styled } from '@mui/material';
 import NewReleasesOutlinedIcon from '@mui/icons-material/NewReleasesOutlined';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import { ReactNode } from 'react';
 
 import { Run } from '@/types/Run';
-import { ReactNode } from 'react';
 
 export const RunPills = ({ run }: { run: Run }) => {
     const { stats } = run;

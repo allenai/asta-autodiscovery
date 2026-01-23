@@ -66,6 +66,35 @@ class ExperimentModel(BaseModel):
         None, description="Results of the experiment in human-readable format"
     )
 
+class MetadataDatasetModel(BaseModel):
+    """Model representing dataset metadata for a run"""
+
+    name: str | None = Field(None, description="Filename of the dataset")
+    description: str | None = Field(None, description="Description of the dataset")
+
+class MetadataModel(BaseModel):
+    """Model representing metadata for a run"""
+
+    name: str | None = Field(None, description="Name of the run")
+    description: str | None = Field(None, description="Description of the run")
+    datasets: list[MetadataDatasetModel] | None = Field(
+        None, description="List of datasets associated with the run"
+    )
+
+class GetRunMetadataRequestModel(BaseModel):
+    """Model for the request to get run metadata"""
+
+    runid: str = Field(..., description="Identifier of the run to fetch metadata for")
+    userid: str | None = Field(
+        None, description="User identifier for whom to retrieve metadata; defaults to the viewer"
+    )
+
+class GetRunMetadataResponseModel(BaseModel):
+    """Model for the response containing run metadata"""
+
+    runid: str = Field(..., description="Identifier of the run")
+    metadata: MetadataModel = Field(..., description="Metadata associated with the run")
+
 class GetExampleRunsRequestModel(BaseModel):
     """Model for the request to get example runs"""
 

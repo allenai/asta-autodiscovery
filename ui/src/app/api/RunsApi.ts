@@ -72,6 +72,22 @@ export interface GetRunExperimentDetailsResponseBody {
     experiment: ExperimentFromApi;
 }
 
+export interface MetadataDatasetFromApi {
+    name: string;
+    description: string | null;
+}
+
+export interface MetadataFromApi {
+    title: string;
+    description: string | null;
+    datasets: MetadataDatasetFromApi[];
+}
+
+export interface GetRunMetadataResponseBody {
+    runid: string;
+    metadata: MetadataFromApi;
+}
+
 export class RunsApi extends BaseApi {
     async createRun() {
         return this.request<RunResponseBody>({
@@ -97,6 +113,13 @@ export class RunsApi extends BaseApi {
     async listExampleRuns() {
         return this.request<GetExampleRunsResponseBody>({
             url: `${RUNS_URL_PREFIX}/list/examples`,
+            method: 'GET',
+        });
+    }
+
+    async getRunMetadata(runid: string) {
+        return this.request<GetRunMetadataResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
         });
     }

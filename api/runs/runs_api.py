@@ -273,10 +273,30 @@ def create() -> Blueprint:
         run_models: list[RunModel] = []
 
         for run_id in sliced_run_ids:
-            run_details = _get_run_details(req.userid, run_id) or {}
-            job_stats = get_job_stats(
-                userid=req.userid, jobid=run_id, config=job_manager.config
-            )
+            try:
+                job_exists = job_manager.job_exists(req.userid, run_id)
+                if not job_exists:
+                    continue
+            except Exception as e:
+                current_app.logger.error(f"Failed to check job existence for {run_id}: {e}")
+                continue
+            try:
+                run_details = _get_run_details(req.userid, run_id) or {}
+            except Exception as e:
+                current_app.logger.error(f"Failed to get run details for {run_id}: {e}")
+                run_details = {}
+            try:
+                job_stats = get_job_stats(
+                    userid=req.userid, jobid=run_id, config=job_manager.config
+                )
+            except Exception as e:
+                current_app.logger.error(f"Failed to get job stats for {run_id}: {e}")
+                job_stats = None
+            try:
+                metadata_dict = job_manager.get_metadata(req.userid, run_id)
+            except Exception as e:
+                current_app.logger.error(f"Failed to get metadata for {run_id}: {e}")
+                metadata_dict = None
 
             run_details_model = RunDetailsModel(
                 execution_id=run_details.get("execution_id"),
@@ -290,14 +310,16 @@ def create() -> Blueprint:
                 pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
                 num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
             )
+            run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
             run_model = RunModel(
                 runid=run_id,
                 status=run_details.get("status", "UNKNOWN"),
-                name=f"Run {run_id}", # TODO: Update when name is supported
-                description=f"Description for Run {run_id}", # TODO: Update when description is supported
+                name=run_metadata_model.title if run_metadata_model else f"Run {run_id}",
+                description=run_metadata_model.description if run_metadata_model else f"Description for Run {run_id}",
                 path=None,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
+                run_metadata=run_metadata_model,
                 execution_status={},
             )
             run_models.append(run_model)
@@ -334,14 +356,20 @@ def create() -> Blueprint:
                 status="COMPLETED",
                 status_checked_at=datetime.now(UTC).isoformat(),
             )
+            run_metadata_model = MetadataModel(
+                title=f"Example Run {i}",
+                description=f"This is the metadata for example run {i}.",
+                datasets=[],
+            )
             run_model = RunModel(
                 runid=f"example-run-{i}",
                 status="COMPLETED",
-                name=f"Example Run {i}",
+                name=run_metadata_model.title,
                 path=None,
-                description=f"This is example run number {i}.",
+                description=run_metadata_model.description,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
+                run_metadata=run_metadata_model,
                 execution_status={},
             )
             runs.append(run_model)
@@ -530,19 +558,7 @@ def create() -> Blueprint:
         if not metadata_dict:
             return jsonify({"error": "Metadata not found"}), 404
 
-        dataset_models: list[MetadataDatasetModel] = []
-        for dataset in metadata_dict.get("datasets", []):
-            dataset_model = MetadataDatasetModel(
-                name=dataset.get("name"),
-                description=dataset.get("description"),
-            )
-            dataset_models.append(dataset_model)
-
-        metadata_model = MetadataModel(
-            title=metadata_dict.get("title"),
-            description=metadata_dict.get("description"),
-            datasets=dataset_models,
-        )
+        metadata_model = MetadataModel.from_dict(metadata_dict)
 
         resp = GetRunMetadataResponseModel(
             runid=req.runid,

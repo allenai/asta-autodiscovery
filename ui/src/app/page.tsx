@@ -1,17 +1,24 @@
-import { Link, Typography } from '@mui/material';
+'use client';
 
-import EnrollmentStatus from './components/EnrollmentStatus';
-import UserProfile from './components/UserProfile';
+import { styled } from '@mui/material';
+import { useRouter } from 'next/dist/client/components/navigation';
+import { useEffect } from 'react';
 
-export default function Home() {
-    return (
-        <>
-            <Typography variant="h1">AutoDiscovery</Typography>
-            <Typography sx={{ marginBottom: 2 }} component="p">
-                Get started over at <Link href="/runs">/runs</Link>
-            </Typography>
-            <UserProfile />
-            <EnrollmentStatus />
-        </>
-    );
+export default function HomePage() {
+    const router = useRouter();
+
+    useEffect(() => {
+        router.replace('/runs');
+    }, [router]);
+
+    return <LoadingScreen />;
 }
+
+const LoadingScreen = styled('div')`
+    align-items: center;
+    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    display: flex;
+    height: 100vh;
+    justify-content: center;
+    width: 100vw;
+`;

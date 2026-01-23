@@ -1,23 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-    Box,
-    Stack,
-    Button,
-    Typography,
-    Paper,
-    CircularProgress,
-    Alert,
-    Chip,
-    Divider,
-} from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { Box, Button, Typography, CircularProgress, Alert, Chip, styled } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
+import CloseIcon from '@mui/icons-material/Close';
+import IconButton from '@mui/material/IconButton';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { RunDetails, getRunFromApi } from '@/types/Run';
-import RunExperiments from './RunExperiments';
+import { Experiment, RunDetails, getRunFromApi } from '@/types/Run';
+import { RunExperiments } from '@/runs/components/RunExperiments';
+import { ExperimentDetails } from './ExperimentDetails';
 
 interface RunStatusProps {
     runid: string;
@@ -37,11 +29,11 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     const api = getRunsApi();
 
     const [runDetails, setRunDetails] = useState<RunDetails | null>(null);
-    const [executionStatus, setExecutionStatus] = useState<Record<string, unknown> | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
 
     const fetchStatus = async (isRefresh = false) => {
         if (isRefresh) {
@@ -56,7 +48,6 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
             const run = getRunFromApi(response.data);
 
             setRunDetails(run.details);
-            setExecutionStatus(run.executionStatus || null);
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
@@ -83,8 +74,12 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         return () => clearInterval(interval);
     }, [runid]);
 
-    const handleRefresh = () => {
-        fetchStatus(true);
+    const handleSelectExperiment = (experiment: Experiment) => {
+        setSelectedExperiment(experiment);
+    };
+
+    const handleCloseDetails = () => {
+        setSelectedExperiment(null);
     };
 
     const handleStop = async () => {
@@ -159,76 +154,24 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     }
 
     return (
-        <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
-            <RunExperiments runId={runid} />
-            <Typography variant="h5" gutterBottom>
-                Run Status
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-                This run has been submitted. You can check its status below.
-            </Typography>
-
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Stack spacing={3}>
+        <>
+            <ExperimentLayout $isDetailsOpen={!!selectedExperiment}>
+                <MainContent>
                     <Box>
-                        <Typography variant="caption" color="text.secondary">
-                            Status
-                        </Typography>
-                        <Box sx={{ mt: 1 }}>
-                            <Chip
-                                label={runDetails.status.toUpperCase()}
-                                color={getStatusColor(runDetails.status)}
-                                size="medium"
-                            />
-                        </Box>
-                    </Box>
-
-                    <Divider />
-
-                    <Box>
-                        <Typography variant="caption" color="text.secondary">
-                            Execution ID
-                        </Typography>
-                        <Typography
-                            variant="body2"
-                            sx={{ fontFamily: 'monospace', wordBreak: 'break-all', mt: 0.5 }}>
-                            {runDetails.executionId || 'Not submitted yet'}
-                        </Typography>
-                    </Box>
-
-                    <Box>
-                        <Typography variant="caption" color="text.secondary">
-                            Created At
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {new Date(runDetails.createdAt).toLocaleString()}
-                        </Typography>
-                    </Box>
-
-                    {runDetails.statusCheckedAt && (
-                        <Box>
-                            <Typography variant="caption" color="text.secondary">
-                                Last Checked
-                            </Typography>
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                {new Date(runDetails.statusCheckedAt).toLocaleString()}
-                            </Typography>
-                        </Box>
-                    )}
-
-                    {error && <Alert severity="error">{error}</Alert>}
-
-                    <Stack direction="row" spacing={2}>
-                        <Button
-                            variant="outlined"
-                            startIcon={
-                                refreshing ? <CircularProgress size={16} /> : <RefreshIcon />
-                            }
-                            onClick={handleRefresh}
-                            disabled={refreshing || cancelling}
-                            sx={{ flex: 1 }}>
-                            {refreshing ? 'Refreshing...' : 'Refresh Status'}
-                        </Button>
+                        {error && <Alert severity="error">{error}</Alert>}
+                        <Chip
+                            label={runDetails.status.toUpperCase()}
+                            color={getStatusColor(runDetails.status)}
+                            size="medium"
+                        />
+                        {runDetails.statusCheckedAt && (
+                            <Box>
+                                <Typography variant="caption">
+                                    Last Checked:{' '}
+                                    {new Date(runDetails.statusCheckedAt).toLocaleString()}
+                                </Typography>
+                            </Box>
+                        )}
                         {canStop && (
                             <Button
                                 variant="outlined"
@@ -242,27 +185,57 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                                 {cancelling ? 'Stopping...' : 'Stop Run'}
                             </Button>
                         )}
-                    </Stack>
-                </Stack>
-            </Paper>
-
-            {executionStatus && (
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                        Execution Details
-                    </Typography>
-                    <Box
-                        component="pre"
-                        sx={{
-                            fontSize: '0.75rem',
-                            overflow: 'auto',
-                            maxHeight: 300,
-                            fontFamily: 'monospace',
-                        }}>
-                        {JSON.stringify(executionStatus, null, 2)}
                     </Box>
-                </Paper>
-            )}
-        </Box>
+
+                    <Box sx={{ flex: 1, minHeight: 0 }}>
+                        <RunExperiments runId={runid} onSelectExperiment={handleSelectExperiment} />
+                    </Box>
+                </MainContent>
+
+                <DetailsWrapper>
+                    {!!selectedExperiment && (
+                        <>
+                            <CloseDetailButton onClick={handleCloseDetails} size="small">
+                                <CloseIcon />
+                            </CloseDetailButton>
+                            <ExperimentDetails experiment={selectedExperiment} />
+                        </>
+                    )}
+                </DetailsWrapper>
+            </ExperimentLayout>
+        </>
     );
 }
+
+const ExperimentLayout = styled('div')<{ $isDetailsOpen: boolean }>`
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    display: grid;
+    grid-template-columns: minmax(40px, 2fr) 1fr;
+    grid-template-areas: 'main-content details';
+    gap: ${({ theme }) => theme.spacing(2)};
+    height: 100%;
+    padding: ${({ theme }) => theme.spacing(2)};
+
+    ${({ $isDetailsOpen }) => !$isDetailsOpen && `grid-template-columns: 1fr 0;`}
+`;
+
+const MainContent = styled('div')`
+    grid-area: main-content;
+    display: flex;
+    flex-direction: column;
+    gap: ${({ theme }) => theme.spacing(2)};
+`;
+
+const DetailsWrapper = styled('div')`
+    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    grid-area: details;
+    padding: ${({ theme }) => theme.spacing(3)};
+    position: relative;
+`;
+
+const CloseDetailButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
+    position: absolute;
+    top: ${({ theme }) => theme.spacing(2)};
+    right: ${({ theme }) => theme.spacing(2)};
+`;

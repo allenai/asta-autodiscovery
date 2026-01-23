@@ -14,14 +14,21 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from utils.auth import requires_enrollment
-from utils.credits import InsufficientCreditsError, check_sufficient_credits
+from utils.credits import InsufficientCreditsError, check_sufficient_credits, get_job_stats
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    GetExampleRunsRequestModel,
+    GetExampleRunsResponseModel,
+    RunDetailsModel,
+    RunModel,
     ExperimentModel,
     GetExperimentStatusResponseModel,
     GetRunExperimentsResponseModel,
+    GetViewerRunsRequestModel,
+    GetViewerRunsResponseModel,
+    RunStatsModel,
 )
 
 # Import autodiscovery_jobs when available
@@ -249,6 +256,100 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to list runs: {e}")
             return jsonify({"error": str(e)}), 500
+
+    @api.route("/list/me", methods=["GET"])
+    @requires_enrollment
+    def list_viewer_runs():
+        req = GetViewerRunsRequestModel(
+            limit=int(request.args.get("limit", 10)),
+            userid=request.user.get("sub"),
+        )
+
+        job_manager = get_job_manager()
+        run_ids = job_manager.list_jobs(req.userid)
+
+        sliced_run_ids = run_ids[: req.limit]
+        run_models: list[RunModel] = []
+
+        for run_id in sliced_run_ids:
+            run_details = _get_run_details(req.userid, run_id) or {}
+            job_stats = get_job_stats(
+                userid=req.userid, jobid=run_id, config=job_manager.config
+            )
+
+            run_details_model = RunDetailsModel(
+                execution_id=run_details.get("execution_id"),
+                created_at=run_details.get("created_at", ""),
+                status=run_details.get("status", "UNKNOWN"),
+                status_checked_at=run_details.get("status_checked_at"),
+            )
+            run_stats_model = RunStatsModel(
+                requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
+                completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
+                pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
+                num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
+            )
+            run_model = RunModel(
+                runid=run_id,
+                status=run_details.get("status", "UNKNOWN"),
+                name=f"Run {run_id}", # TODO: Update when name is supported
+                description=f"Description for Run {run_id}", # TODO: Update when description is supported
+                path=None,
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+                execution_status={},
+            )
+            run_models.append(run_model)
+
+        resp = GetViewerRunsResponseModel(
+            runs=run_models,
+        )
+        return jsonify(resp.model_dump()), 200
+
+    @api.route("/list/examples", methods=["GET"])
+    def list_example_runs():
+        """List example runs available to all users.
+
+        Returns:
+            JSON response with array of example run IDs.
+        """
+
+        req = GetExampleRunsRequestModel(
+            limit=int(request.args.get("limit", 5)),
+        )
+
+        runs: list[RunModel] = []
+        # TODO: Fetch real example runs from a predefined source
+        for i in range(1, req.limit + 1):
+            run_stats_model = RunStatsModel(
+                requested_experiments=0,
+                completed_experiments=0,
+                pending_experiments=0,
+                num_surprising_experiments=0,
+            )
+            run_details_model = RunDetailsModel(
+                execution_id=None,
+                created_at=datetime.now(UTC).isoformat(),
+                status="COMPLETED",
+                status_checked_at=datetime.now(UTC).isoformat(),
+            )
+            run_model = RunModel(
+                runid=f"example-run-{i}",
+                status="COMPLETED",
+                name=f"Example Run {i}",
+                path=None,
+                description=f"This is example run number {i}.",
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+                execution_status={},
+            )
+            runs.append(run_model)
+
+        resp = GetExampleRunsResponseModel(
+            runs=runs,
+        )
+        return jsonify(resp.model_dump()), 200
+
 
     @api.route("/<runid>")
     @requires_enrollment

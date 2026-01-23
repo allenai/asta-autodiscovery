@@ -5,7 +5,10 @@ const DEFAULT_HEADERS = {
 } as const;
 
 export class BaseApi {
-    protected createDefaultHeaders = async () => {
+    protected createDefaultHeaders = async (): Promise<{
+        'Content-Type': string;
+        Authorization?: string;
+    }> => {
         if (!auth0Client) {
             return DEFAULT_HEADERS;
         }
@@ -41,23 +44,32 @@ export class BaseApi {
         response: Response;
         data: T;
     }> {
-        let bodyStr: null | string = null;
+        let bodyToSend: null | string | FormData = null;
+        const isFormData = body instanceof FormData;
+
         switch (method.toUpperCase()) {
             case 'GET':
             case 'HEAD':
                 break;
             default:
-                bodyStr = typeof body === 'string' ? body : JSON.stringify(body || {});
+                if (isFormData) {
+                    bodyToSend = body;
+                } else {
+                    bodyToSend = typeof body === 'string' ? body : JSON.stringify(body || {});
+                }
                 break;
         }
+
+        const defaultHeaders = await this.createDefaultHeaders();
 
         const init: Record<string, any> = {
             method,
             headers: {
-                ...(await this.createDefaultHeaders()),
+                // For FormData, don't include Content-Type header (browser will set it with boundary)
+                ...(isFormData ? { Authorization: defaultHeaders.Authorization } : defaultHeaders),
                 ...headers,
             },
-            body: bodyStr,
+            body: bodyToSend,
             ...options,
         };
 

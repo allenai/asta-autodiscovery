@@ -20,10 +20,6 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     const runIdMatch = pathname.match(/^\/runs\/([^/]+)/);
     const selectedRunId = runIdMatch ? runIdMatch[1] : null;
 
-    const handleRunCreated = (runid: string) => {
-        router.push(`/runs/${runid}`);
-    };
-
     const handleSelectRun = (runid: string) => {
         router.push(`/runs/${runid}`);
     };
@@ -34,14 +30,10 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                 <Grid container sx={{ height: '100%' }}>
                     {/* Sidebar - RunsList */}
                     <Sidebar item xs={12} md={2}>
-                        <Logo>
+                        <Logo href="/runs">
                             <IconAutoDSLogo />
                         </Logo>
-                        <RunsList
-                            selectedRunId={selectedRunId}
-                            onSelectRun={handleSelectRun}
-                            onRunCreated={handleRunCreated}
-                        />
+                        <RunsList selectedRunId={selectedRunId} onSelectRun={handleSelectRun} />
                     </Sidebar>
 
                     {/* Main content */}
@@ -83,8 +75,8 @@ const MainContent = styled(Grid)`
     overflow: auto;
 `;
 
-const Logo = styled('div')`
-    padding: ${({ theme }) => theme.spacing(2)};
+const Logo = styled('a')`
+    padding: ${({ theme }) => theme.spacing(2, 2, 0, 2)};
 
     svg {
         width: 100%;

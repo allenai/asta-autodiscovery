@@ -25,6 +25,7 @@ const STATUS_BUCKETS: Record<RunStatus, Bucket> = {
     RUNNING: Bucket.Running,
     COMPLETED: Bucket.Finished,
     SUCCEEDED: Bucket.Finished,
+    UNKNOWN: Bucket.NotStarted,
 };
 
 // Ordered in which they are displayed
@@ -44,7 +45,7 @@ export const ViewerRunsBox = () => {
         const buckets: Record<string, Run[]> = {};
         if (viewerRuns) {
             viewerRuns.forEach((run) => {
-                const status = run.details?.status ?? 'unknown';
+                const status = run.details?.status ?? RunStatus.UNKNOWN;
                 if (!buckets[status]) {
                     buckets[status] = [];
                 }

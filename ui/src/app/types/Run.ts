@@ -2,6 +2,8 @@ import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi'
 
 export enum RunStatus {
     CREATED = 'CREATED',
+    QUEUED = 'QUEUED',
+    PENDING = 'PENDING',
     RUNNING = 'RUNNING',
     SUCCEEDED = 'SUCCEEDED',
     FAILED = 'FAILED',
@@ -64,7 +66,7 @@ export const getRunDetailsFromApi = (detailsFromApi?: RunDetailsFromApi): RunDet
     return {
         executionId: detailsFromApi.execution_id,
         createdAt: detailsFromApi.created_at,
-        status: detailsFromApi.status,
+        status: detailsFromApi.status as RunStatus,
         statusCheckedAt: detailsFromApi.status_checked_at,
     };
 };

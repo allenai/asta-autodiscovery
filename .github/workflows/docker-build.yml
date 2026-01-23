@@ -22,6 +22,7 @@ jobs:
       - name: Build containers
         run: docker compose build
         env:
+          # These all need to be set for the build.
           GOOGLE_APPLICATION_CREDENTIALS: /dev/null
           GCS_BUCKET: ""
           GCP_PROJECT: ""

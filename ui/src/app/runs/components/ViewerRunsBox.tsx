@@ -1,8 +1,8 @@
-import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
-import AddBoxIcon from '@mui/icons-material/AddBox';
+import { Box, CircularProgress, Typography, styled } from '@mui/material';
 
 import { useRuns } from '@/contexts/RunsContext';
 import { RunSummary } from '@/runs/components/RunSummary';
+import { CreateRunButton } from '@/runs/components/CreateRunButton';
 
 export const ViewerRunsBox = () => {
     const { viewerRuns, isViewerRunsLoading } = useRuns();
@@ -10,15 +10,8 @@ export const ViewerRunsBox = () => {
         <>
             <Header>
                 <Headline variant="h5">Your Sessions</Headline>
-                <div style={{ opacity: 0.3, cursor: 'not-allowed' }}>
-                    <CreateRunButton
-                        variant="contained"
-                        fullWidth
-                        startIcon={<StyledAddBoxIcon />}
-                        onClick={undefined}
-                        disabled={false}>
-                        {'New exploration'}
-                    </CreateRunButton>
+                <div>
+                    <CreateRunButton />
                 </div>
             </Header>
             {viewerRuns && viewerRuns.length > 0 && (
@@ -67,13 +60,3 @@ const Headline = styled(Typography)(({ theme }) => ({
 const RunItem = styled('div')(({ theme }) => ({
     marginBottom: theme.spacing(2),
 }));
-
-const CreateRunButton = styled(Button)`
-    background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    cursor: pointer;
-`;
-
-const StyledAddBoxIcon = styled(AddBoxIcon)`
-    color: ${({ theme }) => theme.color['green-100'].hex};
-`;

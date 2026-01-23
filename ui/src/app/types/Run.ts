@@ -4,8 +4,12 @@ import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi'
 export enum RunStatus {
     CANCELLED = 'CANCELLED',
     FAILED = 'FAILED',
+    ERROR = 'ERROR',
+    CREATED = 'CREATED',
     PENDING = 'PENDING',
+    QUEUED = 'QUEUED',
     RUNNING = 'RUNNING',
+    COMPLETED = 'COMPLETED',
     SUCCEEDED = 'SUCCEEDED',
 }
 

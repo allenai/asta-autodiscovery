@@ -7,7 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { Experiment, RunDetails, RunStatus as RunStatusEnum, getRunFromApi } from '@/types/Run';
+import { Experiment, RunDetails, getRunFromApi } from '@/types/Run';
 import { RunExperiments } from '@/runs/components/RunExperiments';
 import { ExperimentDetails } from './ExperimentDetails';
 
@@ -63,15 +63,16 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         // Auto-refresh every 30 seconds if run is still running
         const interval = setInterval(() => {
             if (
-                runDetails?.status === RunStatusEnum.RUNNING ||
-                runDetails?.status === RunStatusEnum.PENDING
+                runDetails?.status === 'RUNNING' ||
+                runDetails?.status === 'PENDING' ||
+                runDetails?.status === 'QUEUED'
             ) {
                 fetchStatus(true);
             }
         }, 30000);
 
         return () => clearInterval(interval);
-    }, [runid, runDetails?.status]);
+    }, [runid]);
 
     const handleSelectExperiment = (experiment: Experiment) => {
         setSelectedExperiment(experiment);
@@ -106,23 +107,29 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         }
     };
 
-    const getStatusColor = (status: RunStatusEnum) => {
-        switch (status) {
-            case RunStatusEnum.RUNNING:
-            case RunStatusEnum.PENDING:
+    const getStatusColor = (status: string) => {
+        const upperStatus = status.toUpperCase();
+        switch (upperStatus) {
+            case 'CREATED':
+                return 'default';
+            case 'RUNNING':
+            case 'PENDING':
+            case 'QUEUED':
                 return 'primary';
-            case RunStatusEnum.SUCCEEDED:
+            case 'COMPLETED':
+            case 'SUCCEEDED':
                 return 'success';
-            case RunStatusEnum.FAILED:
+            case 'FAILED':
+            case 'ERROR':
                 return 'error';
-            case RunStatusEnum.CANCELLED:
+            case 'CANCELLED':
                 return 'warning';
             default:
                 return 'default';
         }
     };
 
-    const canStop = runDetails?.status === RunStatusEnum.RUNNING;
+    const canStop = runDetails?.status === 'RUNNING';
 
     if (loading) {
         return (

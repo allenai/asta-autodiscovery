@@ -4,11 +4,13 @@ import { Box, styled } from '@mui/material';
 
 import AuthButton from '@/components/AuthButton';
 import CreditsChip from '@/components/CreditsChip';
+import { AboutButton } from '@/components/AboutButton';
 
 export default function Header() {
     return (
         <StyledHeader>
             <CreditsChip />
+            <AboutButton />
             <AuthButton />
         </StyledHeader>
     );

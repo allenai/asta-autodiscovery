@@ -11,6 +11,7 @@ export enum RunStatus {
     RUNNING = 'RUNNING',
     COMPLETED = 'COMPLETED',
     SUCCEEDED = 'SUCCEEDED',
+    UNKNOWN = 'UNKNOWN',
 }
 
 export type Run = {

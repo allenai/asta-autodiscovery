@@ -310,7 +310,7 @@ def create() -> Blueprint:
                 pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
                 num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
             )
-            run_metadata_model = MetadataModel(**metadata_dict) if metadata_dict else None
+            run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
             run_model = RunModel(
                 runid=run_id,
                 status=run_details.get("status", "UNKNOWN"),
@@ -558,19 +558,7 @@ def create() -> Blueprint:
         if not metadata_dict:
             return jsonify({"error": "Metadata not found"}), 404
 
-        dataset_models: list[MetadataDatasetModel] = []
-        for dataset in metadata_dict.get("datasets", []):
-            dataset_model = MetadataDatasetModel(
-                name=dataset.get("name"),
-                description=dataset.get("description"),
-            )
-            dataset_models.append(dataset_model)
-
-        metadata_model = MetadataModel(
-            title=metadata_dict.get("title"),
-            description=metadata_dict.get("description"),
-            datasets=dataset_models,
-        )
+        metadata_model = MetadataModel.from_dict(metadata_dict)
 
         resp = GetRunMetadataResponseModel(
             runid=req.runid,

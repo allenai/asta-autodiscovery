@@ -63,6 +63,23 @@ class MetadataModel(BaseModel):
         None, description="List of datasets associated with the run"
     )
 
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> "MetadataModel":
+        """Create MetadataModel from a dictionary"""
+        datasets_data = data.get("datasets", [])
+        datasets = [
+            MetadataDatasetModel(
+                name=ds.get("name"),
+                description=ds.get("description"),
+            )
+            for ds in datasets_data
+        ]
+        return MetadataModel(
+            title=data.get("title"),
+            description=data.get("description"),
+            datasets=datasets,
+        )
+
 class RunModel(BaseModel):
     """Model representing a run with its attributes"""
 

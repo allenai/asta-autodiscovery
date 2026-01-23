@@ -36,6 +36,7 @@ export const CreateRunButton = () => {
             setError(err instanceof Error ? err.message : 'Failed to create run');
         } finally {
             setError(null);
+            setIsCreating(false);
         }
     };
 

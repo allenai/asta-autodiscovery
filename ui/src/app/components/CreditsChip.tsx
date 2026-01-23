@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Chip, Grid, Popover, styled } from '@mui/material';
+import { Chip, Popover, styled } from '@mui/material';
 import Link from 'next/link';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';

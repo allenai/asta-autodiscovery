@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';
 import Header from '@/components/Header';
+import { RunsContextProvider } from '@/contexts/RunsContext';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -19,43 +20,37 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     const runIdMatch = pathname.match(/^\/runs\/([^/]+)/);
     const selectedRunId = runIdMatch ? runIdMatch[1] : null;
 
-    const handleRunCreated = (runid: string) => {
-        router.push(`/runs/${runid}`);
-    };
-
     const handleSelectRun = (runid: string) => {
         router.push(`/runs/${runid}`);
     };
 
     return (
-        <Wrapper>
-            <Grid container sx={{ height: '100%' }}>
-                {/* Sidebar - RunsList */}
-                <Sidebar item xs={12} md={2}>
-                    <Logo>
-                        <IconAutoDSLogo />
-                    </Logo>
-                    <RunsList
-                        selectedRunId={selectedRunId}
-                        onSelectRun={handleSelectRun}
-                        onRunCreated={handleRunCreated}
-                    />
-                </Sidebar>
+        <RunsContextProvider>
+            <Wrapper>
+                <Grid container sx={{ height: '100%' }}>
+                    {/* Sidebar - RunsList */}
+                    <Sidebar item xs={12} md={2}>
+                        <Logo href="/runs">
+                            <IconAutoDSLogo />
+                        </Logo>
+                        <RunsList selectedRunId={selectedRunId} onSelectRun={handleSelectRun} />
+                    </Sidebar>
 
-                {/* Main content */}
-                <MainContent
-                    item
-                    xs={12}
-                    md={10}
-                    sx={{
-                        height: '100%',
-                        overflow: 'auto',
-                    }}>
-                    <Header />
-                    {children}
-                </MainContent>
-            </Grid>
-        </Wrapper>
+                    {/* Main content */}
+                    <MainContent
+                        item
+                        xs={12}
+                        md={10}
+                        sx={{
+                            height: '100%',
+                            overflow: 'auto',
+                        }}>
+                        <Header />
+                        {children}
+                    </MainContent>
+                </Grid>
+            </Wrapper>
+        </RunsContextProvider>
     );
 }
 
@@ -80,6 +75,11 @@ const MainContent = styled(Grid)`
     overflow: auto;
 `;
 
-const Logo = styled('div')`
-    padding: ${({ theme }) => theme.spacing(2)};
+const Logo = styled('a')`
+    padding: ${({ theme }) => theme.spacing(2, 2, 0, 2)};
+
+    svg {
+        width: 100%;
+        height: auto;
+    }
 `;

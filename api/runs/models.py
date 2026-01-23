@@ -1,5 +1,45 @@
+from typing import Any
 from pydantic import BaseModel, Field
 
+class RunDetailsModel(BaseModel):
+    """Model representing detailed information about a run"""
+
+    execution_id: str | None = Field(None, description="Identifier for the execution")
+    created_at: str = Field(..., description="Timestamp when the run was created")
+    status: str = Field(..., description="Current status of the run")
+    status_checked_at: str | None = Field(None, description="Timestamp when the status was last checked")
+
+class RunStatsModel(BaseModel):
+    """Model representing statistics of a run"""
+
+    requested_experiments: int = Field(..., description="Total number of experiments requested")
+    completed_experiments: int = Field(
+        ..., description="Number of experiments that have been completed"
+    )
+    pending_experiments: int = Field(
+        ..., description="Number of experiments that are still pending"
+    )
+    num_surprising_experiments: int = Field(
+        ..., description="Number of experiments that are considered surprising"
+    )
+
+class RunModel(BaseModel):
+    """Model representing a run with its attributes"""
+
+    runid: str = Field(..., description="Unique identifier for the run")
+    status: str = Field(..., description="Current status of the run")
+    name: str | None = Field(None, description="Name of the run")
+    description: str | None = Field(None, description="Description of the run")
+    path: str | None = Field(None, description="Filesystem path of the run")
+    run_details: RunDetailsModel | None = Field(
+        None, description="Detailed information about the run"
+    )
+    run_stats: RunStatsModel | None = Field(
+        None, description="Statistical information about the run"
+    )
+    execution_status: dict[str, Any] | None = Field(
+        None, description="Execution status of the run"
+    )
 
 class ExperimentModel(BaseModel):
     """Model representing an experiment with its attributes"""
@@ -21,10 +61,33 @@ class ExperimentModel(BaseModel):
     )
     runtime_ms: float | None = Field(None, description="Runtime of the experiment in milliseconds")
     hypothesis: str | None = Field(None, description="Hypothesis associated with the experiment")
-    experiment_plan: dict | None = Field(None, description="Plan details of the experiment")
+    experiment_plan: dict[str, Any] | None = Field(None, description="Plan details of the experiment")
     review: str | None = Field(
         None, description="Results of the experiment in human-readable format"
     )
+
+class GetExampleRunsRequestModel(BaseModel):
+    """Model for the request to get example runs"""
+
+    limit: int = Field(..., description="Maximum number of example runs to retrieve")
+
+class GetExampleRunsResponseModel(BaseModel):
+    """Model for the response containing a list of example runs"""
+
+    runs: list[RunModel] = Field(..., description="List of example runs")
+
+class GetViewerRunsRequestModel(BaseModel):
+    """Model for the request to get runs for the viewer"""
+
+    limit: int = Field(..., description="Maximum number of runs to retrieve")
+    userid: str = Field(
+        ..., description="User identifier for whom to retrieve runs; defaults to the viewer"
+    )
+
+class GetViewerRunsResponseModel(BaseModel):
+    """Model for the response containing a list of runs for the viewer"""
+
+    runs: list[RunModel] = Field(..., description="List of runs available to the viewer")
 
 
 class GetRunExperimentsResponseModel(BaseModel):

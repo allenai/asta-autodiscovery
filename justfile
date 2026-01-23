@@ -23,7 +23,7 @@ sync:
   uv sync --all-packages --all-extras
 
 adk-web:
-  adk web devtools --port 8000
+  uv run adk web packages/devtools/adk --port 8000
 
 serve-docs:
   uv run mkdocs serve

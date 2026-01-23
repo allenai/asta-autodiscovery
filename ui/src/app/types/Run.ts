@@ -1,17 +1,39 @@
-import { ExperimentFromApi, RunDetailsFromApi, RunResponseBody } from '@/api/RunsApi';
+import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
+
+// Maps to values from _get_execution_phase() in cloudrun.py
+export enum RunStatus {
+    CANCELLED = 'CANCELLED',
+    FAILED = 'FAILED',
+    ERROR = 'ERROR',
+    CREATED = 'CREATED',
+    PENDING = 'PENDING',
+    QUEUED = 'QUEUED',
+    RUNNING = 'RUNNING',
+    COMPLETED = 'COMPLETED',
+    SUCCEEDED = 'SUCCEEDED',
+}
 
 export type Run = {
     id: string;
     name: string;
+    description: string | null;
     path: string;
     details: RunDetails | null;
+    stats: RunStats | null;
     executionStatus?: Record<string, unknown> | null;
+};
+
+export type RunStats = {
+    requestedExperiments: number;
+    completedExperiments: number;
+    pendingExperiments: number;
+    numSurprisingExperiments: number;
 };
 
 export type RunDetails = {
     executionId: string | null;
     createdAt: string;
-    status: string;
+    status: RunStatus;
     statusCheckedAt: string | null;
 };
 
@@ -29,13 +51,15 @@ export type Experiment = {
     review: string | null;
 };
 
-export const getRunFromApi = (responseBody: RunResponseBody): Run => {
+export const getRunFromApi = (runFromApi: RunFromApi): Run => {
     return {
-        id: responseBody.runid,
-        name: '', // TODO: Populate name when available from API
-        path: responseBody.path || '',
-        details: getRunDetailsFromApi(responseBody.run_details),
-        executionStatus: responseBody.execution_status || null,
+        id: runFromApi.runid,
+        name: runFromApi.name || `Run ${runFromApi.runid}`,
+        description: runFromApi.description || '',
+        path: runFromApi.path || '',
+        details: getRunDetailsFromApi(runFromApi.run_details),
+        stats: getRunStatsFromApi(runFromApi.run_stats),
+        executionStatus: runFromApi.execution_status || null,
     };
 };
 
@@ -46,8 +70,20 @@ export const getRunDetailsFromApi = (detailsFromApi?: RunDetailsFromApi): RunDet
     return {
         executionId: detailsFromApi.execution_id,
         createdAt: detailsFromApi.created_at,
-        status: detailsFromApi.status,
+        status: detailsFromApi.status as RunStatus,
         statusCheckedAt: detailsFromApi.status_checked_at,
+    };
+};
+
+export const getRunStatsFromApi = (runFromApi: any): RunStats | null => {
+    if (!runFromApi) {
+        return null;
+    }
+    return {
+        requestedExperiments: runFromApi.requested_experiments,
+        completedExperiments: runFromApi.completed_experiments,
+        pendingExperiments: runFromApi.pending_experiments,
+        numSurprisingExperiments: runFromApi.num_surprising_experiments,
     };
 };
 

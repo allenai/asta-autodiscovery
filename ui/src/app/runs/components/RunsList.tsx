@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import {
     Box,
     List,
@@ -8,24 +7,20 @@ import {
     ListItemButton,
     ListItemText,
     Typography,
-    Button,
     CircularProgress,
-    Alert,
     Divider,
     styled,
 } from '@mui/material';
-import AddBoxIcon from '@mui/icons-material/AddBox';
 
 import Link from 'next/link';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getRunsApi } from '@/api/RunsApi';
-import { getRunFromApi } from '@/types/Run';
+import { useRuns } from '@/contexts/RunsContext';
+import { CreateRunButton } from '@/runs/components/CreateRunButton';
 
 interface RunsListProps {
     selectedRunId: string | null;
     onSelectRun: (runid: string) => void;
-    onRunCreated: (runid: string) => void;
 }
 
 /**
@@ -37,55 +32,9 @@ interface RunsListProps {
  * - Highlights currently selected run
  * - Loading and error states
  */
-export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: RunsListProps) {
+export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) {
     const { isAuthenticated } = useAuth0();
-    const [runs, setRuns] = useState<string[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [creating, setCreating] = useState(false);
-    const api = getRunsApi();
-
-    const fetchRuns = async () => {
-        if (!isAuthenticated) return;
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            const { data } = await api.listRuns();
-            setRuns(data.runs);
-        } catch (err) {
-            console.error('Error fetching runs:', err);
-            setError(err instanceof Error ? err.message : 'Failed to load runs');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchRuns();
-    }, [isAuthenticated]);
-
-    const handleCreateRun = async () => {
-        setCreating(true);
-        setError(null);
-
-        try {
-            const { data } = await api.createRun();
-            const run = getRunFromApi(data);
-
-            // Add new run to list
-            setRuns([run.id, ...runs]);
-
-            // Notify parent component
-            onRunCreated(run.id);
-        } catch (err) {
-            console.error('Error creating run:', err);
-            setError(err instanceof Error ? err.message : 'Failed to create run');
-        } finally {
-            setCreating(false);
-        }
-    };
+    const { viewerRuns, isViewerRunsLoading } = useRuns();
 
     if (!isAuthenticated) {
         return (
@@ -105,31 +54,16 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
                 flexDirection: 'column',
             }}>
             <Box sx={{ p: 2 }}>
-                <CreateRunButton
-                    variant="contained"
-                    fullWidth
-                    startIcon={creating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />}
-                    onClick={handleCreateRun}
-                    disabled={creating}>
-                    {creating ? 'Creating...' : 'New exploration'}
-                </CreateRunButton>
+                <CreateRunButton />
             </Box>
 
             <Divider />
 
-            {error && (
-                <Box sx={{ p: 2 }}>
-                    <Alert severity="error" onClose={() => setError(null)}>
-                        {error}
-                    </Alert>
-                </Box>
-            )}
-
-            {loading ? (
+            {isViewerRunsLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                     <CircularProgress />
                 </Box>
-            ) : runs.length === 0 ? (
+            ) : viewerRuns?.length === 0 ? (
                 <Box sx={{ p: 2 }}>
                     <Typography variant="body2" color="text.secondary" align="center">
                         No runs yet. Create your first run to get started.
@@ -137,20 +71,20 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
                 </Box>
             ) : (
                 <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-                    {runs.map((runid) => (
-                        <ListItem key={runid} disablePadding>
+                    {viewerRuns?.map((run) => (
+                        <ListItem key={run.id} disablePadding>
                             <Link
-                                href={`/runs/${runid}`}
+                                href={`/runs/${run.id}`}
                                 style={{
                                     textDecoration: 'none',
                                     color: 'inherit',
                                     width: '100%',
                                 }}>
                                 <RunItemButton
-                                    selected={selectedRunId === runid}
-                                    onClick={() => onSelectRun(runid)}>
+                                    selected={selectedRunId === run.id}
+                                    onClick={() => onSelectRun(run.id)}>
                                     <ListItemText
-                                        primary={runid}
+                                        primary={run.name || run.id}
                                         primaryTypographyProps={{
                                             variant: 'body2',
                                             noWrap: true,
@@ -180,13 +114,4 @@ const RunItemButton = styled(ListItemButton)`
     &:hover {
         background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
     }
-`;
-
-const CreateRunButton = styled(Button)`
-    background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-`;
-
-const StyledAddBoxIcon = styled(AddBoxIcon)`
-    color: ${({ theme }) => theme.color['green-100'].hex};
 `;

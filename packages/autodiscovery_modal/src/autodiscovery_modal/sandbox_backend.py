@@ -9,7 +9,7 @@ from typing import Any, Literal
 import modal
 from code_execution.ipython_session import ExecutionConfig
 
-from .ipython_session import image
+from .ipython_session import image as default_image
 
 _DEFAULT_SANDBOX_TIMEOUT_S = 600
 _SANDBOX_RUNNER = """
@@ -106,6 +106,7 @@ class ModalSandboxIPythonBackend:
         app_name: str,
         bucket_mount: modal.CloudBucketMount,
         mount_path: str = "/data",
+        image: modal.Image | None = None,
         env: dict[str, str] | None = None,
         sandbox_timeout_s: int = _DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> None:
@@ -115,12 +116,14 @@ class ModalSandboxIPythonBackend:
             app_name: Modal app name used to create Sandboxes.
             bucket_mount: CloudBucketMount scoped to the dataset prefix.
             mount_path: Path in the Sandbox where the dataset mount is attached.
+            image: Modal image to use for the Sandbox. Defaults to the package image.
             env: Environment variables for the Sandbox process.
             sandbox_timeout_s: Max Sandbox lifetime in seconds.
         """
         self._app = modal.App.lookup(app_name, create_if_missing=True)
         self._bucket_mount = bucket_mount
         self._mount_path = mount_path
+        self._image = image or default_image
         self._env = env or {}
         self._sandbox_timeout_s = sandbox_timeout_s
 
@@ -139,6 +142,7 @@ class ModalSandboxIPythonBackend:
         bucket_endpoint_url: str | None = None,
         bucket_secret: modal.Secret | None = None,
         oidc_auth_role_arn: str | None = None,
+        image: modal.Image | None = None,
         env: dict[str, str] | None = None,
         sandbox_timeout_s: int = _DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> ModalSandboxIPythonBackend:
@@ -157,6 +161,7 @@ class ModalSandboxIPythonBackend:
             bucket_endpoint_url: Endpoint URL for S3-compatible buckets, if needed.
             bucket_secret: Modal Secret with bucket credentials, if needed.
             oidc_auth_role_arn: IAM role ARN for OIDC-based auth, if used.
+            image: Modal image to use for the Sandbox. Defaults to the package image.
             env: Environment variables for the Sandbox process.
             sandbox_timeout_s: Max Sandbox lifetime in seconds.
 
@@ -183,6 +188,7 @@ class ModalSandboxIPythonBackend:
             app_name=app_name,
             bucket_mount=bucket_mount,
             mount_path=mount_path,
+            image=image,
             env=runtime_env,
             sandbox_timeout_s=sandbox_timeout_s,
         )
@@ -199,6 +205,7 @@ class ModalSandboxIPythonBackend:
         bucket_endpoint_url: str | None = None,
         bucket_secret: modal.Secret | None = None,
         oidc_auth_role_arn: str | None = None,
+        image: modal.Image | None = None,
         env: dict[str, str] | None = None,
         sandbox_timeout_s: int = _DEFAULT_SANDBOX_TIMEOUT_S,
     ) -> ModalSandboxIPythonBackend:
@@ -213,6 +220,7 @@ class ModalSandboxIPythonBackend:
             bucket_endpoint_url: Endpoint URL for S3-compatible buckets, if needed.
             bucket_secret: Modal Secret with bucket credentials, if needed.
             oidc_auth_role_arn: IAM role ARN for OIDC-based auth, if used.
+            image: Modal image to use for the Sandbox. Defaults to the package image.
             env: Environment variables for the Sandbox process.
             sandbox_timeout_s: Max Sandbox lifetime in seconds.
 
@@ -234,6 +242,7 @@ class ModalSandboxIPythonBackend:
             app_name=app_name,
             bucket_mount=bucket_mount,
             mount_path=mount_path,
+            image=image,
             env=runtime_env,
             sandbox_timeout_s=sandbox_timeout_s,
         )
@@ -252,7 +261,7 @@ class ModalSandboxIPythonBackend:
         secrets = [secret] if secret is not None else []
         sandbox = modal.Sandbox.create(
             app=self._app,
-            image=image,
+            image=self._image,
             volumes={self._mount_path: self._bucket_mount},
             secrets=secrets,
             timeout=self._sandbox_timeout_s,

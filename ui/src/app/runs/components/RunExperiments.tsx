@@ -1,4 +1,4 @@
-import { Paper } from '@mui/material';
+import { Paper, styled } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useEffect, useRef, useState } from 'react';
 
@@ -7,6 +7,7 @@ import { getRunsApi } from '@/api/RunsApi';
 
 type RunExperimentsProps = {
     runId: string;
+    onSelectExperiment: (experiment: Experiment) => void;
 };
 
 const DEFAULT_UPDATE_INTERVAL_MS = 15000;
@@ -20,9 +21,9 @@ const columns: GridColDef[] = [
     { field: 'hypothesis', headerName: 'Hypothesis', width: 200, flex: 1 },
 ];
 
-export default function RunExperiments({ runId }: RunExperimentsProps) {
+export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProps) {
     const api = getRunsApi();
-    const [experiments, setExperiments] = useState<Experiment[]>([]); // eslint-disable-line @typescript-eslint/no-unused-vars
+    const [experiments, setExperiments] = useState<Record<string, Experiment>>({});
     const [rows, setRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -45,7 +46,16 @@ export default function RunExperiments({ runId }: RunExperimentsProps) {
             const newExperiments = data.experiments.map((experimentFromApi) =>
                 getExperimentFromApi(experimentFromApi)
             );
-            setExperiments((prevExperiments) => [...prevExperiments, ...newExperiments]);
+            setExperiments((prevExperiments) => ({
+                ...prevExperiments,
+                ...newExperiments.reduce(
+                    (acc, experiment) => {
+                        acc[experiment.experimentId] = experiment;
+                        return acc;
+                    },
+                    {} as Record<string, Experiment>
+                ),
+            }));
 
             // Convert to rows for DataGrid
             const newRows = newExperiments.map((experiment) => ({
@@ -89,16 +99,31 @@ export default function RunExperiments({ runId }: RunExperimentsProps) {
 
     const paginationModel = { page: 0, pageSize: 5 };
 
+    const handleRowClick = (params: any) => {
+        onSelectExperiment(experiments[params.id]);
+    };
+
     return (
-        <Paper sx={{ height: 400, width: '100%' }}>
-            <DataGrid
+        <Paper sx={{ height: '100%', width: '100%' }}>
+            <StyledDataGrid
                 rows={rows}
                 columns={columns}
                 loading={loading}
                 initialState={{ pagination: { paginationModel } }}
-                pageSizeOptions={[5, 10]}
+                pageSizeOptions={[5, 10, 25]}
                 sx={{ border: 0 }}
+                onRowClick={handleRowClick}
             />
         </Paper>
     );
 }
+
+const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    backgroundColor: theme.color['dark-teal-100'].hex,
+    margin: theme.spacing(0.5, 0, 1, 0),
+    '.MuiDataGrid-cell, .MuiDataGrid-columnHeaders, .MuiDataGrid-row, .MuiDataGrid-columnSeparator':
+        {
+            borderColor: theme.color['cream-4'].rgba.toString(),
+        },
+}));

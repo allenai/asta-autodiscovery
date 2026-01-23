@@ -314,7 +314,7 @@ def create() -> Blueprint:
             run_model = RunModel(
                 runid=run_id,
                 status=run_details.get("status", "UNKNOWN"),
-                name=run_metadata_model.title if run_metadata_model else f"Run {run_id}",
+                name=run_metadata_model.name if run_metadata_model else f"Run {run_id}",
                 description=run_metadata_model.description if run_metadata_model else f"Description for Run {run_id}",
                 path=None,
                 run_stats=run_stats_model,
@@ -357,7 +357,7 @@ def create() -> Blueprint:
                 status_checked_at=datetime.now(UTC).isoformat(),
             )
             run_metadata_model = MetadataModel(
-                title=f"Example Run {i}",
+                name=f"Example Run {i}",
                 description=f"This is the metadata for example run {i}.",
                 datasets=[],
             )

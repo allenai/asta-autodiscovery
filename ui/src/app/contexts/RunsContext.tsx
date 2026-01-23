@@ -11,55 +11,7 @@ import {
 } from 'react';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { Run } from '@/types/Run';
-
-const EXAMPLE_RUNS: Run[] = [
-    {
-        id: 'run-1',
-        name: 'Melanoma',
-        path: '/path/to/run-1',
-        details: {
-            executionId: 'exec-1',
-            createdAt: '2024-01-01T12:00:00Z',
-            status: 'completed',
-            statusCheckedAt: '2024-01-01T14:00:00Z',
-        },
-        executionStatus: {
-            accuracy: 0.95,
-            loss: 0.05,
-        },
-    },
-    {
-        id: 'run-2',
-        name: 'Breast Cancer',
-        path: '/path/to/run-2',
-        details: {
-            executionId: 'exec-2',
-            createdAt: '2024-01-02T12:00:00Z',
-            status: 'completed',
-            statusCheckedAt: '2024-01-02T14:00:00Z',
-        },
-        executionStatus: {
-            accuracy: 0.9,
-            loss: 0.1,
-        },
-    },
-    {
-        id: 'run-3',
-        name: 'Reef Notes',
-        path: '/path/to/run-3',
-        details: {
-            executionId: 'exec-3',
-            createdAt: '2024-01-03T12:00:00Z',
-            status: 'completed',
-            statusCheckedAt: '2024-01-03T14:00:00Z',
-        },
-        executionStatus: {
-            accuracy: 0.85,
-            loss: 0.15,
-        },
-    },
-];
+import { getRunFromApi, Run } from '@/types/Run';
 
 export interface RunsState {
     viewerRuns: Run[] | null;
@@ -116,20 +68,8 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const updateViewerRuns = useCallback(async () => {
         setIsViewerRunsLoading(true);
         try {
-            const { data } = await runsApi.listRuns();
-            // TODO: Add details to API for fetching
-            const runs: Run[] = data.runs.map((runData) => ({
-                id: runData,
-                name: `Run ${runData}`,
-                path: `/path/to/${runData}`,
-                details: {
-                    executionId: `exec-${runData}`,
-                    createdAt: new Date().toISOString(),
-                    status: 'completed',
-                    statusCheckedAt: new Date().toISOString(),
-                },
-                executionStatus: {},
-            }));
+            const { data } = await runsApi.listViewerRuns();
+            const runs = data.runs.map((runData) => getRunFromApi(runData));
             setViewerRuns(runs);
         } catch (error: any) {
             setLastError(error.message || 'Failed to fetch viewer runs');
@@ -141,8 +81,9 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const updateExampleRuns = useCallback(async () => {
         setIsExampleRunsLoading(true);
         try {
-            // const { data } = await runsApi.getExampleRuns();
-            setExampleRuns(EXAMPLE_RUNS);
+            const { data } = await runsApi.listExampleRuns();
+            const runs = data.runs.map((runData) => getRunFromApi(runData));
+            setExampleRuns(runs);
         } catch (error: any) {
             setLastError(error.message || 'Failed to fetch example runs');
         } finally {

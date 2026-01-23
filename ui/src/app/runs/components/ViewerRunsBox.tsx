@@ -8,6 +8,8 @@ import { Run, RunStatus } from '@/types/Run';
 
 const STATUS_LABELS = {
     CREATED: 'Not Started',
+    QUEUED: 'Queued',
+    PENDING: 'Pending',
     RUNNING: 'Running',
     SUCCEEDED: 'Finished',
     FAILED: 'Error',
@@ -31,6 +33,8 @@ export const ViewerRunsBox = () => {
         // Order the statuses for display
         return {
             CREATED: buckets.CREATED || [],
+            QUEUED: buckets.QUEUED || [],
+            PENDING: buckets.PENDING || [],
             RUNNING: buckets.RUNNING || [],
             SUCCEEDED: buckets.SUCCEEDED || [],
             FAILED: buckets.FAILED || [],

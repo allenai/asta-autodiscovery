@@ -31,12 +31,17 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
     const pollingStateRef = useRef({
         lastKnownExperimentId: null as string | null,
         hasRunCompleted: false,
+        isFetching: false,
     });
 
     const fetchLatestRunExperiments = async (runId: string) => {
-        if (pollingStateRef.current.hasRunCompleted) {
+        // Prevent concurrent fetches
+        if (pollingStateRef.current.isFetching || pollingStateRef.current.hasRunCompleted) {
             return;
         }
+
+        pollingStateRef.current.isFetching = true;
+
         try {
             // Get the list of experiments since the last one we know about
             const { data } = await api.getRunExperiments({
@@ -69,13 +74,17 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
             setRows((prevRows) => [...prevRows, ...newRows]);
 
             // Update the last known experiment ID for the next poll
-            pollingStateRef.current.lastKnownExperimentId =
-                newExperiments.at(-1)?.experimentId ?? null;
+            const lastExperimentId = newExperiments.at(-1)?.experimentId;
+            if (lastExperimentId) {
+                pollingStateRef.current.lastKnownExperimentId = lastExperimentId;
+            }
             if (data.has_job_completed) {
                 pollingStateRef.current.hasRunCompleted = true;
             }
         } catch (error) {
             console.error('Error fetching experiments:', error);
+        } finally {
+            pollingStateRef.current.isFetching = false;
         }
     };
 

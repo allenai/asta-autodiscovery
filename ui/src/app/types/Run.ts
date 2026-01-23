@@ -1,5 +1,18 @@
 import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
 
+// Maps to values from _get_execution_phase() in cloudrun.py
+export enum RunStatus {
+    CANCELLED = 'CANCELLED',
+    FAILED = 'FAILED',
+    ERROR = 'ERROR',
+    CREATED = 'CREATED',
+    PENDING = 'PENDING',
+    QUEUED = 'QUEUED',
+    RUNNING = 'RUNNING',
+    COMPLETED = 'COMPLETED',
+    SUCCEEDED = 'SUCCEEDED',
+}
+
 export type Run = {
     id: string;
     name: string;
@@ -20,7 +33,7 @@ export type RunStats = {
 export type RunDetails = {
     executionId: string | null;
     createdAt: string;
-    status: string;
+    status: RunStatus;
     statusCheckedAt: string | null;
 };
 
@@ -57,7 +70,7 @@ export const getRunDetailsFromApi = (detailsFromApi?: RunDetailsFromApi): RunDet
     return {
         executionId: detailsFromApi.execution_id,
         createdAt: detailsFromApi.created_at,
-        status: detailsFromApi.status,
+        status: detailsFromApi.status as RunStatus,
         statusCheckedAt: detailsFromApi.status_checked_at,
     };
 };

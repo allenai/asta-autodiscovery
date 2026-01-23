@@ -57,6 +57,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         handleSubmit,
     } = useRunSetup({ runid, onSubmitSuccess });
 
+    const datasetErrors =
+        uploadError || fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
+
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
             <SectionHeader>
@@ -127,15 +130,14 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         onRemoveSelectedFile={handleRemoveSelectedFile}
                         onDescriptionChange={handleFileDescriptionChange}
                         disabled={uploading || submitting}
-                        error={fieldErrors.datasets || fieldErrors.datasetFileDescriptions}
+                        error={datasetErrors}
                     />
 
-                    {fieldErrors.datasets ||
-                        (fieldErrors.datasetFileDescriptions && (
-                            <Alert severity="error" sx={{ mt: 2 }}>
-                                {fieldErrors.datasets || fieldErrors.datasetFileDescriptions}
-                            </Alert>
-                        ))}
+                    {datasetErrors && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {datasetErrors}
+                        </Alert>
+                    )}
                 </FormControl>
             </ConfigurationBox>
 

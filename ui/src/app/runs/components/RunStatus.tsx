@@ -172,19 +172,21 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                                 </Typography>
                             </Box>
                         )}
+                        {canStop && (
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                startIcon={
+                                    cancelling ? <CircularProgress size={16} /> : <CancelIcon />
+                                }
+                                onClick={handleStop}
+                                disabled={refreshing || cancelling}
+                                sx={{ flex: 1 }}>
+                                {cancelling ? 'Stopping...' : 'Stop Run'}
+                            </Button>
+                        )}
                     </Box>
 
-                    {canStop && (
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            startIcon={cancelling ? <CircularProgress size={16} /> : <CancelIcon />}
-                            onClick={handleStop}
-                            disabled={refreshing || cancelling}
-                            sx={{ flex: 1 }}>
-                            {cancelling ? 'Stopping...' : 'Stop Run'}
-                        </Button>
-                    )}
                     <Box sx={{ flex: 1, minHeight: 0 }}>
                         <RunExperiments runId={runid} onSelectExperiment={handleSelectExperiment} />
                     </Box>

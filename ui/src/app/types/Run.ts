@@ -51,6 +51,17 @@ export type Experiment = {
     review: string | null;
 };
 
+export type MetadataDataset = {
+    name: string;
+    description: string | null;
+};
+
+export type Metadata = {
+    title: string;
+    description: string | null;
+    datasets: MetadataDataset[];
+};
+
 export const getRunFromApi = (runFromApi: RunFromApi): Run => {
     return {
         id: runFromApi.runid,
@@ -100,5 +111,20 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         hypothesis: experimentFromApi.hypothesis,
         experimentPlan: experimentFromApi.experiment_plan,
         review: experimentFromApi.review,
+    };
+};
+
+export const getMetadataDatasetFromApi = (datasetFromApi: any): MetadataDataset => {
+    return {
+        name: datasetFromApi.name,
+        description: datasetFromApi.description,
+    };
+};
+
+export const getMetadataFromApi = (metadataFromApi: any): Metadata => {
+    return {
+        title: metadataFromApi.title,
+        description: metadataFromApi.description,
+        datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
     };
 };

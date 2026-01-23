@@ -23,24 +23,6 @@ class RunStatsModel(BaseModel):
         ..., description="Number of experiments that are considered surprising"
     )
 
-class RunModel(BaseModel):
-    """Model representing a run with its attributes"""
-
-    runid: str = Field(..., description="Unique identifier for the run")
-    status: str = Field(..., description="Current status of the run")
-    name: str | None = Field(None, description="Name of the run")
-    description: str | None = Field(None, description="Description of the run")
-    path: str | None = Field(None, description="Filesystem path of the run")
-    run_details: RunDetailsModel | None = Field(
-        None, description="Detailed information about the run"
-    )
-    run_stats: RunStatsModel | None = Field(
-        None, description="Statistical information about the run"
-    )
-    execution_status: dict[str, Any] | None = Field(
-        None, description="Execution status of the run"
-    )
-
 class ExperimentModel(BaseModel):
     """Model representing an experiment with its attributes"""
 
@@ -65,6 +47,73 @@ class ExperimentModel(BaseModel):
     review: str | None = Field(
         None, description="Results of the experiment in human-readable format"
     )
+
+class MetadataDatasetModel(BaseModel):
+    """Model representing dataset metadata for a run"""
+
+    name: str | None = Field(None, description="Filename of the dataset")
+    description: str | None = Field(None, description="Description of the dataset")
+
+class MetadataModel(BaseModel):
+    """Model representing metadata for a run"""
+
+    name: str | None = Field(None, description="Name of the run")
+    description: str | None = Field(None, description="Description of the run")
+    datasets: list[MetadataDatasetModel] | None = Field(
+        None, description="List of datasets associated with the run"
+    )
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> "MetadataModel":
+        """Create MetadataModel from a dictionary"""
+        datasets_data = data.get("datasets", [])
+        datasets = [
+            MetadataDatasetModel(
+                name=ds.get("name"),
+                description=ds.get("description"),
+            )
+            for ds in datasets_data
+        ]
+        return MetadataModel(
+            name=data.get("name"),
+            description=data.get("description"),
+            datasets=datasets,
+        )
+
+class RunModel(BaseModel):
+    """Model representing a run with its attributes"""
+
+    runid: str = Field(..., description="Unique identifier for the run")
+    status: str = Field(..., description="Current status of the run")
+    name: str | None = Field(None, description="Name of the run")
+    description: str | None = Field(None, description="Description of the run")
+    path: str | None = Field(None, description="Filesystem path of the run")
+    run_details: RunDetailsModel | None = Field(
+        None, description="Detailed information about the run"
+    )
+    run_stats: RunStatsModel | None = Field(
+        None, description="Statistical information about the run"
+    )
+    execution_status: dict[str, Any] | None = Field(
+        None, description="Execution status of the run"
+    )
+    run_metadata: MetadataModel | None = Field(
+        None, description="Metadata associated with the run"
+    )
+
+class GetRunMetadataRequestModel(BaseModel):
+    """Model for the request to get run metadata"""
+
+    runid: str = Field(..., description="Identifier of the run to fetch metadata for")
+    userid: str | None = Field(
+        None, description="User identifier for whom to retrieve metadata; defaults to the viewer"
+    )
+
+class GetRunMetadataResponseModel(BaseModel):
+    """Model for the response containing run metadata"""
+
+    runid: str = Field(..., description="Identifier of the run")
+    metadata: MetadataModel = Field(..., description="Metadata associated with the run")
 
 class GetExampleRunsRequestModel(BaseModel):
     """Model for the request to get example runs"""

@@ -110,18 +110,18 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         try {
             // Upload all selected files
-            for (const selectedFile of selectedFiles) {
-                const { data } = await api.uploadDataset(runid, selectedFile.file);
-
-                // Add to datasets list
-                const newDataset: Dataset = {
+            const uploadReq = selectedFiles.map((selectedFile) => {
+                return api.uploadDataset(runid, selectedFile.file);
+            });
+            const uploadResp = await Promise.all(uploadReq);
+            const datasets = uploadResp.map(({ data }, i) => {
+                return {
                     filename: data.filename,
-                    description: selectedFile.description.trim(),
+                    description: selectedFiles[i].description.trim(),
                     path: data.path,
                 };
-
-                setDatasets((prev) => [...prev, newDataset]);
-            }
+            });
+            setDatasets(datasets);
 
             // Reset form
             setSelectedFiles([]);
@@ -229,7 +229,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Prepare metadata
             const submissionMetadata = {
                 name: settings.name.trim(),
-                datasets_description: settings.datasetsDescription.trim(),
+                description: settings.datasetsDescription.trim(),
                 domain: settings.domain.trim(),
                 datasets: selectedFiles.map((ds) => ({
                     name: ds.file.name,

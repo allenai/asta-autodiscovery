@@ -1,5 +1,12 @@
 import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
 
+export enum RunStatus {
+    CREATED = 'CREATED',
+    RUNNING = 'RUNNING',
+    SUCCEEDED = 'SUCCEEDED',
+    FAILED = 'FAILED',
+}
+
 export type Run = {
     id: string;
     name: string;
@@ -20,7 +27,7 @@ export type RunStats = {
 export type RunDetails = {
     executionId: string | null;
     createdAt: string;
-    status: string;
+    status: RunStatus;
     statusCheckedAt: string | null;
 };
 

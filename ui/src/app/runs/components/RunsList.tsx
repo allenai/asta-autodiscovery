@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
     Box,
     List,
@@ -8,25 +7,20 @@ import {
     ListItemButton,
     ListItemText,
     Typography,
-    Button,
     CircularProgress,
-    Alert,
     Divider,
     styled,
 } from '@mui/material';
-import AddBoxIcon from '@mui/icons-material/AddBox';
 
 import Link from 'next/link';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { getRunsApi } from '@/api/RunsApi';
-import { getRunFromApi } from '@/types/Run';
 import { useRuns } from '@/contexts/RunsContext';
+import { CreateRunButton } from '@/runs/components/CreateRunButton';
 
 interface RunsListProps {
     selectedRunId: string | null;
     onSelectRun: (runid: string) => void;
-    onRunCreated: (runid: string) => void;
 }
 
 /**
@@ -38,33 +32,9 @@ interface RunsListProps {
  * - Highlights currently selected run
  * - Loading and error states
  */
-export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: RunsListProps) {
+export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) {
     const { isAuthenticated } = useAuth0();
-    const { viewerRuns, isViewerRunsLoading, addViewerRun } = useRuns();
-    const [error, setError] = useState<string | null>(null);
-    const [creating, setCreating] = useState(false);
-    const api = getRunsApi();
-
-    const handleCreateRun = async () => {
-        setCreating(true);
-        setError(null);
-
-        try {
-            const { data } = await api.createRun();
-            const run = getRunFromApi(data);
-
-            // Add new run to list
-            addViewerRun(run);
-
-            // Notify parent component
-            onRunCreated(run.id);
-        } catch (err) {
-            console.error('Error creating run:', err);
-            setError(err instanceof Error ? err.message : 'Failed to create run');
-        } finally {
-            setCreating(false);
-        }
-    };
+    const { viewerRuns, isViewerRunsLoading } = useRuns();
 
     if (!isAuthenticated) {
         return (
@@ -84,25 +54,10 @@ export default function RunsList({ selectedRunId, onSelectRun, onRunCreated }: R
                 flexDirection: 'column',
             }}>
             <Box sx={{ p: 2 }}>
-                <CreateRunButton
-                    variant="contained"
-                    fullWidth
-                    startIcon={creating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />}
-                    onClick={handleCreateRun}
-                    disabled={creating}>
-                    {creating ? 'Creating...' : 'New exploration'}
-                </CreateRunButton>
+                <CreateRunButton />
             </Box>
 
             <Divider />
-
-            {error && (
-                <Box sx={{ p: 2 }}>
-                    <Alert severity="error" onClose={() => setError(null)}>
-                        {error}
-                    </Alert>
-                </Box>
-            )}
 
             {isViewerRunsLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -159,13 +114,4 @@ const RunItemButton = styled(ListItemButton)`
     &:hover {
         background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
     }
-`;
-
-const CreateRunButton = styled(Button)`
-    background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-`;
-
-const StyledAddBoxIcon = styled(AddBoxIcon)`
-    color: ${({ theme }) => theme.color['green-100'].hex};
 `;

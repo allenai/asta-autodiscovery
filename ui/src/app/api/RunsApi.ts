@@ -191,7 +191,6 @@ export class RunsApi extends BaseApi {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('runid', runId);
-        console.log('here in api upload dataset', file, runId);
 
         return this.request<UploadDatasetResponseBody>({
             url: `${RUNS_URL_PREFIX}/upload-dataset`,

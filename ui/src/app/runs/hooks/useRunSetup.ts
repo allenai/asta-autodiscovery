@@ -229,7 +229,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Prepare metadata
             const submissionMetadata = {
                 name: settings.name.trim(),
-                datasets_description: settings.datasetsDescription.trim(),
+                description: settings.datasetsDescription.trim(),
                 domain: settings.domain.trim(),
                 datasets: selectedFiles.map((ds) => ({
                     name: ds.file.name,

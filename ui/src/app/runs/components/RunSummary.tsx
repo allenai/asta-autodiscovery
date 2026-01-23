@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { Run } from '@/types/Run';
+import { RunPills } from '@/runs/components/RunPills';
 
 export type RunSummaryProps = {
     run: Run;
@@ -29,6 +30,9 @@ export const RunSummary = ({ run, startExpanded }: RunSummaryProps) => {
                     <Title>{name}</Title>
                 </TitleLink>
                 {isExpanded && <>EXPANDED</>}
+                <LayoutPills>
+                    <RunPills run={run} />
+                </LayoutPills>
             </LayoutContent>
         </Layout>
     );
@@ -48,6 +52,10 @@ const LayoutIcon = styled('div')(({ theme }) => ({}));
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const LayoutContent = styled('div')(({ theme }) => ({}));
+
+const LayoutPills = styled('div')(({ theme }) => ({
+    marginTop: theme.spacing(1),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TitleLink = styled(Link)(({ theme }) => ({

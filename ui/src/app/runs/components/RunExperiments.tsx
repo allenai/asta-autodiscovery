@@ -25,7 +25,7 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
     const api = getRunsApi();
     const [experiments, setExperiments] = useState<Record<string, Experiment>>({});
     const [rows, setRows] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [isLoading, setIsloading] = useState(false);
 
     // Keep track of details needed for polling that shouldn't trigger re-renders
     const pollingStateRef = useRef({
@@ -94,8 +94,8 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
         }
         if (!pollingStateRef.current.lastKnownExperimentId) {
             // First time running since mounting
-            setLoading(true);
-            fetchLatestRunExperiments(runId).finally(() => setLoading(false));
+            setIsloading(true);
+            fetchLatestRunExperiments(runId).finally(() => setIsloading(false));
         }
         const intervalId = setInterval(() => {
             console.log('setInterval()', { runId, ...pollingStateRef.current });
@@ -117,7 +117,7 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
             <StyledDataGrid
                 rows={rows}
                 columns={columns}
-                loading={loading}
+                loading={isLoading}
                 initialState={{ pagination: { paginationModel } }}
                 pageSizeOptions={[5, 10, 25]}
                 sx={{ border: 0 }}

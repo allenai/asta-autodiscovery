@@ -1,13 +1,13 @@
 'use client';
 
-import { Box, Grid, styled } from '@mui/material';
-
+import { Box, styled } from '@mui/material';
 import { useRouter, usePathname } from 'next/navigation';
 
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';
 import Header from '@/components/Header';
 import { RunsContextProvider } from '@/contexts/RunsContext';
+import { ToS } from '@/components/ToS';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -27,28 +27,22 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     return (
         <RunsContextProvider>
             <Wrapper>
-                <Grid container sx={{ height: '100%' }}>
+                <Layout>
                     {/* Sidebar - RunsList */}
-                    <Sidebar item xs={12} md={2}>
+                    <Sidebar>
                         <Logo href="/runs">
                             <IconAutoDSLogo />
                         </Logo>
                         <RunsList selectedRunId={selectedRunId} onSelectRun={handleSelectRun} />
+                        <ToS />
                     </Sidebar>
 
                     {/* Main content */}
-                    <MainContent
-                        item
-                        xs={12}
-                        md={10}
-                        sx={{
-                            height: '100%',
-                            overflow: 'auto',
-                        }}>
+                    <MainContent>
                         <Header />
                         {children}
                     </MainContent>
-                </Grid>
+                </Layout>
             </Wrapper>
         </RunsContextProvider>
     );
@@ -61,18 +55,26 @@ const Wrapper = styled(Box)`
     overflow: hidden;
 `;
 
-const Sidebar = styled(Grid)`
+const Layout = styled('div')`
+    display: grid;
+    grid-template-columns: 1fr 5fr;
+    grid-template-areas: 'sidebar main-content';
+`;
+
+const Sidebar = styled('div')`
     background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
     border-right: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     display: flex;
     flex-direction: column;
+    grid-area: sidebar;
     height: 100%;
     overflow: auto;
 `;
 
-const MainContent = styled(Grid)`
-    height: 100%;
-    overflow: auto;
+const MainContent = styled('div')`
+    flex-grow: 1;
+    grid-area: main-content;
+    min-width: 0;
 `;
 
 const Logo = styled('a')`

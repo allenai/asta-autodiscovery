@@ -46,7 +46,7 @@ except ImportError:
     JOBS_AVAILABLE = False
 
 # Trigger phrase in intent field that activates simulated run mode
-SIMULATE_OUTPUTS_TRIGGER = "asta.simulate_outputs"
+SIMULATE_OUTPUTS_TRIGGER = "%asta.simulate_outputs%"
 
 
 def create() -> Blueprint:

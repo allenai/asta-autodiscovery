@@ -1,5 +1,4 @@
-import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
-import AddBoxIcon from '@mui/icons-material/AddBox';
+import { Box, CircularProgress, Typography, styled } from '@mui/material';
 import { useMemo } from 'react';
 
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
@@ -31,10 +30,10 @@ export const ViewerRunsBox = () => {
         }
         // Order the statuses for display
         return {
-            CREATED: buckets['CREATED'] || [],
-            RUNNING: buckets['RUNNING'] || [],
-            SUCCEEDED: buckets['SUCCEEDED'] || [],
-            FAILED: buckets['FAILED'] || [],
+            CREATED: buckets.CREATED || [],
+            RUNNING: buckets.RUNNING || [],
+            SUCCEEDED: buckets.SUCCEEDED || [],
+            FAILED: buckets.FAILED || [],
         };
     }, [viewerRuns]);
 

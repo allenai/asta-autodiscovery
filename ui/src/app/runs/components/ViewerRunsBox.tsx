@@ -61,7 +61,6 @@ export const ViewerRunsBox = () => {
             },
             {} as Record<Bucket, Run[]>
         );
-        console.log({ buckets, orderedBuckets });
         return orderedBuckets;
     }, [viewerRuns]);
 

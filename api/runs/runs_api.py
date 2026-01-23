@@ -19,6 +19,10 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    MetadataDatasetModel,
+    MetadataModel,
+    GetRunMetadataRequestModel,
+    GetRunMetadataResponseModel,
     GetExampleRunsRequestModel,
     GetExampleRunsResponseModel,
     RunDetailsModel,
@@ -507,6 +511,46 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to save metadata: {e}")
             return jsonify({"error": str(e)}), 500
+
+    @api.route("<runid>/metadata", methods=["GET"])
+    @requires_enrollment
+    def get_run_metadata(runid: str):
+        """Fetch metadata for a specific run.
+
+        Args:
+            runid: Run identifier
+        """
+        req = GetRunMetadataRequestModel(
+            runid=runid,
+            userid=request.user.get("sub"),
+        )
+
+        job_manager = get_job_manager()
+        metadata_dict = job_manager.get_metadata(req.userid, req.runid)
+        if not metadata_dict:
+            return jsonify({"error": "Metadata not found"}), 404
+
+        dataset_models: list[MetadataDatasetModel] = []
+        for dataset in metadata_dict.get("datasets", []):
+            dataset_model = MetadataDatasetModel(
+                name=dataset.get("name"),
+                description=dataset.get("description"),
+            )
+            dataset_models.append(dataset_model)
+
+        metadata_model = MetadataModel(
+            title=metadata_dict.get("title"),
+            description=metadata_dict.get("description"),
+            datasets=dataset_models,
+        )
+
+        resp = GetRunMetadataResponseModel(
+            runid=req.runid,
+            metadata=metadata_model,
+        )
+        return jsonify(resp.model_dump()), 200
+
+
 
     @api.route("/submit", methods=["POST"])
     @requires_enrollment

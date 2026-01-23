@@ -295,6 +295,41 @@ def upload_metadata(
         raise GCSError(f"Failed to upload metadata: {e}")
 
 
+def get_metadata(
+    userid: str, jobid: str, config: JobConfig | None = None
+) -> dict[str, Any]:
+    """Download and parse metadata.json from job directory.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Metadata dictionary
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If download fails
+    """
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
+
+    try:
+        blob = bucket.blob(blob_path)
+        metadata_str = blob.download_as_text()
+        return json.loads(metadata_str)
+    except Exception as e:
+        raise GCSError(f"Failed to download metadata: {e}")
+
+
 def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
     """List all result files from a job's output directory.
 

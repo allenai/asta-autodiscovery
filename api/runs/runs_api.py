@@ -50,7 +50,7 @@ except ImportError:
     JOBS_AVAILABLE = False
 
 # Trigger phrase in intent field that activates simulated run mode
-SIMULATE_OUTPUTS_TRIGGER = "%asta.simulate_outputs%"
+SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 
 
 def create() -> Blueprint:
@@ -611,7 +611,7 @@ def create() -> Blueprint:
 
             # Check if this is a simulated run (replay mode)
             intent = data.get("intent", "")
-            is_simulated = SIMULATE_OUTPUTS_TRIGGER in intent
+            is_simulated = SIMULATE_RUN_TRIGGER in intent
 
             if is_simulated:
                 # Run replay job instead of actual AutoDiscovery job
@@ -627,6 +627,7 @@ def create() -> Blueprint:
                     region=manager.config.region,
                 )
             else:
+                assert False, "bananaphone"
                 # Validate sufficient credits before submission
                 check_sufficient_credits(
                     n_experiments=n_experiments, userid=userid, config=manager.config

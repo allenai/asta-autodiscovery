@@ -1,11 +1,45 @@
-import { Box, CircularProgress, Typography, styled } from '@mui/material';
+import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
+import AddBoxIcon from '@mui/icons-material/AddBox';
+import { useMemo } from 'react';
 
+import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { useRuns } from '@/contexts/RunsContext';
 import { RunSummary } from '@/runs/components/RunSummary';
-import { CreateRunButton } from '@/runs/components/CreateRunButton';
+import { Run, RunStatus } from '@/types/Run';
+
+const STATUS_LABELS = {
+    CREATED: 'Not Started',
+    RUNNING: 'Running',
+    SUCCEEDED: 'Finished',
+    FAILED: 'Error',
+};
 
 export const ViewerRunsBox = () => {
     const { viewerRuns, isViewerRunsLoading } = useRuns();
+
+    // Group runs by status
+    const runsByStatus: Record<RunStatus, Run[]> = useMemo(() => {
+        const buckets: Record<string, Run[]> = {};
+        if (viewerRuns) {
+            viewerRuns.forEach((run) => {
+                const status = run.details?.status ?? 'unknown';
+                if (!buckets[status]) {
+                    buckets[status] = [];
+                }
+                buckets[status].push(run);
+            });
+        }
+        // Order the statuses for display
+        return {
+            CREATED: buckets['CREATED'] || [],
+            RUNNING: buckets['RUNNING'] || [],
+            SUCCEEDED: buckets['SUCCEEDED'] || [],
+            FAILED: buckets['FAILED'] || [],
+        };
+    }, [viewerRuns]);
+
+    console.log({ runsByStatus });
+
     return (
         <>
             <Header>
@@ -16,11 +50,19 @@ export const ViewerRunsBox = () => {
             </Header>
             {viewerRuns && viewerRuns.length > 0 && (
                 <Wrapper>
-                    {viewerRuns.map((run) => (
-                        <RunItem key={run.id}>
-                            <RunSummary run={run} />
-                        </RunItem>
-                    ))}
+                    {Object.entries(runsByStatus).map(([status, runs]) => {
+                        if (runs.length === 0) return null;
+                        return (
+                            <StatusGroup key={status}>
+                                <StatusLabel>{STATUS_LABELS[status as RunStatus]}</StatusLabel>
+                                {runs.map((run) => (
+                                    <RunItem key={run.id}>
+                                        <RunSummary run={run} />
+                                    </RunItem>
+                                ))}
+                            </StatusGroup>
+                        );
+                    })}
                 </Wrapper>
             )}
             {isViewerRunsLoading && (
@@ -31,6 +73,19 @@ export const ViewerRunsBox = () => {
         </>
     );
 };
+
+const StatusGroup = styled('div')(({ theme }) => ({
+    marginBottom: theme.spacing(4),
+}));
+
+const StatusLabel = styled(Typography)(({ theme }) => ({
+    variant: 'h5',
+    color: theme.color['cream-100'].hex,
+    fontSize: 16,
+    fontStyle: 'normal',
+    fontWeight: 700,
+    lineHeight: '115%',
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Header = styled('div')(({ theme }) => ({
@@ -58,5 +113,5 @@ const Headline = styled(Typography)(({ theme }) => ({
 }));
 
 const RunItem = styled('div')(({ theme }) => ({
-    marginBottom: theme.spacing(2),
+    marginTop: theme.spacing(2),
 }));

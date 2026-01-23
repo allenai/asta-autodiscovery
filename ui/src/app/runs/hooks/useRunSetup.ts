@@ -2,8 +2,6 @@ import { useState } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { getRunsApi } from '@/api/RunsApi';
-import { submitRun } from '../actions';
-import { useAuth0 } from '@/contexts/Auth0Context';
 
 export const MCTS_SELECTION = {
     UCB1: { value: 'ucb1', label: 'UCB1' },
@@ -57,7 +55,6 @@ interface FieldErrors {
 
 export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
-    const { getAccessToken } = useAuth0();
     const api = getRunsApi();
 
     const creditsRemaining = credits?.remaining ?? 500;
@@ -247,15 +244,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             await api.submitRun(runid, {
                 n_experiments: settings.nExperiments,
             });
-            // Submit run
-            const token = await getAccessToken();
-            // await submitRun(
-            //     runid,
-            //     {
-            //         n_experiments: settings.nExperiments,
-            //     },
-            //     token
-            // );
 
             // Notify parent of success
             onSubmitSuccess();

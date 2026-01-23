@@ -13,6 +13,7 @@ from autodiscovery.utils import query_llm
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self, group=None):
+        """Initialize the argument parser for deduplication runs."""
         super().__init__(description='Get surprising nodes from MCTS logs')
         self.add_argument('--in_fpath', type=str, required=True,
                           help='mcts_nodes.json file path or directory containing mcts_node_*.json files')
@@ -30,6 +31,14 @@ class ArgParser(argparse.ArgumentParser):
 
 
 def hyp_dict_to_str(d):
+    """Render a hypothesis dictionary into a readable string.
+
+    Args:
+        d: Hypothesis dictionary.
+
+    Returns:
+        String representation of the hypothesis fields.
+    """
     return (f"Hypothesis: {d.get('hypothesis', 'N/A')}\n"
             f"Contexts: {d.get('contexts', d.get('context', 'N/A'))}\n"
             f"Variables: {d.get('variables', 'N/A')}\n"
@@ -37,6 +46,14 @@ def hyp_dict_to_str(d):
 
 
 def get_structured_hypothesis(node):
+    """Extract a structured hypothesis payload from a node.
+
+    Args:
+        node: Node dictionary.
+
+    Returns:
+        Structured hypothesis dictionary or None when missing.
+    """
     level, node_idx = node.get("level"), node.get("node_idx")
     h = node.get("hypothesis", None)
     if h is None:
@@ -55,22 +72,43 @@ def get_structured_hypothesis(node):
 
 
 def get_structured_hypotheses(in_nodes_list):
+    """Collect structured hypotheses from a list of nodes.
+
+    Args:
+        in_nodes_list: List of node dictionaries.
+
+    Returns:
+        List of structured hypothesis dictionaries.
+    """
     node_list = [hyp_obj for node in in_nodes_list if (hyp_obj := get_structured_hypothesis(node)) is not None]
     return node_list
 
 
 def get_hypothesis(node):
-    level, node_idx = node.get("level"), node.get("node_idx")
+    """Extract a hypothesis payload from a node.
+
+    Args:
+        node: Node dictionary.
+
+    Returns:
+        Hypothesis dictionary or None when missing.
+    """
     h = node.get("hypothesis", None)
     if h is None:
         return None
-    return {
-        "node_id": f"node_{level}_{node_idx}",
-        "hypothesis": h,
-    }
+    node_id = node["id"]
+    return {"node_id": node_id, "hypothesis": h}
 
 
 def get_hypotheses(in_nodes_list):
+    """Collect hypothesis payloads from a list of nodes.
+
+    Args:
+        in_nodes_list: List of node dictionaries.
+
+    Returns:
+        List of hypothesis dictionaries.
+    """
     node_list = [hyp_obj for node in in_nodes_list if (hyp_obj := get_hypothesis(node)) is not None]
     return node_list
 
@@ -110,20 +148,28 @@ def get_embedding(texts, model="text-embedding-3-large", batch_size=128, client=
 
 def get_llm_merge_decision(hyp1: str, hyp2: str, n_samples: int = 30, threshold: float = 0.7, model: str = "gpt-4o",
                            temperature: float = 1.0, reasoning_effort: str = "medium"):
+    """Determine whether two hypotheses are semantically equivalent.
+
+    Args:
+        hyp1: First hypothesis string.
+        hyp2: Second hypothesis string.
+        n_samples: Number of LLM samples to draw.
+        threshold: Proportion threshold for merging decisions.
+        model: LLM model identifier.
+        temperature: Sampling temperature.
+        reasoning_effort: Reasoning effort for the model.
+
+    Returns:
+        True if the hypotheses should be merged, False otherwise.
+    """
     class ResponseFormat(BaseModel):
         is_same: bool = Field(..., description="Whether the two hypotheses are the same or not.")
 
     system_prompt = "You are a research scientist skilled at analyzing statistical hypotheses."
-    # prompt = (
-    #     f"You are given two hypothesis sets. Each set describes a single hypothesis structured into a context for the "
-    #     f"hypothesis, the variables involved, and the statistical relationships between the variables under that "
-    #     f"context. Your task is to determine whether both sets represent the same hypothesis or not.\n\n"
-    #     f"Hypothesis Set 1:\n{hyp1}\n\nHypothesis Set 2:\n{hyp2}"
-    # )
     prompt = (
-        f"You are given two hypothesis sets. Each set describes a single hypothesis, structured into a context for the "
-        f"hypothesis, the variables involved, and the statistical relationships between the variables under that "
-        f"context. Your task is to determine whether the two hypotheses are semantically the same or not.\n\n"
+        f"You are given two hypotheses. Your task is to determine whether the two hypotheses are semantically the same or not. "
+        f"Carefully consider the meaning, context, and implications of each hypothesis. "
+        f"If there is an additional or different clause/condition in one hypothesis that is not present in the other, consider them different.\n\n"
         f"HYPOTHESIS 1:\n{hyp1}\n\nHYPOTHESIS 2:\n{hyp2}"
     )
     all_msgs = [
@@ -140,24 +186,40 @@ def get_llm_merge_decision(hyp1: str, hyp2: str, n_samples: int = 30, threshold:
 
 def dedupe(nodes_or_json_path, n_samples=10, merge_threshold=0.7, seed=42, rep_mode="biggest", model="gpt-4o",
            n_nodes=None, verbose=False, log_comparisons_fname=None):
+    """Deduplicate hypotheses using embeddings + LLM similarity checks.
+
+    Args:
+        nodes_or_json_path: Nodes list or path to nodes JSON.
+        n_samples: Number of LLM samples per comparison.
+        merge_threshold: Merge threshold for LLM votes.
+        seed: Random seed.
+        rep_mode: Representative selection mode for merged clusters.
+        model: LLM model identifier.
+        n_nodes: Optional cap on nodes processed.
+        verbose: Whether to print verbose details.
+        log_comparisons_fname: Optional JSON path to log LLM comparisons.
+
+    Returns:
+        Tuple of (deduplicated nodes list, duplicates mapping).
+    """
     random.seed(seed)
     np.random.seed(seed)
 
     from autodiscovery.mcts_utils import get_nodes  # Importing here to avoid circular import issues
     nodes_list = get_nodes(nodes_or_json_path)[:n_nodes]
-    data = get_hypotheses(nodes_list)
+    # Remove nodes without hypotheses
+    nodes_list = [node for node in nodes_list if node.get("hypothesis", None) is not None]
 
-    dedup_hyp, dedup_struct_hyp, hyp_to_index, orig_to_dedup = [], [], {}, []
+    dedup_hyp, hyp_to_index, orig_to_dedup = [], {}, []
 
     # Deduplicate hypotheses by exact match
-    for d in data:
-        hyp = d["hypothesis"]  # Hypothesis string
+    for node in nodes_list:
+        hyp = node["hypothesis"]  # Hypothesis string
         if hyp not in hyp_to_index:
+            hyp_to_index[hyp] = len(dedup_hyp)
             dedup_hyp.append(hyp)
-            dedup_struct_hyp.append(hyp_dict_to_str(d))
-            hyp_to_index[hyp] = len(dedup_struct_hyp) - 1
         orig_to_dedup.append(hyp_to_index[hyp])
-    n_dedup = len(dedup_struct_hyp)
+    n_dedup = len(dedup_hyp)
 
     # Generate embeddings for deduplicated hypotheses
     embeds = np.array(get_embedding(dedup_hyp, n_attempts=3))
@@ -167,6 +229,31 @@ def dedupe(nodes_or_json_path, n_samples=10, merge_threshold=0.7, seed=42, rep_m
     cluster_assignment = {i: i for i in range(n_dedup)}
     hac_to_current = {i: i for i in range(n_dedup)}
     cluster_rep = {i: i for i in range(n_dedup)}
+
+    # Map dedup indices back to original node indices (for duplicates output).
+    dedup_to_orig = {i: [] for i in range(n_dedup)}
+    for orig_idx, dedup_idx in enumerate(orig_to_dedup):
+        dedup_to_orig[dedup_idx].append(orig_idx)
+
+    def build_output_from_clusters(in_clusters, in_cluster_rep):
+        """Build deduplicated nodes and duplicates mapping from clusters."""
+        deduped_nodes, duplicates = [], {}
+        for cluster_id, cluster in in_clusters.items():
+            rep_dedup_idx = in_cluster_rep[cluster_id]
+            rep_orig_idx = dedup_to_orig[rep_dedup_idx][0]
+            node_copy = copy.deepcopy(nodes_list[rep_orig_idx])
+            dup_orig_indices = []
+            for dedup_idx in cluster:
+                for orig_idx in dedup_to_orig[dedup_idx]:
+                    if orig_idx != rep_orig_idx:
+                        dup_orig_indices.append(orig_idx)
+            node_copy['duplicate_nodes'] = [nodes_list[i]['id'] for i in dup_orig_indices]
+            duplicates[node_copy['id']] = node_copy['duplicate_nodes']
+            deduped_nodes.append(node_copy)
+        return deduped_nodes, duplicates
+
+    if n_dedup < 2:
+        return build_output_from_clusters(clusters, cluster_rep)
 
     # Perform HAC over LM embeddings and get the linkage matrix
     linkage_matrix = linkage(embeds, method='ward')
@@ -238,36 +325,25 @@ LLM Decision: {'Merge' if llm_decision else 'Do not merge'}\n\n""")
             json.dump(llm_comparisons, f, indent=2)
         print(f"LLM comparisons logged to {log_comparisons_fname}")
 
-    final_labels = [cluster_assignment[orig_to_dedup[i]] for i in range(len(orig_to_dedup))]
-
-    # Dedupe nodes and update cluster information
-    deduped_nodes = []
-    for cluster_id, cluster in clusters.items():
-        node_copy = copy.deepcopy(nodes_list[cluster_id])
-        node_copy['cluster'] = [nodes_list[n]['id'] for n in cluster[1:]]
-        node_copy['cluster_nodes'] = [copy.deepcopy(nodes_list[n]) for n in cluster if n != cluster_id]
-        deduped_nodes.append(node_copy)
-
-    return deduped_nodes, final_labels, clusters
+    # Return final deduplicated nodes and the list of clusters
+    return build_output_from_clusters(clusters, cluster_rep)
 
 
 if __name__ == "__main__":
     parser = ArgParser()
     args = parser.parse_args()
-    deduped_nodes, final_labels, clusters = dedupe(nodes_or_json_path=args.in_fpath,
-                                                   n_samples=args.n_samples,
-                                                   merge_threshold=args.merge_threshold,
-                                                   seed=args.seed,
-                                                   model=args.model,
-                                                   n_nodes=args.n_nodes,
-                                                   verbose=args.verbose)
-    print("Final Labels:", final_labels)
+    deduped_nodes, clusters = dedupe(nodes_or_json_path=args.in_fpath,
+                                     n_samples=args.n_samples,
+                                     merge_threshold=args.merge_threshold,
+                                     seed=args.seed,
+                                     model=args.model,
+                                     n_nodes=args.n_nodes,
+                                     verbose=args.verbose)
     print("Clusters:", clusters)
 
     if args.out_fpath is not None:
         # Save the results to the output file
         output_data = {
-            "final_labels": final_labels,
             "clusters": clusters,
             "deduped_nodes": deduped_nodes
         }

@@ -1,4 +1,4 @@
-FROM python:3.11.3
+FROM python:3.13-slim
 
 # Uncomment the following lines to enable GPU support.
 # See https://***REMOVED***/gpu.html for more details.

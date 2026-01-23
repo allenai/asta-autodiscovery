@@ -8,10 +8,12 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "code-execution",
     "google-cloud-storage",
     "google-cloud-run",
 ]
+
+[project.optional-dependencies]
+cli = ["code-execution"]
 
 [project.scripts]
 ipython-session = "devtools.cli:main"

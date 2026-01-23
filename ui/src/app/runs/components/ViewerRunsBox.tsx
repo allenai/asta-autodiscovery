@@ -6,20 +6,20 @@ import { useRuns } from '@/contexts/RunsContext';
 import { RunSummary } from '@/runs/components/RunSummary';
 import { Run, RunStatus } from '@/types/Run';
 
-const STATUS_LABELS = {
-    CREATED: 'Not Started',
-    QUEUED: 'Queued',
-    PENDING: 'Pending',
+// Ordered in which they are displayed
+const STATUS_LABELS: Record<RunStatus, string> = {
+    PENDING: 'Not Started',
     RUNNING: 'Running',
     SUCCEEDED: 'Finished',
     FAILED: 'Error',
+    CANCELLED: 'Cancelled',
 };
 
 export const ViewerRunsBox = () => {
     const { viewerRuns, isViewerRunsLoading } = useRuns();
 
-    // Group runs by status
-    const runsByStatus: Record<RunStatus, Run[]> = useMemo(() => {
+    // Group runs by status, sorted for display by STATUS_LABELS order
+    const runsByStatus = useMemo(() => {
         const buckets: Record<string, Run[]> = {};
         if (viewerRuns) {
             viewerRuns.forEach((run) => {
@@ -30,15 +30,13 @@ export const ViewerRunsBox = () => {
                 buckets[status].push(run);
             });
         }
-        // Order the statuses for display
-        return {
-            CREATED: buckets.CREATED || [],
-            QUEUED: buckets.QUEUED || [],
-            PENDING: buckets.PENDING || [],
-            RUNNING: buckets.RUNNING || [],
-            SUCCEEDED: buckets.SUCCEEDED || [],
-            FAILED: buckets.FAILED || [],
-        };
+        return Object.values(STATUS_LABELS).reduce(
+            (acc, status) => {
+                acc[status as RunStatus] = buckets[status] || [];
+                return acc;
+            },
+            {} as Record<RunStatus, Run[]>
+        );
     }, [viewerRuns]);
 
     return (

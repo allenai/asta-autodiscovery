@@ -41,8 +41,6 @@ export const ViewerRunsBox = () => {
         };
     }, [viewerRuns]);
 
-    console.log({ runsByStatus });
-
     return (
         <>
             <Header>

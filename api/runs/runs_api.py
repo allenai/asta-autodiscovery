@@ -38,6 +38,9 @@ try:
 except ImportError:
     JOBS_AVAILABLE = False
 
+# Trigger phrase in intent field that activates simulated run mode
+SIMULATE_OUTPUTS_TRIGGER = "asta.simulate_outputs"
+
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -447,23 +450,18 @@ def create() -> Blueprint:
 
             # Check if this is a simulated run (replay mode)
             intent = data.get("intent", "")
-            is_simulated = "asta.simulate_outputs" in intent
+            is_simulated = SIMULATE_OUTPUTS_TRIGGER in intent
 
             if is_simulated:
                 # Run replay job instead of actual AutoDiscovery job
                 current_app.logger.info(f"Running replay job for {userid}/{runid}")
 
-                # Import devtools cloudrun module
-                from devtools.cloudrun import run_replay_job
+                from utils.dev import run_simulated_job
 
-                source_path = "gs://example-gcp-project/users/test/jobs/melanoma/output"
-                time_scale = data.get("time_scale", 0.1)
-                execution_id = run_replay_job(
+                execution_id = run_simulated_job(
                     userid=userid,
                     jobid=runid,
-                    source_path=source_path,
-                    target_bucket=manager.config.bucket,
-                    time_scale=time_scale,
+                    bucket=manager.config.bucket,
                     project_id=manager.config.project_id,
                     region=manager.config.region,
                 )

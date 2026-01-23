@@ -9,11 +9,21 @@ export interface RunDetailsFromApi {
     status_checked_at: string | null;
 }
 
-export interface RunResponseBody {
+export interface RunStatsFromApi {
+    requested_experiments: number;
+    completed_experiments: number;
+    pending_experiments: number;
+    num_surprising_experiments: number;
+}
+
+export interface RunFromApi {
     runid: string;
-    path: string;
-    message: string;
+    path?: string;
+    status: string;
+    name?: string;
+    description?: string;
     run_details?: RunDetailsFromApi;
+    run_stats?: RunStatsFromApi;
     execution_status?: Record<string, unknown>;
 }
 
@@ -23,9 +33,17 @@ interface UploadDatasetResponseBody {
     message: string;
 }
 
+export interface RunResponseBody extends RunFromApi {}
+
 export interface GetAllRunsResponseBody {
     runs: string[];
 }
+
+export interface GetViewerRunsResponseBody {
+    runs: RunFromApi[];
+}
+
+export interface GetExampleRunsResponseBody extends GetViewerRunsResponseBody {}
 
 export interface ExperimentFromApi {
     experiment_id: string;
@@ -65,6 +83,20 @@ export class RunsApi extends BaseApi {
     async listRuns() {
         return this.request<GetAllRunsResponseBody>({
             url: `${RUNS_URL_PREFIX}/list`,
+            method: 'GET',
+        });
+    }
+
+    async listViewerRuns() {
+        return this.request<GetViewerRunsResponseBody>({
+            url: `${RUNS_URL_PREFIX}/list/me`,
+            method: 'GET',
+        });
+    }
+
+    async listExampleRuns() {
+        return this.request<GetExampleRunsResponseBody>({
+            url: `${RUNS_URL_PREFIX}/list/examples`,
             method: 'GET',
         });
     }

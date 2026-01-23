@@ -1,12 +1,12 @@
 import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
 
+// Maps to values from _get_execution_phase() in cloudrun.py
 export enum RunStatus {
-    CREATED = 'CREATED',
-    QUEUED = 'QUEUED',
+    CANCELLED = 'CANCELLED',
+    FAILED = 'FAILED',
     PENDING = 'PENDING',
     RUNNING = 'RUNNING',
     SUCCEEDED = 'SUCCEEDED',
-    FAILED = 'FAILED',
 }
 
 export type Run = {

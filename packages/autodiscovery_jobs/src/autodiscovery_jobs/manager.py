@@ -132,6 +132,17 @@ class JobManager:
         """
         return gcs.upload_metadata(userid, jobid, metadata, self.config)
 
+    def get_metadata(self, userid: str, jobid: str) -> dict[str, Any]:
+        """Download metadata from job directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+        Returns:
+            Metadata dictionary
+        """
+        return gcs.get_metadata(userid, jobid, self.config)
+
     # Job execution
 
     def run_job(

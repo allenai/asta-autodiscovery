@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Chip, Popover, styled } from '@mui/material';
+import Link from 'next/link';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 
@@ -17,11 +18,11 @@ export default function CreditsChip() {
                 ref={anchorRef}
                 label={
                     <span>
-                        Experiment Credits:{' '}
+                        Your Experiment Credits:{' '}
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
                         ) : credits !== null ? (
-                            credits?.remaining.toLocaleString()
+                            <CreditsValue>{credits?.remaining.toLocaleString()}</CreditsValue>
                         ) : (
                             <LoadingShimmer />
                         )}
@@ -42,19 +43,50 @@ export default function CreditsChip() {
                     horizontal: 'right',
                 }}>
                 <PopoverContent>
-                    {credits ? (
-                        <>
-                            <GridContainer>
-                                <CreditValue>{credits.granted.toLocaleString()}</CreditValue>
-                                <CreditLabel>Granted</CreditLabel>
-                                <CreditValue>{credits.used.toLocaleString()}</CreditValue>
-                                <CreditLabel>Used</CreditLabel>
-                                <CreditValue>{credits.pending.toLocaleString()}</CreditValue>
-                                <CreditLabel>Pending</CreditLabel>
-                            </GridContainer>
-                        </>
-                    ) : lastError ? (
-                        <pre>{lastError}</pre>
+                    <PopoverHeading>How experiment credits work</PopoverHeading>
+                    <PopoverParagraph>
+                        To support your research, we are providing a one-time grant of 1,000
+                        credits.
+                    </PopoverParagraph>
+                    <ul>
+                        <li>
+                            <b>Exchange Rate:</b> 1 Credit = 1 Experiment.
+                        </li>
+                        <li>
+                            <b>Budget Protection:</b> Discovery sessions are capped at 500 credits
+                            to prevent accidental overspending. We recommend 50-100 experiments per
+                            session.
+                        </li>
+                        <li>
+                            <b>Expiration:</b> Credits are valid until Feb 28, 2026.
+                        </li>
+                    </ul>
+
+                    <PopoverSubheading>Can I get more credits?</PopoverSubheading>
+                    <PopoverParagraph>
+                        This grant is a fixed allocation and credits cannot be reloaded once
+                        consumed. However, we are actively evaluating future funding or premium
+                        models. If you are interested in discussing potential partnerships, please{' '}
+                        <StyledLink
+                            href="https://allenai.org/contact"
+                            target="_blank"
+                            rel="noopener noreferrer">
+                            contact us
+                        </StyledLink>
+                        .
+                    </PopoverParagraph>
+
+                    {credits !== null ? (
+                        <CreditsReport>
+                            <CreditLabel>Credits Used:</CreditLabel>
+                            <CreditValue>{credits.used.toLocaleString()}</CreditValue>
+
+                            <CreditLabel>Credits Pending:</CreditLabel>
+                            <CreditValue>{credits.pending.toLocaleString()}</CreditValue>
+
+                            <CreditLabel>Credits Remaining:</CreditLabel>
+                            <CreditValue>{credits.remaining.toLocaleString()}</CreditValue>
+                        </CreditsReport>
                     ) : (
                         <LoadingShimmer />
                     )}
@@ -70,13 +102,17 @@ const StyledChip = styled(Chip)`
         border-radius: 4px;
         color: ${({ theme }) => theme.color['cream-100'].hex};
         font-size: 0.85rem;
-        padding: ${({ theme }) => theme.spacing(0.5, 1)};
+        padding: ${({ theme }) => theme.spacing(0.25, 0.5)};
     }
 `;
 
 const ErrorText = styled('span')`
     color: ${({ theme }) => theme.color['error-red-80'].hex};
     margin-left: ${({ theme }) => theme.spacing(0.5)};
+`;
+
+const CreditsValue = styled('span')`
+    font-weight: 600;
 `;
 
 const LoadingShimmer = styled('span')`
@@ -106,15 +142,46 @@ const LoadingShimmer = styled('span')`
 `;
 
 const PopoverContent = styled('div')`
-    padding: ${({ theme }) => theme.spacing(1)};
+    padding: ${({ theme }) => theme.spacing(2.5)};
+    max-width: 500px;
+    background: ${({ theme }) => theme.color['teal-100'].hex};
+    color: ${({ theme }) => theme.color['cream-100'].hex};
 `;
 
-const GridContainer = styled('div')`
+const PopoverHeading = styled('h3')`
+    margin: 0;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.5;
+`;
+
+const PopoverSubheading = styled('h4')`
+    margin: 0;
+`;
+
+const PopoverParagraph = styled('p')`
+    margin-top: 0;
+    margin-bottom: ${({ theme }) => theme.spacing(2)};
+`;
+
+const StyledLink = styled(Link)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+
+    &:hover {
+        text-decoration: underline;
+    }
+`;
+
+const CreditsReport = styled('div')`
     display: grid;
     grid-template-columns: auto auto;
-    grid-template-rows: auto auto auto;
     gap: ${({ theme }) => theme.spacing(0.5, 1)};
     align-items: center;
+    justify-content: center;
+    padding: ${({ theme }) => theme.spacing(2)};
+    border: 1px solid ${({ theme }) => theme.color['green-100'].hex}30;
+    border-radius: ${({ theme }) => theme.spacing(1)};
+    margin: ${({ theme }) => theme.spacing(2)} auto 0;
 `;
 
 const CreditValue = styled('div')`
@@ -125,4 +192,5 @@ const CreditValue = styled('div')`
 const CreditLabel = styled('div')`
     opacity: 0.8;
     font-size: 0.9em;
+    text-align: right;
 `;

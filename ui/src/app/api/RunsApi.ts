@@ -17,6 +17,12 @@ export interface RunResponseBody {
     execution_status?: Record<string, unknown>;
 }
 
+interface UploadDatasetResponseBody {
+    path: string;
+    filename: string;
+    message: string;
+}
+
 export interface GetAllRunsResponseBody {
     runs: string[];
 }
@@ -115,6 +121,35 @@ export class RunsApi extends BaseApi {
         return this.request<void>({
             url: `${RUNS_URL_PREFIX}/${runId}/cancel`,
             method: 'POST',
+        });
+    }
+
+    async saveMetadata(runId: string, metadata: Record<string, unknown>) {
+        return this.request<RunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/metadata`,
+            method: 'POST',
+            body: { runid: runId, metadata },
+        });
+    }
+
+    async uploadDataset(runId: string, file: File) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('runid', runId);
+        console.log('here in api upload dataset', file, runId);
+
+        return this.request<UploadDatasetResponseBody>({
+            url: `${RUNS_URL_PREFIX}/upload-dataset`,
+            method: 'POST',
+            body: formData,
+        });
+    }
+
+    async submitRun(runId: string, config: Record<string, unknown>) {
+        return this.request<RunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/submit`,
+            method: 'POST',
+            body: { runid: runId, ...config },
         });
     }
 }

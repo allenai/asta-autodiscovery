@@ -241,6 +241,20 @@ def run_mcts(
         bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-gcp-project/discoverybench/).
         vision_model: Model used for image analysis in code execution.
     """
+    def _get_executor_rich_outputs(code_executor_agent) -> list:
+        """Return the most recent rich outputs from the code executor, if available."""
+        executor = getattr(code_executor_agent, "code_executor", None)
+        if executor is None or not hasattr(executor, "get_last_rich_outputs"):
+            return []
+        return executor.get_last_rich_outputs() or []
+
+    def _write_rich_outputs(level: int, node_idx: int, rich_outputs: list) -> None:
+        """Persist rich outputs for a node to the rich_outputs directory."""
+        rich_outputs_dir = os.path.join(log_dirname, "rich_outputs")
+        os.makedirs(rich_outputs_dir, exist_ok=True)
+        output_path = os.path.join(rich_outputs_dir, f"ro_{level}_{node_idx}.json")
+        with open(output_path, "w") as f:
+            json.dump(rich_outputs, f, indent=2)
     # Setup logger
     logger = TreeLogger(log_dirname)
 
@@ -264,6 +278,7 @@ def run_mcts(
                             vision_model=vision_model)
     user_proxy = agent_objs["user_proxy"]
     experiment_generator = agent_objs["experiment_generator"]
+    code_executor_agent = agent_objs["code_executor"]
 
     # Set up the group chat
     groupchat, chat_manager = setup_group_chat(agent_objs, max_rounds)
@@ -337,6 +352,8 @@ def run_mcts(
                 node.messages = get_msgs_from_latest_query(groupchat.messages)
                 node.read_experiment_from_messages(
                     store_new_experiments=False if node.level == 1 and _warmstart_experiments is not None else True)
+                rich_outputs = _get_executor_rich_outputs(code_executor_agent)
+                _write_rich_outputs(node.level, node.node_idx, rich_outputs)
                 # Calculate beliefs and rewards
                 if node.success and node.level > 1:
                     compute_and_store_reward(node, belief_model_name, belief_temperature, reasoning_effort,

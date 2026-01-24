@@ -627,7 +627,6 @@ def create() -> Blueprint:
                     region=manager.config.region,
                 )
             else:
-                assert False, "bananaphone"
                 # Validate sufficient credits before submission
                 check_sufficient_credits(
                     n_experiments=n_experiments, userid=userid, config=manager.config

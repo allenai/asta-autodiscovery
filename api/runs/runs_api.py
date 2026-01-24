@@ -49,6 +49,9 @@ try:
 except ImportError:
     JOBS_AVAILABLE = False
 
+# Trigger phrase in intent field that activates simulated run mode
+SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
+
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -606,24 +609,42 @@ def create() -> Blueprint:
         try:
             manager = get_job_manager()
 
-            # Validate sufficient credits before submission
-            check_sufficient_credits(
-                n_experiments=n_experiments, userid=userid, config=manager.config
-            )
+            # Check if this is a simulated run (replay mode)
+            intent = data.get("intent", "")
+            is_simulated = SIMULATE_RUN_TRIGGER in intent
 
-            # Pass all additional parameters to run_job
-            execution_id = manager.run_job(
-                userid,
-                runid,
-                n_experiments=n_experiments,
-                model=model,
-                belief_model=belief_model,
-                **{
-                    k: v
-                    for k, v in data.items()
-                    if k not in ["runid", "n_experiments", "model", "belief_model"]
-                },
-            )
+            if is_simulated:
+                # Run replay job instead of actual AutoDiscovery job
+                current_app.logger.info(f"Running replay job for {userid}/{runid}")
+
+                from utils.dev import run_simulated_job
+
+                execution_id = run_simulated_job(
+                    userid=userid,
+                    jobid=runid,
+                    bucket=manager.config.bucket,
+                    project_id=manager.config.project_id,
+                    region=manager.config.region,
+                )
+            else:
+                # Validate sufficient credits before submission
+                check_sufficient_credits(
+                    n_experiments=n_experiments, userid=userid, config=manager.config
+                )
+
+                # Pass all additional parameters to run_job
+                execution_id = manager.run_job(
+                    userid,
+                    runid,
+                    n_experiments=n_experiments,
+                    model=model,
+                    belief_model=belief_model,
+                    **{
+                        k: v
+                        for k, v in data.items()
+                        if k not in ["runid", "n_experiments", "model", "belief_model"]
+                    },
+                )
 
             # Update run_details.json with execution_id and status
             _update_run_details(

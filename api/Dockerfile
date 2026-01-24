@@ -1,4 +1,4 @@
-FROM python:3.11.3
+FROM python:3.13-slim
 
 # Uncomment the following lines to enable GPU support.
 # See https://***REMOVED***/gpu.html for more details.
@@ -12,6 +12,10 @@ WORKDIR /api
 # Copy and install autodiscovery_jobs package
 COPY packages/autodiscovery_jobs /tmp/autodiscovery_jobs
 RUN pip install /tmp/autodiscovery_jobs
+
+# Copy and install devtools package (for replay functionality)
+COPY packages/devtools /tmp/devtools
+RUN pip install /tmp/devtools
 
 # Install Python dependencies
 COPY api/requirements.txt .

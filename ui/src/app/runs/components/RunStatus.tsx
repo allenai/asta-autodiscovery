@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { Box, Button, Typography, CircularProgress, Alert, Chip, styled } from '@mui/material';
-import CancelIcon from '@mui/icons-material/Cancel';
+import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { Experiment, RunDetails, getRunFromApi } from '@/types/Run';
+import { Experiment, Run, getRunFromApi } from '@/types/Run';
 import { RunExperiments } from '@/runs/components/RunExperiments';
 import { ExperimentDetails } from './ExperimentDetails';
 
@@ -28,32 +28,26 @@ interface RunStatusProps {
 export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     const api = getRunsApi();
 
-    const [runDetails, setRunDetails] = useState<RunDetails | null>(null);
+    const [run, setRun] = useState<Run | null>(null);
     const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
 
-    const fetchStatus = async (isRefresh = false) => {
-        if (isRefresh) {
-            setRefreshing(true);
-        } else {
-            setLoading(true);
-        }
+    const fetchStatus = async () => {
+        setLoading(true);
         setError(null);
 
         try {
-            const response = await api.getRunStatus(runid);
+            const response = await api.getRun(runid);
             const run = getRunFromApi(response.data);
 
-            setRunDetails(run.details);
+            setRun(run);
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
         } finally {
             setLoading(false);
-            setRefreshing(false);
         }
     };
 
@@ -63,11 +57,11 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         // Auto-refresh every 30 seconds if run is still running
         const interval = setInterval(() => {
             if (
-                runDetails?.status === 'RUNNING' ||
-                runDetails?.status === 'PENDING' ||
-                runDetails?.status === 'QUEUED'
+                run?.details?.status === 'RUNNING' ||
+                run?.details?.status === 'PENDING' ||
+                run?.details?.status === 'QUEUED'
             ) {
-                fetchStatus(true);
+                fetchStatus();
             }
         }, 30000);
 
@@ -94,7 +88,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
             await api.cancelRun(runid);
 
             // Refresh status
-            await fetchStatus(true);
+            await fetchStatus();
 
             if (onRunCancelled) {
                 onRunCancelled();
@@ -129,7 +123,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         }
     };
 
-    const canStop = runDetails?.status === 'RUNNING';
+    const canStop = run?.details?.status === 'RUNNING';
 
     if (loading) {
         return (
@@ -145,7 +139,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         );
     }
 
-    if (!runDetails) {
+    if (!run?.details) {
         return (
             <Box sx={{ p: 3 }}>
                 <Alert severity="error">Run details not found</Alert>
@@ -157,51 +151,52 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         <>
             <ExperimentLayout $isDetailsOpen={!!selectedExperiment}>
                 <MainContent>
-                    <Box>
+                    <RunHeader>{run.name}</RunHeader>
+
+                    <Box sx={{ padding: 3 }}>
                         {error && <Alert severity="error">{error}</Alert>}
                         <Chip
-                            label={runDetails.status.toUpperCase()}
-                            color={getStatusColor(runDetails.status)}
+                            label={run?.details.status.toUpperCase()}
+                            color={getStatusColor(run?.details.status)}
                             size="medium"
                         />
-                        {runDetails.statusCheckedAt && (
+                        {run?.details.statusCheckedAt && (
                             <Box>
                                 <Typography variant="caption">
                                     Last Checked:{' '}
-                                    {new Date(runDetails.statusCheckedAt).toLocaleString()}
+                                    {new Date(run?.details.statusCheckedAt).toLocaleString()}
                                 </Typography>
                             </Box>
                         )}
                         {canStop && (
-                            <Button
-                                variant="outlined"
-                                color="error"
+                            <StopButton
+                                variant="text"
                                 startIcon={
-                                    cancelling ? <CircularProgress size={16} /> : <CancelIcon />
+                                    cancelling ? (
+                                        <CircularProgress size={16} />
+                                    ) : (
+                                        <StopCircleOutlinedIcon />
+                                    )
                                 }
                                 onClick={handleStop}
-                                disabled={refreshing || cancelling}
-                                sx={{ flex: 1 }}>
-                                {cancelling ? 'Stopping...' : 'Stop Run'}
-                            </Button>
+                                disabled={true}>
+                                {cancelling ? 'Stopping...' : 'Stop'}
+                            </StopButton>
                         )}
-                    </Box>
-
-                    <Box sx={{ flex: 1, minHeight: 0 }}>
                         <RunExperiments runId={runid} onSelectExperiment={handleSelectExperiment} />
                     </Box>
                 </MainContent>
 
-                <DetailsWrapper>
-                    {!!selectedExperiment && (
+                {!!selectedExperiment && (
+                    <DetailsWrapper>
                         <>
                             <CloseDetailButton onClick={handleCloseDetails} size="small">
                                 <CloseIcon />
                             </CloseDetailButton>
                             <ExperimentDetails experiment={selectedExperiment} />
                         </>
-                    )}
-                </DetailsWrapper>
+                    </DetailsWrapper>
+                )}
             </ExperimentLayout>
         </>
     );
@@ -220,14 +215,17 @@ const ExperimentLayout = styled('div')<{ $isDetailsOpen: boolean }>`
 `;
 
 const MainContent = styled('div')`
-    grid-area: main-content;
+    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    border-radius: ${({ theme }) => theme.shape.borderRadius};
     display: flex;
     flex-direction: column;
     gap: ${({ theme }) => theme.spacing(2)};
+    grid-area: main-content;
 `;
 
 const DetailsWrapper = styled('div')`
     background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    border-radius: ${({ theme }) => theme.shape.borderRadius};
     grid-area: details;
     padding: ${({ theme }) => theme.spacing(3)};
     position: relative;
@@ -238,4 +236,21 @@ const CloseDetailButton = styled(IconButton)`
     position: absolute;
     top: ${({ theme }) => theme.spacing(2)};
     right: ${({ theme }) => theme.spacing(2)};
+`;
+
+const StopButton = styled(Button)`
+    color: ${({ theme }) => theme.color['error-red-100'].hex};
+
+    &.Mui-disabled {
+        color: ${({ theme }) => theme.color['error-red-60'].hex};
+    }
+`;
+
+const RunHeader = styled('div')`
+    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    color: ${({ theme }) => theme.color['green-100'].hex};
+    display: flex;
+    font-size: 1.25rem;
+    justify-content: space-between;
+    padding: ${({ theme }) => theme.spacing(3)};
 `;

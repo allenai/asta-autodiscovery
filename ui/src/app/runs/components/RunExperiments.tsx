@@ -1,9 +1,18 @@
-import { Paper, styled } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { Paper, styled, Box } from '@mui/material';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { useEffect, useRef, useState } from 'react';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 
 import { Experiment, getExperimentFromApi } from '@/types/Run';
 import { getRunsApi } from '@/api/RunsApi';
+import {
+    SurprisalLabels,
+    SurprisalScale,
+    getPriorAndPosteriorLabel,
+    getSurprisalColor,
+    getSurprisalScale,
+} from '@/runs/utils/ExperimentUtils';
 
 type RunExperimentsProps = {
     runId: string;
@@ -14,11 +23,46 @@ const DEFAULT_UPDATE_INTERVAL_MS = 15000;
 
 const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 130 },
-    { field: 'isSurprising', headerName: 'Surprising', width: 100 },
-    { field: 'status', headerName: 'Status', width: 120 },
-    { field: 'creationIdx', headerName: 'Creation Index', width: 130 },
-    { field: 'runtimeMs', headerName: 'Runtime (ms)', width: 130 },
     { field: 'hypothesis', headerName: 'Hypothesis', width: 200, flex: 1 },
+    {
+        field: 'prior',
+        headerName: 'Before',
+        width: 150,
+        renderHeader: () => (
+            <ColumnHeaderWrapper>
+                <span>Before</span>
+                <ScienceOutlinedIcon fontSize="small" />
+            </ColumnHeaderWrapper>
+        ),
+    },
+    {
+        field: 'posterior',
+        headerName: 'After',
+        width: 150,
+        renderHeader: () => (
+            <ColumnHeaderWrapper>
+                <span>After</span>
+                <ScienceOutlinedIcon fontSize="small" />
+            </ColumnHeaderWrapper>
+        ),
+    },
+    {
+        field: 'surprisal',
+        headerName: 'Surprisal',
+        width: 150,
+        renderHeader: () => (
+            <ColumnHeaderWrapper>
+                <span>Surprisal</span>
+                <LightbulbOutlinedIcon fontSize="small" />
+            </ColumnHeaderWrapper>
+        ),
+        renderCell: (params: GridRenderCellParams) => {
+            const scale = params.row.surprisalScale as SurprisalScale;
+            const color = getSurprisalColor(scale);
+            return <Box sx={{ color }}>{params.value}</Box>;
+        },
+    },
+    { field: 'status', headerName: 'Status', width: 120 },
 ];
 
 export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProps) {
@@ -63,14 +107,20 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
             }));
 
             // Convert to rows for DataGrid
-            const newRows = newExperiments.map((experiment) => ({
-                id: experiment.experimentId,
-                hypothesis: experiment.hypothesis ?? 'N/A',
-                isSurprising: experiment.isSurprising ? 'Yes' : 'No',
-                status: experiment.status,
-                creationIdx: experiment.creationIdx,
-                runtimeMs: experiment.runtimeMs ?? 'N/A',
-            }));
+            const newRows = newExperiments.map((experiment) => {
+                const surprisalScale = getSurprisalScale(experiment.surprise);
+                return {
+                    id: experiment.experimentId,
+                    hypothesis: experiment.hypothesis ?? 'N/A',
+                    prior: getPriorAndPosteriorLabel(experiment.prior),
+                    posterior: getPriorAndPosteriorLabel(experiment.posterior),
+                    surprisal: SurprisalLabels[surprisalScale],
+                    surprisalScale,
+                    status: experiment.status,
+                    creationIdx: experiment.creationIdx,
+                    runtimeMs: experiment.runtimeMs ?? 'N/A',
+                };
+            });
             setRows((prevRows) => [...prevRows, ...newRows]);
 
             // Update the last known experiment ID for the next poll
@@ -98,7 +148,6 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
             fetchLatestRunExperiments(runId).finally(() => setIsloading(false));
         }
         const intervalId = setInterval(() => {
-            console.log('setInterval()', { runId, ...pollingStateRef.current });
             fetchLatestRunExperiments(runId);
         }, DEFAULT_UPDATE_INTERVAL_MS);
         return () => {
@@ -129,10 +178,23 @@ export function RunExperiments({ runId, onSelectExperiment }: RunExperimentsProp
 
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     color: theme.color['cream-100'].hex,
-    backgroundColor: theme.color['dark-teal-100'].hex,
+    backgroundColor: theme.color['extra-dark-teal-100'].hex,
     margin: theme.spacing(0.5, 0, 1, 0),
+
     '.MuiDataGrid-cell, .MuiDataGrid-columnHeaders, .MuiDataGrid-row, .MuiDataGrid-columnSeparator':
         {
             borderColor: theme.color['cream-4'].rgba.toString(),
         },
+
+    '.MuiDataGrid-columnHeaderTitle, .MuiDataGrid-columnHeader svg': {
+        color: theme.color['green-40'].hex,
+        fontWeight: 700,
+    },
 }));
+
+const ColumnHeaderWrapper = styled(Box)`
+    align-items: center;
+    color: ${({ theme }) => theme.color['green-40'].hex};
+    display: flex;
+    gap: ${({ theme }) => theme.spacing(0.5)};
+`;

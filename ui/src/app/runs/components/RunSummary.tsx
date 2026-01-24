@@ -1,4 +1,4 @@
-import { styled } from '@mui/material';
+import { styled, Typography } from '@mui/material';
 import IconHub from '@mui/icons-material/HubOutlined';
 import IconError from '@mui/icons-material/Error';
 import Link from 'next/link';
@@ -13,15 +13,13 @@ export type RunSummaryProps = {
 };
 
 export const RunSummary = ({ run, startExpanded }: RunSummaryProps) => {
-    const { id, name } = run;
+    const { id, name, description } = run;
     const status = run.details?.status ?? RunStatus.UNKNOWN;
-
-    const [isExpanded, setIsExpanded] = useState(startExpanded ?? false);
 
     return (
         <Layout>
             <LayoutIcon>
-                <IconWrapper onClick={() => setIsExpanded(!isExpanded)}>
+                <IconWrapper>
                     <RunIcon status={status} />
                 </IconWrapper>
             </LayoutIcon>
@@ -29,7 +27,7 @@ export const RunSummary = ({ run, startExpanded }: RunSummaryProps) => {
                 <TitleLink href={`/runs/${id}`} passHref>
                     <Title>{name}</Title>
                 </TitleLink>
-                {isExpanded && <>EXPANDED</>}
+                {description && <Description>{description}</Description>}
                 <LayoutPills>
                     <RunPills run={run} />
                 </LayoutPills>
@@ -55,6 +53,12 @@ const LayoutContent = styled('div')(({ theme }) => ({}));
 
 const LayoutPills = styled('div')(({ theme }) => ({
     marginTop: theme.spacing(1),
+}));
+
+const Description = styled(Typography)(({ theme }) => ({
+    margin: 0,
+    fontSize: '1rem',
+    color: theme.color['cream-100'].hex,
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -84,7 +88,6 @@ const IconWrapper = styled('div')(({ theme }) => ({
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    cursor: 'pointer',
 }));
 
 const RunIcon = ({ status }: { status: RunStatus }) => {

@@ -1,5 +1,7 @@
-import { Box, CircularProgress, Typography, styled } from '@mui/material';
-import { useMemo } from 'react';
+import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
+import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
+import { useMemo, useState } from 'react';
 
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { useRuns } from '@/contexts/RunsContext';
@@ -7,40 +9,39 @@ import { RunSummary } from '@/runs/components/RunSummary';
 import { Run, RunStatus } from '@/types/Run';
 
 enum Bucket {
-    NotStarted = 'NotStarted',
-    Running = 'Running',
-    Finished = 'Finished',
-    Error = 'Error',
-    Cancelled = 'Cancelled',
+    NOT_STARTED = 'NOT_STARTED',
+    RUNNING = 'RUNNING',
+    FINISHED = 'FINISHED',
+    ERROR = 'ERROR',
+    CANCELLED = 'CANCELLED',
 }
 
-// Mapping of status value to bucket
+// Mapping of status value to bucket, ordered for display
 const STATUS_BUCKETS: Record<RunStatus, Bucket> = {
-    CANCELLED: Bucket.Cancelled,
-    FAILED: Bucket.Error,
-    ERROR: Bucket.Error,
-    CREATED: Bucket.NotStarted,
-    QUEUED: Bucket.NotStarted,
-    PENDING: Bucket.NotStarted,
-    RUNNING: Bucket.Running,
-    COMPLETED: Bucket.Finished,
-    SUCCEEDED: Bucket.Finished,
-    UNKNOWN: Bucket.NotStarted,
+    CREATED: Bucket.NOT_STARTED,
+    QUEUED: Bucket.NOT_STARTED,
+    PENDING: Bucket.NOT_STARTED,
+    UNKNOWN: Bucket.NOT_STARTED,
+    RUNNING: Bucket.RUNNING,
+    COMPLETED: Bucket.FINISHED,
+    SUCCEEDED: Bucket.FINISHED,
+    FAILED: Bucket.ERROR,
+    ERROR: Bucket.ERROR,
+    CANCELLED: Bucket.CANCELLED,
 };
 
-// Ordered in which they are displayed
 const BUCKET_LABELS: Record<Bucket, string> = {
-    [Bucket.NotStarted]: 'Not Started',
-    [Bucket.Running]: 'Running',
-    [Bucket.Finished]: 'Finished',
-    [Bucket.Error]: 'Error',
-    [Bucket.Cancelled]: 'Cancelled',
+    [Bucket.NOT_STARTED]: 'Not Started',
+    [Bucket.RUNNING]: 'Running',
+    [Bucket.FINISHED]: 'Finished',
+    [Bucket.ERROR]: 'Error',
+    [Bucket.CANCELLED]: 'Cancelled',
 };
 
 export const ViewerRunsBox = () => {
     const { viewerRuns, isViewerRunsLoading } = useRuns();
 
-    // Group runs by status, sorted for display by STATUS_LABELS order
+    // Group runs by status, sorted for display by STATUS_BUCKETS order
     const runsByBucket = useMemo(() => {
         const buckets: Record<string, Run[]> = {};
         if (viewerRuns) {
@@ -65,10 +66,25 @@ export const ViewerRunsBox = () => {
         return orderedBuckets;
     }, [viewerRuns]);
 
+    const [expandedBuckets, setExpandedBuckets] = useState<Record<Bucket, boolean>>(() => ({
+        [Bucket.NOT_STARTED]: true,
+        [Bucket.RUNNING]: false,
+        [Bucket.FINISHED]: false,
+        [Bucket.ERROR]: false,
+        [Bucket.CANCELLED]: false,
+    }));
+
+    const onClickToggleButton = (bucket: Bucket) => {
+        setExpandedBuckets((prev) => ({
+            ...prev,
+            [bucket]: !prev[bucket],
+        }));
+    };
+
     return (
         <>
             <Header>
-                <Headline variant="h5">Your Sessions</Headline>
+                <Headline>Your Sessions</Headline>
                 <div>
                     <CreateRunButton />
                 </div>
@@ -77,14 +93,32 @@ export const ViewerRunsBox = () => {
                 <Wrapper>
                     {Object.entries(runsByBucket).map(([bucket, runs]) => {
                         if (runs.length === 0) return null;
+                        const isExpanded = expandedBuckets[bucket as Bucket];
                         return (
                             <StatusGroup key={bucket}>
-                                <StatusLabel>{BUCKET_LABELS[bucket as Bucket]}</StatusLabel>
-                                {runs.map((run) => (
-                                    <RunItem key={run.id}>
-                                        <RunSummary run={run} />
-                                    </RunItem>
-                                ))}
+                                <StatusHeader onClick={() => onClickToggleButton(bucket as Bucket)}>
+                                    <ToggleButton
+                                        startIcon={
+                                            isExpanded ? (
+                                                <ExpandLessOutlinedIcon />
+                                            ) : (
+                                                <ExpandMoreOutlinedIcon />
+                                            )
+                                        }
+                                    />
+                                    <StatusLabel>
+                                        {runs.length} {BUCKET_LABELS[bucket as Bucket]}
+                                    </StatusLabel>
+                                </StatusHeader>
+                                {isExpanded && (
+                                    <>
+                                        {runs.map((run) => (
+                                            <RunItem key={run.id}>
+                                                <RunSummary run={run} />
+                                            </RunItem>
+                                        ))}
+                                    </>
+                                )}
                             </StatusGroup>
                         );
                     })}
@@ -103,13 +137,32 @@ const StatusGroup = styled('div')(({ theme }) => ({
     marginBottom: theme.spacing(4),
 }));
 
+const StatusHeader = styled('div')(({ theme }) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'start',
+    gap: theme.spacing(1),
+}));
+
 const StatusLabel = styled(Typography)(({ theme }) => ({
-    variant: 'h5',
     color: theme.color['cream-100'].hex,
     fontSize: 16,
     fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
+}));
+
+const ToggleButton = styled(Button)(({ theme }) => ({
+    background: theme.color['teal-100'].hex,
+    border: 'none',
+    color: theme.color['cream-100'].hex,
+    cursor: 'pointer',
+    width: '20px',
+    height: '20px',
+    minWidth: '20px',
+    '& .MuiButton-startIcon': {
+        margin: 0,
+    },
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

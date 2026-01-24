@@ -46,6 +46,8 @@ export type Experiment = {
     status: string;
     isSurprising: boolean;
     surprise: number | null;
+    prior: number | null;
+    posterior: number | null;
     runtimeMs: number | null;
     hypothesis: string | null;
     experimentPlan: Record<string, any> | null;
@@ -108,6 +110,8 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         status: experimentFromApi.status,
         isSurprising: experimentFromApi.is_surprising,
         surprise: experimentFromApi.surprise,
+        prior: experimentFromApi.prior,
+        posterior: experimentFromApi.posterior,
         runtimeMs: experimentFromApi.runtime_ms,
         hypothesis: experimentFromApi.hypothesis,
         experimentPlan: experimentFromApi.experiment_plan,

@@ -141,10 +141,39 @@ def save_nodes_to_json(nodes_list, log_dirname, run_dedupe=True, dedupe_model="g
     """
     # Optionally deduplicate nodes based on hypothesis
     if run_dedupe:
-        deduped_nodes, _, _ = dedupe(nodes_list, model=dedupe_model,
-                                     log_comparisons_fname=None if not log_dedupe_comparisons else os.path.join(
-                                         log_dirname, "dedupe_comparisons.json"))
+        deduped_nodes, duplicates = dedupe(
+            nodes_list,
+            model=dedupe_model,
+            log_comparisons_fname=None
+            if not log_dedupe_comparisons
+            else os.path.join(log_dirname, "dedupe_log.json"),
+            verbose=False,
+        )
         file_to_save = deduped_nodes
+        nonempty_clusters = {k: v for k, v in duplicates.items() if len(v) > 0}
+        if len(nonempty_clusters) > 0:
+            print(
+                f"\n[DEDUPE] Deduplicated MCTS nodes to n={len(deduped_nodes)}.\nMerged nodes:"
+            )
+            print(json.dumps(nonempty_clusters, indent=2))
+        else:
+            print("\n[DEDUPE] No duplicate MCTS nodes found.")
+
+        with open(os.path.join(log_dirname, "duplicate_nodes.json"), "w") as f:
+            # Add hypothesis texts for each node in the clusters
+            _hyp_by_node_id = {node["id"]: node["hypothesis"] for node in nodes_list}
+            for cluster_id, node_ids in nonempty_clusters.items():
+                nonempty_clusters[cluster_id] = {
+                    "hypothesis": _hyp_by_node_id[cluster_id],
+                    "duplicates": [
+                        {"node_id": nid, "hypothesis": _hyp_by_node_id[nid]}
+                        for nid in node_ids
+                    ],
+                }
+            json.dump(nonempty_clusters, f, indent=2)
+            print(
+                f"[DEDUPE] Duplicates saved to {os.path.join(log_dirname, 'duplicate_nodes.json')}."
+            )
     else:
         file_to_save = nodes_list
 

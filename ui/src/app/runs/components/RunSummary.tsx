@@ -4,7 +4,7 @@ import IconError from '@mui/icons-material/Error';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { Run } from '@/types/Run';
+import { Run, RunStatus } from '@/types/Run';
 import { RunPills } from '@/runs/components/RunPills';
 
 export type RunSummaryProps = {
@@ -14,7 +14,7 @@ export type RunSummaryProps = {
 
 export const RunSummary = ({ run, startExpanded }: RunSummaryProps) => {
     const { id, name } = run;
-    const status = run.details?.status ?? 'unknown';
+    const status = run.details?.status ?? RunStatus.UNKNOWN;
 
     const [isExpanded, setIsExpanded] = useState(startExpanded ?? false);
 
@@ -87,7 +87,7 @@ const IconWrapper = styled('div')(({ theme }) => ({
     cursor: 'pointer',
 }));
 
-const RunIcon = ({ status }: { status: string }) => {
+const RunIcon = ({ status }: { status: RunStatus }) => {
     const sharedProps = {
         sx: {
             height: '20px',
@@ -95,9 +95,15 @@ const RunIcon = ({ status }: { status: string }) => {
         },
     };
     switch (status) {
-        case 'failed':
-            return <IconError {...sharedProps} />;
+        case RunStatus.CREATED:
+        case RunStatus.CANCELLED:
+        case RunStatus.PENDING:
+        case RunStatus.QUEUED:
+            return <IconHub {...sharedProps} htmlColor="#FAF2E980" />;
+        case RunStatus.ERROR:
+        case RunStatus.FAILED:
+            return <IconError {...sharedProps} color="error" />;
         default:
-            return <IconHub {...sharedProps} />;
+            return <IconHub {...sharedProps} color="secondary" />;
     }
 };

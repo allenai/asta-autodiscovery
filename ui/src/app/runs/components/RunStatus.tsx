@@ -7,7 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { Experiment, Run, RunDetails, getRunFromApi } from '@/types/Run';
+import { Experiment, Run, getRunFromApi } from '@/types/Run';
 import { RunExperiments } from '@/runs/components/RunExperiments';
 import { ExperimentDetails } from './ExperimentDetails';
 

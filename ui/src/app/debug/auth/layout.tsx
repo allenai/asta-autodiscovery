@@ -1,38 +1,25 @@
 'use client';
 
-import { Box, Grid, styled } from '@mui/material';
+import { Box, styled } from '@mui/material';
 
 /**
- * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
+ * Layout for debug authentication pages
  */
 export default function DebugAuthLayout({ children }: { children: React.ReactNode }) {
     return (
-        <Wrapper>
-            <Grid container sx={{ height: '100%' }}>
-                {/* Main content */}
-                <MainContent
-                    item
-                    xs={12}
-                    md={10}
-                    sx={{
-                        height: '100%',
-                        overflow: 'auto',
-                    }}>
-                    {children}
-                </MainContent>
-            </Grid>
-        </Wrapper>
+        <ScrollContainer>
+            <ScrollableArea>{children}</ScrollableArea>
+        </ScrollContainer>
     );
 }
 
-const Wrapper = styled(Box)`
+const ScrollContainer = styled(Box)`
     background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
+    position: absolute;
+    inset: 0;
 `;
 
-const MainContent = styled(Grid)`
+const ScrollableArea = styled('div')`
     height: 100%;
     overflow: auto;
 `;

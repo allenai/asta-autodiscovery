@@ -60,9 +60,10 @@ class ExperimentNode:
             self.status = "failed"
 
         # Metrics
+        self.prior: float | None = node_data.get("prior", {}).get("mean")
+        self.posterior: float | None = node_data.get("posterior", {}).get("mean")
+        self.surprise: float | None = self.posterior - self.prior if self.posterior is not None and self.prior is not None else node_data.get("belief_change", None)
         self.is_surprising: bool | None = node_data.get("surprising")
-        # NOTE: Surprise might be posterior.mean - prior.mean instead
-        self.surprise: float | None = node_data.get("belief_change")
 
         # Convert time_elapsed (seconds) to runtime_ms (milliseconds)
         time_elapsed = node_data.get("time_elapsed")
@@ -86,6 +87,8 @@ class ExperimentNode:
             "status": self.status,
             "is_surprising": self.is_surprising,
             "surprise": self.surprise,
+            "prior": self.prior,
+            "posterior": self.posterior,
             "runtime_ms": self.runtime_ms,
             "hypothesis": self.hypothesis,
             "experiment_plan": self.experiment_plan,

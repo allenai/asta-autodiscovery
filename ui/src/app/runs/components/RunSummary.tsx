@@ -2,17 +2,15 @@ import { styled, Typography } from '@mui/material';
 import IconHub from '@mui/icons-material/HubOutlined';
 import IconError from '@mui/icons-material/Error';
 import Link from 'next/link';
-import { useState } from 'react';
 
 import { Run, RunStatus } from '@/types/Run';
 import { RunPills } from '@/runs/components/RunPills';
 
 export type RunSummaryProps = {
     run: Run;
-    startExpanded?: boolean;
 };
 
-export const RunSummary = ({ run, startExpanded }: RunSummaryProps) => {
+export const RunSummary = ({ run }: RunSummaryProps) => {
     const { id, name, description } = run;
     const status = run.details?.status ?? RunStatus.UNKNOWN;
 

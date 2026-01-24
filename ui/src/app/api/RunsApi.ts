@@ -53,6 +53,8 @@ export interface ExperimentFromApi {
     status: string;
     is_surprising: boolean;
     surprise: number | null;
+    prior: number | null;
+    posterior: number | null;
     runtime_ms: number | null;
     hypothesis: string | null;
     experiment_plan: Record<string, any> | null;

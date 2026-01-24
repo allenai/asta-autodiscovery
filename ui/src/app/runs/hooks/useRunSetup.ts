@@ -1,23 +1,7 @@
 import { useState } from 'react';
 
-import { useAuth0 } from '@/contexts/Auth0Context';
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
-import { uploadDataset, saveMetadata, submitRun } from '../actions';
-
-export const MODEL_OPTIONS = [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'o4-mini', label: 'o4-mini' },
-    { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
-    { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
-];
-
-export const BELIEF_MODES = {
-    BOOLEAN: { value: 'boolean', label: 'Boolean' },
-    BOOLEAN_CAT: { value: 'boolean_cat', label: 'Boolean Categorical' },
-    CATEGORICAL: { value: 'categorical', label: 'Categorical' },
-    CATEGORICAL_NUMERIC: { value: 'categorical_numeric', label: 'Categorical Numeric' },
-    GAUSSIAN: { value: 'gaussian', label: 'Gaussian' },
-};
+import { getRunsApi } from '@/api/RunsApi';
 
 export const MCTS_SELECTION = {
     UCB1: { value: 'ucb1', label: 'UCB1' },
@@ -27,118 +11,125 @@ export const MCTS_SELECTION = {
     UCB1_RECURSIVE: { value: 'ucb1_recursive', label: 'UCB1 Recursive' },
 };
 
-export interface Dataset {
+export type Dataset = {
     filename: string;
     description: string;
     path?: string;
-}
+};
 
-export interface RunMetadata {
+type Settings = {
+    // metadata
     name: string;
-    intent: string;
+    datasetsDescription: string;
     domain: string;
-    datasetDescription: string;
+    datasets: Dataset[];
+
+    // advanced settings
     nExperiments: number;
-    model: string;
-    beliefMode: string;
+    intent: string;
     explorationWeight: number;
-    useBeamSearch: boolean;
     mctsSelection: string;
     surprisalWidth: number;
     evidenceWeight: number;
     warmstartExperiments: string;
-}
+    nWarmstart: number;
+};
 
 interface UseRunSetupProps {
     runid: string;
     onSubmitSuccess: () => void;
 }
 
+export interface SelectedFile {
+    file: File;
+    description: string;
+}
+
+interface FieldErrors {
+    name?: string;
+    datasetsDescription?: string;
+    datasets?: string;
+    datasetFileDescriptions?: string;
+    nExperiments?: string;
+}
+
 export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
-    const { getAccessToken } = useAuth0();
     const { credits } = useViewerCredits();
+    const api = getRunsApi();
 
     const creditsRemaining = credits?.remaining ?? 500;
 
     // Dataset upload state
     const [datasets, setDatasets] = useState<Dataset[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
-
-    // Run configuration state
-    const [metadata, setMetadata] = useState<RunMetadata>({
+    const [settings, setSettings] = useState<Settings>({
         name: '',
-        intent: '',
+        datasetsDescription: '',
         domain: '',
-        datasetDescription: '',
+        datasets: [],
         nExperiments: 4,
-        model: 'gpt-4o',
-        beliefMode: BELIEF_MODES.BOOLEAN_CAT.value,
+        intent: '',
         explorationWeight: 2,
-        useBeamSearch: false,
         mctsSelection: MCTS_SELECTION.UCB1_RECURSIVE.value,
         surprisalWidth: 0.2,
         evidenceWeight: 2,
         warmstartExperiments: '',
+        nWarmstart: 8,
     });
-    const [experimentsError, setExperimentsError] = useState<string | null>(null);
 
     // Field validation errors
-    const [fieldErrors, setFieldErrors] = useState<{
-        name?: string;
-        intent?: string;
-        datasetDescription?: string;
-        datasets?: string;
-    }>({});
+    const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
     // Submission state
     const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
 
     const handleFileSelect = (file: File) => {
-        console.log(file);
         if (file) {
-            setSelectedFiles((prev) => [...prev, file]);
+            setSelectedFiles((prev) => [...prev, { file, description: '' }]);
             setUploadError(null);
         }
     };
 
-    const handleUploadDataset = async () => {
-        if (selectedFiles.length === 0 || !metadata.datasetDescription.trim()) {
-            setUploadError('Please select files and provide an intent');
-            return;
-        }
+    const handleFileDescriptionChange = (index: number, description: string) => {
+        setFieldErrors((prev) => {
+            const { datasetFileDescriptions, ...rest } = prev;
+            return rest;
+        });
+        setSelectedFiles((prev) =>
+            prev.map((selectedFile, i) =>
+                i === index ? { ...selectedFile, description } : selectedFile
+            )
+        );
+    };
 
+    const handleUploadDataset = async (): Promise<boolean> => {
         setUploading(true);
-        setUploadError(null);
 
         try {
-            const token = await getAccessToken();
-
             // Upload all selected files
-            for (const file of selectedFiles) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('runid', runid);
-
-                const response = await uploadDataset(formData, token);
-
-                // Add to datasets list
-                const newDataset: Dataset = {
-                    filename: response.filename,
-                    description: metadata.datasetDescription.trim(),
-                    path: response.path,
+            const uploadReq = selectedFiles.map((selectedFile) => {
+                return api.uploadDataset(runid, selectedFile.file);
+            });
+            const uploadResp = await Promise.all(uploadReq);
+            const datasets = uploadResp.map(({ data }, i) => {
+                return {
+                    filename: data.filename,
+                    description: selectedFiles[i].description.trim(),
+                    path: data.path,
                 };
-
-                setDatasets((prev) => [...prev, newDataset]);
-            }
+            });
+            setDatasets(datasets);
 
             // Reset form
             setSelectedFiles([]);
+            return true;
         } catch (err) {
             console.error('Error uploading dataset:', err);
             setUploadError(err instanceof Error ? err.message : 'Failed to upload dataset');
+            return false;
         } finally {
             setUploading(false);
         }
@@ -154,110 +145,111 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         setSelectedFiles(newFiles);
     };
 
-    const updateMetadata = <K extends keyof RunMetadata>(key: K, value: RunMetadata[K]) => {
-        setMetadata((prev) => ({ ...prev, [key]: value }));
+    const updateSettings = <K extends keyof Settings>(key: K, value: Settings[K]) => {
+        setFieldErrors({});
+        setSettings((prev) => ({ ...prev, [key]: value }));
     };
 
     const handleExperimentsChange = (value: string) => {
         const num = parseInt(value, 10);
 
         if (value === '') {
-            updateMetadata('nExperiments', 0);
-            setExperimentsError('Number of experiments is required');
+            setFieldErrors((prev) => ({
+                ...prev,
+                nExperiments: 'Number of experiments is required',
+            }));
+
             return;
         }
 
         if (isNaN(num) || num < 1 || num > creditsRemaining) {
-            setExperimentsError(`Must be between 1 and ${creditsRemaining}`);
+            setFieldErrors((prev) => ({
+                ...prev,
+                nExperiments: `Must be between 1 and ${creditsRemaining}`,
+            }));
         } else {
-            setExperimentsError(null);
+            setFieldErrors((prev) => {
+                const { nExperiments, ...rest } = prev;
+                return rest;
+            });
         }
-
-        updateMetadata('nExperiments', num);
     };
 
-    const handleSubmit = async () => {
+    const isFormInvalid = () => {
         // Validate all required fields
-        const errors: {
-            name?: string;
-            intent?: string;
-            datasetDescription?: string;
-            datasets?: string;
-        } = {};
+        const errors: FieldErrors = {};
+        setUploadError(null);
 
-        if (!metadata.name.trim()) {
+        if (!settings.name.trim()) {
             errors.name = 'Run name is required';
         }
 
-        if (!metadata.intent.trim()) {
-            errors.intent = 'Intent is required';
+        if (!settings.datasetsDescription.trim()) {
+            errors.datasetsDescription = 'Description for datasets is required';
         }
 
-        if (!metadata.datasetDescription.trim()) {
-            errors.datasetDescription = 'Dataset description is required';
-        }
-
-        if (datasets.length === 0) {
+        if (!selectedFiles.length) {
             errors.datasets = 'Please upload at least one dataset';
         }
 
-        if (Object.keys(errors).length > 0) {
+        // Validate file descriptions
+        const fileValidation = validateFileDescriptions(selectedFiles);
+        const hasValidationErrors = Object.values(errors).length > 0 || !fileValidation.isValid;
+
+        if (!fileValidation.isValid) {
+            errors.datasetFileDescriptions = 'Please provide a description for all selected files';
+        }
+
+        if (settings.nExperiments < 1 || settings.nExperiments > creditsRemaining) {
+            errors.nExperiments = `Number of experiments must be between 1 and ${creditsRemaining}`;
+        }
+
+        if (hasValidationErrors) {
             setFieldErrors(errors);
-            setError('Please fill in all required fields');
-            return;
+            setFormError('Please fill in all required fields');
         }
 
-        if (metadata.nExperiments < 1 || metadata.nExperiments > creditsRemaining) {
-            setError(`Number of experiments must be between 1 and ${creditsRemaining}`);
-            return;
-        }
+        return hasValidationErrors;
+    };
 
+    const handleSubmit = async () => {
         setSubmitting(true);
-        setError(null);
-        setFieldErrors({});
+        if (isFormInvalid()) {
+            return;
+        }
 
         try {
-            const token = await getAccessToken();
+            // upload files
+            const isSuccessfulUpload = await handleUploadDataset();
+            if (!isSuccessfulUpload) {
+                setSubmitting(false);
+                return;
+            }
 
             // Prepare metadata
             const submissionMetadata = {
-                name: metadata.name.trim(),
-                intent: metadata.intent.trim(),
-                domain: metadata.domain.trim(),
-                dataset_description: metadata.datasetDescription.trim() || undefined,
-                datasets: datasets.map((ds) => ({
-                    name: ds.filename,
-                    intent: ds.description,
+                name: settings.name.trim(),
+                description: settings.datasetsDescription.trim(),
+                domain: settings.domain.trim(),
+                datasets: selectedFiles.map((ds) => ({
+                    name: ds.file.name,
+                    description: ds.description,
                 })),
-                nExperiments: metadata.nExperiments,
-                beliefMode: metadata.beliefMode,
-                explorationWeight: metadata.explorationWeight,
-                useBeamSearch: metadata.useBeamSearch,
-                mctsSelection: metadata.mctsSelection,
-                surprisalWidth: metadata.surprisalWidth,
-                evidenceWeight: metadata.evidenceWeight,
-                warmstartExperiments: metadata.warmstartExperiments,
             };
 
             // Save metadata
-            await saveMetadata(runid, submissionMetadata, token);
+            await api.saveMetadata(runid, submissionMetadata);
 
-            // Submit run
-            await submitRun(
-                runid,
-                {
-                    n_experiments: metadata.nExperiments,
-                    model: metadata.model,
-                    belief_model: metadata.beliefMode,
-                },
-                token
-            );
+            // // Submit run
+            await api.submitRun(runid, {
+                n_experiments: settings.nExperiments,
+            });
 
             // Notify parent of success
             onSubmitSuccess();
         } catch (err) {
             console.error('Error submitting run:', err);
-            setError(err instanceof Error ? err.message : 'Failed to submit run');
+            setFormError(err instanceof Error ? err.message : 'Failed to submit run');
             setSubmitting(false);
         }
     };
@@ -273,19 +265,19 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         uploadError,
 
         // Run configuration state
-        metadata,
-        experimentsError,
+        settings,
         fieldErrors,
 
         // Submission state
         submitting,
-        error,
+        formError,
 
         // Setters
-        updateMetadata,
+        updateSettings,
 
         // Handlers
         handleFileSelect,
+        handleFileDescriptionChange,
         handleUploadDataset,
         handleRemoveDataset,
         handleRemoveSelectedFile,
@@ -293,3 +285,16 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         handleSubmit,
     };
 }
+
+// Helpers
+
+// Validates that all selected files have non-empty descriptions
+const validateFileDescriptions = (selectedFiles: SelectedFile[]) => {
+    const filesWithoutDescription = selectedFiles.filter((file) => !file.description.trim());
+
+    return {
+        isValid: filesWithoutDescription.length === 0,
+        filesWithoutDescription,
+        missingCount: filesWithoutDescription.length,
+    };
+};

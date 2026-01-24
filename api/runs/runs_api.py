@@ -7,7 +7,6 @@ their own autodiscovery experiment runs.
 import json
 import os
 import tempfile
-from urllib import response
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,9 +14,26 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 from google.cloud import storage
 from utils.auth import requires_enrollment
+from utils.credits import InsufficientCreditsError, check_sufficient_credits, get_job_stats
+from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
-from runs.models import ExperimentModel, GetExperimentStatusResponseModel, GetRunExperimentsResponseModel
+from runs.models import (
+    MetadataDatasetModel,
+    MetadataModel,
+    GetRunMetadataRequestModel,
+    GetRunMetadataResponseModel,
+    GetExampleRunsRequestModel,
+    GetExampleRunsResponseModel,
+    RunDetailsModel,
+    RunModel,
+    ExperimentModel,
+    GetExperimentStatusResponseModel,
+    GetRunExperimentsResponseModel,
+    GetViewerRunsRequestModel,
+    GetViewerRunsResponseModel,
+    RunStatsModel,
+)
 
 # Import autodiscovery_jobs when available
 try:
@@ -32,6 +48,9 @@ try:
     JOBS_AVAILABLE = True
 except ImportError:
     JOBS_AVAILABLE = False
+
+# Trigger phrase in intent field that activates simulated run mode
+SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 
 
 def create() -> Blueprint:
@@ -242,6 +261,128 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to list runs: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @api.route("/list/me", methods=["GET"])
+    @requires_enrollment
+    def list_viewer_runs():
+        req = GetViewerRunsRequestModel(
+            limit=int(request.args.get("limit", 10)),
+            userid=request.user.get("sub"),
+        )
+
+        job_manager = get_job_manager()
+        run_ids = job_manager.list_jobs(req.userid)
+
+        sliced_run_ids = run_ids[: req.limit]
+        run_models: list[RunModel] = []
+
+        for run_id in sliced_run_ids:
+            try:
+                job_exists = job_manager.job_exists(req.userid, run_id)
+                if not job_exists:
+                    continue
+            except Exception as e:
+                current_app.logger.error(f"Failed to check job existence for {run_id}: {e}")
+                continue
+            try:
+                run_details = _get_run_details(req.userid, run_id) or {}
+            except Exception as e:
+                current_app.logger.error(f"Failed to get run details for {run_id}: {e}")
+                run_details = {}
+            try:
+                job_stats = get_job_stats(
+                    userid=req.userid, jobid=run_id, config=job_manager.config
+                )
+            except Exception as e:
+                current_app.logger.error(f"Failed to get job stats for {run_id}: {e}")
+                job_stats = None
+            try:
+                metadata_dict = job_manager.get_metadata(req.userid, run_id)
+            except Exception as e:
+                current_app.logger.error(f"Failed to get metadata for {run_id}: {e}")
+                metadata_dict = None
+
+            run_details_model = RunDetailsModel(
+                execution_id=run_details.get("execution_id"),
+                created_at=run_details.get("created_at", ""),
+                status=run_details.get("status", "UNKNOWN"),
+                status_checked_at=run_details.get("status_checked_at"),
+            )
+            run_stats_model = RunStatsModel(
+                requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
+                completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
+                pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
+                num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
+            )
+            run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
+            run_model = RunModel(
+                runid=run_id,
+                status=run_details.get("status", "UNKNOWN"),
+                name=run_metadata_model.name if run_metadata_model else f"Run {run_id}",
+                description=run_metadata_model.description if run_metadata_model else f"Description for Run {run_id}",
+                path=None,
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+                run_metadata=run_metadata_model,
+                execution_status={},
+            )
+            run_models.append(run_model)
+
+        resp = GetViewerRunsResponseModel(
+            runs=run_models,
+        )
+        return jsonify(resp.model_dump()), 200
+
+    @api.route("/list/examples", methods=["GET"])
+    def list_example_runs():
+        """List example runs available to all users.
+
+        Returns:
+            JSON response with array of example run IDs.
+        """
+
+        req = GetExampleRunsRequestModel(
+            limit=int(request.args.get("limit", 5)),
+        )
+
+        runs: list[RunModel] = []
+        # TODO: Fetch real example runs from a predefined source
+        for i in range(1, req.limit + 1):
+            run_stats_model = RunStatsModel(
+                requested_experiments=0,
+                completed_experiments=0,
+                pending_experiments=0,
+                num_surprising_experiments=0,
+            )
+            run_details_model = RunDetailsModel(
+                execution_id=None,
+                created_at=datetime.now(UTC).isoformat(),
+                status="COMPLETED",
+                status_checked_at=datetime.now(UTC).isoformat(),
+            )
+            run_metadata_model = MetadataModel(
+                name=f"Example Run {i}",
+                description=f"This is the metadata for example run {i}.",
+                datasets=[],
+            )
+            run_model = RunModel(
+                runid=f"example-run-{i}",
+                status="COMPLETED",
+                name=run_metadata_model.title,
+                path=None,
+                description=run_metadata_model.description,
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+                run_metadata=run_metadata_model,
+                execution_status={},
+            )
+            runs.append(run_model)
+
+        resp = GetExampleRunsResponseModel(
+            runs=runs,
+        )
+        return jsonify(resp.model_dump()), 200
+
+
     @api.route("/<runid>")
     @requires_enrollment
     def get_run(runid: str):
@@ -402,6 +543,34 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to save metadata: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @api.route("<runid>/metadata", methods=["GET"])
+    @requires_enrollment
+    def get_run_metadata(runid: str):
+        """Fetch metadata for a specific run.
+
+        Args:
+            runid: Run identifier
+        """
+        req = GetRunMetadataRequestModel(
+            runid=runid,
+            userid=request.user.get("sub"),
+        )
+
+        job_manager = get_job_manager()
+        metadata_dict = job_manager.get_metadata(req.userid, req.runid)
+        if not metadata_dict:
+            return jsonify({"error": "Metadata not found"}), 404
+
+        metadata_model = MetadataModel.from_dict(metadata_dict)
+
+        resp = GetRunMetadataResponseModel(
+            runid=req.runid,
+            metadata=metadata_model,
+        )
+        return jsonify(resp.model_dump()), 200
+
+
+
     @api.route("/submit", methods=["POST"])
     @requires_enrollment
     def submit_run():
@@ -440,19 +609,42 @@ def create() -> Blueprint:
         try:
             manager = get_job_manager()
 
-            # Pass all additional parameters to run_job
-            execution_id = manager.run_job(
-                userid,
-                runid,
-                n_experiments=n_experiments,
-                model=model,
-                belief_model=belief_model,
-                **{
-                    k: v
-                    for k, v in data.items()
-                    if k not in ["runid", "n_experiments", "model", "belief_model"]
-                },
-            )
+            # Check if this is a simulated run (replay mode)
+            intent = data.get("intent", "")
+            is_simulated = SIMULATE_RUN_TRIGGER in intent
+
+            if is_simulated:
+                # Run replay job instead of actual AutoDiscovery job
+                current_app.logger.info(f"Running replay job for {userid}/{runid}")
+
+                from utils.dev import run_simulated_job
+
+                execution_id = run_simulated_job(
+                    userid=userid,
+                    jobid=runid,
+                    bucket=manager.config.bucket,
+                    project_id=manager.config.project_id,
+                    region=manager.config.region,
+                )
+            else:
+                # Validate sufficient credits before submission
+                check_sufficient_credits(
+                    n_experiments=n_experiments, userid=userid, config=manager.config
+                )
+
+                # Pass all additional parameters to run_job
+                execution_id = manager.run_job(
+                    userid,
+                    runid,
+                    n_experiments=n_experiments,
+                    model=model,
+                    belief_model=belief_model,
+                    **{
+                        k: v
+                        for k, v in data.items()
+                        if k not in ["runid", "n_experiments", "model", "belief_model"]
+                    },
+                )
 
             # Update run_details.json with execution_id and status
             _update_run_details(
@@ -466,6 +658,12 @@ def create() -> Blueprint:
             )
 
             return jsonify({"execution_id": execution_id, "message": "Run submitted successfully"})
+
+        except InsufficientCreditsError as e:
+            return jsonify(
+                {"error": e.message, "requested": e.requested, "available": e.available}
+            ), 402  # Payment Required
+
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500
@@ -541,9 +739,9 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/experiments/status", methods=["GET"])
+    @api.route("/<runid>/experiments", methods=["GET"])
     @requires_enrollment
-    def get_experiments_status(runid: str, after_experiment_id: str | None = None):
+    def get_run_experiments(runid: str):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
 
@@ -551,29 +749,46 @@ def create() -> Blueprint:
             runid: Run identifier
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
         """
-        # userid = request.user.get("sub")
+        userid = request.user.get("sub")
+        after_experiment_id = request.args.get("after_experiment_id", None)
+
+        # Get job status to determine if polling can stop
+        job_manager = get_job_manager()
+        run_details = _get_run_details(userid, runid) or {}
+        has_job_completed = run_details.get("status") in ["SUCCEEDED", "FAILED", "CANCELLED"]
+
+        # Load experiment tree and convert to models
+        tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
+        experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+        experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
         resp = GetRunExperimentsResponseModel(
-            run_id=runid,
+            runid=runid,
             after_experiment_id=after_experiment_id,
-            experiments=[],
+            experiments=experiment_models,
+            has_job_completed=has_job_completed,
         )
-        return jsonify(resp.model_dump())
+        return jsonify(resp.model_dump()), 200
 
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
-    def get_experiment_details(runid: str, experiment_id: str):
+    def get_run_experiment_details(runid: str, experiment_id: str):
         """Fetch details about a specific experiment within a run."""
-        # userid = request.user.get("sub")
+        userid = request.user.get("sub")
 
-        experiment = None  # TODO: Replace with actual fetching logic
+        job_manager = get_job_manager()
+        tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
+        node = tree.get_node(experiment_id)
+
+        experiment_node = node.to_dict() if node else None
+        experiment_model = ExperimentModel(**experiment_node) if experiment_node else None
 
         resp = GetExperimentStatusResponseModel(
-            run_id=runid,
+            runid=runid,
             experiment_id=experiment_id,
-            experiment=experiment,
+            experiment=experiment_model,
         )
-        return jsonify(resp.model_dump())
+        return jsonify(resp.model_dump()), 200
 
     @api.route("/<runid>/cancel", methods=["POST"])
     @requires_enrollment

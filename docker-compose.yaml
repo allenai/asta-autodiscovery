@@ -20,7 +20,7 @@ services:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=DEBUG
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - AUTH0_DOMAIN=auth.example.com
       - AUTH0_AUDIENCE=https://autodiscovery.example.com
       - AUTH0_REQUIRED_PERMISSION=enroll:autodiscovery_v0

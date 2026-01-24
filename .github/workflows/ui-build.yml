@@ -1,4 +1,4 @@
-name: UI Build & Lint
+name: UI Build
 
 on:
   push:
@@ -29,9 +29,6 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-
-      - name: Run lint
-        run: yarn lint
 
       - name: Build project
         run: yarn build

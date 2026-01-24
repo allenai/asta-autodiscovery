@@ -1,5 +1,6 @@
 """Cloud Run operations for executing and managing jobs."""
 
+import re
 from typing import Any
 
 from google.cloud import logging as cloud_logging
@@ -7,6 +8,10 @@ from google.cloud import run_v2
 
 from .config import JobConfig
 from .exceptions import CloudRunError
+
+# Pattern to extract job name from execution ID
+# Execution IDs are formatted as {job-name}-{random-suffix} where suffix is 5 alphanumeric chars
+_EXECUTION_ID_PATTERN = re.compile(r"^(.+)-[a-z0-9]{5}$")
 
 
 def run_job(
@@ -184,8 +189,11 @@ def get_job_status(execution_id: str, config: JobConfig | None = None) -> dict[s
             "GCP_PROJECT environment variable."
         )
 
+    # Infer job name from execution ID (supports multiple job types)
+    job_name = _infer_job_name_from_execution_id(execution_id, config.job_name)
+
     # Build execution resource name
-    execution_name = f"projects/{project_id}/locations/{config.region}/jobs/{config.job_name}/executions/{execution_id}"
+    execution_name = f"projects/{project_id}/locations/{config.region}/jobs/{job_name}/executions/{execution_id}"
 
     try:
         # Create ExecutionsClient and get execution details
@@ -223,6 +231,25 @@ def get_job_status(execution_id: str, config: JobConfig | None = None) -> dict[s
 
     except Exception as e:
         raise CloudRunError(f"Failed to get job status: {e}")
+
+
+def _infer_job_name_from_execution_id(execution_id: str, default_job_name: str) -> str:
+    """Infer the Cloud Run job name from an execution ID.
+
+    Execution IDs are formatted as {job-name}-{random-suffix}, where the suffix
+    is a 5-character alphanumeric string.
+
+    Args:
+        execution_id: The execution ID (e.g., "autodiscovery-replay-67d4p")
+        default_job_name: Fallback job name if inference fails
+
+    Returns:
+        The inferred job name, or default_job_name if pattern doesn't match
+    """
+    match = _EXECUTION_ID_PATTERN.match(execution_id)
+    if match:
+        return match.group(1)
+    return default_job_name
 
 
 def _get_execution_phase(execution: run_v2.Execution) -> str:
@@ -266,8 +293,11 @@ def cancel_job(execution_id: str, config: JobConfig | None = None) -> None:
             "GCP_PROJECT environment variable."
         )
 
+    # Infer job name from execution ID (supports multiple job types)
+    job_name = _infer_job_name_from_execution_id(execution_id, config.job_name)
+
     # Build execution resource name
-    execution_name = f"projects/{project_id}/locations/{config.region}/jobs/{config.job_name}/executions/{execution_id}"
+    execution_name = f"projects/{project_id}/locations/{config.region}/jobs/{job_name}/executions/{execution_id}"
 
     try:
         # Create ExecutionsClient and cancel the execution

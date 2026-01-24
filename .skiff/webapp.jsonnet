@@ -194,6 +194,15 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
         }
     };
 
+    local ingressCloudArmor = ingress + {
+        metadata+: {
+            name: ingress.metadata.name + '-node-port',
+        },
+         spec+: {             
+            ingressClassName: 'nginx-node-port',
+        }
+    };
+
     local allenAITLS = util.getTLSConfig(fullyQualifiedName + '-allen-dot-ai', allenAIHosts);
     local allenAIIngress = {
         apiVersion: 'networking.k8s.io/v1',
@@ -232,6 +241,15 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
         }
     };
 
+    local allenAIIngressCloudArmor = allenAIIngress + {
+        metadata+: {
+            name: allenAIIngress.metadata.name + '-node-port',
+        },
+         spec+: {             
+            ingressClassName: 'nginx-node-port',
+        }
+    };
+
     local scholarTLS = util.getTLSConfig(fullyQualifiedName + '-scholar', scholarHosts);
     local scholarIngress = {
         apiVersion: 'networking.k8s.io/v1',
@@ -267,6 +285,15 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                     }
                 } for host in scholarHosts
             ]
+        }
+    };
+
+    local scholarIngressCloudArmor = allenAIIngress + {
+        metadata: {
+            name+: scholarIngress.metadata.name + '-node-port',
+        },
+         spec+: {             
+            ingressClassName: 'nginx-node-port',
         }
     };
 
@@ -434,6 +461,15 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                     }
                                 },
                                 {
+                                    name: 'GOOGLE_GEMINI_API_KEY',
+                                    valueFrom: {
+                                        secretKeyRef: {
+                                            name: 'autodiscovery-google-gemini-api-key',
+                                            key: 'GOOGLE_GEMINI_API_KEY'
+                                        }
+                                    }
+                                },
+                                {
                                     name: 'GOOGLE_APPLICATION_CREDENTIALS',
                                     value: '/secret/autodiscovery-gcp-service-account'
                                 }
@@ -589,13 +625,15 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
     local defaultObjects = [
         namespace,
         ingress,
+        ingressCloudArmor,
         allenAIIngress,
+        allenAIIngressCloudArmor,
         deployment,
         service,
         pdb
     ];
 
     if std.length(scholarHosts) > 0 then
-        defaultObjects + [ scholarIngress ]
+        defaultObjects + [ scholarIngress, scholarIngressCloudArmor ]
     else
         defaultObjects

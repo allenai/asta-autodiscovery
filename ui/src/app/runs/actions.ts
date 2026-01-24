@@ -23,12 +23,6 @@ export interface Run {
     run_details?: RunDetails;
 }
 
-export interface CreateRunResponse {
-    runid: string;
-    path: string;
-    message: string;
-}
-
 export interface UploadDatasetResponse {
     path: string;
     filename: string;
@@ -42,78 +36,6 @@ export interface SubmitRunResponse {
 
 export interface ApiError {
     error: string;
-}
-
-/**
- * Create a new run with auto-generated UUID.
- *
- * @param token - Auth0 access token
- * @returns Created run details
- * @throws Error if request fails
- */
-export async function createRun(token: string): Promise<CreateRunResponse> {
-    const response = await fetch(`${API_ORIGIN}/api/runs/create`, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const error: ApiError = await response.json();
-        throw new Error(error.error || 'Failed to create run');
-    }
-
-    return await response.json();
-}
-
-/**
- * List all runs for the authenticated user.
- *
- * @param token - Auth0 access token
- * @returns Array of run IDs
- * @throws Error if request fails
- */
-export async function listRuns(token: string): Promise<string[]> {
-    const response = await fetch(`${API_ORIGIN}/api/runs/list`, {
-        method: 'GET',
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (!response.ok) {
-        const error: ApiError = await response.json();
-        throw new Error(error.error || 'Failed to list runs');
-    }
-
-    const data = await response.json();
-    return data.runs;
-}
-
-/**
- * Get details for a specific run.
- *
- * @param runid - Run identifier
- * @param token - Auth0 access token
- * @returns Run details
- * @throws Error if request fails
- */
-export async function getRun(runid: string, token: string): Promise<Run> {
-    const response = await fetch(`${API_ORIGIN}/api/runs/${runid}`, {
-        method: 'GET',
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (!response.ok) {
-        const error: ApiError = await response.json();
-        throw new Error(error.error || 'Failed to get run details');
-    }
-
-    return await response.json();
 }
 
 /**
@@ -230,61 +152,6 @@ export async function submitRun(
     if (!response.ok) {
         const error: ApiError = await response.json();
         throw new Error(error.error || 'Failed to submit run');
-    }
-
-    return await response.json();
-}
-
-/**
- * Get the current status of a run.
- *
- * @param runid - Run identifier
- * @param token - Auth0 access token
- * @returns Run status details
- * @throws Error if request fails
- */
-export async function getRunStatus(
-    runid: string,
-    token: string
-): Promise<{
-    runid: string;
-    run_details: RunDetails;
-    execution_status?: Record<string, unknown>;
-}> {
-    const response = await fetch(`${API_ORIGIN}/api/runs/${runid}/status`, {
-        method: 'GET',
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (!response.ok) {
-        const error: ApiError = await response.json();
-        throw new Error(error.error || 'Failed to get run status');
-    }
-
-    return await response.json();
-}
-
-/**
- * Cancel a running job.
- *
- * @param runid - Run identifier
- * @param token - Auth0 access token
- * @returns Cancellation confirmation
- * @throws Error if request fails
- */
-export async function cancelRun(runid: string, token: string): Promise<{ message: string }> {
-    const response = await fetch(`${API_ORIGIN}/api/runs/${runid}/cancel`, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (!response.ok) {
-        const error: ApiError = await response.json();
-        throw new Error(error.error || 'Failed to cancel run');
     }
 
     return await response.json();

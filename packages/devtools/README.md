@@ -2,6 +2,20 @@
 
 Developer Tools for AutoDiscovery
 
+## ADK Web
+
+Run from the repo root:
+
+```bash
+just adk-web
+```
+
+Or directly:
+
+```bash
+uv run adk web packages/devtools/adk --port 8000
+```
+
 ## CLI
 
 ### Running Code with IPython Session

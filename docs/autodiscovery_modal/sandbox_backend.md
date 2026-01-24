@@ -122,6 +122,28 @@ result = executor.run_cell("import os; print(os.environ['EXPERIMENT_NAME'])")
 print(result["stdout"].strip())
 ```
 
+### Custom image with extra dependencies
+
+```python
+from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
+from code_execution import IPythonExecutor
+
+custom_image = build_sandbox_image(extra_packages=["matplotlib", "matplotlib-inline", "scipy"])
+
+backend = ModalSandboxIPythonBackend.for_bucket_prefix(
+    app_name="asta-autodiscovery",
+    bucket="myapp-datasets",
+    key_prefix="samples/",
+    read_only=True,
+    image=custom_image,
+)
+
+executor = IPythonExecutor(backend)
+result = executor.run_cell("import scipy; print(scipy.__version__)")
+
+print(result["stdout"].strip())
+```
+
 ## Notes
 
 - Each call creates a fresh Sandbox. This prevents untrusted code from

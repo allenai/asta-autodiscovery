@@ -106,7 +106,8 @@ export const ViewerRunsBox = () => {
                                             )
                                         }
                                     />
-                                    <StatusLabel>
+                                    <StatusLabel
+                                        className={isExpanded ? 'is-expanded' : 'is-collapsed'}>
                                         {runs.length} {BUCKET_LABELS[bucket as Bucket]}
                                     </StatusLabel>
                                 </StatusHeader>
@@ -150,6 +151,9 @@ const StatusLabel = styled(Typography)(({ theme }) => ({
     fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
+    '&.is-collapsed': {
+        color: theme.color['green-20'].hex,
+    },
 }));
 
 const ToggleButton = styled(Button)(({ theme }) => ({

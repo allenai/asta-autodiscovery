@@ -264,6 +264,11 @@ def create() -> Blueprint:
     @api.route("/list/me", methods=["GET"])
     @requires_enrollment
     def list_viewer_runs():
+        """List runs available to the authenticated viewer.
+
+        Returns:
+            JSON response containing run metadata, details, and stats.
+        """
         req = GetViewerRunsRequestModel(
             limit=int(request.args.get("limit", 10)),
             userid=request.user.get("sub"),
@@ -274,31 +279,26 @@ def create() -> Blueprint:
 
         sliced_run_ids = run_ids[: req.limit]
         run_models: list[RunModel] = []
+        app_logger = current_app.logger
 
-        for run_id in sliced_run_ids:
-            try:
-                job_exists = job_manager.job_exists(req.userid, run_id)
-                if not job_exists:
-                    continue
-            except Exception as e:
-                current_app.logger.error(f"Failed to check job existence for {run_id}: {e}")
-                continue
+        def _build_run_model(run_id: str) -> RunModel | None:
+            # Parallelize I/O-heavy GCS calls to reduce tail latency.
             try:
                 run_details = _get_run_details(req.userid, run_id) or {}
             except Exception as e:
-                current_app.logger.error(f"Failed to get run details for {run_id}: {e}")
+                app_logger.error(f"Failed to get run details for {run_id}: {e}")
                 run_details = {}
             try:
                 job_stats = get_job_stats(
                     userid=req.userid, jobid=run_id, config=job_manager.config
                 )
             except Exception as e:
-                current_app.logger.error(f"Failed to get job stats for {run_id}: {e}")
+                app_logger.error(f"Failed to get job stats for {run_id}: {e}")
                 job_stats = None
             try:
                 metadata_dict = job_manager.get_metadata(req.userid, run_id)
             except Exception as e:
-                current_app.logger.error(f"Failed to get metadata for {run_id}: {e}")
+                app_logger.error(f"Failed to get metadata for {run_id}: {e}")
                 metadata_dict = None
 
             run_details_model = RunDetailsModel(
@@ -311,21 +311,29 @@ def create() -> Blueprint:
                 requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
                 completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
                 pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
-                num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
+                num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
-            run_model = RunModel(
+            return RunModel(
                 runid=run_id,
                 status=run_details.get("status", "UNKNOWN"),
                 name=run_metadata_model.name if run_metadata_model else f"Run {run_id}",
-                description=run_metadata_model.description if run_metadata_model else f"Description for Run {run_id}",
+                description=run_metadata_model.description
+                if run_metadata_model
+                else f"Description for Run {run_id}",
                 path=None,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
                 execution_status={},
             )
-            run_models.append(run_model)
+
+        if sliced_run_ids:
+            from concurrent.futures import ThreadPoolExecutor
+
+            max_workers = min(8, len(sliced_run_ids))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                run_models = [model for model in executor.map(_build_run_model, sliced_run_ids) if model]
 
         resp = GetViewerRunsResponseModel(
             runs=run_models,

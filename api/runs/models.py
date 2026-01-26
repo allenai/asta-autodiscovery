@@ -49,6 +49,7 @@ class ExperimentModel(BaseModel):
     review: str | None = Field(
         None, description="Results of the experiment in human-readable format"
     )
+    code: str | None = Field(None, description="Code generated for the experiment")
 
 class MetadataDatasetModel(BaseModel):
     """Model representing dataset metadata for a run"""

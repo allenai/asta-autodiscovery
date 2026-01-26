@@ -18,7 +18,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  IMAGE_NAME: gcr.io/ai2-aristo/autodiscovery-maintenance
+  IMAGE_NAME: gcr.io/ai2-aristo/autodiscovery/maintenance
 
 jobs:
   build-and-push:

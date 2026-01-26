@@ -212,6 +212,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const handleSubmit = async () => {
         setSubmitting(true);
         if (isFormInvalid()) {
+            setSubmitting(false);
             return;
         }
 
@@ -219,7 +220,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // upload files
             const isSuccessfulUpload = await handleUploadDataset();
             if (!isSuccessfulUpload) {
-                setSubmitting(false);
                 return;
             }
 
@@ -247,6 +247,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         } catch (err) {
             console.error('Error submitting run:', err);
             setFormError(err instanceof Error ? err.message : 'Failed to submit run');
+            setSubmitting(false);
+        } finally {
             setSubmitting(false);
         }
     };

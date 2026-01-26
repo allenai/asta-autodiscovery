@@ -26,8 +26,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <AppRouterCacheProvider>
                     <ClientProviders>
                         <VarnishApp>
-                            {children}
-                            <Footer />
+                            <div
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateRows: '1fr auto',
+                                    height: '100%',
+                                    minHeight: '100vh',
+                                }}>
+                                <div
+                                    style={{
+                                        overflow: 'hidden',
+                                        position: 'relative',
+                                    }}>
+                                    {children}
+                                </div>
+                                <div>
+                                    <Footer />
+                                </div>
+                            </div>
                         </VarnishApp>
                         <AuthErrorDialog />
                     </ClientProviders>

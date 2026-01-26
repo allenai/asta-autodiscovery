@@ -33,14 +33,27 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                         <Logo href="/runs">
                             <IconAutoDSLogo />
                         </Logo>
-                        <RunsList selectedRunId={selectedRunId} onSelectRun={handleSelectRun} />
+                        <ScrollArea>
+                            <ScrollContainer>
+                                <ScrollContent>
+                                    <RunsList
+                                        selectedRunId={selectedRunId}
+                                        onSelectRun={handleSelectRun}
+                                    />
+                                </ScrollContent>
+                            </ScrollContainer>
+                        </ScrollArea>
                         <ToS />
                     </Sidebar>
 
                     {/* Main content */}
                     <MainContent>
                         <Header />
-                        {children}
+                        <ScrollArea>
+                            <ScrollContainer>
+                                <ScrollContent>{children}</ScrollContent>
+                            </ScrollContainer>
+                        </ScrollArea>
                     </MainContent>
                 </Layout>
             </Wrapper>
@@ -50,15 +63,25 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
 
 const Wrapper = styled(Box)`
     background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
+    position: absolute;
+    inset: 0;
 `;
 
 const Layout = styled('div')`
     display: grid;
+    height: 100%;
     grid-template-columns: 1fr 5fr;
     grid-template-areas: 'sidebar main-content';
+
+    @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        grid-template-areas: 'sidebar' 'main-content';
+    }
+
+    @media (min-width: 1600px) {
+        grid-template-columns: 266px 1fr;
+    }
 `;
 
 const Sidebar = styled('div')`
@@ -67,12 +90,12 @@ const Sidebar = styled('div')`
     display: flex;
     flex-direction: column;
     grid-area: sidebar;
-    height: 100%;
-    overflow: auto;
 `;
 
 const MainContent = styled('div')`
-    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
     grid-area: main-content;
     min-width: 0;
 `;
@@ -82,6 +105,23 @@ const Logo = styled('a')`
 
     svg {
         width: 100%;
+        min-width: 175px;
+        max-width: 300px;
         height: auto;
     }
+`;
+
+const ScrollArea = styled(Box)`
+    flex: 1 1 auto;
+    position: relative;
+`;
+
+const ScrollContainer = styled('div')`
+    position: absolute;
+    inset: 0;
+`;
+
+const ScrollContent = styled('div')`
+    height: 100%;
+    overflow: auto;
 `;

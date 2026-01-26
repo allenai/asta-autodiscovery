@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - jason/data-expire  # temporary for testing
   pull_request:
     branches:
       - main

@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - jason/data-expire  # temporary for testing
     paths:
       - 'scripts/**'
       - 'packages/autodiscovery_jobs/**'
@@ -45,7 +44,7 @@ jobs:
             .
 
       - name: Push image
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/jason/data-expire')  # temporary for testing
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.IMAGE_NAME }}:latest

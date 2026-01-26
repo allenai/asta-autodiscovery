@@ -50,6 +50,7 @@ export type Experiment = {
     posterior: number | null;
     runtimeMs: number | null;
     hypothesis: string | null;
+    analysis: string | null;
     experimentPlan: Record<string, any> | null;
     review: string | null;
     code: string | null;
@@ -115,6 +116,7 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         posterior: experimentFromApi.posterior,
         runtimeMs: experimentFromApi.runtime_ms,
         hypothesis: experimentFromApi.hypothesis,
+        analysis: experimentFromApi.analysis,
         experimentPlan: experimentFromApi.experiment_plan,
         review: experimentFromApi.review,
         code: experimentFromApi.code,

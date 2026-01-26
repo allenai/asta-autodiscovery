@@ -349,6 +349,16 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
             border: '1px solid ' + theme.color['green-100'].hex,
             transition: 'all 250ms ease-in-out',
         },
+
+        '&.Mui-disabled': {
+            backgroundColor: theme.color['cream-10'].rgba.toString(),
+            color: theme.color['cream-60'].rgba.toString(),
+            '-webkit-text-fill-color': theme.color['cream-60'].rgba.toString(),
+
+            '&:hover': {
+                border: '1px solid ' + theme.color['cream-20'].rgba.toString(),
+            },
+        },
     },
 
     '.MuiOutlinedInput-notchedOutline': {

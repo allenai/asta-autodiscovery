@@ -27,12 +27,15 @@ export interface RunFromApi {
     execution_status?: Record<string, unknown>;
 }
 
+<<<<<<< Updated upstream
 interface UploadDatasetResponseBody {
     path: string;
     filename: string;
     message: string;
 }
 
+=======
+>>>>>>> Stashed changes
 export interface RunResponseBody extends RunFromApi {}
 
 export interface GetAllRunsResponseBody {
@@ -121,6 +124,7 @@ export class RunsApi extends BaseApi {
         });
     }
 
+<<<<<<< Updated upstream
     async getRunMetadata(runid: string) {
         return this.request<GetRunMetadataResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/metadata`,
@@ -128,6 +132,8 @@ export class RunsApi extends BaseApi {
         });
     }
 
+=======
+>>>>>>> Stashed changes
     async getRunExperiments({
         runid,
         afterExperimentId,

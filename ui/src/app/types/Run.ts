@@ -1,5 +1,4 @@
 import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
-<<<<<<< Updated upstream
 
 // Maps to values from _get_execution_phase() in cloudrun.py
 export enum RunStatus {
@@ -14,8 +13,6 @@ export enum RunStatus {
     SUCCEEDED = 'SUCCEEDED',
     UNKNOWN = 'UNKNOWN',
 }
-=======
->>>>>>> Stashed changes
 
 export type Run = {
     id: string;
@@ -59,7 +56,6 @@ export type Experiment = {
     code: string | null;
 };
 
-<<<<<<< Updated upstream
 export type MetadataDataset = {
     name: string;
     description: string | null;
@@ -71,8 +67,6 @@ export type Metadata = {
     datasets: MetadataDataset[];
 };
 
-=======
->>>>>>> Stashed changes
 export const getRunFromApi = (runFromApi: RunFromApi): Run => {
     return {
         id: runFromApi.runid,

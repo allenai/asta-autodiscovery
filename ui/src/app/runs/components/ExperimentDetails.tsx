@@ -28,6 +28,15 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                 </Box>
             )}
 
+            {experiment.analysis && (
+                <Box>
+                    <SectionHeader>Analysis</SectionHeader>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        {experiment.analysis}
+                    </Typography>
+                </Box>
+            )}
+
             {experiment.experimentPlan && (
                 <>
                     <Box>

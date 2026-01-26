@@ -18,7 +18,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  IMAGE_NAME: gcr.io/example-legacy-project/autodiscovery/maintenance
+  IMAGE_NAME: gcr.io/example-legacy-project/autodiscovery-maintenance
 
 jobs:
   build-and-push:

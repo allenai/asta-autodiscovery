@@ -168,10 +168,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                 nExperiments: `Must be between 1 and ${creditsRemaining}`,
             }));
         } else {
-            setFieldErrors((prev) => {
-                const { nExperiments, ...rest } = prev;
-                return rest;
-            });
+            updateSettings('nExperiments', num);
         }
     };
 

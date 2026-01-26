@@ -70,14 +70,12 @@ Note: Currently configured with `--dry-run` for safety. Remove `--dry-run` from 
 ### Schedule with Cloud Scheduler
 
 ```bash
-project_number=$(gcloud projects describe example-legacy-project --format="value(projectNumber)")
-
 gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule \
   --location us-west1 \
   --schedule "0 2 * * *" \
   --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup:run" \
   --http-method POST \
-  --oidc-service-account-email ${project_number}-compute@developer.gserviceaccount.com
+  --oidc-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com
 ```
 
 This runs daily at 2 AM.
@@ -97,9 +95,9 @@ gcloud run jobs update autodiscovery-dataset-cleanup \
 **`example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com`** is used for:
 - Running maintenance Cloud Run Jobs (job runtime identity)
 - Pushing images to GCR (via GitHub Actions)
+- Invoking Cloud Run Jobs (via Cloud Scheduler)
 
 It needs:
 - `roles/storage.objectAdmin` - for GCS operations (list/delete)
 - `roles/artifactregistry.writer` - for pushing images to Artifact Registry/GCR
-
-**Default compute service account** is used by Cloud Scheduler to invoke the job (needs `roles/run.invoker`).
+- `roles/run.invoker` - for Cloud Scheduler to invoke the job

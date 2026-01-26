@@ -19,10 +19,13 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+<<<<<<< Updated upstream
     MetadataDatasetModel,
     MetadataModel,
     GetRunMetadataRequestModel,
     GetRunMetadataResponseModel,
+=======
+>>>>>>> Stashed changes
     GetExampleRunsRequestModel,
     GetExampleRunsResponseModel,
     RunDetailsModel,
@@ -264,11 +267,14 @@ def create() -> Blueprint:
     @api.route("/list/me", methods=["GET"])
     @requires_enrollment
     def list_viewer_runs():
+<<<<<<< Updated upstream
         """List runs available to the authenticated viewer.
 
         Returns:
             JSON response containing run metadata, details, and stats.
         """
+=======
+>>>>>>> Stashed changes
         req = GetViewerRunsRequestModel(
             limit=int(request.args.get("limit", 10)),
             userid=request.user.get("sub"),
@@ -279,6 +285,7 @@ def create() -> Blueprint:
 
         sliced_run_ids = run_ids[: req.limit]
         run_models: list[RunModel] = []
+<<<<<<< Updated upstream
         app_logger = current_app.logger
 
         def _build_run_model(run_id: str) -> RunModel | None:
@@ -300,6 +307,14 @@ def create() -> Blueprint:
             except Exception as e:
                 app_logger.error(f"Failed to get metadata for {run_id}: {e}")
                 metadata_dict = None
+=======
+
+        for run_id in sliced_run_ids:
+            run_details = _get_run_details(req.userid, run_id) or {}
+            job_stats = get_job_stats(
+                userid=req.userid, jobid=run_id, config=job_manager.config
+            )
+>>>>>>> Stashed changes
 
             run_details_model = RunDetailsModel(
                 execution_id=run_details.get("execution_id"),
@@ -311,6 +326,7 @@ def create() -> Blueprint:
                 requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
                 completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
                 pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
+<<<<<<< Updated upstream
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
@@ -334,6 +350,21 @@ def create() -> Blueprint:
             max_workers = min(8, len(sliced_run_ids))
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 run_models = [model for model in executor.map(_build_run_model, sliced_run_ids) if model]
+=======
+                num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
+            )
+            run_model = RunModel(
+                runid=run_id,
+                status=run_details.get("status", "UNKNOWN"),
+                name=f"Run {run_id}", # TODO: Update when name is supported
+                description=f"Description for Run {run_id}", # TODO: Update when description is supported
+                path=None,
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+                execution_status={},
+            )
+            run_models.append(run_model)
+>>>>>>> Stashed changes
 
         resp = GetViewerRunsResponseModel(
             runs=run_models,
@@ -367,6 +398,7 @@ def create() -> Blueprint:
                 status="COMPLETED",
                 status_checked_at=datetime.now(UTC).isoformat(),
             )
+<<<<<<< Updated upstream
             run_metadata_model = MetadataModel(
                 name=f"Example Run {i}",
                 description=f"This is the metadata for example run {i}.",
@@ -381,6 +413,16 @@ def create() -> Blueprint:
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
+=======
+            run_model = RunModel(
+                runid=f"example-run-{i}",
+                status="COMPLETED",
+                name=f"Example Run {i}",
+                path=None,
+                description=f"This is example run number {i}.",
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+>>>>>>> Stashed changes
                 execution_status={},
             )
             runs.append(run_model)

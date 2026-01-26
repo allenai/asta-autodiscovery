@@ -52,6 +52,7 @@ export type Experiment = {
     hypothesis: string | null;
     experimentPlan: Record<string, any> | null;
     review: string | null;
+    code: string | null;
 };
 
 export type MetadataDataset = {
@@ -116,6 +117,7 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         hypothesis: experimentFromApi.hypothesis,
         experimentPlan: experimentFromApi.experiment_plan,
         review: experimentFromApi.review,
+        code: experimentFromApi.code,
     };
 };
 

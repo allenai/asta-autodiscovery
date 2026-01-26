@@ -90,6 +90,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         if (file) {
             setSelectedFiles((prev) => [...prev, { file, description: '' }]);
             setUploadError(null);
+            setFieldErrors({});
         }
     };
 

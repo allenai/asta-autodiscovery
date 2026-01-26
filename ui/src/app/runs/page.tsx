@@ -4,7 +4,7 @@ import { Box, CircularProgress, Alert, styled } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { IntroBox } from '@/runs/components/IntroBox';
-// import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
+import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
 import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
 
 /**
@@ -43,9 +43,9 @@ export default function RunsPage() {
             <Section>
                 <ViewerRunsBox />
             </Section>
-            {/* <Section>
+            <Section>
                 <ExamplesRunsBox />
-            </Section> */}
+            </Section>
         </Layout>
     );
 }

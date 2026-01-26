@@ -264,6 +264,11 @@ def create() -> Blueprint:
     @api.route("/list/me", methods=["GET"])
     @requires_enrollment
     def list_viewer_runs():
+        """List runs available to the authenticated viewer.
+
+        Returns:
+            JSON response containing run metadata, details, and stats.
+        """
         req = GetViewerRunsRequestModel(
             limit=int(request.args.get("limit", 10)),
             userid=request.user.get("sub"),
@@ -274,31 +279,26 @@ def create() -> Blueprint:
 
         sliced_run_ids = run_ids[: req.limit]
         run_models: list[RunModel] = []
+        app_logger = current_app.logger
 
-        for run_id in sliced_run_ids:
-            try:
-                job_exists = job_manager.job_exists(req.userid, run_id)
-                if not job_exists:
-                    continue
-            except Exception as e:
-                current_app.logger.error(f"Failed to check job existence for {run_id}: {e}")
-                continue
+        def _build_run_model(run_id: str) -> RunModel | None:
+            # Parallelize I/O-heavy GCS calls to reduce tail latency.
             try:
                 run_details = _get_run_details(req.userid, run_id) or {}
             except Exception as e:
-                current_app.logger.error(f"Failed to get run details for {run_id}: {e}")
+                app_logger.error(f"Failed to get run details for {run_id}: {e}")
                 run_details = {}
             try:
                 job_stats = get_job_stats(
                     userid=req.userid, jobid=run_id, config=job_manager.config
                 )
             except Exception as e:
-                current_app.logger.error(f"Failed to get job stats for {run_id}: {e}")
+                app_logger.error(f"Failed to get job stats for {run_id}: {e}")
                 job_stats = None
             try:
                 metadata_dict = job_manager.get_metadata(req.userid, run_id)
             except Exception as e:
-                current_app.logger.error(f"Failed to get metadata for {run_id}: {e}")
+                app_logger.error(f"Failed to get metadata for {run_id}: {e}")
                 metadata_dict = None
 
             run_details_model = RunDetailsModel(
@@ -311,21 +311,29 @@ def create() -> Blueprint:
                 requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
                 completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
                 pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
-                num_surprising_experiments=0, # TODO: Update when surprising experiments are tracked
+                num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
-            run_model = RunModel(
+            return RunModel(
                 runid=run_id,
                 status=run_details.get("status", "UNKNOWN"),
                 name=run_metadata_model.name if run_metadata_model else f"Run {run_id}",
-                description=run_metadata_model.description if run_metadata_model else f"Description for Run {run_id}",
+                description=run_metadata_model.description
+                if run_metadata_model
+                else f"Description for Run {run_id}",
                 path=None,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
                 execution_status={},
             )
-            run_models.append(run_model)
+
+        if sliced_run_ids:
+            from concurrent.futures import ThreadPoolExecutor
+
+            max_workers = min(8, len(sliced_run_ids))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                run_models = [model for model in executor.map(_build_run_model, sliced_run_ids) if model]
 
         resp = GetViewerRunsResponseModel(
             runs=run_models,
@@ -392,7 +400,7 @@ def create() -> Blueprint:
             runid: Run identifier.
 
         Returns:
-            JSON response with run details.
+            JSON response with run details as RunModel.
         """
         userid = request.user.get("sub")
         if not userid:
@@ -406,17 +414,51 @@ def create() -> Blueprint:
                 return jsonify({"error": "Run not found"}), 404
 
             # Get run details
-            run_details = _get_run_details(userid, runid)
+            run_details = _get_run_details(userid, runid) or {}
             path = manager.get_job_path(userid, runid)
 
-            return jsonify(
-                {
-                    "runid": runid,
-                    "path": path,
-                    "userid": userid,
-                    "run_details": run_details,
-                }
+            # Get job stats
+            try:
+                job_stats = get_job_stats(userid=userid, jobid=runid, config=manager.config)
+            except Exception as e:
+                current_app.logger.error(f"Failed to get job stats for {runid}: {e}")
+                job_stats = None
+
+            # Get metadata
+            try:
+                metadata_dict = manager.get_metadata(userid, runid)
+            except Exception as e:
+                current_app.logger.error(f"Failed to get metadata for {runid}: {e}")
+                metadata_dict = None
+
+            # Build RunModel
+            run_details_model = RunDetailsModel(
+                execution_id=run_details.get("execution_id"),
+                created_at=run_details.get("created_at", ""),
+                status=run_details.get("status", "UNKNOWN"),
+                status_checked_at=run_details.get("status_checked_at"),
             )
+            run_stats_model = RunStatsModel(
+                requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
+                completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
+                pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
+                num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
+            )
+            run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
+            run_model = RunModel(
+                runid=runid,
+                status=run_details.get("status", "UNKNOWN"),
+                name=run_metadata_model.name if run_metadata_model else f"Run {runid}",
+                description=run_metadata_model.description if run_metadata_model else None,
+                path=path,
+                run_stats=run_stats_model,
+                run_details=run_details_model,
+                run_metadata=run_metadata_model,
+                execution_status={},
+            )
+
+            return jsonify(run_model.model_dump()), 200
+
         except Exception as e:
             current_app.logger.error(f"Failed to get run details: {e}")
             return jsonify({"error": str(e)}), 500

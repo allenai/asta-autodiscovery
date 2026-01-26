@@ -59,6 +59,7 @@ export interface ExperimentFromApi {
     hypothesis: string | null;
     experiment_plan: Record<string, any> | null;
     review: string | null;
+    code: string | null;
 }
 
 export interface GetRunExperimentsResponseBody {

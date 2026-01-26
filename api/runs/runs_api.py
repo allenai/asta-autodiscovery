@@ -367,7 +367,7 @@ def create() -> Blueprint:
             run_model = RunModel(
                 runid=f"example-run-{i}",
                 status="COMPLETED",
-                name=run_metadata_model.title,
+                name=run_metadata_model.name,
                 path=None,
                 description=run_metadata_model.description,
                 run_stats=run_stats_model,

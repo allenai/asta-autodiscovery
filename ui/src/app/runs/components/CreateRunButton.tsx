@@ -48,7 +48,7 @@ export const CreateRunButton = () => {
                 startIcon={isCreating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />}
                 onClick={handleCreateRun}
                 disabled={isCreating}>
-                {isCreating ? 'isCreating...' : 'New exploration'}
+                {isCreating ? 'Creating...' : 'New exploration'}
             </StyledButton>
             {error && (
                 <Typography variant="body2" color="error" sx={{ mt: 1 }}>

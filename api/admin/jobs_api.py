@@ -196,8 +196,11 @@ def create() -> Blueprint:
             raise BadRequest("userid and jobid are required")
 
         # Extract job parameters
-        n_experiments = data.get("n_experiments", 4)
-        model = data.get("model", "gpt-4o")
+        n_experiments = data.get("n_experiments")
+        model = data.get("model")
+
+        if n_experiments is None:
+            raise BadRequest("Number of Experiments is required")
 
         try:
             manager = get_job_manager()

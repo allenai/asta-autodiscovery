@@ -18,8 +18,8 @@ def run_job(
     userid: str,
     jobid: str,
     config: JobConfig | None = None,
-    n_experiments: int = 4,
-    model: str = "gpt-4o",
+    n_experiments: int | None = None,
+    model: str | None = None,
     belief_model: str | None = None,
     temperature: float | None = None,
     belief_temperature: float | None = None,
@@ -38,7 +38,7 @@ def run_job(
         jobid: Job identifier
         config: Configuration (uses default if None)
         n_experiments: Number of experiments to run (required)
-        model: Model to use (e.g., "gpt-4o", "o4-mini") (required)
+        model: Model to use (e.g., "gpt-4o", "o4-mini"); uses args.py default when omitted
         belief_model: Model for belief distribution (optional)
         temperature: Temperature for agents (optional)
         belief_temperature: Temperature for belief agent (optional)
@@ -67,6 +67,9 @@ def run_job(
     """
     config = config or JobConfig()
 
+    if n_experiments is None:
+        raise CloudRunError("n_experiments is required to run a job")
+
     # Construct paths
     job_base = f"users/{userid}/jobs/{jobid}"
     metadata_path = f"/mnt/gcs/{job_base}/metadata.json"
@@ -78,7 +81,6 @@ def run_job(
         f"--dataset_metadata={metadata_path}",
         f"--out_dir={output_path}",
         f"--n_experiments={n_experiments}",
-        f"--model={model}",
         "--work_dir=work",
         "--use_modal_sandbox",
         f"--bucket_path={bucket_path}",
@@ -88,6 +90,8 @@ def run_job(
     # Add optional explicit parameters if provided
     if belief_model is not None:
         args.append(f"--belief_model={belief_model}")
+    if model is not None:
+        args.append(f"--model={model}")
     if temperature is not None:
         args.append(f"--temperature={temperature}")
     if belief_temperature is not None:

@@ -1,0 +1,30 @@
+name: Slack Notification
+
+on:
+  workflow_run:
+    workflows:
+      - "Docker Compose Build"
+      - "Build and Push Maintenance Image"
+      - "UI Build"
+    types:
+      - completed
+    branches:
+      - main
+      - jason/data-expire  # temporary for testing
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    # Only notify on failure
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+
+    steps:
+      - name: Notify Slack on failure
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 ${{ github.event.workflow_run.name }} Failed\nRepository: ${{ github.repository }}\nBranch: ${{ github.event.workflow_run.head_branch }}\nWorkflow: ${{ github.event.workflow_run.html_url }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

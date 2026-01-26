@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - jason/data-expire  # temporary for testing
   pull_request:
     branches:
       - main
@@ -28,14 +29,3 @@ jobs:
           GCP_PROJECT: ""
           GOOGLE_ACCESS_KEY_ID: ""
           GOOGLE_ACCESS_KEY_SECRET: ""
-
-      - name: Notify Slack on failure
-        if: failure() && github.ref == 'refs/heads/main'
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          payload: |
-            {
-              "text": "🚨 Docker Build Failed on main branch\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

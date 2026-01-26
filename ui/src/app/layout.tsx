@@ -1,4 +1,4 @@
-import { Footer, VarnishApp } from '@allenai/varnish2/components';
+import { VarnishApp } from '@allenai/varnish2/components';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
@@ -39,9 +39,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                                         position: 'relative',
                                     }}>
                                     {children}
-                                </div>
-                                <div>
-                                    <Footer />
                                 </div>
                             </div>
                         </VarnishApp>

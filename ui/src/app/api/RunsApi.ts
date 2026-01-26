@@ -57,8 +57,10 @@ export interface ExperimentFromApi {
     posterior: number | null;
     runtime_ms: number | null;
     hypothesis: string | null;
+    analysis: string | null;
     experiment_plan: Record<string, any> | null;
     review: string | null;
+    code: string | null;
 }
 
 export interface GetRunExperimentsResponseBody {

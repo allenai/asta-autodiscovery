@@ -180,8 +180,8 @@ class JobManager:
         self,
         userid: str,
         jobid: str,
-        n_experiments: int = 4,
-        model: str = "gpt-4o",
+        n_experiments: int | None = None,
+        model: str | None = None,
         belief_model: str | None = None,
         temperature: float | None = None,
         belief_temperature: float | None = None,
@@ -199,7 +199,7 @@ class JobManager:
             userid: User identifier
             jobid: Job identifier
             n_experiments: Number of experiments to run
-            model: Model to use (e.g., "gpt-4o", "o4-mini")
+            model: Model to use (e.g., "gpt-4o", "o4-mini"); uses args.py default when omitted
             belief_model: Model for belief distribution (optional)
             temperature: Temperature for agents (optional)
             belief_temperature: Temperature for belief agent (optional)
@@ -298,8 +298,8 @@ class JobManager:
         jobid: str,
         dataset_path: Path,
         metadata: dict[str, Any],
-        n_experiments: int = 4,
-        model: str = "gpt-4o",
+        n_experiments: int | None = None,
+        model: str | None = None,
         **kwargs,
     ) -> str:
         """Create job, upload data, and execute in one call.
@@ -316,7 +316,7 @@ class JobManager:
             dataset_path: Local path to dataset file or directory
             metadata: Metadata dictionary
             n_experiments: Number of experiments to run
-            model: Model to use
+            model: Model to use; uses args.py default when omitted
             **kwargs: Additional arguments for run_job()
 
         Returns:

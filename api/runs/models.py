@@ -45,10 +45,12 @@ class ExperimentModel(BaseModel):
     posterior: float | None = Field(None, description="Posterior probability of the experiment")
     runtime_ms: float | None = Field(None, description="Runtime of the experiment in milliseconds")
     hypothesis: str | None = Field(None, description="Hypothesis associated with the experiment")
+    analysis: str | None = Field(None, description="Analysis details of the experiment")
     experiment_plan: dict[str, Any] | None = Field(None, description="Plan details of the experiment")
     review: str | None = Field(
         None, description="Results of the experiment in human-readable format"
     )
+    code: str | None = Field(None, description="Code generated for the experiment")
 
 class MetadataDatasetModel(BaseModel):
     """Model representing dataset metadata for a run"""

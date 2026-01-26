@@ -1,6 +1,7 @@
 import { styled, Typography, Box, Chip, Stack } from '@mui/material';
 
 import { Experiment } from '@/types/Run';
+import { CodeBlock } from '@/components/CodeBlock';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
@@ -20,30 +21,57 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
 
             {experiment.hypothesis && (
                 <Box>
-                    <Typography variant="caption">Hypothesis</Typography>
+                    <SectionHeader>Hypothesis</SectionHeader>
                     <Typography variant="body2" sx={{ mt: 0.5 }}>
                         {experiment.hypothesis}
                     </Typography>
                 </Box>
             )}
 
-            <Box>
-                <Typography variant="caption">Surprising</Typography>
-                <Box sx={{ mt: 0.5 }}>{experiment.isSurprising ? 'Yes' : 'No'}</Box>
-            </Box>
-
-            <Box>
-                <Typography variant="caption">Creation Index</Typography>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    {experiment.creationIdx}
-                </Typography>
-            </Box>
-
-            {experiment.runtimeMs && (
+            {experiment.analysis && (
                 <Box>
-                    <Typography variant="caption">Runtime</Typography>
+                    <SectionHeader>Analysis</SectionHeader>
                     <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        {experiment.runtimeMs} ms
+                        {experiment.analysis}
+                    </Typography>
+                </Box>
+            )}
+
+            {experiment.experimentPlan && (
+                <>
+                    <Box>
+                        <SectionHeader>Experiment Plan</SectionHeader>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            Objective: {experiment.experimentPlan.objective}
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <SectionHeader>Steps</SectionHeader>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {experiment.experimentPlan.steps}
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <SectionHeader>Deliverables</SectionHeader>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {experiment.experimentPlan.deliverables}
+                        </Typography>
+                    </Box>
+
+                    {experiment.code && (
+                        <Box>
+                            <SectionHeader>Code</SectionHeader>
+                            <CodeBlock code={experiment.code} />
+                        </Box>
+                    )}
+                </>
+            )}
+
+            {experiment.review && (
+                <Box>
+                    <SectionHeader>Review</SectionHeader>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        Objective: {experiment.review}
                     </Typography>
                 </Box>
             )}
@@ -57,5 +85,10 @@ const DetailsWrapper = styled(Stack)`
 
 const ExperimentName = styled(Typography)`
     color: ${({ theme }) => theme.color['warning-orange-100'].hex};
+    font-weight: 700;
+`;
+
+const SectionHeader = styled(Typography)`
+    color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
     font-weight: 700;
 `;

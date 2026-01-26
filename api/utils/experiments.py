@@ -47,8 +47,10 @@ class ExperimentNode:
 
         # Experiment content fields
         self.hypothesis: str | None = node_data.get("hypothesis")
+        self.analysis: str | None = node_data.get("analysis")
         self.experiment_plan: dict | None = node_data.get("experiment_plan")
         self.review: str | None = node_data.get("review")
+        self.code: str | None = node_data.get("code")
 
         # Status derived from success field
         success = node_data.get("success")
@@ -91,8 +93,10 @@ class ExperimentNode:
             "posterior": self.posterior,
             "runtime_ms": self.runtime_ms,
             "hypothesis": self.hypothesis,
+            "analysis": self.analysis,
             "experiment_plan": self.experiment_plan,
             "review": self.review,
+            "code": self.code,
         }
 
     def __repr__(self) -> str:

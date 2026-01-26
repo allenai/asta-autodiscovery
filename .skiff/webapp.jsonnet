@@ -165,7 +165,8 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
             namespace: namespaceName,
             labels: labels,
             annotations: annotations + tls.ingressAnnotations + util.getAuthAnnotations(config, '.apps.allenai.org') + {
-                'nginx.ingress.kubernetes.io/ssl-redirect': 'true'
+                'nginx.ingress.kubernetes.io/ssl-redirect': 'true',
+                'nginx.ingress.kubernetes.io/proxy-body-size': '500m' // REMOVE AFTER PRESIGNED UPLOADS ARE IMPLEMENTED
             }
         },
         spec: {
@@ -198,7 +199,7 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
         metadata+: {
             name: ingress.metadata.name + '-node-port',
         },
-         spec+: {             
+         spec+: {
             ingressClassName: 'nginx-node-port',
         }
     };
@@ -245,7 +246,7 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
         metadata+: {
             name: allenAIIngress.metadata.name + '-node-port',
         },
-         spec+: {             
+         spec+: {
             ingressClassName: 'nginx-node-port',
         }
     };
@@ -292,7 +293,7 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
         metadata: {
             name+: scholarIngress.metadata.name + '-node-port',
         },
-         spec+: {             
+         spec+: {
             ingressClassName: 'nginx-node-port',
         }
     };

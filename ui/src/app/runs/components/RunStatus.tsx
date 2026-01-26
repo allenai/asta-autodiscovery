@@ -179,7 +179,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                                     )
                                 }
                                 onClick={handleStop}
-                                disabled={true}>
+                                disabled={cancelling}>
                                 {cancelling ? 'Stopping...' : 'Stop'}
                             </StopButton>
                         )}

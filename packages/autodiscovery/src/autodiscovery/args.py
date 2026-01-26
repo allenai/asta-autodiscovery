@@ -7,11 +7,11 @@ class ArgParser(argparse.ArgumentParser):
 
         self.add_argument('--dataset_metadata', type=str, required=True, help='Path to dataset metadata.')
         self.add_argument('--out_dir', type=str, required=True, help='Output directory for logs.')
-        self.add_argument("--model", type=str, default="o4-mini",
+        self.add_argument("--model", type=str, default="gemini-3-pro-preview",
                           help="LLM to use for all agents (except belief distribution agent).")
-        self.add_argument("--belief_model", type=str, default="gpt-4o",
+        self.add_argument("--belief_model", type=str, default="gemini-3-flash-preview",
                           help="LLM to use for belief distribution agent.")
-        self.add_argument("--vision_model", type=str, default="gpt-4o",
+        self.add_argument("--vision_model", type=str, default="gemini-3-flash-preview",
                           help="Model to use for image analysis during code execution.")
         self.add_argument("--user_query", type=str,
                           help="Custom user query to condition experiment generation during exploration.")

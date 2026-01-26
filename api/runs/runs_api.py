@@ -367,7 +367,7 @@ def create() -> Blueprint:
             run_model = RunModel(
                 runid=f"example-run-{i}",
                 status="COMPLETED",
-                name=run_metadata_model.title,
+                name=run_metadata_model.name,
                 path=None,
                 description=run_metadata_model.description,
                 run_stats=run_stats_model,
@@ -578,8 +578,8 @@ def create() -> Blueprint:
 
         Expects JSON body with:
         - runid: Run identifier
-        - n_experiments: Number of experiments (optional, default: 4)
-        - model: Model name (optional, default: "gpt-4o")
+        - n_experiments: Number of experiments
+        - model: Model name (optional, uses args.py default when omitted)
         - belief_model: Belief model (optional)
         - Additional optional parameters
 
@@ -602,8 +602,8 @@ def create() -> Blueprint:
             raise BadRequest("runid is required")
 
         # Extract run parameters
-        n_experiments = data.get("n_experiments", 4)
-        model = data.get("model", "gpt-4o")
+        n_experiments = data.get("n_experiments")
+        model = data.get("model")
         belief_model = data.get("belief_model")
 
         try:
@@ -627,6 +627,9 @@ def create() -> Blueprint:
                     region=manager.config.region,
                 )
             else:
+                if n_experiments is None:
+                    raise BadRequest("Number of Experiments is required")
+
                 # Validate sufficient credits before submission
                 check_sufficient_credits(
                     n_experiments=n_experiments, userid=userid, config=manager.config

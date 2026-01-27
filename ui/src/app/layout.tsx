@@ -28,18 +28,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                         <VarnishApp>
                             <div
                                 style={{
-                                    display: 'grid',
-                                    gridTemplateRows: '1fr auto',
+                                    overflow: 'hidden',
                                     height: '100%',
                                     minHeight: '100vh',
+                                    position: 'relative',
                                 }}>
-                                <div
-                                    style={{
-                                        overflow: 'hidden',
-                                        position: 'relative',
-                                    }}>
-                                    {children}
-                                </div>
+                                {children}
                             </div>
                         </VarnishApp>
                         <AuthErrorDialog />

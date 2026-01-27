@@ -339,7 +339,7 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
 
     '.MuiInputBase-input': {
         border: '1px solid ' + theme.color['cream-20'].rgba.toString(),
-        borderRadius: theme.shape.borderRadius,
+        borderRadius: theme.shape.borderRadius + 'px',
         color: theme.color['cream-100'].hex,
         padding: theme.spacing(2.25),
 
@@ -418,7 +418,7 @@ const StyledAccordian = styled(Accordion)(({ theme }) => ({
 const RemainingCreditsChip = styled(Chip)(({ theme }) => ({
     alignSelf: 'flex-start',
     backgroundColor: theme.color['cream-10'].rgba.toString(),
-    borderRadius: theme.shape.borderRadius,
+    borderRadius: theme.shape.borderRadius + 'px',
     color: theme.color['cream-100'].hex,
     marginTop: theme.spacing(1),
 }));

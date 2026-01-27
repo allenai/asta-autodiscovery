@@ -164,3 +164,22 @@ class GetExperimentStatusResponseModel(BaseModel):
     runid: str | None = Field(None, description="Identifier of the run containing the experiment")
     experiment_id: str = Field(..., description="Unique identifier for the experiment")
     experiment: ExperimentModel | None = Field(..., description="Details of the experiment")
+
+
+class GenerateUploadUrlRequestModel(BaseModel):
+    """Model for the request to generate a presigned upload URL"""
+
+    filename: str = Field(..., description="Name of the file to upload")
+    content_type: str | None = Field(
+        "application/octet-stream", description="MIME type of the file"
+    )
+    file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
+
+
+class GenerateUploadUrlResponseModel(BaseModel):
+    """Model for the response containing the presigned upload URL"""
+
+    upload_url: str = Field(..., description="Presigned URL for uploading the file to GCS")
+    gcs_path: str = Field(..., description="GCS path where the file will be stored")
+    filename: str = Field(..., description="Name of the file")
+    expires_in: int = Field(..., description="Number of seconds until the URL expires")

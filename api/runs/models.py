@@ -171,7 +171,7 @@ class GenerateUploadUrlRequestModel(BaseModel):
 
     filename: str = Field(..., description="Name of the file to upload")
     content_type: str | None = Field(
-        "application/octet-stream", description="MIME type of the file"
+        None, description="MIME type of the file"
     )
     file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
 

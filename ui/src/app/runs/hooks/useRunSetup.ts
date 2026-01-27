@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { getRunsApi } from '@/api/RunsApi';
+import { getRunFromApi } from '@/types/Run';
 
 export const MCTS_SELECTION = {
     UCB1: { value: 'ucb1', label: 'UCB1' },
@@ -63,7 +64,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const [datasets, setDatasets] = useState<Dataset[]>([]);
     const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
     const [uploading, setUploading] = useState(false);
-    const [uploadError, setUploadError] = useState<string | null>(null);
     const [settings, setSettings] = useState<Settings>({
         name: '',
         datasetsDescription: '',
@@ -83,22 +83,56 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
     // Submission state
-    const [submitting, setSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+
+    // Loading state for initial run fetch
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Fetch run metadata on mount and prepopulate form
+    useEffect(() => {
+        const fetchRunMetadata = async () => {
+            setIsLoading(true);
+            try {
+                const { data } = await api.getRun(runid);
+                const { metadata } = getRunFromApi(data);
+                console.log(metadata, data);
+
+                if (metadata) {
+                    setSettings((prev) => ({
+                        ...prev,
+                        name: metadata.name || '',
+                        datasetsDescription: metadata.description || '',
+                        domain: metadata.domain || '',
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching run metadata:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchRunMetadata();
+    }, [runid, api]);
 
     const handleFileSelect = (file: File) => {
         if (file) {
             setSelectedFiles((prev) => [...prev, { file, description: '' }]);
-            setUploadError(null);
-            setFieldErrors({});
+            setFieldErrors((prev) => {
+                const { datasets, datasetFileDescriptions, ...rest } = prev;
+                return rest;
+            });
+            setFormError(null);
         }
     };
 
     const handleFileDescriptionChange = (index: number, description: string) => {
         setFieldErrors((prev) => {
-            const { datasetFileDescriptions, ...rest } = prev;
+            const { datasets, datasetFileDescriptions, ...rest } = prev;
             return rest;
         });
+        setFormError(null);
         setSelectedFiles((prev) =>
             prev.map((selectedFile, i) =>
                 i === index ? { ...selectedFile, description } : selectedFile
@@ -129,7 +163,10 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             return true;
         } catch (err) {
             console.error('Error uploading dataset:', err);
-            setUploadError(err instanceof Error ? err.message : 'Failed to upload dataset');
+            setFieldErrors((prev) => ({
+                ...prev,
+                datasets: err instanceof Error ? err.message : 'Failed to upload dataset',
+            }));
             return false;
         } finally {
             setUploading(false);
@@ -147,8 +184,26 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     };
 
     const updateSettings = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-        setFieldErrors({});
+        setFieldErrors((prev) => {
+            const { [key]: _, ...rest } = prev;
+            return rest;
+        });
         setSettings((prev) => ({ ...prev, [key]: value }));
+        setFormError(null);
+    };
+
+    const saveMetadata = async () => {
+        const metadata = {
+            name: settings.name.trim(),
+            description: settings.datasetsDescription.trim(),
+            domain: settings.domain.trim(),
+            datasets: selectedFiles.map((ds) => ({
+                name: ds.file.name,
+                description: ds.description,
+            })),
+        };
+
+        await api.saveMetadata(runid, metadata);
     };
 
     const handleExperimentsChange = (value: string) => {
@@ -170,13 +225,13 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             }));
         } else {
             updateSettings('nExperiments', num);
+            setFormError(null);
         }
     };
 
     const isFormInvalid = () => {
         // Validate all required fields
         const errors: FieldErrors = {};
-        setUploadError(null);
 
         if (!settings.name.trim()) {
             errors.name = 'Run name is required';
@@ -211,9 +266,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     };
 
     const handleSubmit = async () => {
-        setSubmitting(true);
+        setIsSubmitting(true);
         if (isFormInvalid()) {
-            setSubmitting(false);
+            setIsSubmitting(false);
             return;
         }
 
@@ -224,19 +279,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                 return;
             }
 
-            // Prepare metadata
-            const submissionMetadata = {
-                name: settings.name.trim(),
-                description: settings.datasetsDescription.trim(),
-                domain: settings.domain.trim(),
-                datasets: selectedFiles.map((ds) => ({
-                    name: ds.file.name,
-                    description: ds.description,
-                })),
-            };
-
             // Save metadata
-            await api.saveMetadata(runid, submissionMetadata);
+            await saveMetadata();
 
             // // Submit run
             await api.submitRun(runid, {
@@ -246,11 +290,11 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Notify parent of success
             onSubmitSuccess();
         } catch (err) {
-            console.error('Error submitting run:', err);
+            console.error('Error isSubmitting run:', err);
             setFormError(err instanceof Error ? err.message : 'Failed to submit run');
-            setSubmitting(false);
+            setIsSubmitting(false);
         } finally {
-            setSubmitting(false);
+            setIsSubmitting(false);
         }
     };
 
@@ -262,18 +306,21 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         datasets,
         selectedFiles,
         uploading,
-        uploadError,
 
         // Run configuration state
         settings,
         fieldErrors,
 
         // Submission state
-        submitting,
+        isSubmitting,
         formError,
+
+        // Loading state
+        isLoading,
 
         // Setters
         updateSettings,
+        saveMetadata,
 
         // Handlers
         handleFileSelect,

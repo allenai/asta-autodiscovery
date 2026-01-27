@@ -370,6 +370,7 @@ def create() -> Blueprint:
             run_metadata_model = MetadataModel(
                 name=f"Example Run {i}",
                 description=f"This is the metadata for example run {i}.",
+                domain=None,
                 datasets=[],
             )
             run_model = RunModel(

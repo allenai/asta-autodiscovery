@@ -39,15 +39,16 @@ interface RunSetupProps {
  */
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
+        saveMetadata,
         settings,
         creditsRemaining,
         datasets,
         selectedFiles,
         uploading,
-        uploadError,
         fieldErrors,
-        submitting,
+        isSubmitting,
         formError,
+        isLoading,
         updateSettings,
         handleFileSelect,
         handleFileDescriptionChange,
@@ -57,8 +58,22 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         handleSubmit,
     } = useRunSetup({ runid, onSubmitSuccess });
 
-    const datasetErrors =
-        uploadError || fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
+    const isFormDisabled = uploading || isSubmitting || isLoading;
+    const datasetErrors = fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
+
+    if (isLoading) {
+        return (
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    minHeight: '400px',
+                }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
@@ -80,10 +95,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         value={settings.name}
                         onChange={(e) => updateSettings('name', e.target.value)}
                         placeholder="Name"
-                        disabled={uploading || submitting}
+                        disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.name}
                         helperText={fieldErrors.name}
+                        onBlur={saveMetadata}
                     />
                 </FormControl>
 
@@ -99,10 +115,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         value={settings.datasetsDescription}
                         onChange={(e) => updateSettings('datasetsDescription', e.target.value)}
                         placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023"
-                        disabled={uploading || submitting}
+                        disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.datasetsDescription}
                         helperText={fieldErrors.datasetsDescription}
+                        onBlur={saveMetadata}
                     />
                 </FormControl>
 
@@ -115,8 +132,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         value={settings.domain}
                         onChange={(e) => updateSettings('domain', e.target.value)}
                         placeholder="e.g., Computer Science"
-                        disabled={uploading || submitting}
-                        required
+                        disabled={isFormDisabled}
+                        onBlur={saveMetadata}
                     />
                 </FormControl>
 
@@ -129,7 +146,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         onRemove={handleRemoveDataset}
                         onRemoveSelectedFile={handleRemoveSelectedFile}
                         onDescriptionChange={handleFileDescriptionChange}
-                        disabled={uploading || submitting}
+                        disabled={isFormDisabled}
                         error={datasetErrors}
                     />
 
@@ -157,7 +174,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         type="number"
                         value={settings.nExperiments}
                         onChange={(e) => handleExperimentsChange(e.target.value)}
-                        disabled={submitting}
+                        disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.nExperiments}
                         helperText={fieldErrors.nExperiments}
@@ -188,7 +205,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.intent}
                             onChange={(e) => updateSettings('intent', e.target.value)}
                             placeholder="e.g., Focus on relationships between demographic factors and outcomes"
-                            disabled={uploading || submitting}
+                            disabled={isFormDisabled}
                         />
                     </FormControl>
 
@@ -205,7 +222,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(e) =>
                                 updateSettings('explorationWeight', parseFloat(e.target.value))
                             }
-                            disabled={uploading || submitting}
+                            disabled={isFormDisabled}
                         />
                     </FormControl>
 
@@ -241,7 +258,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(e) =>
                                 updateSettings('surprisalWidth', parseFloat(e.target.value))
                             }
-                            disabled={uploading || submitting}
+                            disabled={isFormDisabled}
                         />
                     </FormControl>
 
@@ -259,7 +276,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(e) =>
                                 updateSettings('evidenceWeight', parseFloat(e.target.value))
                             }
-                            disabled={uploading || submitting}
+                            disabled={isFormDisabled}
                         />
                     </FormControl>
 
@@ -274,7 +291,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <TextField
                             value={settings.warmstartExperiments}
                             onChange={(e) => updateSettings('warmstartExperiments', e.target.value)}
-                            disabled={uploading || submitting}
+                            disabled={isFormDisabled}
                             placeholder="Path to json file"
                         />
                     </FormControl>
@@ -290,7 +307,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             type="number"
                             value={settings.nWarmstart}
                             onChange={(e) => updateSettings('nWarmstart', parseInt(e.target.value))}
-                            disabled={uploading || submitting}
+                            disabled={isFormDisabled}
                         />
                     </FormControl>
                 </StyledAccordian>
@@ -306,15 +323,15 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 variant="contained"
                 size="large"
                 startIcon={
-                    submitting ? (
+                    isSubmitting ? (
                         <CircularProgress size={16} />
                     ) : (
                         <PlayCircleFilledWhiteOutlinedIcon />
                     )
                 }
                 onClick={handleSubmit}
-                disabled={submitting || uploading || Object.keys(fieldErrors).length > 0}>
-                {submitting ? 'Starting...' : 'Start Run'}
+                disabled={isFormDisabled || Object.keys(fieldErrors).length > 0}>
+                {isSubmitting ? 'Starting...' : 'Start Run'}
             </SubmitButton>
         </Box>
     );
@@ -341,7 +358,7 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
 
     '.MuiInputBase-input': {
         border: '1px solid ' + theme.color['cream-20'].rgba.toString(),
-        borderRadius: theme.shape.borderRadius,
+        borderRadius: theme.shape.borderRadius + 'px',
         color: theme.color['cream-100'].hex,
         padding: theme.spacing(2.25),
 
@@ -420,7 +437,7 @@ const StyledAccordian = styled(Accordion)(({ theme }) => ({
 const RemainingCreditsChip = styled(Chip)(({ theme }) => ({
     alignSelf: 'flex-start',
     backgroundColor: theme.color['cream-10'].rgba.toString(),
-    borderRadius: theme.shape.borderRadius,
+    borderRadius: theme.shape.borderRadius + 'px',
     color: theme.color['cream-100'].hex,
     marginTop: theme.spacing(1),
 }));

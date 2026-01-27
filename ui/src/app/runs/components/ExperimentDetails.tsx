@@ -4,7 +4,7 @@ import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 
 import { Experiment } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
-import { getPriorAndPosteriorLabel } from '../utils/ExperimentUtils';
+import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
@@ -61,7 +61,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                     <SectionHeader>Surprise</SectionHeader>
                     <BeliefChip>
                         <LightbulbOutlinedIcon />
-                        {experiment.surprise > 0 ? 'Positive' : 'Negative'}{' '}
+                        {getSurprisalDirection(experiment.surprise)}{' '}
                         <strong>({experiment.surprise.toFixed(3)})</strong>
                     </BeliefChip>
                 </Box>

@@ -1,4 +1,4 @@
-import { Paper, styled, Box, Alert } from '@mui/material';
+import { Paper, styled, Box, Alert, Tooltip } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { useMemo } from 'react';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
@@ -6,13 +6,7 @@ import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 
 import { Experiment } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
-import {
-    SurprisalLabels,
-    SurprisalScale,
-    getPriorAndPosteriorLabel,
-    getSurprisalColor,
-    getSurprisalScale,
-} from '@/runs/utils/ExperimentUtils';
+import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
 const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 130 },
@@ -27,6 +21,15 @@ const columns: GridColDef[] = [
                 <ScienceOutlinedIcon fontSize="small" />
             </ColumnHeaderWrapper>
         ),
+        renderCell: (params: GridRenderCellParams) => {
+            const value = params.row.priorValue;
+            const label = params.value;
+            return (
+                <Tooltip title={value != null ? value.toFixed(3) : 'N/A'} arrow>
+                    <Box sx={{ cursor: 'pointer' }}>{label}</Box>
+                </Tooltip>
+            );
+        },
     },
     {
         field: 'posterior',
@@ -38,6 +41,15 @@ const columns: GridColDef[] = [
                 <ScienceOutlinedIcon fontSize="small" />
             </ColumnHeaderWrapper>
         ),
+        renderCell: (params: GridRenderCellParams) => {
+            const value = params.row.posteriorValue;
+            const label = params.value;
+            return (
+                <Tooltip title={value != null ? value.toFixed(3) : 'N/A'} arrow>
+                    <Box sx={{ cursor: 'pointer' }}>{label}</Box>
+                </Tooltip>
+            );
+        },
     },
     {
         field: 'surprisal',
@@ -50,12 +62,18 @@ const columns: GridColDef[] = [
             </ColumnHeaderWrapper>
         ),
         renderCell: (params: GridRenderCellParams) => {
-            const scale = params.row.surprisalScale as SurprisalScale;
-            const color = getSurprisalColor(scale);
-            return <Box sx={{ color }}>{params.value}</Box>;
+            return <Box>{params.value.toFixed(3)}</Box>;
         },
     },
-    { field: 'status', headerName: 'Status', width: 120 },
+    {
+        field: 'direction',
+        headerName: 'Direction',
+        width: 120,
+        renderCell: (params: GridRenderCellParams) => {
+            const direction = params.value;
+            return <Box>{direction}</Box>;
+        },
+    },
 ];
 
 export function ExperimentsTable() {
@@ -75,15 +93,15 @@ export function ExperimentsTable() {
     // Convert experiments to rows for DataGrid
     const rows = useMemo(() => {
         return experiments.map((experiment) => {
-            const surprisalScale = getSurprisalScale(experiment.surprise);
             return {
                 id: experiment.experimentId,
                 hypothesis: experiment.hypothesis ?? 'N/A',
                 prior: getPriorAndPosteriorLabel(experiment.prior),
+                priorValue: experiment.prior,
                 posterior: getPriorAndPosteriorLabel(experiment.posterior),
-                surprisal: SurprisalLabels[surprisalScale],
-                surprisalScale,
-                status: experiment.status,
+                posteriorValue: experiment.posterior,
+                surprisal: experiment.surprise,
+                direction: getSurprisalDirection(experiment.surprise),
                 creationIdx: experiment.creationIdx,
                 runtimeMs: experiment.runtimeMs ?? 'N/A',
             };

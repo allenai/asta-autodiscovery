@@ -16,6 +16,7 @@ import {
     FormLabel,
     Accordion,
     AccordionSummary,
+    Slider,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
@@ -246,19 +247,30 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </FormControl>
 
                     <FormControl fullWidth>
-                        <StyledFormLabel>Surprise threshold</StyledFormLabel>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                            }}>
+                            <StyledFormLabel>Surprise threshold</StyledFormLabel>
+                        </Box>
                         <HelperText>
                             Sets the minimum belief shift required for a discovery to count as
                             "surprising." Higher values (e.g., 0.3-0.5) only flag dramatic findings,
                             while lower values (e.g., 0.05-0.1) capture more subtle discoveries.
                             This affects which hypotheses the system considers worth pursuing.
                         </HelperText>
-                        <TextField
-                            value={settings.surprisalWidth}
-                            onChange={(e) =>
-                                updateSettings('surprisalWidth', parseFloat(e.target.value))
+                        <SurpriseSlider
+                            value={settings.surprisalWidth ?? 0}
+                            onChange={(_, value) =>
+                                updateSettings('surprisalWidth', value as number)
                             }
+                            min={0}
+                            max={1}
+                            step={0.01}
                             disabled={isFormDisabled}
+                            valueLabelDisplay="on"
                         />
                     </FormControl>
 
@@ -440,4 +452,20 @@ const RemainingCreditsChip = styled(Chip)(({ theme }) => ({
     borderRadius: theme.shape.borderRadius + 'px',
     color: theme.color['cream-100'].hex,
     marginTop: theme.spacing(1),
+}));
+
+const SurpriseSlider = styled(Slider)(({ theme }) => ({
+    '& .MuiSlider-valueLabel': {
+        fontSize: '0.875rem',
+        top: 45,
+        backgroundColor: 'unset',
+        color: theme.palette.text.primary,
+        '&::before': {
+            display: 'none',
+        },
+        '& *': {
+            background: 'transparent',
+            color: theme.color['cream-100'].hex,
+        },
+    },
 }));

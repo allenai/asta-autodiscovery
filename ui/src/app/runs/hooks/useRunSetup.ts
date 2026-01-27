@@ -63,7 +63,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const [datasets, setDatasets] = useState<Dataset[]>([]);
     const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
     const [uploading, setUploading] = useState(false);
-    const [uploadError, setUploadError] = useState<string | null>(null);
     const [settings, setSettings] = useState<Settings>({
         name: '',
         datasetsDescription: '',
@@ -89,16 +88,20 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const handleFileSelect = (file: File) => {
         if (file) {
             setSelectedFiles((prev) => [...prev, { file, description: '' }]);
-            setUploadError(null);
-            setFieldErrors({});
+            setFieldErrors((prev) => {
+                const { datasets, datasetFileDescriptions, ...rest } = prev;
+                return rest;
+            });
+            setFormError(null);
         }
     };
 
     const handleFileDescriptionChange = (index: number, description: string) => {
         setFieldErrors((prev) => {
-            const { datasetFileDescriptions, ...rest } = prev;
+            const { datasets, datasetFileDescriptions, ...rest } = prev;
             return rest;
         });
+        setFormError(null);
         setSelectedFiles((prev) =>
             prev.map((selectedFile, i) =>
                 i === index ? { ...selectedFile, description } : selectedFile
@@ -129,7 +132,10 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             return true;
         } catch (err) {
             console.error('Error uploading dataset:', err);
-            setUploadError(err instanceof Error ? err.message : 'Failed to upload dataset');
+            setFieldErrors((prev) => ({
+                ...prev,
+                datasets: err instanceof Error ? err.message : 'Failed to upload dataset',
+            }));
             return false;
         } finally {
             setUploading(false);
@@ -147,8 +153,12 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     };
 
     const updateSettings = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-        setFieldErrors({});
+        setFieldErrors((prev) => {
+            const { [key]: _, ...rest } = prev;
+            return rest;
+        });
         setSettings((prev) => ({ ...prev, [key]: value }));
+        setFormError(null);
     };
 
     const handleExperimentsChange = (value: string) => {
@@ -170,13 +180,13 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             }));
         } else {
             updateSettings('nExperiments', num);
+            setFormError(null);
         }
     };
 
     const isFormInvalid = () => {
         // Validate all required fields
         const errors: FieldErrors = {};
-        setUploadError(null);
 
         if (!settings.name.trim()) {
             errors.name = 'Run name is required';
@@ -262,7 +272,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         datasets,
         selectedFiles,
         uploading,
-        uploadError,
 
         // Run configuration state
         settings,

@@ -44,7 +44,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         datasets,
         selectedFiles,
         uploading,
-        uploadError,
         fieldErrors,
         submitting,
         formError,
@@ -57,8 +56,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         handleSubmit,
     } = useRunSetup({ runid, onSubmitSuccess });
 
-    const datasetErrors =
-        uploadError || fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
+    const datasetErrors = fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
 
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>

@@ -19,7 +19,6 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
-    MetadataDatasetModel,
     MetadataModel,
     GetRunMetadataRequestModel,
     GetRunMetadataResponseModel,
@@ -53,6 +52,15 @@ except ImportError:
 
 # Trigger phrase in intent field that activates simulated run mode
 SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
+
+# Max size of files that can be uploaded
+UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB
+
+# Allowed file extensions for uploads
+UPLOAD_ALLOWED_EXTENSIONS = {'.csv', '.json', '.txt', '.tsv'}
+
+# Expiration time for presigned upload URLs
+UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 
 
 def create() -> Blueprint:
@@ -89,6 +97,19 @@ def create() -> Blueprint:
             Blob path for run_details.json
         """
         return f"users/{userid}/jobs/{runid}/run_details.json"
+
+    def _get_run_data_upload_path(userid: str, runid: str, filename: str) -> str:
+        """Get the GCS path for uploading run data.
+
+        Args:
+            userid: User identifier
+            runid: Run identifier
+            filename: Name of the file to upload
+
+        Returns:
+            Blob path for the upload
+        """
+        return f"users/{userid}/jobs/{runid}/data/{filename}"
 
     def _create_run_details(userid: str, runid: str) -> dict:
         """Create initial run_details.json file.
@@ -589,14 +610,12 @@ def create() -> Blueprint:
 
         try:
             # Validate file size
-            MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
-            if req.file_size_bytes and req.file_size_bytes > MAX_FILE_SIZE:
-                return jsonify({"error": "File too large. Maximum size is 500MB"}), 400
+            if req.file_size_bytes and req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
+                return jsonify({"error": "File too large"}), 413
 
             # Validate file extension
-            ALLOWED_EXTENSIONS = {'.csv', '.json', '.txt', '.tsv'}
             file_ext = Path(req.filename).suffix.lower()
-            if file_ext not in ALLOWED_EXTENSIONS:
+            if file_ext not in UPLOAD_ALLOWED_EXTENSIONS:
                 return jsonify({"error": f"File type not allowed: {file_ext}"}), 400
 
             manager = get_job_manager()
@@ -609,14 +628,13 @@ def create() -> Blueprint:
             client = storage.Client(project=manager.config.project_id)
             bucket = client.bucket(manager.config.bucket)
 
-            # Construct blob path (matches existing pattern: users/{userid}/jobs/{jobid}/data/{filename})
-            blob_path = f"users/{userid}/jobs/{runid}/data/{req.filename}"
+            blob_path = _get_run_data_upload_path(userid, runid, req.filename)
             blob = bucket.blob(blob_path)
 
             # Generate signed URL for PUT operation with 1-hour expiration
             upload_url = blob.generate_signed_url(
                 version="v4",
-                expiration=timedelta(hours=1),
+                expiration=timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS),
                 method="PUT",
                 content_type=req.content_type,
             )
@@ -628,7 +646,7 @@ def create() -> Blueprint:
                 upload_url=upload_url,
                 gcs_path=gcs_path,
                 filename=req.filename,
-                expires_in=3600,
+                expires_in=UPLOAD_URL_EXPIRATION_SECONDS,
             )
             return jsonify(resp.model_dump()), 200
 

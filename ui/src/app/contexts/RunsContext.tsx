@@ -12,6 +12,7 @@ import {
 
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, Run } from '@/types/Run';
+import { useAuth0 } from '@/contexts/Auth0Context';
 
 export interface RunsState {
     viewerRuns: Run[] | null;
@@ -49,6 +50,7 @@ export type RunsProviderProps = PropsWithChildren<{}>;
 
 export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const runsApi = getRunsApi();
+    const { isAuthenticated } = useAuth0();
 
     const [lastError, setLastError] = useState<string | null>(null);
     const [viewerRuns, setViewerRuns] = useState<Run[] | null>(null);
@@ -92,9 +94,11 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     }, [runsApi]);
 
     useEffect(() => {
-        updateViewerRuns();
-        updateExampleRuns();
-    }, [updateViewerRuns, updateExampleRuns]);
+        if (isAuthenticated) {
+            updateViewerRuns();
+            updateExampleRuns();
+        }
+    }, [updateViewerRuns, updateExampleRuns, isAuthenticated]);
 
     const memoizedState = useMemo<RunsState>(
         () => ({

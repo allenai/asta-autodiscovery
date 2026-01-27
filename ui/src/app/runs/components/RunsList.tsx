@@ -7,14 +7,13 @@ import {
     ListItemButton,
     ListItemText,
     Typography,
-    CircularProgress,
     Divider,
     styled,
+    Skeleton,
 } from '@mui/material';
 
 import Link from 'next/link';
 
-import { useAuth0 } from '@/contexts/Auth0Context';
 import { useRuns } from '@/contexts/RunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 
@@ -33,18 +32,7 @@ interface RunsListProps {
  * - Loading and error states
  */
 export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) {
-    const { isAuthenticated } = useAuth0();
     const { viewerRuns, isViewerRunsLoading } = useRuns();
-
-    if (!isAuthenticated) {
-        return (
-            <Box sx={{ p: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                    Please log in to view runs
-                </Typography>
-            </Box>
-        );
-    }
 
     return (
         <Box
@@ -60,9 +48,11 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
             <Divider />
 
             {isViewerRunsLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                    <CircularProgress />
-                </Box>
+                <SkeletonWrapper>
+                    {Array.from({ length: 5 }).map((_, index) => (
+                        <RunSkeleton key={index} animation="wave" />
+                    ))}
+                </SkeletonWrapper>
             ) : viewerRuns?.length === 0 ? (
                 <Box sx={{ p: 2 }}>
                     <Typography variant="body2" color="text.secondary" align="center">
@@ -114,4 +104,17 @@ const RunItemButton = styled(ListItemButton)`
     &:hover {
         background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
     }
+`;
+
+const SkeletonWrapper = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    gap: ${({ theme }) => theme.spacing(0.5)};
+    padding: ${({ theme }) => theme.spacing(2)};
+`;
+
+const RunSkeleton = styled(Skeleton)`
+    background-color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    height: 35px;
+    width: 100%;
 `;

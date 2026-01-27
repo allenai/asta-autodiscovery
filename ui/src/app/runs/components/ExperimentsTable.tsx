@@ -62,7 +62,18 @@ const columns: GridColDef[] = [
             </ColumnHeaderWrapper>
         ),
         renderCell: (params: GridRenderCellParams) => {
-            return <Box>{params.value.toFixed(3)}</Box>;
+            const isSurprising = params.row.isSurprising;
+            return (
+                <Box
+                    sx={(theme) => ({
+                        color: isSurprising
+                            ? theme.color['warning-orange-100'].hex
+                            : theme.color['cream-100'].hex,
+                        fontWeight: isSurprising ? 700 : 'normal',
+                    })}>
+                    {params.value.toFixed(3)}
+                </Box>
+            );
         },
     },
     {
@@ -101,6 +112,7 @@ export function ExperimentsTable() {
                 posterior: getPriorAndPosteriorLabel(experiment.posterior),
                 posteriorValue: experiment.posterior,
                 surprisal: experiment.surprise,
+                isSurprising: experiment.isSurprising,
                 direction: getSurprisalDirection(experiment.surprise),
                 creationIdx: experiment.creationIdx,
                 runtimeMs: experiment.runtimeMs ?? 'N/A',

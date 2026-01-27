@@ -169,6 +169,8 @@ class GetExperimentStatusResponseModel(BaseModel):
 class GenerateUploadUrlRequestModel(BaseModel):
     """Model for the request to generate a presigned upload URL"""
 
+    runid: str = Field(..., description="Identifier of the run for which to generate the upload URL")
+    userid: str = Field(..., description="User identifier for whom to generate the upload URL")
     filename: str = Field(..., description="Name of the file to upload")
     content_type: str = Field(
         ..., description="MIME type of the file"
@@ -180,6 +182,5 @@ class GenerateUploadUrlResponseModel(BaseModel):
     """Model for the response containing the presigned upload URL"""
 
     upload_url: str = Field(..., description="Presigned URL for uploading the file to GCS")
-    gcs_path: str = Field(..., description="GCS path where the file will be stored")
     filename: str = Field(..., description="Name of the file")
     expires_at_unix: int = Field(..., description="Unix timestamp (seconds since epoch) when the URL expires")

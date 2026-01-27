@@ -32,6 +32,7 @@ from runs.models import (
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
     RunStatsModel,
+    RunArgsModel,
     GenerateUploadUrlRequestModel,
     GenerateUploadUrlResponseModel,
 )
@@ -442,6 +443,13 @@ def create() -> Blueprint:
                 current_app.logger.error(f"Failed to get metadata for {runid}: {e}")
                 metadata_dict = None
 
+            # Get args
+            try:
+                args_dict = manager.get_job_args(userid, runid)
+            except Exception as e:
+                current_app.logger.error(f"Failed to get job args for {runid}: {e}")
+                args_dict = None
+
             # Build RunModel
             run_details_model = RunDetailsModel(
                 execution_id=run_details.get("execution_id"),
@@ -456,6 +464,7 @@ def create() -> Blueprint:
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
+            run_args_model = RunArgsModel.from_dict(args_dict) if args_dict else None
             run_model = RunModel(
                 runid=runid,
                 status=run_details.get("status", "UNKNOWN"),
@@ -465,6 +474,7 @@ def create() -> Blueprint:
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
+                run_args=run_args_model,
                 execution_status={},
             )
 
@@ -639,13 +649,15 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to generate upload URL: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/metadata", methods=["POST"])
+    @api.route("/<runid>/metadata", methods=["POST"])
     @requires_enrollment
-    def save_metadata():
+    def save_metadata(runid: str):
         """Save or update metadata for a run.
 
+        Args:
+            runid: Run identifier from URL path
+
         Expects JSON body with:
-        - runid: Run identifier
         - metadata: Metadata object (typically with "datasets" array)
 
         Returns:
@@ -662,11 +674,10 @@ def create() -> Blueprint:
         if not data:
             raise BadRequest("No request body")
 
-        runid = data.get("runid")
         metadata = data.get("metadata")
 
-        if not runid or not metadata:
-            raise BadRequest("runid and metadata are required")
+        if not metadata:
+            raise BadRequest("metadata is required")
 
         try:
             manager = get_job_manager()
@@ -674,6 +685,44 @@ def create() -> Blueprint:
             return jsonify({"path": path, "message": "Metadata saved successfully"})
         except Exception as e:
             current_app.logger.error(f"Failed to save metadata: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route("/<runid>/args", methods=["POST"])
+    @requires_enrollment
+    def save_job_args(runid: str):
+        """Save or update job arguments for a run.
+
+        Args:
+            runid: Run identifier from URL path
+
+        Expects JSON body with:
+        - args: Job arguments object
+
+        Returns:
+            JSON response with upload confirmation.
+
+        Raises:
+            BadRequest: If request body is missing or invalid.
+        """
+        userid = request.user.get("sub")
+        if not userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        data = request.json
+        if not data:
+            raise BadRequest("No request body")
+
+        args = data.get("args")
+
+        if not args:
+            raise BadRequest("args is required")
+
+        try:
+            manager = get_job_manager()
+            path = manager.upload_job_args(userid, runid, args)
+            return jsonify({"path": path, "message": "Job args saved successfully"})
+        except Exception as e:
+            current_app.logger.error(f"Failed to save job args: {e}")
             return jsonify({"error": str(e)}), 500
 
     @api.route("<runid>/metadata", methods=["GET"])

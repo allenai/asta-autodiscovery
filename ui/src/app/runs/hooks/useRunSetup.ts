@@ -24,10 +24,10 @@ type Settings = {
     datasetsDescription: string;
     domain: string;
     datasets: Dataset[];
+    intent: string;
 
     // advanced settings
     nExperiments: number;
-    intent: string;
     explorationWeight: number;
     mctsSelection: string;
     surprisalWidth: number;
@@ -95,15 +95,23 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             setIsLoading(true);
             try {
                 const { data } = await api.getRun(runid);
-                const { metadata } = getRunFromApi(data);
-                console.log(metadata, data);
+                const { metadata, args } = getRunFromApi(data);
 
-                if (metadata) {
+                if (metadata || args) {
                     setSettings((prev) => ({
                         ...prev,
-                        name: metadata.name || '',
-                        datasetsDescription: metadata.description || '',
-                        domain: metadata.domain || '',
+                        name: metadata?.name || '',
+                        datasetsDescription: metadata?.description || '',
+                        domain: metadata?.domain || '',
+                        intent: metadata?.intent || '',
+                        nExperiments: args?.nExperiments || prev.nExperiments,
+                        explorationWeight: args?.explorationWeight || prev.explorationWeight,
+                        mctsSelection: args?.mctsSelection || prev.mctsSelection,
+                        surprisalWidth: args?.surprisalWidth || prev.surprisalWidth,
+                        evidenceWeight: args?.evidenceWeight || prev.evidenceWeight,
+                        warmstartExperiments:
+                            args?.warmstartExperiments || prev.warmstartExperiments,
+                        nWarmstart: args?.nWarmstart || prev.nWarmstart,
                     }));
                 }
             } catch (err) {
@@ -197,6 +205,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             name: settings.name.trim(),
             description: settings.datasetsDescription.trim(),
             domain: settings.domain.trim(),
+            intent: settings.intent.trim(),
             datasets: selectedFiles.map((ds) => ({
                 name: ds.file.name,
                 description: ds.description,
@@ -204,6 +213,19 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         };
 
         await api.saveMetadata(runid, metadata);
+    };
+
+    const saveJobArgs = async () => {
+        const jobArgs = {
+            n_experiments: settings.nExperiments,
+            exploration_weight: settings.explorationWeight,
+            mcts_selection: settings.mctsSelection,
+            surprisal_width: settings.surprisalWidth,
+            evidence_weight: settings.evidenceWeight,
+            warmstart_experiments: settings.warmstartExperiments,
+            n_warmstart: settings.nWarmstart,
+        };
+        await api.saveJobArgs(runid, jobArgs);
     };
 
     const handleExperimentsChange = (value: string) => {
@@ -225,6 +247,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             }));
         } else {
             updateSettings('nExperiments', num);
+            saveJobArgs();
             setFormError(null);
         }
     };
@@ -321,6 +344,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         // Setters
         updateSettings,
         saveMetadata,
+        saveJobArgs,
 
         // Handlers
         handleFileSelect,

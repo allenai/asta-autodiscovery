@@ -398,6 +398,42 @@ def upload_metadata(
         raise GCSError(f"Failed to upload metadata: {e}")
 
 
+def upload_job_args(
+    userid: str, jobid: str, args: dict[str, Any], config: JobConfig | None = None
+) -> str:
+    """Upload args.json to job's output directory.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        args: Arguments dictionary
+        config: Configuration (uses default if None)
+
+    Returns:
+        GCS path to saved args file
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If upload fails
+    """
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    blob_path = f"users/{userid}/jobs/{jobid}/output/args.json"
+
+    try:
+        blob = bucket.blob(blob_path)
+        blob.upload_from_string(json.dumps(args, indent=2))
+        return f"gs://{config.bucket}/{blob_path}"
+    except Exception as e:
+        raise GCSError(f"Failed to save job args: {e}")
+
+
 def get_metadata(
     userid: str, jobid: str, config: JobConfig | None = None
 ) -> dict[str, Any]:

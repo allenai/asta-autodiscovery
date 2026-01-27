@@ -41,6 +41,7 @@ interface RunSetupProps {
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
         saveMetadata,
+        saveJobArgs,
         settings,
         creditsRemaining,
         datasets,
@@ -207,6 +208,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(e) => updateSettings('intent', e.target.value)}
                             placeholder="e.g., Focus on relationships between demographic factors and outcomes"
                             disabled={isFormDisabled}
+                            onBlur={saveMetadata}
                         />
                     </FormControl>
 
@@ -219,11 +221,13 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             1-2) focus more on refining already-promising directions.
                         </HelperText>
                         <TextField
+                            type="number"
                             value={settings.explorationWeight}
                             onChange={(e) =>
                                 updateSettings('explorationWeight', parseFloat(e.target.value))
                             }
                             disabled={isFormDisabled}
+                            onBlur={saveJobArgs}
                         />
                     </FormControl>
 
@@ -237,7 +241,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         </HelperText>
                         <Select
                             value={settings.mctsSelection}
-                            onChange={(e) => updateSettings('mctsSelection', e.target.value)}>
+                            onChange={(e) => updateSettings('mctsSelection', e.target.value)}
+                            onClose={saveJobArgs}>
                             {Object.values(MCTS_SELECTION).map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
                                     {option.label}
@@ -266,6 +271,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(_, value) =>
                                 updateSettings('surprisalWidth', value as number)
                             }
+                            onChangeCommitted={saveJobArgs}
                             min={0}
                             max={1}
                             step={0.01}
@@ -284,11 +290,13 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             assumptions.
                         </HelperText>
                         <TextField
+                            type="number"
                             value={settings.evidenceWeight}
                             onChange={(e) =>
                                 updateSettings('evidenceWeight', parseFloat(e.target.value))
                             }
                             disabled={isFormDisabled}
+                            onBlur={saveJobArgs}
                         />
                     </FormControl>
 
@@ -305,6 +313,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(e) => updateSettings('warmstartExperiments', e.target.value)}
                             disabled={isFormDisabled}
                             placeholder="Path to json file"
+                            onBlur={saveJobArgs}
                         />
                     </FormControl>
 
@@ -320,6 +329,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.nWarmstart}
                             onChange={(e) => updateSettings('nWarmstart', parseInt(e.target.value))}
                             disabled={isFormDisabled}
+                            onBlur={saveJobArgs}
                         />
                     </FormControl>
                 </StyledAccordian>

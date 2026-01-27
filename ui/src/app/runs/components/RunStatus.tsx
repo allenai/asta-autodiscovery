@@ -188,7 +188,7 @@ function RunStatusContent({
                 </Background>
                 <TablePanel
                     $isExpanded={isTableExpanded}
-                    key={isTableExpanded ? 'expanded' : 'collapsed'}>
+                    key={`${isTableExpanded ? 'expanded' : 'collapsed'} ${selectedExperiment?.experimentId ?? ''}`}>
                     <RunHeader>
                         <RunHeaderName>{run.name}</RunHeaderName>
                         <RunHeaderExpandButton onClick={() => setIsTableExpanded(!isTableExpanded)}>
@@ -281,7 +281,6 @@ const PanelLayout = styled('div')`
 const Background = styled('div')`
     position: absolute;
     inset: 0;
-    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
     z-index: 1;
 
     @container run-status (width < 1000px) {
@@ -292,7 +291,7 @@ const Background = styled('div')`
 const TablePanel = styled('div')<{ $isExpanded: boolean }>`
     flex: 0 1 auto;
     width: ${({ $isExpanded }) => ($isExpanded ? '100%' : '400px')};
-    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    background-color: #163638f3;
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     display: flex;
     flex-direction: column;
@@ -310,7 +309,7 @@ const TablePanel = styled('div')<{ $isExpanded: boolean }>`
 const DetailsPanel = styled('div')`
     flex: 0 1 auto;
     max-width: 500px;
-    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    background-color: #163638f3;
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     padding: ${({ theme }) => theme.spacing(3)};
     position: relative;

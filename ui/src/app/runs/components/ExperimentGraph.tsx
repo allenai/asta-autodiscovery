@@ -25,7 +25,6 @@ const GraphContainer = styled('div')`
 const MockGraph = styled('div')`
     animation: flash 0.25s ease-in-out;
     flex: 1 1 auto;
-    opacity: 0.05;
     background-position: center;
     background-size: contain;
     background-repeat: no-repeat;
@@ -33,13 +32,13 @@ const MockGraph = styled('div')`
 
     @keyframes flash {
         0% {
-            opacity: 0.05;
+            filter: brightness(1);
         }
         10% {
-            opacity: 0.3;
+            filter: brightness(2);
         }
         100% {
-            opacity: 0.05;
+            filter: brightness(1);
         }
     }
 `;

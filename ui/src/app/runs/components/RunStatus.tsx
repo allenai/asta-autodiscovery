@@ -181,100 +181,87 @@ function RunStatusContent({
     const [isTableExpanded, setIsTableExpanded] = useState(false);
 
     return (
-        <Layout>
-            <Background>
-                <ExperimentGraph />
-            </Background>
-            <Foreground>
-                <PanelLayout>
-                    <TablePanel $isExpanded={isTableExpanded}>
-                        <RunHeader>
-                            <RunHeaderName>{run.name}</RunHeaderName>
-                            <RunHeaderExpandButton
-                                onClick={() => setIsTableExpanded(!isTableExpanded)}>
-                                {isTableExpanded ? 'Collapse' : 'Expand'}
-                            </RunHeaderExpandButton>
-                        </RunHeader>
+        <Container>
+            <PanelLayout>
+                <Background>
+                    <ExperimentGraph />
+                </Background>
+                <TablePanel
+                    $isExpanded={isTableExpanded}
+                    key={isTableExpanded ? 'expanded' : 'collapsed'}>
+                    <RunHeader>
+                        <RunHeaderName>{run.name}</RunHeaderName>
+                        <RunHeaderExpandButton onClick={() => setIsTableExpanded(!isTableExpanded)}>
+                            {isTableExpanded ? 'Collapse' : 'Expand'}
+                        </RunHeaderExpandButton>
+                    </RunHeader>
 
-                        <Box sx={{ padding: 3 }}>
-                            {error && <Alert severity="error">{error}</Alert>}
-                            <Chip
-                                label={run.details.status.toUpperCase()}
-                                color={getStatusColor(run.details.status)}
-                                size="medium"
-                            />
-                            {run.details.statusCheckedAt && (
-                                <Box>
-                                    <Typography variant="caption">
-                                        Last Checked:{' '}
-                                        {new Date(run.details.statusCheckedAt).toLocaleString()}
-                                    </Typography>
-                                </Box>
-                            )}
-                            {run.stats && (
-                                <Box display="flex" gap={1.5}>
+                    <Box sx={{ padding: 3 }}>
+                        {error && <Alert severity="error">{error}</Alert>}
+                        <Chip
+                            label={run.details.status.toUpperCase()}
+                            color={getStatusColor(run.details.status)}
+                            size="medium"
+                        />
+                        {run.details.statusCheckedAt && (
+                            <Box>
+                                <Typography variant="caption">
+                                    Last Checked:{' '}
+                                    {new Date(run.details.statusCheckedAt).toLocaleString()}
+                                </Typography>
+                            </Box>
+                        )}
+                        {run.stats && (
+                            <Box display="flex" gap={1.5}>
+                                <ExperimentCount>
+                                    <ScienceOutlinedIcon />
+                                    {run.stats.requestedExperiments} {experimentsLabel}
+                                </ExperimentCount>
+                                {!!run.stats.pendingExperiments && (
                                     <ExperimentCount>
-                                        <ScienceOutlinedIcon />
-                                        {run.stats.requestedExperiments} {experimentsLabel}
+                                        <HourglassTopOutlinedIcon />
+                                        {run.stats.pendingExperiments} pending
                                     </ExperimentCount>
-                                    {!!run.stats.pendingExperiments && (
-                                        <ExperimentCount>
-                                            <HourglassTopOutlinedIcon />
-                                            {run.stats.pendingExperiments} pending
-                                        </ExperimentCount>
-                                    )}
-                                </Box>
-                            )}
-                            {canStop && (
-                                <StopButton
-                                    variant="text"
-                                    startIcon={
-                                        cancelling ? (
-                                            <CircularProgress size={16} />
-                                        ) : (
-                                            <StopCircleOutlinedIcon />
-                                        )
-                                    }
-                                    onClick={handleStop}
-                                    disabled={cancelling}>
-                                    {cancelling ? 'Stopping...' : 'Stop'}
-                                </StopButton>
-                            )}
-                            <ExperimentsTable />
-                        </Box>
-                    </TablePanel>
+                                )}
+                            </Box>
+                        )}
+                        {canStop && (
+                            <StopButton
+                                variant="text"
+                                startIcon={
+                                    cancelling ? (
+                                        <CircularProgress size={16} />
+                                    ) : (
+                                        <StopCircleOutlinedIcon />
+                                    )
+                                }
+                                onClick={handleStop}
+                                disabled={cancelling}>
+                                {cancelling ? 'Stopping...' : 'Stop'}
+                            </StopButton>
+                        )}
+                        <ExperimentsTable />
+                    </Box>
+                </TablePanel>
 
-                    {!!selectedExperiment && (
-                        <DetailsPanel>
-                            <>
-                                <CloseDetailButton
-                                    onClick={() => selectExperiment(null)}
-                                    size="small">
-                                    <CloseIcon />
-                                </CloseDetailButton>
-                                <ExperimentDetails experiment={selectedExperiment} />
-                            </>
-                        </DetailsPanel>
-                    )}
-                </PanelLayout>
-            </Foreground>
-        </Layout>
+                {!!selectedExperiment && (
+                    <DetailsPanel>
+                        <>
+                            <CloseDetailButton onClick={() => selectExperiment(null)} size="small">
+                                <CloseIcon />
+                            </CloseDetailButton>
+                            <ExperimentDetails experiment={selectedExperiment} />
+                        </>
+                    </DetailsPanel>
+                )}
+            </PanelLayout>
+        </Container>
     );
 }
 
-const Layout = styled('div')`
-    display: grid;
+const Container = styled('div')`
+    container: run-status / inline-size;
     height: 100%;
-`;
-
-const Background = styled('div')`
-    grid-row: 1;
-    grid-column: 1;
-`;
-
-const Foreground = styled('div')`
-    grid-row: 1;
-    grid-column: 1;
 `;
 
 const PanelLayout = styled('div')`
@@ -284,10 +271,21 @@ const PanelLayout = styled('div')`
     height: 100%;
     padding: ${({ theme }) => theme.spacing(2)};
     justify-content: space-between;
-    opacity: 0.9;
+    position: relative;
 
-    &:hover {
-        opacity: 1;
+    @container run-status (width < 1000px) {
+        display: grid;
+    }
+`;
+
+const Background = styled('div')`
+    position: absolute;
+    inset: 0;
+    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    z-index: 1;
+
+    @container run-status (width < 1000px) {
+        display: none;
     }
 `;
 
@@ -299,6 +297,14 @@ const TablePanel = styled('div')<{ $isExpanded: boolean }>`
     display: flex;
     flex-direction: column;
     gap: ${({ theme }) => theme.spacing(2)};
+    z-index: 2;
+
+    @container run-status (width < 1000px) {
+        flex: initial;
+        width: initial;
+        grid-row: 1;
+        grid-column: 1;
+    }
 `;
 
 const DetailsPanel = styled('div')`
@@ -308,6 +314,14 @@ const DetailsPanel = styled('div')`
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     padding: ${({ theme }) => theme.spacing(3)};
     position: relative;
+    z-index: 2;
+
+    @container run-status (width < 1000px) {
+        flex: initial;
+        max-width: initial;
+        grid-row: 1;
+        grid-column: 1;
+    }
 `;
 
 const CloseDetailButton = styled(IconButton)`
@@ -343,6 +357,10 @@ const RunHeaderName = styled('div')`
 
 const RunHeaderExpandButton = styled(Button)`
     color: ${({ theme }) => theme.color['green-100'].hex};
+
+    @container run-status (width < 1000px) {
+        display: none;
+    }
 `;
 
 const ExperimentCount = styled('div')`

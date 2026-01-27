@@ -413,6 +413,10 @@ const SubmitButton = styled(Button)(({ theme }) => ({
         backgroundColor: theme.color['green-100'].hex,
         color: theme.color['teal-100'].hex,
         marginTop: theme.spacing(3),
+
+        '&.Mui-disabled': {
+            backgroundColor: theme.color['gray-60'].rgba.toString(),
+        },
     },
 }));
 

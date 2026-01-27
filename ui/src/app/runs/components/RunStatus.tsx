@@ -10,6 +10,7 @@ import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Run, getRunFromApi } from '@/types/Run';
+import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
@@ -177,101 +178,150 @@ function RunStatusContent({
     experimentsLabel,
 }: RunStatusContentProps) {
     const { selectedExperiment, selectExperiment } = useRunExperiments();
+    const [isTableExpanded, setIsTableExpanded] = useState(false);
 
     return (
-        <ExperimentLayout $isDetailsOpen={!!selectedExperiment}>
-            <MainContent>
-                <RunHeader>{run.name}</RunHeader>
+        <Container>
+            <PanelLayout>
+                <Background>
+                    <ExperimentGraph />
+                </Background>
+                <TablePanel
+                    $isExpanded={isTableExpanded}
+                    key={`${isTableExpanded ? 'expanded' : 'collapsed'} ${selectedExperiment?.experimentId ?? ''}`}>
+                    <RunHeader>
+                        <RunHeaderName>{run.name}</RunHeaderName>
+                        <RunHeaderExpandButton onClick={() => setIsTableExpanded(!isTableExpanded)}>
+                            {isTableExpanded ? 'Collapse' : 'Expand'}
+                        </RunHeaderExpandButton>
+                    </RunHeader>
 
-                <Box sx={{ padding: 3 }}>
-                    {error && <Alert severity="error">{error}</Alert>}
-                    <Chip
-                        label={run.details.status.toUpperCase()}
-                        color={getStatusColor(run.details.status)}
-                        size="medium"
-                    />
-                    {run.details.statusCheckedAt && (
-                        <Box>
-                            <Typography variant="caption">
-                                Last Checked:{' '}
-                                {new Date(run.details.statusCheckedAt).toLocaleString()}
-                            </Typography>
-                        </Box>
-                    )}
-                    {run.stats && (
-                        <Box display="flex" gap={1.5}>
-                            <ExperimentCount>
-                                <ScienceOutlinedIcon />
-                                {run.stats.requestedExperiments} {experimentsLabel}
-                            </ExperimentCount>
-                            {!!run.stats.pendingExperiments && (
+                    <Box sx={{ padding: 3 }}>
+                        {error && <Alert severity="error">{error}</Alert>}
+                        <Chip
+                            label={run.details.status.toUpperCase()}
+                            color={getStatusColor(run.details.status)}
+                            size="medium"
+                        />
+                        {run.details.statusCheckedAt && (
+                            <Box>
+                                <Typography variant="caption">
+                                    Last Checked:{' '}
+                                    {new Date(run.details.statusCheckedAt).toLocaleString()}
+                                </Typography>
+                            </Box>
+                        )}
+                        {run.stats && (
+                            <Box display="flex" gap={1.5}>
                                 <ExperimentCount>
-                                    <HourglassTopOutlinedIcon />
-                                    {run.stats.pendingExperiments} pending
+                                    <ScienceOutlinedIcon />
+                                    {run.stats.requestedExperiments} {experimentsLabel}
                                 </ExperimentCount>
-                            )}
-                        </Box>
-                    )}
-                    {canStop && (
-                        <StopButton
-                            variant="text"
-                            startIcon={
-                                cancelling ? (
-                                    <CircularProgress size={16} />
-                                ) : (
-                                    <StopCircleOutlinedIcon />
-                                )
-                            }
-                            onClick={handleStop}
-                            disabled={cancelling}>
-                            {cancelling ? 'Stopping...' : 'Stop'}
-                        </StopButton>
-                    )}
-                    <ExperimentsTable />
-                </Box>
-            </MainContent>
+                                {!!run.stats.pendingExperiments && (
+                                    <ExperimentCount>
+                                        <HourglassTopOutlinedIcon />
+                                        {run.stats.pendingExperiments} pending
+                                    </ExperimentCount>
+                                )}
+                            </Box>
+                        )}
+                        {canStop && (
+                            <StopButton
+                                variant="text"
+                                startIcon={
+                                    cancelling ? (
+                                        <CircularProgress size={16} />
+                                    ) : (
+                                        <StopCircleOutlinedIcon />
+                                    )
+                                }
+                                onClick={handleStop}
+                                disabled={cancelling}>
+                                {cancelling ? 'Stopping...' : 'Stop'}
+                            </StopButton>
+                        )}
+                        <ExperimentsTable />
+                    </Box>
+                </TablePanel>
 
-            {!!selectedExperiment && (
-                <DetailsWrapper>
-                    <>
-                        <CloseDetailButton onClick={() => selectExperiment(null)} size="small">
-                            <CloseIcon />
-                        </CloseDetailButton>
-                        <ExperimentDetails experiment={selectedExperiment} />
-                    </>
-                </DetailsWrapper>
-            )}
-        </ExperimentLayout>
+                {!!selectedExperiment && (
+                    <DetailsPanel>
+                        <>
+                            <CloseDetailButton onClick={() => selectExperiment(null)} size="small">
+                                <CloseIcon />
+                            </CloseDetailButton>
+                            <ExperimentDetails experiment={selectedExperiment} />
+                        </>
+                    </DetailsPanel>
+                )}
+            </PanelLayout>
+        </Container>
     );
 }
 
-const ExperimentLayout = styled('div')<{ $isDetailsOpen: boolean }>`
+const Container = styled('div')`
+    container: run-status / inline-size;
+    height: 100%;
+`;
+
+const PanelLayout = styled('div')`
     color: ${({ theme }) => theme.color['cream-100'].hex};
-    display: grid;
-    grid-template-columns: minmax(40px, 2fr) 1fr;
-    grid-template-areas: 'main-content details';
+    display: flex;
     gap: ${({ theme }) => theme.spacing(2)};
     height: 100%;
     padding: ${({ theme }) => theme.spacing(2)};
+    justify-content: space-between;
+    position: relative;
 
-    ${({ $isDetailsOpen }) => !$isDetailsOpen && `grid-template-columns: 1fr 0;`}
+    @container run-status (width < 1000px) {
+        display: grid;
+    }
 `;
 
-const MainContent = styled('div')`
-    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
-    border-radius: ${({ theme }) => theme.shape.borderRadius};
+const Background = styled('div')`
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+
+    @container run-status (width < 1000px) {
+        display: none;
+    }
+`;
+
+const TablePanel = styled('div')<{ $isExpanded: boolean }>`
+    flex: 0 1 auto;
+    width: ${({ $isExpanded }) => ($isExpanded ? '100%' : '400px')};
+    background-color: #163638f3;
+    border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     display: flex;
     flex-direction: column;
     gap: ${({ theme }) => theme.spacing(2)};
-    grid-area: main-content;
+    z-index: 2;
+
+    @container run-status (width < 1000px) {
+        flex: initial;
+        width: calc(100cqw - 20px);
+        grid-row: 1;
+        grid-column: 1;
+    }
 `;
 
-const DetailsWrapper = styled('div')`
-    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
-    border-radius: ${({ theme }) => theme.shape.borderRadius};
-    grid-area: details;
+const DetailsPanel = styled('div')`
+    flex: 0 1 auto;
+    max-width: 500px;
+    background-color: #163638f3;
+    border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     padding: ${({ theme }) => theme.spacing(3)};
     position: relative;
+    z-index: 2;
+
+    @container run-status (width < 1000px) {
+        flex: 1 1 auto;
+        max-width: initial;
+        width: calc(100cqw - 20px);
+        grid-row: 1;
+        grid-column: 1;
+    }
 `;
 
 const CloseDetailButton = styled(IconButton)`
@@ -291,11 +341,26 @@ const StopButton = styled(Button)`
 
 const RunHeader = styled('div')`
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-    color: ${({ theme }) => theme.color['green-100'].hex};
     display: flex;
-    font-size: 1.25rem;
     justify-content: space-between;
     padding: ${({ theme }) => theme.spacing(3)};
+`;
+
+const RunHeaderName = styled('div')`
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: ${({ theme }) => theme.color['green-100'].hex};
+    font-size: 1.25rem;
+`;
+
+const RunHeaderExpandButton = styled(Button)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+
+    @container run-status (width < 1000px) {
+        display: none;
+    }
 `;
 
 const ExperimentCount = styled('div')`

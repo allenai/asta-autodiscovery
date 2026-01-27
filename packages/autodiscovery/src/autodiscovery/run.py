@@ -1,6 +1,9 @@
+import math
 import os
 import json
+import threading
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import time
 
 from autodiscovery.agents import get_agents
@@ -14,30 +17,17 @@ from datetime import datetime
 import shutil
 
 from autodiscovery.args import ArgParser
-from autodiscovery.mcts_utils import load_mcts_from_json, save_nodes, get_msgs_from_latest_query, setup_group_chat, \
-    print_node_info, get_self_value, get_context_string
-
-
-def select_node(selection_method, root, nodes_by_level, n_warmstart=0):
-    """
-    Select the next node to expand in MCTS using the provided selection method.
-
-    Args:
-        selection_method: Function to select nodes in MCTS.
-        root: Root MCTSNode to select from.
-        nodes_by_level: Dictionary of nodes by level.
-        n_warmstart: Number of warmstart experiments to run after data loading but before MCTS selection.
-
-    Returns:
-        Selected MCTSNode for expansion.
-    """
-    n_children_at_data_loader = len(nodes_by_level[2])
-
-    # If there are warmstart experiments left to run, select the data loader node to execute the next experiment.
-    if len(nodes_by_level[1]) > 0 and (n_warmstart - n_children_at_data_loader) > 0:
-        return nodes_by_level[1][0]
-
-    return selection_method(root, nodes_by_level)
+from autodiscovery.mcts_utils import (
+    load_mcts_from_json,
+    save_nodes,
+    get_msgs_from_latest_query,
+    setup_group_chat,
+    print_node_info,
+    get_self_value,
+    get_context_string,
+    select_nodes,
+    save_mcts_node,
+)
 
 
 def compute_and_store_reward(node, belief_model_name, belief_temperature, reasoning_effort,
@@ -201,6 +191,8 @@ def run_mcts(
         use_modal_sandbox=False,
         bucket_path=None,
         vision_model="gpt-4o",
+        batch_size=1,
+        n_threads=1,
 ):
     """
     Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
@@ -240,6 +232,8 @@ def run_mcts(
         use_modal_sandbox: Whether to use ModalSandboxIPythonBackend for code execution.
         bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-gcp-project/discoverybench/).
         vision_model: Model used for image analysis in code execution.
+        batch_size: Number of nodes to select and expand per iteration.
+        n_threads: Number of threads to use for parallel node expansion.
     """
     def _get_executor_rich_outputs(code_executor_agent) -> list:
         """Return the most recent rich outputs from the code executor, if available."""
@@ -270,18 +264,22 @@ def run_mcts(
         for dataset_fpath in dataset_paths:
             shutil.copy(dataset_fpath, work_dir)
 
-    # Get agents
-    agent_objs = get_agents(work_dir, model_name=model_name, temperature=temperature,
-                            reasoning_effort=reasoning_effort, branching_factor=branching_factor,
-                            user_query=user_query, experiment_first=experiment_first, code_timeout=code_timeout,
-                            use_modal_sandbox=use_modal_sandbox, bucket_path=bucket_path, dataset_paths=dataset_paths,
-                            vision_model=vision_model)
-    user_proxy = agent_objs["user_proxy"]
-    experiment_generator = agent_objs["experiment_generator"]
-    code_executor_agent = agent_objs["code_executor"]
-
-    # Set up the group chat
-    groupchat, chat_manager = setup_group_chat(agent_objs, max_rounds)
+    base_agent_objs = None
+    if n_threads <= 1:
+        base_agent_objs = get_agents(
+            work_dir,
+            model_name=model_name,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+            branching_factor=branching_factor,
+            user_query=user_query,
+            experiment_first=experiment_first,
+            code_timeout=code_timeout,
+            use_modal_sandbox=use_modal_sandbox,
+            bucket_path=bucket_path,
+            dataset_paths=dataset_paths,
+            vision_model=vision_model,
+        )
 
     if selection_method is None:
         # Default selection method is UCB1
@@ -303,64 +301,160 @@ def run_mcts(
     # TEMPORARY LOGGING
     TEMP_LOG = []
 
+    total_to_sample = max_iterations
+    n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
+    warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
+    remaining_after_warmstart = max(
+        0, total_to_sample - n_root_iteration - warmstart_remaining
+    )
+    n_iterations = (
+        n_root_iteration
+        + math.ceil(warmstart_remaining / batch_size)
+        + math.ceil(remaining_after_warmstart / batch_size)
+    )
+    n_sampled = 0
+
     try:
-        for iteration_idx in range(max_iterations):
+        for iteration_idx in range(n_iterations):
             # MCTS SELECTION, EXPANSION, and EXECUTION
-            print(f"\n\n######### ITERATION {iteration_idx + 1} / {max_iterations} #########\n")
+            print(f"\n\n######### ITERATION {iteration_idx + 1} / {n_iterations} #########\n")
 
-            # Select the next node to expand
-            node = select_node(selection_method, root, nodes_by_level, n_warmstart)
-            # Fetch or generate the next experiment from the selected node (retries built in)
-            new_experiment, new_query = node.get_next_experiment(experiment_generator=experiment_generator)
+            next_nodes = select_nodes(
+                selection_method,
+                root,
+                nodes_by_level,
+                n_warmstart,
+                return_n=batch_size,
+            )[: total_to_sample - n_sampled]
+            if not next_nodes:
+                break
+            print(
+                "SAMPLED "
+                f"{len(next_nodes)} NODE(S) FOR EXPANSION: "
+                f"{[f'{node.level}_{node.node_idx}' for node in next_nodes]}\n"
+            )
+            n_sampled += len(next_nodes)
 
-            if new_query is not None:
+            def _expand_node(
+                inbatch_idx,
+                node,
+                agent_objs,
+                logger_obj,
+                get_node_idx,
+                update_mcts_lock=None,
+                is_threaded=False,
+            ):
+                print(
+                    f"({inbatch_idx + 1}/{len(next_nodes)}): "
+                    f"EXPANDING NODE {node.level}_{node.node_idx}\n"
+                    "==========================\n"
+                )
+
+                experiment_generator = agent_objs["experiment_generator"]
+                user_proxy_local = agent_objs["user_proxy"]
+
+                # Fetch or generate the next experiment from the selected node (retries built in)
+                new_experiment, new_query = node.get_next_experiment(
+                    experiment_generator=experiment_generator
+                )
+
+                if new_query is None:
+                    print(
+                        f"No new experiment generated for node {node.level}_{node.node_idx}. "
+                        "Skipping this iteration."
+                    )
+                    return None
+
                 # Create a new node for the next experiment
                 new_level = node.level + 1
-                new_node_idx = len(nodes_by_level[new_level])
-                node = MCTSNode(level=new_level, node_idx=new_node_idx, hypothesis=new_experiment["hypothesis"],
-                                experiment_plan=new_experiment["experiment_plan"], query=new_query, parent=node,
-                                allow_generate_experiments=allow_generate_experiments and new_level > 0,
-                                untried_experiments=_warmstart_experiments if new_level == 1 else None)
+                new_node_idx = get_node_idx(new_level)
+                node = MCTSNode(
+                    level=new_level,
+                    node_idx=new_node_idx,
+                    hypothesis=new_experiment["hypothesis"],
+                    experiment_plan=new_experiment["experiment_plan"],
+                    query=new_query,
+                    parent=node,
+                    allow_generate_experiments=allow_generate_experiments and new_level > 0,
+                    untried_experiments=_warmstart_experiments if new_level == 1 else None,
+                )
+
                 # Update logger state
-                logger.level = node.level
-                logger.node_idx = node.node_idx
+                logger_obj.level = node.level
+                logger_obj.node_idx = node.node_idx
 
                 # Load previous explorations (make sure the root is always included)
                 node_context = []
                 if node.level > 1:
                     node_context = [root.children[0].get_context(include_code_output=True)] + node.get_path_context(
-                        k=k_parents - 1, skip_root=True)
+                        k=k_parents - 1, skip_root=True
+                    )
                 node_messages = []
                 if node_context is not None:
                     node_messages += [
-                        {"name": "user_proxy", "role": "user", "content": "PREVIOUS EXPLORATION:\n\n" + n} for n in
-                        node_context]
+                        {"name": "user_proxy", "role": "user", "content": "PREVIOUS EXPLORATION:\n\n" + n}
+                        for n in node_context
+                    ]
                 node_messages += [
-                    {"name": "user_proxy", "role": "user", "content": node.query}]
+                    {
+                        "name": "user_proxy",
+                        "role": "user",
+                        "content": node.query
+                        + (
+                            "\n\nNote for the programmer: Dataset files are present one level above the current "
+                            "working directory."
+                            if is_threaded
+                            else ""
+                        ),
+                    }
+                ]
+
+                # Set up the group chat
+                groupchat, chat_manager = setup_group_chat(agent_objs, max_rounds)
                 _, last_message = chat_manager.resume(messages=node_messages)
 
                 # Track time per node
                 _node_start_time = time()
 
                 # Execute current experiment and generate new experiments
-                user_proxy.initiate_chat(recipient=chat_manager, message=last_message, clear_history=False)
+                user_proxy_local.initiate_chat(
+                    recipient=chat_manager, message=last_message, clear_history=False
+                )
 
                 # Store the raw message logs for the node
-                logger.log_node(node.level, node.node_idx, chat_manager.messages_to_string(groupchat.messages))
+                logger_obj.log_node(
+                    node.level, node.node_idx, chat_manager.messages_to_string(groupchat.messages)
+                )
 
                 # Get messages starting from the current query and update the node
                 node.messages = get_msgs_from_latest_query(groupchat.messages)
                 node.read_experiment_from_messages(
-                    store_new_experiments=False if node.level == 1 and _warmstart_experiments is not None else True)
-                rich_outputs = _get_executor_rich_outputs(code_executor_agent)
+                    store_new_experiments=False
+                    if node.level == 1 and _warmstart_experiments is not None
+                    else True
+                )
+                rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
                 _write_rich_outputs(node.level, node.node_idx, rich_outputs)
+
                 # Calculate beliefs and rewards
                 if node.success and node.level > 1:
-                    compute_and_store_reward(node, belief_model_name, belief_temperature, reasoning_effort,
-                                             n_belief_samples, implicit_bayes_posterior, surprisal_width, belief_mode,
-                                             use_binary_reward, all_surprisals, use_online_beliefs=use_online_beliefs,
-                                             evidence_weight=evidence_weight, kl_scale=kl_scale,
-                                             reward_mode=reward_mode, TEMP_LOG=TEMP_LOG)
+                    compute_and_store_reward(
+                        node,
+                        belief_model_name,
+                        belief_temperature,
+                        reasoning_effort,
+                        n_belief_samples,
+                        implicit_bayes_posterior,
+                        surprisal_width,
+                        belief_mode,
+                        use_binary_reward,
+                        all_surprisals,
+                        use_online_beliefs=use_online_beliefs,
+                        evidence_weight=evidence_weight,
+                        kl_scale=kl_scale,
+                        reward_mode=reward_mode,
+                        TEMP_LOG=TEMP_LOG,
+                    )
 
                     if node.success:  # i.e., reward was computed successfully
                         # Print debug information
@@ -377,19 +471,120 @@ def run_mcts(
                 _node_end_time = time()
                 node.time_elapsed = round(_node_end_time - _node_start_time, 2)
 
-                # Add the new node to the nodes_by_level dictionary
-                nodes_by_level[node.level].append(node)
+                def _backprop_and_save():
+                    # MCTS BACKPROPAGATION
+                    node.update_counts(visits=1, reward=node.self_value)
+                    # Save the new node and its parents' updated counts to JSON files
+                    save_mcts_node(node, log_dirname, to_root=True)
 
-                # MCTS BACKPROPAGATION
-                node.update_counts(visits=1, reward=node.self_value)
+                if update_mcts_lock is not None:
+                    with update_mcts_lock:
+                        _backprop_and_save()
+                else:
+                    _backprop_and_save()
 
-                # Save the current state of the node
-                node_file = os.path.join(log_dirname, f"mcts_{node.id}.json")
-                with open(node_file, "w") as f:
-                    json.dump(node.to_dict(), f, indent=2)
+                return node
+
+            if n_threads > 1 and len(next_nodes) > 1:
+                # Parallel expansion of nodes
+                index_lock = threading.Lock()
+                update_mcts_lock = threading.Lock()
+                next_node_idx_by_level = defaultdict(
+                    int, {level: len(nodes) for level, nodes in nodes_by_level.items()}
+                )
+                thread_local = threading.local()
+
+                def _get_node_idx(new_level):
+                    with index_lock:
+                        new_node_idx = next_node_idx_by_level[new_level]
+                        next_node_idx_by_level[new_level] += 1
+                    return new_node_idx
+
+                def _get_thread_agents():
+                    if not hasattr(thread_local, "agent_objs"):
+                        thread_id = threading.get_ident()
+                        thread_work_dir = os.path.join(work_dir, f"thread_{thread_id}")
+                        os.makedirs(thread_work_dir, exist_ok=True)
+                        thread_local.agent_objs = get_agents(
+                            thread_work_dir,
+                            model_name=model_name,
+                            temperature=temperature,
+                            reasoning_effort=reasoning_effort,
+                            branching_factor=branching_factor,
+                            user_query=user_query,
+                            experiment_first=experiment_first,
+                            code_timeout=code_timeout,
+                            use_modal_sandbox=use_modal_sandbox,
+                            bucket_path=bucket_path,
+                            dataset_paths=dataset_paths,
+                            vision_model=vision_model,
+                        )
+                    return thread_local.agent_objs
+
+                def _expand_node_parallel(inbatch_idx, node):
+                    return _expand_node(
+                        inbatch_idx,
+                        node,
+                        _get_thread_agents(),
+                        TreeLogger(log_dirname),
+                        _get_node_idx,
+                        update_mcts_lock=update_mcts_lock,
+                        is_threaded=True,
+                    )
+
+                expanded_nodes = []
+                with ThreadPoolExecutor(max_workers=n_threads) as executor:
+                    futures = [
+                        executor.submit(_expand_node_parallel, inbatch_idx, node)
+                        for inbatch_idx, node in enumerate(next_nodes)
+                    ]
+                    for future in as_completed(futures):
+                        result = future.result()
+                        if result is not None:
+                            expanded_nodes.append(result)
             else:
-                # No new experiment was generated; don't change the state of the tree and sample again
-                print(f"No new experiment generated for node {node.level}_{node.node_idx}. Skipping this iteration.")
+                # Sequential expansion of nodes
+                if base_agent_objs is None:
+                    base_agent_objs = get_agents(
+                        work_dir,
+                        model_name=model_name,
+                        temperature=temperature,
+                        reasoning_effort=reasoning_effort,
+                        branching_factor=branching_factor,
+                        user_query=user_query,
+                        experiment_first=experiment_first,
+                        code_timeout=code_timeout,
+                        use_modal_sandbox=use_modal_sandbox,
+                        bucket_path=bucket_path,
+                        dataset_paths=dataset_paths,
+                        vision_model=vision_model,
+                    )
+
+                next_node_idx_by_level = defaultdict(
+                    int, {level: len(nodes) for level, nodes in nodes_by_level.items()}
+                )
+
+                def _get_node_idx(new_level):
+                    new_node_idx = next_node_idx_by_level[new_level]
+                    next_node_idx_by_level[new_level] += 1
+                    return new_node_idx
+
+                expanded_nodes = []
+                for inbatch_idx, node in enumerate(next_nodes):
+                    new_node = _expand_node(
+                        inbatch_idx,
+                        node,
+                        base_agent_objs,
+                        logger,
+                        _get_node_idx,
+                    )
+                    if new_node is not None:
+                        expanded_nodes.append(new_node)
+
+            # Add expanded nodes to the tree
+            expanded_nodes.sort(key=lambda n: (n.level, n.node_idx))
+            for node in expanded_nodes:
+                nodes_by_level[node.level].append(node)
     except KeyboardInterrupt:
         print("\n\n######### EXPLORATION INTERRUPTED! SAVING THE CURRENT STATE... #########\n\n")
 
@@ -537,6 +732,8 @@ if __name__ == "__main__":
         use_modal_sandbox=args.use_modal_sandbox,
         bucket_path=args.bucket_path,
         vision_model=args.vision_model,
+        batch_size=args.batch_size,
+        n_threads=args.n_threads,
     )
 
     if args.delete_work_dir:

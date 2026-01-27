@@ -8,7 +8,7 @@ import json
 import os
 import tempfile
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
@@ -19,7 +19,6 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
-    MetadataDatasetModel,
     MetadataModel,
     GetRunMetadataRequestModel,
     GetRunMetadataResponseModel,
@@ -33,6 +32,8 @@ from runs.models import (
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
     RunStatsModel,
+    GenerateUploadUrlRequestModel,
+    GenerateUploadUrlResponseModel,
 )
 
 # Import autodiscovery_jobs when available
@@ -51,6 +52,15 @@ except ImportError:
 
 # Trigger phrase in intent field that activates simulated run mode
 SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
+
+# Max size of files that can be uploaded
+UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB
+
+# Allowed file extensions for uploads
+UPLOAD_ALLOWED_EXTENSIONS = {'.csv', '.json', '.txt', '.tsv'}
+
+# Expiration time for presigned upload URLs
+UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 
 
 def create() -> Blueprint:
@@ -547,6 +557,86 @@ def create() -> Blueprint:
 
         except Exception as e:
             current_app.logger.error(f"Failed to upload dataset: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route("/<runid>/generate-upload-url", methods=["POST"])
+    @requires_enrollment
+    def generate_upload_url(runid: str):
+        """Generate a presigned URL for direct GCS upload.
+
+        This endpoint creates a signed URL that allows the browser to upload
+        files directly to GCS without routing through the Flask server.
+
+        Args:
+            runid: Run identifier (from URL path)
+
+        Request body:
+            filename: Name of file to upload
+            content_type: MIME type of file
+            file_size_bytes: Size of file in bytes
+
+        Returns:
+            JSON with upload_url, gcs_path, filename, and expires_at_unix (Unix timestamp)
+
+        Raises:
+            BadRequest: If required fields are missing or validation fails
+        """
+        userid = request.user.get("sub")
+        if not userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        data = request.get_json()
+        if not data:
+            raise BadRequest("No request body")
+
+        # Parse and validate request using Pydantic model
+        try:
+            req = GenerateUploadUrlRequestModel(runid=runid, userid=userid, **data)
+        except Exception as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        try:
+            # Validate file size
+            if req.file_size_bytes < 0:
+                return jsonify({"error": "Invalid file size."}), 400
+            if req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
+                return jsonify({"error": "File too large."}), 413
+
+            # Validate file extension
+            file_ext = Path(req.filename).suffix.lower()
+            if file_ext not in UPLOAD_ALLOWED_EXTENSIONS:
+                return jsonify({"error": f"File type not allowed: {file_ext}"}), 400
+
+            manager = get_job_manager()
+
+            # Generate presigned URL using gcs module
+            result = manager.generate_upload_url(
+                userid=req.userid,
+                jobid=req.runid,
+                filename=req.filename,
+                content_type=req.content_type,
+                expiration_seconds=UPLOAD_URL_EXPIRATION_SECONDS,
+            )
+
+            # Calculate expiration timestamp
+            expires_at = datetime.now(UTC) + timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS)
+            expires_at_unix = int(expires_at.timestamp())
+
+            # Return response using Pydantic model
+            resp = GenerateUploadUrlResponseModel(
+                upload_url=result["upload_url"],
+                filename=req.filename,
+                expires_at_unix=expires_at_unix,
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except JobNotFoundError as e:
+            return jsonify({"error": str(e)}), 404
+        except GCSError as e:
+            current_app.logger.error(f"Failed to generate upload URL: {e}")
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            current_app.logger.error(f"Failed to generate upload URL: {e}")
             return jsonify({"error": str(e)}), 500
 
     @api.route("/metadata", methods=["POST"])

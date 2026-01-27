@@ -285,6 +285,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // // Submit run
             await api.submitRun(runid, {
                 n_experiments: settings.nExperiments,
+                intent: settings.intent,
             });
 
             // Notify parent of success

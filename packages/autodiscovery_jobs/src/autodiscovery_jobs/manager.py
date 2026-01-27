@@ -192,6 +192,19 @@ class JobManager:
         """
         return gcs.upload_metadata(userid, jobid, metadata, self.config)
 
+    def upload_job_args(self, userid: str, jobid: str, args: dict[str, Any]) -> str:
+        """Upload job arguments to output directory.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            args: Arguments dictionary
+
+        Returns:
+            GCS path to saved args file
+        """
+        return gcs.upload_job_args(userid, jobid, args, self.config)
+
     def get_metadata(self, userid: str, jobid: str) -> dict[str, Any]:
         """Download metadata from job directory.
 
@@ -203,6 +216,18 @@ class JobManager:
         """
         return gcs.get_metadata(userid, jobid, self.config)
 
+    def get_job_args(self, userid: str, jobid: str) -> dict[str, Any] | None:
+        """Get job arguments from metadata.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+
+        Returns:
+            Dictionary of job arguments, or None if not found
+        """
+        return gcs.get_job_args(userid, jobid, self.config)
+        
     # Job execution
 
     def run_job(

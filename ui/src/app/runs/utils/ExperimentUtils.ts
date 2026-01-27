@@ -11,7 +11,11 @@ export const getPriorAndPosteriorLabel = (score: number | null): string => {
         return 'Maybe False';
     }
 
-    if (score >= 0.5 && score < 0.75) {
+    if (score === 0.5) {
+        return 'Uncertain';
+    }
+
+    if (score > 0.5 && score < 0.75) {
         return 'Maybe True';
     }
 
@@ -23,7 +27,7 @@ export const getPriorAndPosteriorLabel = (score: number | null): string => {
 };
 
 export const getSurprisalDirection = (surprise: number | null): string => {
-    if (surprise === null) {
+    if (surprise === null || surprise === 0) {
         return 'Neutral';
     }
     return surprise > 0 ? 'Positive' : 'Negative';

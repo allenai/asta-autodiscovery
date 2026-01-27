@@ -1,4 +1,4 @@
-import { ExperimentFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
+import { ExperimentFromApi, MetadataFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
 
 // Maps to values from _get_execution_phase() in cloudrun.py
 export enum RunStatus {
@@ -22,6 +22,7 @@ export type Run = {
     details: RunDetails | null;
     stats: RunStats | null;
     executionStatus?: Record<string, unknown> | null;
+    metadata: Metadata | null;
 };
 
 export type RunStats = {
@@ -62,9 +63,10 @@ export type MetadataDataset = {
 };
 
 export type Metadata = {
-    title: string;
+    name: string;
     description: string | null;
     datasets: MetadataDataset[];
+    domain?: string;
 };
 
 export const getRunFromApi = (runFromApi: RunFromApi): Run => {
@@ -76,6 +78,7 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         details: getRunDetailsFromApi(runFromApi.run_details),
         stats: getRunStatsFromApi(runFromApi.run_stats),
         executionStatus: runFromApi.execution_status || null,
+        metadata: getMetadataFromApi(runFromApi.run_metadata) || null,
     };
 };
 
@@ -130,10 +133,11 @@ export const getMetadataDatasetFromApi = (datasetFromApi: any): MetadataDataset 
     };
 };
 
-export const getMetadataFromApi = (metadataFromApi: any): Metadata => {
+export const getMetadataFromApi = (metadataFromApi: MetadataFromApi): Metadata => {
     return {
-        title: metadataFromApi.title,
+        name: metadataFromApi.name,
         description: metadataFromApi.description,
+        domain: metadataFromApi.domain || undefined,
         datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
     };
 };

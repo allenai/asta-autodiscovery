@@ -26,9 +26,9 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--continue_from_json', type=str,
                           help='Path to mcts_nodes.json file to continue exploration from')
         self.add_argument('--n_experiments', type=int, help='Number of MCTS iterations (max_iterations)', required=True)
-        self.add_argument('--batch_size', type=int, default=1,
+        self.add_argument('--batch_size', type=int, default=2,
                           help='Number of nodes to select for expansion in a single iteration')
-        self.add_argument('--n_threads', type=int, default=1,
+        self.add_argument('--n_threads', type=int, default=2,
                           help='Number of threads to use for parallel node expansion')
         self.add_argument('--k_experiments', type=int, default=8, help='Branching factor for experiments (>= 1)')
         self.add_argument('--allow_generate_experiments', action=argparse.BooleanOptionalAction, default=True,

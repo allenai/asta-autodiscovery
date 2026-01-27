@@ -275,12 +275,30 @@ class MCTSNode(object):
 
 
 def default_mcts_selection(exploration_weight):
-    def select(node, nodes_by_level):
-        # Traverse the tree until we find a node with untried experiments
-        while node.children and not node.has_untried_experiments():
-            # Select the child with the highest UCB1 value
-            node = max(node.children, key=lambda n: ucb1(n, exploration_weight))
-        return node
+    """Create a selection function that returns nodes with available experiments by UCB1 score.
+
+    Args:
+        exploration_weight: Exploration weight for UCB1 selection.
+
+    Returns:
+        Callable selection function.
+    """
+
+    def select(node, nodes_by_level, return_n=1):
+        return_nodes = []
+        queue = [node]
+
+        while len(return_nodes) < return_n and queue:
+            current_node = queue.pop(0)
+            if current_node.has_untried_experiments():
+                return_nodes.append(current_node)
+            if current_node.children:
+                sorted_children = sorted(
+                    current_node.children, key=lambda n: ucb1(n, exploration_weight), reverse=True
+                )
+                queue += sorted_children
+
+        return return_nodes
 
     return select
 
@@ -298,23 +316,28 @@ def progressive_widening(k, alpha, exploration_weight=1.0):
         A callable function that accepts a `node` and returns the selected node.
     """
 
-    def select(node, nodes_by_level):
-        # Get the number of visits and children for the current node
-        num_visits = node.visits
-        num_children = len(node.children)
+    def select(node, nodes_by_level, return_n=1):
+        return_nodes = []
+        queue = [node]
 
-        # Check if we can add a new child based on the progressive widening condition
-        if (num_children < k * (num_visits ** alpha)) and node.has_untried_experiments():
-            # Sample a new child (expand the tree)
-            return node
+        while len(return_nodes) < return_n and queue:
+            current_node = queue.pop(0)
+            num_visits = current_node.visits
+            num_children = len(current_node.children)
+            if (
+                num_children == 0 or num_children < k * (num_visits ** alpha)
+            ) and current_node.has_untried_experiments():
+                return_nodes.append(current_node)
+                if len(return_nodes) >= return_n:
+                    break
 
-        # Otherwise, recursively sample from the children
-        if node.children:
-            # Select a child node recursively using the same selection function
-            return select(max(node.children, key=lambda n: ucb1(n, exploration_weight)), nodes_by_level)
+            if current_node.children:
+                sorted_children = sorted(
+                    current_node.children, key=lambda n: ucb1(n, exploration_weight), reverse=True
+                )
+                queue += sorted_children
 
-        # If no children exist, return the current node
-        return node
+        return return_nodes
 
     return select
 
@@ -333,7 +356,8 @@ def progressive_widening_all(k, alpha, exploration_weight=1.0):
         A callable function that accepts a `node` and returns the selected node.
     """
 
-    def select(node, nodes_by_level):
+    def select(node, nodes_by_level, return_n=1):
+        return_nodes = []
         all_nodes = [n for level, nodes in nodes_by_level.items() if level > 0 for n in nodes]
         # Sort all nodes by UCB1 value
         all_nodes_sorted = sorted(all_nodes, key=lambda n: ucb1(n, exploration_weight), reverse=True)
@@ -342,12 +366,14 @@ def progressive_widening_all(k, alpha, exploration_weight=1.0):
             num_visits = _node.visits
             num_children = len(_node.children)
             # If we can add a new child based on the progressive widening condition
-            if (num_children < k * (num_visits ** alpha)) and _node.has_untried_experiments():
-                # Sample a new child (expand the tree)
-                return _node
+            if (
+                num_children == 0 or num_children < k * (num_visits ** alpha)
+            ) and _node.has_untried_experiments():
+                return_nodes.append(_node)
+                if len(return_nodes) >= return_n:
+                    break
 
-        # If no children exist, return the current node
-        return node
+        return return_nodes
 
     return select
 
@@ -363,16 +389,24 @@ def ucb1_recursive(exploration_weight=1.0):
         A callable function that accepts a `node` and returns the selected node.
     """
 
-    def select(node, nodes_by_level):
+    def select(node, nodes_by_level, return_n=1):
         # Sort self and children by UCB1 value
         all_nodes = [node] + node.children
         sorted_nodes = sorted(all_nodes, key=lambda n: ucb1(n, exploration_weight), reverse=True)
 
+        return_nodes = []
         for best_node in sorted_nodes:
+            if len(return_nodes) >= return_n:
+                break
             if best_node.has_untried_experiments():
                 if best_node is node:
-                    return best_node
-                return select(best_node, nodes_by_level)
+                    return_nodes.append(best_node)
+                else:
+                    return_nodes.extend(
+                        select(best_node, nodes_by_level, return_n=return_n - len(return_nodes))
+                    )
+
+        return return_nodes
 
     return select
 
@@ -386,44 +420,48 @@ def beam_search(branching_factor, beam_width, log_dirname=None):
         beam_width: Number of nodes to keep in beam
 
     Returns:
-        A callable function that accepts a root node and returns selected node
+        A callable function that accepts a root node and returns selected nodes.
     """
-    beam = []  # Current nodes in beam
+    def select(root, nodes_by_level, return_n=1):
+        return_nodes = []
+        beam = [root]
 
-    def select(root, nodes_by_level):
-        nonlocal beam
+        while beam and len(return_nodes) < return_n:
+            for node in beam:
+                if node.has_untried_experiments() and len(node.children) < branching_factor:
+                    return_nodes.append(node)
+                    if len(return_nodes) >= return_n:
+                        break
+            if len(return_nodes) >= return_n:
+                break
 
-        # Initialize beam with root if empty
-        if not beam:
-            beam = [root]
-            # Log initial beam state
-            if log_dirname:
-                beam_state = [{"level": node.level, "node_idx": node.node_idx} for node in beam]
-                with open(os.path.join(log_dirname, f"beam_level_{root.level}.json"), "w") as f:
-                    json.dump(beam_state, f, indent=2)
+            candidates = []
+            for node in beam:
+                children = node.children
+                if not children:
+                    continue
+                if len(children) > branching_factor:
+                    candidates.extend(
+                        sorted(children, key=lambda n: ucb1(n), reverse=True)[:branching_factor]
+                    )
+                else:
+                    candidates.extend(children)
 
-        # Try nodes in current beam
-        for node in beam:
-            if node.has_untried_experiments() and len(node.children) < branching_factor:
-                return node
+            if not candidates:
+                break
 
-        # All nodes in beam are exhausted, select new beam
-        all_children = []
-        for node in beam:
-            all_children.extend(node.children)
+            if len(candidates) > beam_width:
+                beam = sorted(candidates, key=lambda n: ucb1(n), reverse=True)[:beam_width]
+            else:
+                beam = candidates
 
-        # Sort children by UCB1 score and select top beam_width
-        if all_children:
-            beam = sorted(all_children, key=lambda n: ucb1(n), reverse=True)[:beam_width]
-            # Log new beam state
-            if log_dirname:
-                beam_state = [{"level": node.level, "node_idx": node.node_idx} for node in beam]
-                level = beam[0].level if beam else 0
-                with open(os.path.join(log_dirname, f"beam_level_{level}.json"), "w") as f:
-                    json.dump(beam_state, f, indent=2)
-            return select(root, nodes_by_level)  # Recurse with new beam
+        if log_dirname:
+            beam_state = [{"level": node.level, "node_idx": node.node_idx} for node in beam]
+            level = beam[0].level if beam else 0
+            with open(os.path.join(log_dirname, f"beam_level_{level}.json"), "w") as f:
+                json.dump(beam_state, f, indent=2)
 
-        return beam[0]  # Default to first beam node if no children
+        return return_nodes
 
     return select
 

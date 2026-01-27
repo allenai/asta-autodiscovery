@@ -576,7 +576,7 @@ def create() -> Blueprint:
             file_size_bytes: Size of file in bytes
 
         Returns:
-            JSON with upload_url, gcs_path, filename, and expiration time
+            JSON with upload_url, gcs_path, filename, and expires_at_unix (Unix timestamp)
 
         Raises:
             BadRequest: If required fields are missing or validation fails
@@ -617,12 +617,17 @@ def create() -> Blueprint:
                 expiration_seconds=UPLOAD_URL_EXPIRATION_SECONDS,
             )
 
+            # Calculate expiration timestamp
+            from datetime import timedelta
+            expires_at = datetime.now(UTC) + timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS)
+            expires_at_unix = int(expires_at.timestamp())
+
             # Return response using Pydantic model
             resp = GenerateUploadUrlResponseModel(
                 upload_url=result["upload_url"],
                 gcs_path=result["gcs_path"],
                 filename=req.filename,
-                expires_in=UPLOAD_URL_EXPIRATION_SECONDS,
+                expires_at_unix=expires_at_unix,
             )
             return jsonify(resp.model_dump()), 200
 

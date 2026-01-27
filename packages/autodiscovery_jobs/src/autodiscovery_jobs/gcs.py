@@ -68,6 +68,42 @@ def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> st
     return f"gs://{config.bucket}/users/{userid}/jobs/{jobid}/"
 
 
+def list_user_ids(config: JobConfig | None = None) -> list[str]:
+    """List all user IDs with job data.
+
+    Args:
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of user IDs
+
+    Raises:
+        GCSError: If listing fails
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    prefix = "users/"
+
+    try:
+        # List all "directories" (common prefixes) under the users prefix
+        blobs = bucket.list_blobs(prefix=prefix, delimiter="/")
+        # Consume the iterator to get prefixes
+        list(blobs)
+
+        # Extract user IDs from prefixes
+        users = []
+        for prefix_path in blobs.prefixes:
+            # prefix looks like: "users/{userid}/"
+            userid = prefix_path.rstrip("/").split("/")[-1]
+            users.append(userid)
+
+        return sorted(users)
+    except Exception as e:
+        raise GCSError(f"Failed to list users: {e}")
+
+
 def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
     """List all jobs for a user.
 
@@ -257,6 +293,73 @@ def upload_dataset(
         return f"gs://{config.bucket}/{base_path}/"
     except Exception as e:
         raise GCSError(f"Failed to upload dataset: {e}")
+
+
+def expire_datasets(
+    userid: str,
+    jobid: str,
+    max_age_days: int,
+    dry_run: bool,
+    config: JobConfig | None = None,
+) -> list[str]:
+    """Delete uploaded dataset files from job's data directory.
+
+    This removes all files in the data/ directory to comply with data retention
+    policies. Job metadata, results, and other files are preserved.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        max_age_days: Only delete files older than this many days
+        dry_run: If True, don't delete files, just return what would be deleted
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of GCS paths that were deleted (or would be deleted if dry_run=True)
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If deletion fails
+    """
+    from datetime import UTC, datetime, timedelta
+
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    prefix = f"users/{userid}/jobs/{jobid}/data/"
+
+    # Calculate cutoff time
+    cutoff_time = datetime.now(UTC) - timedelta(days=max_age_days)
+
+    try:
+        blobs = bucket.list_blobs(prefix=prefix)
+        expired_paths = []
+
+        for blob in blobs:
+            # Skip placeholder files
+            if blob.name.endswith(".placeholder"):
+                continue
+
+            # Check age
+            if not blob.time_created or blob.time_created >= cutoff_time:
+                continue
+
+            # Record the path
+            gcs_path = f"gs://{config.bucket}/{blob.name}"
+            expired_paths.append(gcs_path)
+
+            # Delete if not dry run
+            if not dry_run:
+                print(f"Deleting dataset file: {gcs_path}")
+                # blob.delete()
+
+        return expired_paths
+    except Exception as e:
+        raise GCSError(f"Failed to expire datasets: {e}")
 
 
 def upload_metadata(

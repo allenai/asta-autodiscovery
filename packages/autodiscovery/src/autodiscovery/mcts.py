@@ -60,6 +60,7 @@ class MCTSNode(object):
         self.prior = None
         self.posterior = None
         self.belief_change: Optional[float] = None  # Change in belief from prior to posterior
+        self.normalized_surprisal: Optional[float] = None
         self.kl_divergence: Optional[float] = None
 
     def init_from_dict(self, data):
@@ -113,6 +114,9 @@ class MCTSNode(object):
             belief_cls = BELIEF_MODE_TO_CLS[data['posterior']['_type']]
             self.posterior = belief_cls.DistributionFormat(**data['posterior'])
         self.belief_change = data.get('belief_change', self.belief_change)
+        self.normalized_surprisal = data.get(
+            'normalized_surprisal', self.normalized_surprisal
+        )
         self.kl_divergence = data.get('kl_divergence', self.kl_divergence)
 
     def get_next_experiment(self, experiment_generator=None, n_retry=3):
@@ -169,6 +173,7 @@ class MCTSNode(object):
             "self_value": self.self_value,
             "surprising": self.surprising,
             "belief_change": self.belief_change,
+            "normalized_surprisal": self.normalized_surprisal,
             "kl_divergence": self.kl_divergence,
             "prior": self.prior.to_dict() if self.prior else None,
             "posterior": self.posterior.to_dict() if self.posterior else None,

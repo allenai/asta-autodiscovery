@@ -9,9 +9,10 @@ import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { Experiment, Run, getRunFromApi } from '@/types/Run';
-import { RunExperiments } from '@/runs/components/RunExperiments';
+import { Run, getRunFromApi } from '@/types/Run';
+import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from './ExperimentDetails';
+import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
 
 interface RunStatusProps {
     runid: string;
@@ -34,7 +35,6 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     const [loading, setLoading] = useState(true);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
 
     const fetchStatus = async () => {
         setLoading(true);
@@ -69,14 +69,6 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
 
         return () => clearInterval(interval);
     }, [runid]);
-
-    const handleSelectExperiment = (experiment: Experiment) => {
-        setSelectedExperiment(experiment);
-    };
-
-    const handleCloseDetails = () => {
-        setSelectedExperiment(null);
-    };
 
     const handleStop = async () => {
         if (!confirm('Are you sure you want to stop this run?')) {
@@ -151,71 +143,105 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     }
 
     return (
-        <>
-            <ExperimentLayout $isDetailsOpen={!!selectedExperiment}>
-                <MainContent>
-                    <RunHeader>{run.name}</RunHeader>
+        <RunExperimentsProvider runid={runid} autoStart>
+            <RunStatusContent
+                run={run as Run & { details: NonNullable<Run['details']> }}
+                error={error}
+                canStop={canStop}
+                cancelling={cancelling}
+                handleStop={handleStop}
+                getStatusColor={getStatusColor}
+                experimentsLabel={experimentsLabel}
+            />
+        </RunExperimentsProvider>
+    );
+}
 
-                    <Box sx={{ padding: 3 }}>
-                        {error && <Alert severity="error">{error}</Alert>}
-                        <Chip
-                            label={run?.details.status.toUpperCase()}
-                            color={getStatusColor(run?.details.status)}
-                            size="medium"
-                        />
-                        {run?.details.statusCheckedAt && (
-                            <Box>
-                                <Typography variant="caption">
-                                    Last Checked:{' '}
-                                    {new Date(run?.details.statusCheckedAt).toLocaleString()}
-                                </Typography>
-                            </Box>
-                        )}
-                        {run?.stats && (
-                            <Box display="flex" gap={1.5}>
+interface RunStatusContentProps {
+    run: Run & { details: NonNullable<Run['details']> };
+    error: string | null;
+    canStop: boolean;
+    cancelling: boolean;
+    handleStop: () => void;
+    getStatusColor: (status: string) => any;
+    experimentsLabel: string;
+}
+
+function RunStatusContent({
+    run,
+    error,
+    canStop,
+    cancelling,
+    handleStop,
+    getStatusColor,
+    experimentsLabel,
+}: RunStatusContentProps) {
+    const { selectedExperiment, selectExperiment } = useRunExperiments();
+
+    return (
+        <ExperimentLayout $isDetailsOpen={!!selectedExperiment}>
+            <MainContent>
+                <RunHeader>{run.name}</RunHeader>
+
+                <Box sx={{ padding: 3 }}>
+                    {error && <Alert severity="error">{error}</Alert>}
+                    <Chip
+                        label={run.details.status.toUpperCase()}
+                        color={getStatusColor(run.details.status)}
+                        size="medium"
+                    />
+                    {run.details.statusCheckedAt && (
+                        <Box>
+                            <Typography variant="caption">
+                                Last Checked:{' '}
+                                {new Date(run.details.statusCheckedAt).toLocaleString()}
+                            </Typography>
+                        </Box>
+                    )}
+                    {run.stats && (
+                        <Box display="flex" gap={1.5}>
+                            <ExperimentCount>
+                                <ScienceOutlinedIcon />
+                                {run.stats.requestedExperiments} {experimentsLabel}
+                            </ExperimentCount>
+                            {!!run.stats.pendingExperiments && (
                                 <ExperimentCount>
-                                    <ScienceOutlinedIcon />
-                                    {run?.stats.requestedExperiments} {experimentsLabel}
+                                    <HourglassTopOutlinedIcon />
+                                    {run.stats.pendingExperiments} pending
                                 </ExperimentCount>
-                                {!!run?.stats.pendingExperiments && (
-                                    <ExperimentCount>
-                                        <HourglassTopOutlinedIcon />
-                                        {run?.stats.pendingExperiments} pending
-                                    </ExperimentCount>
-                                )}
-                            </Box>
-                        )}
-                        {canStop && (
-                            <StopButton
-                                variant="text"
-                                startIcon={
-                                    cancelling ? (
-                                        <CircularProgress size={16} />
-                                    ) : (
-                                        <StopCircleOutlinedIcon />
-                                    )
-                                }
-                                onClick={handleStop}
-                                disabled={cancelling}>
-                                {cancelling ? 'Stopping...' : 'Stop'}
-                            </StopButton>
-                        )}
-                        <RunExperiments runId={runid} onSelectExperiment={handleSelectExperiment} />
-                    </Box>
-                </MainContent>
+                            )}
+                        </Box>
+                    )}
+                    {canStop && (
+                        <StopButton
+                            variant="text"
+                            startIcon={
+                                cancelling ? (
+                                    <CircularProgress size={16} />
+                                ) : (
+                                    <StopCircleOutlinedIcon />
+                                )
+                            }
+                            onClick={handleStop}
+                            disabled={cancelling}>
+                            {cancelling ? 'Stopping...' : 'Stop'}
+                        </StopButton>
+                    )}
+                    <ExperimentsTable />
+                </Box>
+            </MainContent>
 
-                {!!selectedExperiment && (
-                    <DetailsWrapper>
-                        <>
-                            <CloseDetailButton onClick={handleCloseDetails} size="small">
-                                <CloseIcon />
-                            </CloseDetailButton>
-                            <ExperimentDetails experiment={selectedExperiment} />
-                        </>
-                    </DetailsWrapper>
-                )}
-            </ExperimentLayout>
-        </>
+            {!!selectedExperiment && (
+                <DetailsWrapper>
+                    <>
+                        <CloseDetailButton onClick={() => selectExperiment(null)} size="small">
+                            <CloseIcon />
+                        </CloseDetailButton>
+                        <ExperimentDetails experiment={selectedExperiment} />
+                    </>
+                </DetailsWrapper>
+            )}
+        </ExperimentLayout>
     );
 }
 

@@ -56,6 +56,18 @@ interface UploadDatasetResponseBody {
     message: string;
 }
 
+interface GenerateUploadUrlRequest {
+    filename: string;
+    content_type: string;
+    file_size_bytes: number;
+}
+
+interface GenerateUploadUrlResponse {
+    upload_url: string;
+    filename: string;
+    expires_at_unix: number;
+}
+
 export interface RunResponseBody extends RunFromApi {}
 
 export interface GetAllRunsResponseBody {
@@ -233,6 +245,14 @@ export class RunsApi extends BaseApi {
             url: `${RUNS_URL_PREFIX}/upload-dataset`,
             method: 'POST',
             body: formData,
+        });
+    }
+
+    async generateUploadUrl(runId: string, params: GenerateUploadUrlRequest) {
+        return this.request<GenerateUploadUrlResponse>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/generate-upload-url`,
+            method: 'POST',
+            body: params,
         });
     }
 

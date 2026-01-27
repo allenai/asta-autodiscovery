@@ -50,19 +50,13 @@ export interface RunFromApi {
     run_args?: RunArgsFromApi;
 }
 
-interface UploadDatasetResponseBody {
+export interface UploadDatasetResponseBody {
     path: string;
     filename: string;
     message: string;
 }
 
-interface GenerateUploadUrlRequest {
-    filename: string;
-    content_type: string;
-    file_size_bytes: number;
-}
-
-interface GenerateUploadUrlResponse {
+export interface GenerateUploadUrlResponseBody {
     upload_url: string;
     filename: string;
     expires_at_unix: number;
@@ -248,11 +242,25 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async generateUploadUrl(runId: string, params: GenerateUploadUrlRequest) {
-        return this.request<GenerateUploadUrlResponse>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/generate-upload-url`,
+    async generateUploadUrl({
+        runid,
+        filename,
+        contentType,
+        fileSizeBytes,
+    }: {
+        runid: string;
+        filename: string;
+        contentType: string;
+        fileSizeBytes: number;
+    }) {
+        return this.request<GenerateUploadUrlResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/generate-upload-url`,
             method: 'POST',
-            body: params,
+            body: {
+                filename,
+                content_type: contentType,
+                file_size_bytes: fileSizeBytes,
+            },
         });
     }
 

@@ -8,7 +8,8 @@ import json
 import os
 import tempfile
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
@@ -591,7 +592,7 @@ def create() -> Blueprint:
 
         # Parse and validate request using Pydantic model
         try:
-            req = GenerateUploadUrlRequestModel(**data)
+            req = GenerateUploadUrlRequestModel(runid=runid, userid=userid, **data)
         except Exception as e:
             raise BadRequest(f"Invalid request body: {e}")
 
@@ -611,22 +612,20 @@ def create() -> Blueprint:
 
             # Generate presigned URL using gcs module
             result = manager.generate_upload_url(
-                userid=userid,
-                jobid=runid,
+                userid=req.userid,
+                jobid=req.runid,
                 filename=req.filename,
-                content_type=req.content_type or "application/octet-stream",
+                content_type=req.content_type,
                 expiration_seconds=UPLOAD_URL_EXPIRATION_SECONDS,
             )
 
             # Calculate expiration timestamp
-            from datetime import timedelta
             expires_at = datetime.now(UTC) + timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS)
             expires_at_unix = int(expires_at.timestamp())
 
             # Return response using Pydantic model
             resp = GenerateUploadUrlResponseModel(
                 upload_url=result["upload_url"],
-                gcs_path=result["gcs_path"],
                 filename=req.filename,
                 expires_at_unix=expires_at_unix,
             )

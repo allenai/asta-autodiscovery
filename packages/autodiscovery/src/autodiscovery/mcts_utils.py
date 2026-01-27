@@ -216,6 +216,62 @@ def setup_group_chat(agents, max_rounds):
     return group_chat, chat_manager
 
 
+def select_nodes(selection_method, root, nodes_by_level, n_warmstart=0, return_n=1):
+    """Select the next nodes to expand in MCTS using the provided selection method.
+
+    Args:
+        selection_method: Function to select nodes in MCTS.
+        root: Root MCTSNode to select from.
+        nodes_by_level: Dictionary of nodes by level.
+        n_warmstart: Number of warmstart experiments to run after data loading but before MCTS selection.
+        return_n: Number of nodes to return.
+
+    Returns:
+        List of selected MCTSNode instances for expansion.
+    """
+    # If the data loader node hasn't been executed, return the root. This is not run in batch mode.
+    if len(nodes_by_level[1]) == 0:
+        return [root]
+
+    # If there are warmstart experiments left to run, select the data loader node.
+    n_children_at_data_loader = len(nodes_by_level[2])
+    if (n_warmstart - n_children_at_data_loader) > 0:
+        return [nodes_by_level[1][0]] * min(
+            return_n, n_warmstart - n_children_at_data_loader
+        )
+
+    # Otherwise, use the selection policy to select the next nodes.
+    try:
+        selected = selection_method(root, nodes_by_level, return_n=return_n)
+    except TypeError:
+        selected = selection_method(root, nodes_by_level)
+    return_nodes = selected if isinstance(selected, list) else [selected]
+    # Repeat return_nodes sequentially if needed to fill the batch
+    return_nodes = (
+        return_nodes * (return_n // len(return_nodes))
+        + return_nodes[: return_n % len(return_nodes)]
+    )
+    return return_nodes
+
+
+def save_mcts_node(node, log_dirname, to_root=False, root_id="node_1_0"):
+    """Save an MCTS node to JSON and optionally persist parent updates.
+
+    Args:
+        node: MCTSNode to save.
+        log_dirname: Directory to save node JSON files.
+        to_root: Whether to recursively save parent nodes up to the root.
+        root_id: Root node id used to stop recursion.
+    """
+    if node is None:
+        return
+    node_file = os.path.join(log_dirname, f"mcts_{node.id}.json")
+    with open(node_file, "w") as f:
+        json.dump(node.to_dict(), f, indent=2)
+    if to_root and node.id != root_id:
+        save_mcts_node(node.parent, log_dirname, to_root=to_root, root_id=root_id)
+
+
 def get_nodes(in_fpath_or_json: str | List[Dict[str, any]]) -> List[Dict[str, any]] | None:
     """
     Load MCTS nodes from a file, directory, or a list of dictionaries without creating class objects.

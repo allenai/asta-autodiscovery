@@ -63,6 +63,7 @@ class MetadataModel(BaseModel):
 
     name: str | None = Field(None, description="Name of the run")
     description: str | None = Field(None, description="Description of the run")
+    domain: str | None = Field(None, description="Domain of the run")
     datasets: list[MetadataDatasetModel] | None = Field(
         None, description="List of datasets associated with the run"
     )
@@ -81,6 +82,7 @@ class MetadataModel(BaseModel):
         return MetadataModel(
             name=data.get("name"),
             description=data.get("description"),
+            domain=data.get("domain"),
             datasets=datasets,
         )
 

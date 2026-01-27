@@ -694,3 +694,72 @@ def read_experiment_node(
 
         logging.error(f"Failed to read experiment node {filename} for job {jobid}: {e}")
         return None
+
+
+def generate_upload_url(
+    userid: str,
+    jobid: str,
+    filename: str,
+    content_type: str = "application/octet-stream",
+    expiration_seconds: int = 3600,  # 1 hour default
+    config: JobConfig | None = None,
+) -> dict[str, str]:
+    """Generate a presigned URL for direct upload to GCS.
+
+    Creates a signed URL that allows clients to upload files directly to GCS
+    without routing through the application server.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        filename: Name of file to upload
+        content_type: MIME type of the file
+        expiration_seconds: Number of seconds until URL expires (default: 3600 = 1 hour)
+        config: Configuration (uses default if None)
+
+    Returns:
+        Dictionary with 'upload_url' and 'gcs_path' keys
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If URL generation fails
+
+    Example:
+        >>> result = generate_upload_url("user123", "job456", "data.csv", "text/csv")
+        >>> result['upload_url']
+        'https://storage.googleapis.com/...'
+        >>> result['gcs_path']
+        'gs://example-gcp-project/users/user123/jobs/job456/data/data.csv'
+    """
+    from datetime import timedelta
+
+    config = config or JobConfig()
+
+    # Verify job exists
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    try:
+        client = storage.Client(project=config.project_id)
+        bucket = client.bucket(config.bucket)
+
+        # Construct blob path (matches existing pattern: users/{userid}/jobs/{jobid}/data/{filename})
+        blob_path = f"users/{userid}/jobs/{jobid}/data/{filename}"
+        blob = bucket.blob(blob_path)
+
+        # Generate signed URL for PUT operation
+        upload_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=expiration_seconds),
+            method="PUT",
+            content_type=content_type,
+        )
+
+        gcs_path = f"gs://{config.bucket}/{blob_path}"
+
+        return {
+            "upload_url": upload_url,
+            "gcs_path": gcs_path,
+        }
+    except Exception as e:
+        raise GCSError(f"Failed to generate upload URL: {e}")

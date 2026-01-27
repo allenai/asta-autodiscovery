@@ -597,9 +597,10 @@ def create() -> Blueprint:
 
         try:
             # Validate file size
-            if req.file_size_bytes and req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
-                max_gb = UPLOAD_MAX_FILE_SIZE_BYTES / (1024 * 1024 * 1024)
-                return jsonify({"error": f"File too large. Maximum size is {max_gb:.0f}GB"}), 400
+            if req.file_size_bytes < 0:
+                return jsonify({"error": "Invalid file size."}), 400
+            if req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
+                return jsonify({"error": "File too large."}), 413
 
             # Validate file extension
             file_ext = Path(req.filename).suffix.lower()

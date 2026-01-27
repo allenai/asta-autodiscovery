@@ -3,7 +3,7 @@
 from devtools.cloudrun import run_replay_job
 
 # Source path for simulated runs - template files to replay
-REPLAY_SOURCE_PATH = "gs://ai2-autodiscovery/users/test/jobs/melanoma/output"
+REPLAY_SOURCE_PATH = "gs://ai2-autodiscovery/users/reecea/jobs/nls_bmi-o4-mini/output"
 # REPLAY_SOURCE_PATH = "gs://ai2-autodiscovery/users/google-oauth2|111191403355692313475/jobs/39ca1146-a09b-45d1-966f-dfd503093e80/output"
 
 # Time scale for replay (0.1 = 10x faster than original)

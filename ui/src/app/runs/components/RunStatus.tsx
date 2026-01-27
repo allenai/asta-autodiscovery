@@ -319,6 +319,7 @@ const DetailsPanel = styled('div')`
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     padding: ${({ theme }) => theme.spacing(3)};
     position: relative;
+    overflow-y: scroll;
     z-index: 2;
 
     @container run-status (width < 1000px) {

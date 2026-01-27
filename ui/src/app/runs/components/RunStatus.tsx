@@ -215,7 +215,7 @@ function RunStatusContent({
                             <Box display="flex" gap={1.5}>
                                 <ExperimentCount>
                                     <ScienceOutlinedIcon />
-                                    {!!run.stats.requestedExperiments ? (
+                                    {run.stats.requestedExperiments ? (
                                         <>
                                             {run.stats.requestedExperiments} {experimentsLabel}
                                         </>

@@ -22,7 +22,7 @@ export type Run = {
     details: RunDetails | null;
     stats: RunStats | null;
     executionStatus?: Record<string, unknown> | null;
-    metadata: Metadata | null;
+    metadata?: Metadata | null;
 };
 
 export type RunStats = {
@@ -133,7 +133,11 @@ export const getMetadataDatasetFromApi = (datasetFromApi: any): MetadataDataset 
     };
 };
 
-export const getMetadataFromApi = (metadataFromApi: MetadataFromApi): Metadata => {
+export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata | null => {
+    if (!metadataFromApi) {
+        return null;
+    }
+
     return {
         name: metadataFromApi.name,
         description: metadataFromApi.description,

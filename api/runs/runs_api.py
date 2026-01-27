@@ -8,7 +8,7 @@ import json
 import os
 import tempfile
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
@@ -33,6 +33,8 @@ from runs.models import (
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
     RunStatsModel,
+    GenerateUploadUrlRequestModel,
+    GenerateUploadUrlResponseModel,
 )
 
 # Import autodiscovery_jobs when available
@@ -547,6 +549,91 @@ def create() -> Blueprint:
 
         except Exception as e:
             current_app.logger.error(f"Failed to upload dataset: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route("/<runid>/generate-upload-url", methods=["POST"])
+    @requires_enrollment
+    def generate_upload_url(runid: str):
+        """Generate a presigned URL for direct GCS upload.
+
+        This endpoint creates a signed URL that allows the browser to upload
+        files directly to GCS without routing through the Flask server.
+
+        Args:
+            runid: Run identifier (from URL path)
+
+        Request body:
+            filename: Name of file to upload
+            content_type: MIME type of file
+            file_size_bytes: Size of file in bytes
+
+        Returns:
+            JSON with upload_url, gcs_path, filename, and expiration time
+
+        Raises:
+            BadRequest: If required fields are missing or validation fails
+        """
+        userid = request.user.get("sub")
+        if not userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        data = request.get_json()
+        if not data:
+            raise BadRequest("No request body")
+
+        # Parse and validate request using Pydantic model
+        try:
+            req = GenerateUploadUrlRequestModel(**data)
+        except Exception as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        try:
+            # Validate file size
+            MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
+            if req.file_size_bytes and req.file_size_bytes > MAX_FILE_SIZE:
+                return jsonify({"error": "File too large. Maximum size is 500MB"}), 400
+
+            # Validate file extension
+            ALLOWED_EXTENSIONS = {'.csv', '.json', '.txt', '.tsv'}
+            file_ext = Path(req.filename).suffix.lower()
+            if file_ext not in ALLOWED_EXTENSIONS:
+                return jsonify({"error": f"File type not allowed: {file_ext}"}), 400
+
+            manager = get_job_manager()
+
+            # Verify job exists and belongs to user
+            if not manager.job_exists(userid, runid):
+                return jsonify({"error": "Job not found"}), 404
+
+            # Generate presigned URL
+            client = storage.Client(project=manager.config.project_id)
+            bucket = client.bucket(manager.config.bucket)
+
+            # Construct blob path (matches existing pattern: users/{userid}/jobs/{jobid}/data/{filename})
+            blob_path = f"users/{userid}/jobs/{runid}/data/{req.filename}"
+            blob = bucket.blob(blob_path)
+
+            # Generate signed URL for PUT operation with 1-hour expiration
+            upload_url = blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(hours=1),
+                method="PUT",
+                content_type=req.content_type,
+            )
+
+            gcs_path = f"gs://{manager.config.bucket}/{blob_path}"
+
+            # Return response using Pydantic model
+            resp = GenerateUploadUrlResponseModel(
+                upload_url=upload_url,
+                gcs_path=gcs_path,
+                filename=req.filename,
+                expires_in=3600,
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to generate upload URL: {e}")
             return jsonify({"error": str(e)}), 500
 
     @api.route("/metadata", methods=["POST"])

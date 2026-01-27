@@ -1,7 +1,7 @@
 from autogen import ConversableAgent, UserProxyAgent
 from autodiscovery.structured_outputs import ExperimentList, ExperimentCode, ExperimentAnalyst, ExperimentReviewer, Experiment, \
     ExperimentHypothesisList
-from autodiscovery.utils import GEMINI_OPENAI_BASE_URL, is_gemini_model
+from autodiscovery.utils import get_vertex_access_token, get_vertex_openai_base_url, is_gemini_model, normalize_vertex_model_name
 import os
 import json
 from autogen.coding import LocalCommandLineCodeExecutor, CodeBlock, CodeResult, CodeExecutor
@@ -48,12 +48,18 @@ class ModalSandboxExecutor(CodeExecutor):
     def _get_vision_client(self):
         from openai import OpenAI
         is_gemini = is_gemini_model(self.vision_model)
-        api_key = os.getenv("GOOGLE_GEMINI_API_KEY") if is_gemini else os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            missing = "GOOGLE_GEMINI_API_KEY" if is_gemini else "OPENAI_API_KEY"
-            return None, f"Image analysis skipped: {missing} is not set for {self.vision_model}."
         if is_gemini:
-            return OpenAI(api_key=api_key, base_url=GEMINI_OPENAI_BASE_URL), None
+            try:
+                api_key = get_vertex_access_token()
+                base_url = get_vertex_openai_base_url()
+            except ValueError as exc:
+                return None, f"Image analysis skipped: {exc}"
+        else:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return None, f"Image analysis skipped: OPENAI_API_KEY is not set for {self.vision_model}."
+        if is_gemini:
+            return OpenAI(api_key=api_key, base_url=base_url), None
         return OpenAI(api_key=api_key), None
 
     def _analyze_image(self, image_data: str) -> str:
@@ -89,7 +95,7 @@ class ModalSandboxExecutor(CodeExecutor):
         ]
 
         response = client.chat.completions.create(
-            model=self.vision_model,
+            model=normalize_vertex_model_name(self.vision_model) if is_gemini_model(self.vision_model) else self.vision_model,
             messages=messages,
             max_tokens=1000,
         )
@@ -230,15 +236,38 @@ import os
 from openai import OpenAI
 
 VISION_MODEL = __VISION_MODEL__
-GEMINI_BASE_URL = __GEMINI_BASE_URL__
+VERTEX_OPENAI_BASE_URL_ENV = "VERTEX_OPENAI_BASE_URL"
+VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
+VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
+
+def _normalize_vertex_model_name(model: str) -> str:
+    if model.startswith("gemini") and "/" not in model:
+        return f"google/{model}"
+    return model
+
+def _get_vertex_base_url():
+    # Reference: https://github.com/GoogleCloudPlatform/generative-ai/blob/main/gemini/chat-completions/intro_chat_completions_api.ipynb
+    explicit_base_url = os.getenv(VERTEX_OPENAI_BASE_URL_ENV)
+    if explicit_base_url:
+        return explicit_base_url
+    project_id = os.getenv(VERTEX_PROJECT_ENV_VAR)
+    location = os.getenv(VERTEX_LOCATION_ENV_VAR)
+    if not project_id or not location:
+        return None
+    api_host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
+    return f"https://{api_host}/v1/projects/{project_id}/locations/{location}/endpoints/openapi"
 
 def _get_openai_client():
     is_gemini = VISION_MODEL.startswith("gemini")
-    api_key = os.getenv("GOOGLE_GEMINI_API_KEY") if is_gemini else os.getenv("OPENAI_API_KEY")
+    if is_gemini:
+        api_key = os.getenv("VERTEX_ACCESS_TOKEN") or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
+        base_url = _get_vertex_base_url()
+        if not api_key or not base_url:
+            return None
+        return OpenAI(api_key=api_key, base_url=base_url)
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
-    if is_gemini:
-        return OpenAI(api_key=api_key, base_url=GEMINI_BASE_URL)
     return OpenAI(api_key=api_key)
 
 image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
@@ -247,7 +276,7 @@ image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
 def image_to_text():
     client = _get_openai_client()
     if client is None:
-        missing = "GOOGLE_GEMINI_API_KEY" if VISION_MODEL.startswith("gemini") else "OPENAI_API_KEY"
+        missing = "VERTEX_ACCESS_TOKEN/GOOGLE_OAUTH_ACCESS_TOKEN + Vertex base URL" if VISION_MODEL.startswith("gemini") else "OPENAI_API_KEY"
         print(f"Image analysis skipped: {{missing}} is not set for {{VISION_MODEL}}.")
         return
     for fig_num in plt.get_fignums():
@@ -278,7 +307,7 @@ def image_to_text():
             ]
             # Get image analysis from the LLM
             response = client.chat.completions.create(
-                model=VISION_MODEL,
+                model=_normalize_vertex_model_name(VISION_MODEL) if VISION_MODEL.startswith("gemini") else VISION_MODEL,
                 messages=messages,
                 max_tokens=1000,
             )
@@ -301,7 +330,6 @@ patch_matplotlib_show()
     return (
         template
         .replace("__VISION_MODEL__", repr(vision_model))
-        .replace("__GEMINI_BASE_URL__", repr(GEMINI_OPENAI_BASE_URL))
         .replace("__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT))
     )
 
@@ -383,13 +411,13 @@ def get_openai_config(
     is_gemini = is_gemini_model(model_name)
 
     if is_gemini:
-        # Configure Gemini via the OpenAI-compatible endpoint (Google AI Studio).
+        # Configure Gemini via the OpenAI-compatible endpoint (Vertex AI).
         config = {
             "api_type": "openai",
-            "model": model_name,
+            "model": normalize_vertex_model_name(model_name),
             "timeout": timeout,
-            "api_key": api_key if api_key else os.getenv("GOOGLE_GEMINI_API_KEY"),
-            "base_url": GEMINI_OPENAI_BASE_URL,
+            "api_key": api_key if api_key else get_vertex_access_token(),
+            "base_url": get_vertex_openai_base_url(),
             "max_retries": 3,
             "cache_seed": None
         }
@@ -422,7 +450,7 @@ def get_agents(work_dir, model_name="o4-mini", temperature=None, reasoning_effor
                user_query=None, experiment_first=False, code_timeout=30 * 60, use_modal_sandbox=False,
                bucket_path=None, dataset_paths=None, vision_model: str = "gpt-4o") -> dict[str, ConversableAgent]:
     is_gemini = is_gemini_model(model_name)
-    api_key = os.getenv("GOOGLE_GEMINI_API_KEY") if is_gemini else os.getenv("OPENAI_API_KEY")
+    api_key = get_vertex_access_token() if is_gemini else os.getenv("OPENAI_API_KEY")
     llm_config = get_openai_config(api_key=api_key, model_name=model_name, temperature=temperature,
                                    reasoning_effort=reasoning_effort)
 

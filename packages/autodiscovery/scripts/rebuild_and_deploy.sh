@@ -8,10 +8,10 @@ cd "${ROOT_DIR}"
 # Configuration
 PROJECT_ID=$(gcloud config get-value project)
 REGION="us-west1"
+VERTEX_LOCATION="${VERTEX_LOCATION:-$REGION}"
 IMAGE="us-west1-docker.pkg.dev/${PROJECT_ID}/autodiscovery/autodiscovery:latest"
 JOB_NAME="autodiscovery-job"
 BUCKET="example-gcp-project"
-GEMINI_SECRET_NAME="gemini-api-key-secret"
 OPENAI_SECRET_NAME="openai-api-key-secret"
 GITHUB_SECRET_NAME="github-token-secret"
 MODAL_TOKEN_ID_SECRET_NAME="modal-token-id-secret"
@@ -31,7 +31,6 @@ missing_secrets=()
 for secret in \
     "${GITHUB_SECRET_NAME}" \
     "${OPENAI_SECRET_NAME}" \
-    "${GEMINI_SECRET_NAME}" \
     "${MODAL_TOKEN_ID_SECRET_NAME}" \
     "${MODAL_TOKEN_SECRET_SECRET_NAME}" \
     "${MODAL_ENVIRONMENT_SECRET_NAME}" \
@@ -66,7 +65,6 @@ echo "Step 2: Updating Cloud Run Job with GCS mount"
 echo "========================================="
 UPDATE_SECRETS=(
     "OPENAI_API_KEY=${OPENAI_SECRET_NAME}:latest"
-    "GOOGLE_GEMINI_API_KEY=${GEMINI_SECRET_NAME}:latest"
     "MODAL_TOKEN_ID=${MODAL_TOKEN_ID_SECRET_NAME}:latest"
     "MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET_SECRET_NAME}:latest"
     "MODAL_ENVIRONMENT=${MODAL_ENVIRONMENT_SECRET_NAME}:latest"
@@ -78,6 +76,7 @@ gcloud run jobs update ${JOB_NAME} \
     --region ${REGION} \
     --image ${IMAGE} \
     --update-secrets "${UPDATE_SECRETS_ARG}" \
+    --update-env-vars "VERTEX_PROJECT_ID=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION}" \
     --add-volume name=job-storage,type=cloud-storage,bucket=${BUCKET} \
     --add-volume-mount volume=job-storage,mount-path=/mnt/gcs
 

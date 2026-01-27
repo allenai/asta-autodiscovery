@@ -1,7 +1,5 @@
 'use client';
 
-import { getRunsApi } from '@/api/RunsApi';
-import { Experiment, getExperimentFromApi } from '@/types/Run';
 import {
     createContext,
     PropsWithChildren,
@@ -12,6 +10,9 @@ import {
     useRef,
     useState,
 } from 'react';
+
+import { getRunsApi } from '@/api/RunsApi';
+import { Experiment, getExperimentFromApi } from '@/types/Run';
 
 export interface RunExperimentsState {
     isPolling: boolean;

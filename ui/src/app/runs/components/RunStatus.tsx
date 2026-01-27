@@ -301,7 +301,7 @@ const TablePanel = styled('div')<{ $isExpanded: boolean }>`
 
     @container run-status (width < 1000px) {
         flex: initial;
-        width: initial;
+        width: calc(100cqw - 20px);
         grid-row: 1;
         grid-column: 1;
     }
@@ -317,8 +317,9 @@ const DetailsPanel = styled('div')`
     z-index: 2;
 
     @container run-status (width < 1000px) {
-        flex: initial;
+        flex: 1 1 auto;
         max-width: initial;
+        width: calc(100cqw - 20px);
         grid-row: 1;
         grid-column: 1;
     }

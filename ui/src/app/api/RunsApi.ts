@@ -16,6 +16,15 @@ export interface RunStatsFromApi {
     num_surprising_experiments: number;
 }
 
+export interface RunMetadataFromApi {
+    name: string;
+    description: string | null;
+    domain: string | null;
+    datasets: {
+        name: string;
+        description: string | null;
+    }[];
+}
 export interface RunFromApi {
     runid: string;
     path?: string;
@@ -25,6 +34,7 @@ export interface RunFromApi {
     run_details?: RunDetailsFromApi;
     run_stats?: RunStatsFromApi;
     execution_status?: Record<string, unknown>;
+    run_metadata?: RunMetadataFromApi;
 }
 
 interface UploadDatasetResponseBody {
@@ -82,8 +92,9 @@ export interface MetadataDatasetFromApi {
 }
 
 export interface MetadataFromApi {
-    title: string;
+    name: string;
     description: string | null;
+    domain: string | null;
     datasets: MetadataDatasetFromApi[];
 }
 

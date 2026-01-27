@@ -8,7 +8,7 @@ import json
 import os
 import tempfile
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
@@ -97,19 +97,6 @@ def create() -> Blueprint:
             Blob path for run_details.json
         """
         return f"users/{userid}/jobs/{runid}/run_details.json"
-
-    def _get_run_data_upload_path(userid: str, runid: str, filename: str) -> str:
-        """Get the GCS path for uploading run data.
-
-        Args:
-            userid: User identifier
-            runid: Run identifier
-            filename: Name of the file to upload
-
-        Returns:
-            Blob path for the upload
-        """
-        return f"users/{userid}/jobs/{runid}/data/{filename}"
 
     def _create_run_details(userid: str, runid: str) -> dict:
         """Create initial run_details.json file.
@@ -611,7 +598,8 @@ def create() -> Blueprint:
         try:
             # Validate file size
             if req.file_size_bytes and req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
-                return jsonify({"error": "File too large"}), 413
+                max_gb = UPLOAD_MAX_FILE_SIZE_BYTES / (1024 * 1024 * 1024)
+                return jsonify({"error": f"File too large. Maximum size is {max_gb:.0f}GB"}), 400
 
             # Validate file extension
             file_ext = Path(req.filename).suffix.lower()
@@ -620,36 +608,29 @@ def create() -> Blueprint:
 
             manager = get_job_manager()
 
-            # Verify job exists and belongs to user
-            if not manager.job_exists(userid, runid):
-                return jsonify({"error": "Job not found"}), 404
-
-            # Generate presigned URL
-            client = storage.Client(project=manager.config.project_id)
-            bucket = client.bucket(manager.config.bucket)
-
-            blob_path = _get_run_data_upload_path(userid, runid, req.filename)
-            blob = bucket.blob(blob_path)
-
-            # Generate signed URL for PUT operation with 1-hour expiration
-            upload_url = blob.generate_signed_url(
-                version="v4",
-                expiration=timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS),
-                method="PUT",
-                content_type=req.content_type,
+            # Generate presigned URL using gcs module
+            result = manager.generate_upload_url(
+                userid=userid,
+                jobid=runid,
+                filename=req.filename,
+                content_type=req.content_type or "application/octet-stream",
+                expiration_seconds=UPLOAD_URL_EXPIRATION_SECONDS,
             )
-
-            gcs_path = f"gs://{manager.config.bucket}/{blob_path}"
 
             # Return response using Pydantic model
             resp = GenerateUploadUrlResponseModel(
-                upload_url=upload_url,
-                gcs_path=gcs_path,
+                upload_url=result["upload_url"],
+                gcs_path=result["gcs_path"],
                 filename=req.filename,
                 expires_in=UPLOAD_URL_EXPIRATION_SECONDS,
             )
             return jsonify(resp.model_dump()), 200
 
+        except JobNotFoundError as e:
+            return jsonify({"error": str(e)}), 404
+        except GCSError as e:
+            current_app.logger.error(f"Failed to generate upload URL: {e}")
+            return jsonify({"error": str(e)}), 400
         except Exception as e:
             current_app.logger.error(f"Failed to generate upload URL: {e}")
             return jsonify({"error": str(e)}), 500

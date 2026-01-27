@@ -127,6 +127,35 @@ class JobManager:
         """
         return gcs.upload_dataset(userid, jobid, local_path, self.config, remote_name)
 
+    def generate_upload_url(
+        self,
+        userid: str,
+        jobid: str,
+        filename: str,
+        content_type: str = "application/octet-stream",
+        expiration_seconds: int = 3600,
+    ) -> dict[str, str]:
+        """Generate a presigned URL for direct upload to GCS.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            filename: Name of file to upload
+            content_type: MIME type of the file
+            expiration_seconds: Number of seconds until URL expires
+
+        Returns:
+            Dictionary with 'upload_url' and 'gcs_path' keys
+        """
+        return gcs.generate_upload_url(
+            userid,
+            jobid,
+            filename,
+            content_type,
+            expiration_seconds,
+            self.config,
+        )
+
     def expire_datasets(
         self,
         userid: str,

@@ -170,10 +170,10 @@ class GenerateUploadUrlRequestModel(BaseModel):
     """Model for the request to generate a presigned upload URL"""
 
     filename: str = Field(..., description="Name of the file to upload")
-    content_type: str | None = Field(
-        None, description="MIME type of the file"
+    content_type: str = Field(
+        ..., description="MIME type of the file"
     )
-    file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
+    file_size_bytes: int = Field(..., description="Size of the file in bytes")
 
 
 class GenerateUploadUrlResponseModel(BaseModel):

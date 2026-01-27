@@ -5,6 +5,8 @@ import { Box, Button, Typography, CircularProgress, Alert, Chip, styled } from '
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
+import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Experiment, Run, getRunFromApi } from '@/types/Run';
@@ -124,6 +126,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     };
 
     const canStop = run?.details?.status === 'RUNNING';
+    const experimentsLabel = run?.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments';
 
     if (loading) {
         return (
@@ -166,6 +169,20 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                                     Last Checked:{' '}
                                     {new Date(run?.details.statusCheckedAt).toLocaleString()}
                                 </Typography>
+                            </Box>
+                        )}
+                        {run?.stats && (
+                            <Box display="flex" gap={1.5}>
+                                <ExperimentCount>
+                                    <ScienceOutlinedIcon />
+                                    {run?.stats.requestedExperiments} {experimentsLabel}
+                                </ExperimentCount>
+                                {!!run?.stats.pendingExperiments && (
+                                    <ExperimentCount>
+                                        <HourglassTopOutlinedIcon />
+                                        {run?.stats.pendingExperiments} pending
+                                    </ExperimentCount>
+                                )}
                             </Box>
                         )}
                         {canStop && (
@@ -253,4 +270,16 @@ const RunHeader = styled('div')`
     font-size: 1.25rem;
     justify-content: space-between;
     padding: ${({ theme }) => theme.spacing(3)};
+`;
+
+const ExperimentCount = styled('div')`
+    align-items: center;
+    color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+    display: flex;
+    font-weight: 700;
+    gap: ${({ theme }) => theme.spacing(0.5)};
+
+    .MuiSvgIcon-root {
+        font-size: 1.2rem;
+    }
 `;

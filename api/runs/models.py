@@ -58,12 +58,37 @@ class MetadataDatasetModel(BaseModel):
     name: str | None = Field(None, description="Filename of the dataset")
     description: str | None = Field(None, description="Description of the dataset")
 
+class RunArgsModel(BaseModel):
+    """Model representing run arguments/configuration"""
+
+    n_experiments: int | None = Field(None, description="Number of experiments to run")
+    exploration_weight: float | None = Field(None, description="Weight for exploration in MCTS")
+    mcts_selection: str | None = Field(None, description="MCTS selection strategy")
+    surprisal_width: float | None = Field(None, description="Surprisal threshold width")
+    evidence_weight: float | None = Field(None, description="Weight for evidence in belief updates")
+    warmstart_experiments: str | None = Field(None, description="Path to warmstart experiments")
+    n_warmstart: int | None = Field(None, description="Number of warmstart experiments")
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> "RunArgsModel":
+        """Create RunArgsModel from a dictionary"""
+        return RunArgsModel(
+            n_experiments=data.get("n_experiments"),
+            exploration_weight=data.get("exploration_weight"),
+            mcts_selection=data.get("mcts_selection"),
+            surprisal_width=data.get("surprisal_width"),
+            evidence_weight=data.get("evidence_weight"),
+            warmstart_experiments=data.get("warmstart_experiments"),
+            n_warmstart=data.get("n_warmstart"),
+        )
+
 class MetadataModel(BaseModel):
     """Model representing metadata for a run"""
 
     name: str | None = Field(None, description="Name of the run")
     description: str | None = Field(None, description="Description of the run")
     domain: str | None = Field(None, description="Domain of the run")
+    intent: str | None = Field(None, description="High-level intent for the run")
     datasets: list[MetadataDatasetModel] | None = Field(
         None, description="List of datasets associated with the run"
     )
@@ -83,6 +108,7 @@ class MetadataModel(BaseModel):
             name=data.get("name"),
             description=data.get("description"),
             domain=data.get("domain"),
+            intent=data.get("intent"),
             datasets=datasets,
         )
 
@@ -105,6 +131,9 @@ class RunModel(BaseModel):
     )
     run_metadata: MetadataModel | None = Field(
         None, description="Metadata associated with the run"
+    )
+    run_args: RunArgsModel | None = Field(
+        None, description="Arguments and configuration for the run"
     )
 
 class GetRunMetadataRequestModel(BaseModel):

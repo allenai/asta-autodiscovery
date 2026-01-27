@@ -20,11 +20,23 @@ export interface RunMetadataFromApi {
     name: string;
     description: string | null;
     domain: string | null;
+    intent: string | null;
     datasets: {
         name: string;
         description: string | null;
     }[];
 }
+
+export interface RunArgsFromApi {
+    n_experiments: number | null;
+    exploration_weight: number | null;
+    mcts_selection: string | null;
+    surprisal_width: number | null;
+    evidence_weight: number | null;
+    warmstart_experiments: string | null;
+    n_warmstart: number | null;
+}
+
 export interface RunFromApi {
     runid: string;
     path?: string;
@@ -35,6 +47,7 @@ export interface RunFromApi {
     run_stats?: RunStatsFromApi;
     execution_status?: Record<string, unknown>;
     run_metadata?: RunMetadataFromApi;
+    run_args?: RunArgsFromApi;
 }
 
 interface UploadDatasetResponseBody {
@@ -95,6 +108,7 @@ export interface MetadataFromApi {
     name: string;
     description: string | null;
     domain: string | null;
+    intent: string | null;
     datasets: MetadataDatasetFromApi[];
 }
 
@@ -194,11 +208,19 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async saveMetadata(runId: string, metadata: Record<string, unknown>) {
-        return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/metadata`,
+    async saveMetadata(runId: string, metadata: RunMetadataFromApi) {
+        return this.request<{ path: string; message: string }>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/metadata`,
             method: 'POST',
-            body: { runid: runId, metadata },
+            body: { metadata },
+        });
+    }
+
+    async saveJobArgs(runId: string, args: Record<string, unknown>) {
+        return this.request<{ path: string; message: string }>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/args`,
+            method: 'POST',
+            body: { args },
         });
     }
 

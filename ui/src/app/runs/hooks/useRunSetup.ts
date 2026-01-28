@@ -169,7 +169,10 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Create unique key for this upload
             const uploadKey = `${upload.file.name}-${upload.file.size}-${index}`;
 
-            if (upload.status === UploadStatus.PENDING && !startedUploadsRef.current.has(uploadKey)) {
+            if (
+                upload.status === UploadStatus.PENDING &&
+                !startedUploadsRef.current.has(uploadKey)
+            ) {
                 startedUploadsRef.current.add(uploadKey);
                 // Use setTimeout to ensure state is fully committed
                 setTimeout(() => {

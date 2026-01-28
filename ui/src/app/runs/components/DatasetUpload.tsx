@@ -308,7 +308,10 @@ export default function DatasetUpload({
     );
 }
 
-const DropZone = styled(Box)<{ isDragging: boolean; disabled: boolean; hasError: boolean }>(
+const DropZone = styled(Box, {
+    shouldForwardProp: (prop) =>
+        prop !== 'isDragging' && prop !== 'disabled' && prop !== 'hasError',
+})<{ isDragging: boolean; disabled: boolean; hasError: boolean }>(
     ({ theme, isDragging, disabled, hasError }) => ({
         border: `1px dashed ${
             hasError

@@ -118,12 +118,10 @@ export default function DatasetUpload({
                 hasError={!!error}>
                 <CloudUploadOutlinedIcon />
                 <Typography variant="body1" gutterBottom>
-                    {isDragging
-                        ? 'Drop file here'
-                        : 'Click, or drag & drop to add datasets to explore'}
+                    Drop files here or browse
                 </Typography>
                 <Typography variant="caption" sx={{ mt: 1, opacity: 0.6 }}>
-                    Supported formats: CSV, JSON, TXT, TSV
+                    Max 10GB per file, 20GB total session limit
                 </Typography>
             </DropZone>
 
@@ -151,9 +149,13 @@ export default function DatasetUpload({
                                     </IconButton>
                                 </FileHeader>
                                 <FileDescription>
-                                    <DatasetSchemaTitle>Dataset Schema</DatasetSchemaTitle>
-                                    Describe the structure of your dataset including column names
-                                    and what each field represents. The more information the better.
+                                    <DatasetSchemaTitle>
+                                        Dataset Schema (Optional)
+                                    </DatasetSchemaTitle>
+                                    Help us interpret your data accurately. Our system will analyze
+                                    your files automatically. For the best results, please use this
+                                    space to clarify any abbreviations, complex structures, or
+                                    similar or unclear variables (e.g., column names).
                                     <TextField
                                         multiline
                                         maxRows={3}
@@ -161,7 +163,10 @@ export default function DatasetUpload({
                                         value={selectedFile.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
                                         sx={{ mt: 1 }}
-                                        placeholder='e.g., "patient_id" - unique patient identifier, "age" - patient age in years'
+                                        placeholder='e.g., 
+1. "n" - count of non-native plant species introductions in each time period,
+2. "final_choice_new" - “parcipants final choice in the treatment condition”
+3. Each row in this file represents a time-series'
                                     />
                                 </FileDescription>
                             </File>

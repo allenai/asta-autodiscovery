@@ -56,7 +56,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                 </Box>
             )}
 
-            {experiment.surprise && (
+            {experiment.surprise !== null && (
                 <Box>
                     <SectionHeader>Surprise</SectionHeader>
                     <BeliefChip>

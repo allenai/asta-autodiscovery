@@ -1,16 +1,65 @@
-import { Paper, styled, Box, Alert, Tooltip } from '@mui/material';
+import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 
-import { Experiment } from '@/types/Run';
+import { Experiment, RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
 const columns: GridColDef[] = [
-    { field: 'id', headerName: 'ID', width: 130 },
-    { field: 'hypothesis', headerName: 'Hypothesis', width: 200, flex: 1 },
+    {
+        field: 'id',
+        headerName: 'ID',
+        width: 130,
+        renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="90%" />;
+            }
+            return params.value;
+        },
+    },
+    {
+        field: 'hypothesis',
+        headerName: 'Hypothesis',
+        width: 200,
+        flex: 1,
+        renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="100%" />;
+            }
+            return params.value;
+        },
+    },
+    {
+        field: 'surprisal',
+        headerName: 'Surprisal',
+        width: 150,
+        renderHeader: () => (
+            <ColumnHeaderWrapper>
+                <span>Surprisal</span>
+                <LightbulbOutlinedIcon fontSize="small" />
+            </ColumnHeaderWrapper>
+        ),
+        renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="70%" />;
+            }
+            const isSurprising = params.row.isSurprising;
+            return (
+                <Box
+                    sx={(theme) => ({
+                        color: isSurprising
+                            ? theme.color['warning-orange-100'].hex
+                            : theme.color['cream-100'].hex,
+                        fontWeight: isSurprising ? 700 : 'normal',
+                    })}>
+                    {params.value?.toFixed(3) ?? 'N/A'}
+                </Box>
+            );
+        },
+    },
     {
         field: 'prior',
         headerName: 'Before',
@@ -22,10 +71,13 @@ const columns: GridColDef[] = [
             </ColumnHeaderWrapper>
         ),
         renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="80%" />;
+            }
             const value = params.row.priorValue;
             const label = params.value;
             return (
-                <Tooltip title={value != null ? value.toFixed(3) : 'N/A'} arrow>
+                <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
                     <Box sx={{ cursor: 'pointer' }}>{label}</Box>
                 </Tooltip>
             );
@@ -42,37 +94,15 @@ const columns: GridColDef[] = [
             </ColumnHeaderWrapper>
         ),
         renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="80%" />;
+            }
             const value = params.row.posteriorValue;
             const label = params.value;
             return (
-                <Tooltip title={value != null ? value.toFixed(3) : 'N/A'} arrow>
+                <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
                     <Box sx={{ cursor: 'pointer' }}>{label}</Box>
                 </Tooltip>
-            );
-        },
-    },
-    {
-        field: 'surprisal',
-        headerName: 'Surprisal',
-        width: 150,
-        renderHeader: () => (
-            <ColumnHeaderWrapper>
-                <span>Surprisal</span>
-                <LightbulbOutlinedIcon fontSize="small" />
-            </ColumnHeaderWrapper>
-        ),
-        renderCell: (params: GridRenderCellParams) => {
-            const isSurprising = params.row.isSurprising;
-            return (
-                <Box
-                    sx={(theme) => ({
-                        color: isSurprising
-                            ? theme.color['warning-orange-100'].hex
-                            : theme.color['cream-100'].hex,
-                        fontWeight: isSurprising ? 700 : 'normal',
-                    })}>
-                    {params.value.toFixed(3)}
-                </Box>
             );
         },
     },
@@ -81,14 +111,22 @@ const columns: GridColDef[] = [
         headerName: 'Direction',
         width: 120,
         renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="60%" />;
+            }
             const direction = params.value;
-            return <Box>{direction}</Box>;
+            return <Box>{direction ?? 'N/A'}</Box>;
         },
     },
 ];
 
-export function ExperimentsTable() {
-    const { experiments, isLoading, lastError, selectExperiment } = useRunExperiments();
+interface ExperimentsTableProps {
+    runStats?: RunStats | null;
+}
+
+export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
+    const { experiments, isLoading, lastError, selectExperiment, hasJobCompleted } =
+        useRunExperiments();
 
     // Create a map for O(1) lookups when clicking rows
     const experimentsMap = useMemo(() => {
@@ -101,9 +139,31 @@ export function ExperimentsTable() {
         );
     }, [experiments]);
 
+    const createSkeletonRows = useCallback(() => {
+        const pendingCount = runStats?.pendingExperiments ?? 0;
+        if (!hasJobCompleted && pendingCount > 0) {
+            const skeletonRows = Array.from({ length: pendingCount }, (_, i) => ({
+                id: `skeleton-${i}`,
+                hypothesis: '',
+                prior: '',
+                priorValue: null,
+                posterior: '',
+                posteriorValue: null,
+                surprisal: 0,
+                isSurprising: false,
+                direction: '',
+                creationIdx: experiments.length + i,
+                runtimeMs: 'N/A',
+                isSkeleton: true,
+            }));
+            return skeletonRows;
+        }
+        return [];
+    }, [runStats?.pendingExperiments, hasJobCompleted, experiments.length]);
+
     // Convert experiments to rows for DataGrid
     const rows = useMemo(() => {
-        return experiments.map((experiment) => {
+        const experimentRows = experiments.map((experiment) => {
             return {
                 id: experiment.experimentId,
                 hypothesis: experiment.hypothesis ?? 'N/A',
@@ -111,18 +171,29 @@ export function ExperimentsTable() {
                 priorValue: experiment.prior,
                 posterior: getPriorAndPosteriorLabel(experiment.posterior),
                 posteriorValue: experiment.posterior,
-                surprisal: experiment.surprise,
+                surprisal: experiment.surprise
+                    ? Math.abs(experiment.surprise)
+                    : experiment.surprise,
                 isSurprising: experiment.isSurprising,
                 direction: getSurprisalDirection(experiment.surprise),
                 creationIdx: experiment.creationIdx,
                 runtimeMs: experiment.runtimeMs ?? 'N/A',
+                isSkeleton: false,
             };
         });
-    }, [experiments]);
 
-    const paginationModel = { page: 0, pageSize: 5 };
+        // Add skeleton rows for pending experiments if job is not completed
+        const skeletonRows = createSkeletonRows();
+        return [...experimentRows, ...skeletonRows];
+    }, [experiments, runStats, hasJobCompleted]);
+
+    const paginationModel = { page: 0, pageSize: 50 };
 
     const handleRowClick = (params: any) => {
+        // Don't allow clicking on skeleton rows
+        if (params.row.isSkeleton) {
+            return;
+        }
         selectExperiment(experimentsMap[params.id]);
     };
 
@@ -136,7 +207,7 @@ export function ExperimentsTable() {
             <StyledDataGrid
                 rows={rows}
                 columns={columns}
-                loading={isLoading}
+                loading={isLoading || (!runStats?.pendingExperiments && !experiments.length)}
                 initialState={{ pagination: { paginationModel } }}
                 pageSizeOptions={[5, 10, 25]}
                 sx={{ border: 0 }}
@@ -160,6 +231,15 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         color: theme.color['green-40'].hex,
         fontWeight: 700,
     },
+
+    '.MuiDataGrid-footerContainer': {
+        color: theme.color['cream-100'].hex,
+    },
+
+    '.MuiTablePagination-root, .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows, .MuiTablePagination-select, .MuiTablePagination-selectIcon':
+        {
+            color: theme.color['cream-100'].hex,
+        },
 }));
 
 const ColumnHeaderWrapper = styled(Box)`
@@ -168,3 +248,7 @@ const ColumnHeaderWrapper = styled(Box)`
     display: flex;
     gap: ${({ theme }) => theme.spacing(0.5)};
 `;
+
+const StyledSkeleton = styled(Skeleton)(({ theme }) => ({
+    backgroundColor: theme.color['cream-10'].rgba.toString(),
+}));

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
+import { useRuns } from '@/contexts/RunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
 
@@ -48,7 +49,6 @@ export interface SelectedFile {
 
 interface FieldErrors {
     name?: string;
-    datasetsDescription?: string;
     datasets?: string;
     datasetFileDescriptions?: string;
     nExperiments?: string;
@@ -56,6 +56,7 @@ interface FieldErrors {
 
 export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
+    const { updateViewerRun } = useRuns();
     const api = getRunsApi();
 
     const creditsRemaining = credits?.remaining ?? 500;
@@ -229,16 +230,16 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     };
 
     const handleExperimentsChange = (value: string) => {
-        const num = parseInt(value, 10);
-
         if (value === '') {
             setFieldErrors((prev) => ({
                 ...prev,
                 nExperiments: 'Number of experiments is required',
             }));
-
+            setSettings((prev) => ({ ...prev, nExperiments: '' as any }));
             return;
         }
+
+        const num = parseInt(value, 10);
 
         if (isNaN(num) || num < 1 || num > creditsRemaining) {
             setFieldErrors((prev) => ({
@@ -258,10 +259,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         if (!settings.name.trim()) {
             errors.name = 'Run name is required';
-        }
-
-        if (!settings.datasetsDescription.trim()) {
-            errors.datasetsDescription = 'Description for datasets is required';
         }
 
         if (!selectedFiles.length) {
@@ -304,6 +301,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
             // Save metadata
             await saveMetadata();
+
+            // Update the run name in the sidebar list
+            updateViewerRun({ id: runid, name: settings.name.trim() });
 
             // // Submit run
             await api.submitRun(runid, {

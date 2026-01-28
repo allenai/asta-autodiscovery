@@ -31,10 +31,12 @@ def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
     node_map = {}  # Map (level, idx) to node objects for linking
 
     # Iterate over the nodes in level order and build the tree
-    node_data.sort(key=lambda x: (int(x['id'].split('_')[1]), int(x['id'].split('_')[2])))
+    node_data.sort(key=lambda x: (int(x["id"].split("_")[1]), int(x["id"].split("_")[2])))
     for data in node_data:
         # Create an empty node and initialize from dict (parent links added in second pass)
-        node = MCTSNode(allow_generate_experiments=args.allow_generate_experiments if args else True)
+        node = MCTSNode(
+            allow_generate_experiments=args.allow_generate_experiments if args else True
+        )
         node.init_from_dict(data)
         # Add to data structures
         nodes_by_level[node.level].append(node)
@@ -47,8 +49,9 @@ def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
                 node.parent = node_map[(parent_level, parent_idx)]
                 node.parent.children.append(node)
             except KeyError:
-                assert (parent_level, parent_idx) == (
-                    0, 0), f"Parent node ({parent_level}, {parent_idx}) not found in node_map."
+                assert (parent_level, parent_idx) == (0, 0), (
+                    f"Parent node ({parent_level}, {parent_idx}) not found in node_map."
+                )
 
     # Create root node if it does not exist
     if (0, 0) not in node_map:
@@ -65,7 +68,9 @@ def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
     # Fix tried/untried experiments
     for node in node_map.values():
         _tried_experiments, _untried_experiments = [], []
-        cur_untried_experiments = set(list(map(get_query_from_experiment, node.untried_experiments)))
+        cur_untried_experiments = set(
+            list(map(get_query_from_experiment, node.untried_experiments))
+        )
         for child in node.children:
             # Keep only children in tried experiments
             _tried_experiments.append(get_experiment_from_query(child.query))
@@ -90,8 +95,14 @@ def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
     return root, nodes_by_level
 
 
-def save_nodes(nodes_dict_or_list, log_dirname, run_dedupe=True, model="gpt-4o", save_csv=True,
-               time_elapsed=None):
+def save_nodes(
+    nodes_dict_or_list,
+    log_dirname,
+    run_dedupe=True,
+    model="gpt-4o",
+    save_csv=True,
+    time_elapsed=None,
+):
     """Save MCTS nodes to JSON and optionally to CSV.
 
     Args:
@@ -118,8 +129,13 @@ def save_nodes(nodes_dict_or_list, log_dirname, run_dedupe=True, model="gpt-4o",
             nodes_list = [node.to_dict() for node in nodes_list]
 
     # Save nodes to JSON
-    nodes_list = save_nodes_to_json(nodes_list, log_dirname, run_dedupe=run_dedupe, dedupe_model=model,
-                                    time_elapsed=time_elapsed)
+    nodes_list = save_nodes_to_json(
+        nodes_list,
+        log_dirname,
+        run_dedupe=run_dedupe,
+        dedupe_model=model,
+        time_elapsed=time_elapsed,
+    )
 
     # Save nodes to CSV
     if save_csv:
@@ -127,8 +143,14 @@ def save_nodes(nodes_dict_or_list, log_dirname, run_dedupe=True, model="gpt-4o",
         nodes_to_csv(nodes_list, csv_output_file)
 
 
-def save_nodes_to_json(nodes_list, log_dirname, run_dedupe=True, dedupe_model="gpt-4o", log_dedupe_comparisons=False,
-                       time_elapsed=None):
+def save_nodes_to_json(
+    nodes_list,
+    log_dirname,
+    run_dedupe=True,
+    dedupe_model="gpt-4o",
+    log_dedupe_comparisons=False,
+    time_elapsed=None,
+):
     """Save all MCTS nodes to a JSON file.
 
     Args:
@@ -152,9 +174,7 @@ def save_nodes_to_json(nodes_list, log_dirname, run_dedupe=True, dedupe_model="g
         file_to_save = deduped_nodes
         nonempty_clusters = {k: v for k, v in duplicates.items() if len(v) > 0}
         if len(nonempty_clusters) > 0:
-            print(
-                f"\n[DEDUPE] Deduplicated MCTS nodes to n={len(deduped_nodes)}.\nMerged nodes:"
-            )
+            print(f"\n[DEDUPE] Deduplicated MCTS nodes to n={len(deduped_nodes)}.\nMerged nodes:")
             print(json.dumps(nonempty_clusters, indent=2))
         else:
             print("\n[DEDUPE] No duplicate MCTS nodes found.")
@@ -166,8 +186,7 @@ def save_nodes_to_json(nodes_list, log_dirname, run_dedupe=True, dedupe_model="g
                 nonempty_clusters[cluster_id] = {
                     "hypothesis": _hyp_by_node_id[cluster_id],
                     "duplicates": [
-                        {"node_id": nid, "hypothesis": _hyp_by_node_id[nid]}
-                        for nid in node_ids
+                        {"node_id": nid, "hypothesis": _hyp_by_node_id[nid]} for nid in node_ids
                     ],
                 }
             json.dump(nonempty_clusters, f, indent=2)
@@ -210,7 +229,7 @@ def setup_group_chat(agents, max_rounds):
         agents=list(agents.values()),
         messages=[],
         max_round=max_rounds,
-        speaker_selection_method=SpeakerSelector().select_next_speaker
+        speaker_selection_method=SpeakerSelector().select_next_speaker,
     )
     chat_manager = GroupChatManager(groupchat=group_chat, llm_config=None)
     return group_chat, chat_manager
@@ -236,9 +255,7 @@ def select_nodes(selection_method, root, nodes_by_level, n_warmstart=0, return_n
     # If there are warmstart experiments left to run, select the data loader node.
     n_children_at_data_loader = len(nodes_by_level[2])
     if (n_warmstart - n_children_at_data_loader) > 0:
-        return [nodes_by_level[1][0]] * min(
-            return_n, n_warmstart - n_children_at_data_loader
-        )
+        return [nodes_by_level[1][0]] * min(return_n, n_warmstart - n_children_at_data_loader)
 
     # Otherwise, use the selection policy to select the next nodes.
     try:
@@ -287,13 +304,13 @@ def get_nodes(in_fpath_or_json: str | List[Dict[str, any]]) -> List[Dict[str, an
         # Load the MCTS nodes from the input file
         if os.path.isdir(in_fpath_or_json):
             mcts_nodes = []
-            filenames = glob(os.path.join(in_fpath_or_json, 'mcts_node_*.json'))
+            filenames = glob(os.path.join(in_fpath_or_json, "mcts_node_*.json"))
             for filename in filenames:
-                with open(filename, 'r') as f:
+                with open(filename, "r") as f:
                     obj = json.load(f)
                     mcts_nodes.append(obj)
         else:
-            with open(in_fpath_or_json, 'r') as f:
+            with open(in_fpath_or_json, "r") as f:
                 mcts_nodes = json.load(f)
     return mcts_nodes
 
@@ -301,7 +318,9 @@ def get_nodes(in_fpath_or_json: str | List[Dict[str, any]]) -> List[Dict[str, an
 def print_node_info(node):
     prior_mean = node.prior.get_mean_belief()
     posterior_mean = node.posterior.get_mean_belief(prior=node.prior)
-    direction = "+" if posterior_mean > prior_mean else ("-" if posterior_mean < prior_mean else "=")
+    direction = (
+        "+" if posterior_mean > prior_mean else ("-" if posterior_mean < prior_mean else "=")
+    )
     print(f"""\n\n\
 ================================================================================
 
@@ -320,43 +339,39 @@ Reward: {node.self_value:.4f}
 
 
 def get_query_from_experiment(exp):
-    hypothesis = exp['hypothesis']
-    exp_plan = exp['experiment_plan']
+    hypothesis = exp["hypothesis"]
+    exp_plan = exp["experiment_plan"]
     new_query = ""
     if hypothesis is not None:
         new_query += f"Hypothesis: {hypothesis}\n\n"
     new_query += f"""\
-Experiment objective: {exp_plan['objective']}
+Experiment objective: {exp_plan["objective"]}
 
 Steps for the programmer:
-{exp_plan['steps']}
+{exp_plan["steps"]}
 
 Deliverables:
-{exp_plan['deliverables']}"""
+{exp_plan["deliverables"]}"""
     return new_query
 
 
 def get_experiment_from_query(query):
     # Extract the hypothesis and experiment plan from the query
-    hypothesis_match = re.search(r'Hypothesis:\s*(.*)', query)
+    hypothesis_match = re.search(r"Hypothesis:\s*(.*)", query)
     hypothesis = hypothesis_match.group(1).strip() if hypothesis_match else None
 
-    exp_plan_match = re.search(r'Experiment objective:\s*(.*?)(?=\n\n|$)', query, re.DOTALL)
+    exp_plan_match = re.search(r"Experiment objective:\s*(.*?)(?=\n\n|$)", query, re.DOTALL)
     exp_plan = exp_plan_match.group(1).strip() if exp_plan_match else None
 
-    steps_match = re.search(r'Steps for the programmer:\s*(.*?)(?=\n\n|$)', query, re.DOTALL)
+    steps_match = re.search(r"Steps for the programmer:\s*(.*?)(?=\n\n|$)", query, re.DOTALL)
     steps = steps_match.group(1).strip() if steps_match else None
 
-    deliverables_match = re.search(r'Deliverables:\s*(.*?)(?=\n\n|$)', query, re.DOTALL)
+    deliverables_match = re.search(r"Deliverables:\s*(.*?)(?=\n\n|$)", query, re.DOTALL)
     deliverables = deliverables_match.group(1).strip() if deliverables_match else None
 
     return {
         "hypothesis": hypothesis,
-        "experiment_plan": {
-            "objective": exp_plan,
-            "steps": steps,
-            "deliverables": deliverables
-        }
+        "experiment_plan": {"objective": exp_plan, "steps": steps, "deliverables": deliverables},
     }
 
 
@@ -374,8 +389,14 @@ def get_node_level_idx(node_or_id):
     return map(int, id.split("_")[1:])
 
 
-def get_context_string(hyp_exp_query, code_output=None, analysis=None, review=None,
-                       belief_mean=None, include_code_output=False):
+def get_context_string(
+    hyp_exp_query,
+    code_output=None,
+    analysis=None,
+    review=None,
+    belief_mean=None,
+    include_code_output=False,
+):
     # Format the experiment to include as context in, e.g., an LLM call.
     context_str = hyp_exp_query
     if include_code_output and code_output is not None:
@@ -390,8 +411,14 @@ def get_context_string(hyp_exp_query, code_output=None, analysis=None, review=No
     return context_str
 
 
-def get_self_value(belief_change, kl_divergence, binary=True, width=0.2, kl_scale=20.0,
-                   mode: Literal["belief", "kl", "belief_and_kl"] = "belief_and_kl"):
+def get_self_value(
+    belief_change,
+    kl_divergence,
+    binary=True,
+    width=0.2,
+    kl_scale=20.0,
+    mode: Literal["belief", "kl", "belief_and_kl"] = "belief_and_kl",
+):
     """Get self value for a node based on its belief.
 
     Args:
@@ -420,10 +447,12 @@ def get_self_value(belief_change, kl_divergence, binary=True, width=0.2, kl_scal
             return kl_divergence / kl_scale, bool((kl_divergence / kl_scale) >= 1.0)
     elif mode == "belief_and_kl":
         # Satisfy both modes
-        belief_value, is_surprising_belief = get_self_value(belief_change, kl_divergence, binary, width, kl_scale,
-                                                            mode="belief")
-        kl_value, is_surprising_kl = get_self_value(belief_change, kl_divergence, binary, width, kl_scale,
-                                                    mode="kl")
+        belief_value, is_surprising_belief = get_self_value(
+            belief_change, kl_divergence, binary, width, kl_scale, mode="belief"
+        )
+        kl_value, is_surprising_kl = get_self_value(
+            belief_change, kl_divergence, binary, width, kl_scale, mode="kl"
+        )
         # Combine both values
         combined_value = max(belief_value, kl_value)
         is_surprising = bool(is_surprising_belief or is_surprising_kl)

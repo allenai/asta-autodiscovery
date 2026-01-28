@@ -64,7 +64,7 @@ class ExperimentNode:
         # Metrics
         self.prior: float | None = node_data.get("prior", {}).get("mean")
         self.posterior: float | None = node_data.get("posterior", {}).get("mean")
-        self.surprise: float | None = self.posterior - self.prior if self.posterior is not None and self.prior is not None else node_data.get("belief_change", None)
+        self.surprise: float | None = node_data.get("normalized_surprisal")
         self.is_surprising: bool | None = node_data.get("surprising")
 
         # Convert time_elapsed (seconds) to runtime_ms (milliseconds)

@@ -61,7 +61,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     } = useRunSetup({ runid, onSubmitSuccess });
 
     const isFormDisabled = isSubmitting || isLoading;
-    const datasetErrors = fieldErrors.datasets || fieldErrors.datasetsDescription;
+    const datasetErrors = fieldErrors.datasets;
 
     if (isLoading) {
         return (

@@ -4,6 +4,7 @@ import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useRuns } from '@/contexts/RunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
+import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 
 export const MCTS_SELECTION = {
     UCB1: { value: 'ucb1', label: 'UCB1' },
@@ -160,80 +161,40 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         );
     };
 
-    const uploadToGCS = (index: number, uploadUrl: string): Promise<void> => {
-        return new Promise((resolve, reject) => {
-            const upload = fileUploads[index];
-            if (!upload) {
-                reject(new Error('Upload not found'));
-                return;
-            }
+    const uploadToGCS = async (index: number, uploadUrl: string): Promise<void> => {
+        const upload = fileUploads[index];
+        if (!upload || !upload.uploadStartTime) {
+            throw new Error('Upload not found or not started');
+        }
 
-            const xhr = new XMLHttpRequest();
-            const abortController = new AbortController();
+        const abortController = new AbortController();
+        updateUploadState(index, { abortController });
 
-            updateUploadState(index, { abortController });
-
-            xhr.upload.addEventListener('progress', (event) => {
-                if (event.lengthComputable) {
-                    const progress = (event.loaded / event.total) * 100;
-                    const uploadedBytes = event.loaded;
-
-                    const uploadStartTime = fileUploads[index]?.uploadStartTime;
-                    if (uploadStartTime) {
-                        const elapsedTime = (Date.now() - uploadStartTime) / 1000;
-                        const uploadSpeed = uploadedBytes / elapsedTime;
-                        const remainingBytes = event.total - uploadedBytes;
-                        const timeRemaining = uploadSpeed > 0 ? remainingBytes / uploadSpeed : null;
-
-                        updateUploadState(index, {
-                            progress,
-                            uploadedBytes,
-                            timeRemaining,
-                        });
-                    }
-                }
-            });
-
-            xhr.addEventListener('load', () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    updateUploadState(index, {
-                        status: 'completed',
-                        progress: 100,
-                        timeRemaining: 0,
-                    });
-                    resolve();
-                } else {
-                    updateUploadState(index, {
-                        status: 'error',
-                        error: `Upload failed with status ${xhr.status}`,
-                    });
-                    reject(new Error(`Upload failed with status ${xhr.status}`));
-                }
-            });
-
-            xhr.addEventListener('error', () => {
+        await uploadFileToGCS({
+            file: upload.file,
+            uploadUrl,
+            uploadStartTime: upload.uploadStartTime,
+            onProgress: (progressEvent) => {
+                updateUploadState(index, {
+                    progress: progressEvent.progress,
+                    uploadedBytes: progressEvent.uploadedBytes,
+                    timeRemaining: progressEvent.timeRemaining,
+                });
+            },
+            onComplete: () => {
+                updateUploadState(index, {
+                    status: 'completed',
+                    progress: 100,
+                    timeRemaining: 0,
+                });
+            },
+            onError: (error) => {
                 updateUploadState(index, {
                     status: 'error',
-                    error: 'Network error during upload',
+                    error: error.message,
                 });
-                reject(new Error('Network error during upload'));
-            });
-
-            xhr.addEventListener('abort', () => {
-                updateUploadState(index, {
-                    status: 'error',
-                    error: 'Upload cancelled',
-                });
-                reject(new Error('Upload cancelled'));
-            });
-
-            abortController.signal.addEventListener('abort', () => {
-                xhr.abort();
-            });
-
-            xhr.open('PUT', uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', upload.file.type || 'application/octet-stream');
-            xhr.send(upload.file);
+            },
+            abortSignal: abortController.signal,
         });
     };
 

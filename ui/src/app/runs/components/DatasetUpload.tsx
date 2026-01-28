@@ -18,6 +18,8 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import prettyBytes from 'pretty-bytes';
+import prettyMs from 'pretty-ms';
 
 import { FileUploadState, UploadStatus } from '../hooks/useRunSetup';
 
@@ -31,22 +33,6 @@ export interface Dataset {
  * Displays upload progress with percentage, bytes transferred, and time remaining
  */
 const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
-    const formatBytes = (bytes: number): string => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-    };
-
-    const formatTime = (seconds: number | null): string => {
-        if (seconds === null) return 'Calculating...';
-        if (seconds < 60) return `${Math.round(seconds)}s`;
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.round(seconds % 60);
-        return `${minutes}m ${secs}s`;
-    };
-
     return (
         <Box sx={{ mt: 1, mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
@@ -61,11 +47,11 @@ const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="caption" color="text.secondary">
-                    {formatBytes(upload.uploadedBytes)} / {formatBytes(upload.totalBytes)}
+                    {prettyBytes(upload.uploadedBytes)} / {prettyBytes(upload.totalBytes)}
                 </Typography>
                 {upload.secondsRemaining !== null && (
                     <Typography variant="caption" color="text.secondary">
-                        {formatTime(upload.secondsRemaining)} remaining
+                        {prettyMs(upload.secondsRemaining * 1000)} remaining
                     </Typography>
                 )}
             </Box>
@@ -191,7 +177,6 @@ export default function DatasetUpload({
             {(fileUploads.length > 0 || datasets.length > 0) && (
                 <FilesContainer>
                     {fileUploads.map((upload, index) => {
-                        const fileSizeMB = (upload.file.size / (1024 * 1024)).toFixed(2);
                         const fileType = upload.file.type || 'Unknown';
 
                         return (
@@ -205,7 +190,7 @@ export default function DatasetUpload({
                                         variant="body2"
                                         color="text.secondary"
                                         sx={{ mr: 2 }}>
-                                        {fileType} • {fileSizeMB} MB
+                                        {fileType} • {prettyBytes(upload.file.size)}
                                     </Typography>
 
                                     {/* Status indicators */}

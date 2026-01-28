@@ -44,9 +44,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         saveJobArgs,
         settings,
         creditsRemaining,
-        datasets,
-        selectedFiles,
-        uploading,
+        fileUploads,
         fieldErrors,
         isSubmitting,
         formError,
@@ -54,13 +52,14 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         updateSettings,
         handleFileSelect,
         handleFileDescriptionChange,
-        handleRemoveDataset,
-        handleRemoveSelectedFile,
+        handleRemoveFileUpload,
         handleExperimentsChange,
         handleSubmit,
+        cancelUpload,
+        retryUpload,
     } = useRunSetup({ runid, onSubmitSuccess });
 
-    const isFormDisabled = uploading || isSubmitting || isLoading;
+    const isFormDisabled = isSubmitting || isLoading;
     const datasetErrors = fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
 
     if (isLoading) {
@@ -139,12 +138,14 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 <FormControl fullWidth>
                     <StyledFormLabel>Upload source files</StyledFormLabel>
                     <DatasetUpload
-                        datasets={datasets}
-                        selectedFiles={selectedFiles}
+                        datasets={[]}
+                        fileUploads={fileUploads}
                         onFileSelect={handleFileSelect}
-                        onRemove={handleRemoveDataset}
-                        onRemoveSelectedFile={handleRemoveSelectedFile}
+                        onRemove={() => {}}
+                        onRemoveFileUpload={handleRemoveFileUpload}
                         onDescriptionChange={handleFileDescriptionChange}
+                        onCancelUpload={cancelUpload}
+                        onRetryUpload={retryUpload}
                         disabled={isFormDisabled}
                         error={datasetErrors}
                     />

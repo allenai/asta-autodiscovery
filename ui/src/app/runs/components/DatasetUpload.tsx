@@ -1,12 +1,25 @@
 'use client';
 
 import { useState, useRef, DragEvent } from 'react';
-import { Box, Stack, Typography, styled, alpha, TextField, IconButton } from '@mui/material';
+import {
+    Box,
+    Stack,
+    Typography,
+    styled,
+    alpha,
+    TextField,
+    IconButton,
+    LinearProgress,
+    Alert,
+    Button,
+} from '@mui/material';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
 
-import { SelectedFile } from '../hooks/useRunSetup';
+import { FileUploadState } from '../hooks/useRunSetup';
 
 export interface Dataset {
     filename: string;
@@ -14,13 +27,61 @@ export interface Dataset {
     path?: string;
 }
 
+/**
+ * Displays upload progress with percentage, bytes transferred, and time remaining
+ */
+const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
+    const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const formatTime = (seconds: number | null): string => {
+        if (seconds === null) return 'Calculating...';
+        if (seconds < 60) return `${Math.round(seconds)}s`;
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.round(seconds % 60);
+        return `${minutes}m ${secs}s`;
+    };
+
+    return (
+        <Box sx={{ mt: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <LinearProgress
+                    variant="determinate"
+                    value={upload.progress}
+                    sx={{ flex: 1, mr: 2 }}
+                />
+                <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'right' }}>
+                    {Math.round(upload.progress)}%
+                </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="text.secondary">
+                    {formatBytes(upload.uploadedBytes)} / {formatBytes(upload.totalBytes)}
+                </Typography>
+                {upload.secondsRemaining !== null && (
+                    <Typography variant="caption" color="text.secondary">
+                        {formatTime(upload.secondsRemaining)} remaining
+                    </Typography>
+                )}
+            </Box>
+        </Box>
+    );
+};
+
 interface DatasetUploadProps {
     datasets: Dataset[];
-    selectedFiles: SelectedFile[];
+    fileUploads: FileUploadState[];
     onFileSelect: (file: File) => void;
     onRemove: (index: number) => void;
-    onRemoveSelectedFile: (index: number) => void;
+    onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
+    onCancelUpload: (index: number) => void;
+    onRetryUpload: (index: number) => void;
     disabled?: boolean;
     error?: string;
 }
@@ -36,10 +97,12 @@ interface DatasetUploadProps {
  */
 export default function DatasetUpload({
     datasets,
-    selectedFiles,
+    fileUploads,
     onFileSelect,
-    onRemoveSelectedFile,
+    onRemoveFileUpload,
     onDescriptionChange,
+    onCancelUpload,
+    onRetryUpload,
     disabled = false,
     error,
 }: DatasetUploadProps) {
@@ -125,29 +188,92 @@ export default function DatasetUpload({
                 </Typography>
             </DropZone>
 
-            {(selectedFiles.length > 0 || datasets.length > 0) && (
+            {(fileUploads.length > 0 || datasets.length > 0) && (
                 <FilesContainer>
-                    {selectedFiles.map((selectedFile, index) => {
-                        const fileSizeMB = (selectedFile.file.size / (1024 * 1024)).toFixed(2);
-                        const fileType = selectedFile.file.type || 'Unknown';
+                    {fileUploads.map((upload, index) => {
+                        const fileSizeMB = (upload.file.size / (1024 * 1024)).toFixed(2);
+                        const fileType = upload.file.type || 'Unknown';
+                        const isUploading = upload.status === 'uploading';
+                        const isCompleted = upload.status === 'completed';
+                        const isError = upload.status === 'error';
+                        const isPending = upload.status === 'pending';
 
                         return (
-                            <File key={`selected-${index}`}>
+                            <File key={`upload-${index}`}>
                                 <FileHeader>
                                     <DescriptionOutlinedIcon />
-                                    <Typography variant="subtitle2">
-                                        {selectedFile.file.name}
+                                    <Typography variant="subtitle2" sx={{ flex: 1 }}>
+                                        {upload.file.name}
                                     </Typography>
-                                    <Typography variant="body2">
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mr: 2 }}>
                                         {fileType} • {fileSizeMB} MB
                                     </Typography>
+
+                                    {/* Status indicators */}
+                                    {isCompleted && (
+                                        <CheckCircleIcon
+                                            sx={{ color: 'success.main', mr: 1 }}
+                                            titleAccess="Upload completed"
+                                        />
+                                    )}
+                                    {isError && (
+                                        <ErrorIcon
+                                            sx={{ color: 'error.main', mr: 1 }}
+                                            titleAccess="Upload failed"
+                                        />
+                                    )}
+                                    {isPending && (
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{ mr: 1 }}>
+                                            Starting...
+                                        </Typography>
+                                    )}
+
+                                    {/* Cancel or Remove button */}
                                     <IconButton
                                         size="small"
-                                        onClick={() => onRemoveSelectedFile(index)}
-                                        sx={{ ml: 'auto' }}>
+                                        onClick={() =>
+                                            isUploading
+                                                ? onCancelUpload(index)
+                                                : onRemoveFileUpload(index)
+                                        }
+                                        disabled={disabled}
+                                        sx={{ ml: 'auto' }}
+                                        title={isUploading ? 'Cancel upload' : 'Remove file'}>
                                         <CloseIcon fontSize="small" />
                                     </IconButton>
                                 </FileHeader>
+
+                                {/* Progress bar - only show during upload */}
+                                {isUploading && (
+                                    <Box sx={{ px: 2, py: 1 }}>
+                                        <UploadProgress upload={upload} />
+                                    </Box>
+                                )}
+
+                                {/* Error message with retry button */}
+                                {isError && (
+                                    <Alert
+                                        severity="error"
+                                        sx={{ mx: 2, mt: 1 }}
+                                        action={
+                                            <Button
+                                                size="small"
+                                                onClick={() => onRetryUpload(index)}
+                                                sx={{ ml: 1 }}>
+                                                Retry
+                                            </Button>
+                                        }>
+                                        {upload.error || 'Upload failed'}
+                                    </Alert>
+                                )}
+
+                                {/* Description field */}
                                 <FileDescription>
                                     <DatasetSchemaTitle>
                                         Dataset Schema (Optional)
@@ -160,10 +286,10 @@ export default function DatasetUpload({
                                         multiline
                                         maxRows={3}
                                         fullWidth
-                                        value={selectedFile.description}
+                                        value={upload.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
                                         sx={{ mt: 1 }}
-                                        placeholder='e.g., 
+                                        placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,
 2. "final_choice_new" - “parcipants final choice in the treatment condition”
 3. Each row in this file represents a time-series'

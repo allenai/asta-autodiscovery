@@ -18,10 +18,12 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import prettyBytes from 'pretty-bytes';
 import prettyMs from 'pretty-ms';
 
-import { FileUploadState, UploadStatus } from '../hooks/useRunSetup';
+import { FileUploadState, UploadStatus } from '@/runs/hooks/useRunSetup';
+import { getFriendlyMimeType } from '@/utils/mimeType';
 
 export interface Dataset {
     filename: string;
@@ -175,61 +177,91 @@ export default function DatasetUpload({
                 <FilesContainer>
                     {fileUploads.map((upload, index) => {
                         const fileType = upload.file.type || 'Unknown';
+                        const friendlyType = getFriendlyMimeType(fileType);
 
                         return (
                             <File key={`upload-${index}`}>
                                 <FileHeader>
-                                    <DescriptionOutlinedIcon />
-                                    <Typography variant="subtitle2" sx={{ flex: 1 }}>
-                                        {upload.file.name}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                        sx={{ mr: 2 }}>
-                                        {fileType} • {prettyBytes(upload.file.size)}
-                                    </Typography>
+                                    <FileHeaderLeft>
+                                        <DescriptionOutlinedIcon />
+                                        <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
+                                        <FileHeaderFileMeta variant="body2" sx={{ mr: 2 }}>
+                                            {friendlyType} • {prettyBytes(upload.file.size)}
+                                        </FileHeaderFileMeta>
+                                    </FileHeaderLeft>
+                                    <FileHeaderRight>
+                                        {/* Status indicators */}
+                                        {upload.status === UploadStatus.COMPLETED && (
+                                            <CheckCircleIcon
+                                                sx={{ color: 'success.main', mr: 1 }}
+                                                titleAccess="Upload completed"
+                                            />
+                                        )}
+                                        {upload.status === UploadStatus.ERROR && (
+                                            <ErrorIcon
+                                                sx={{ mr: 1 }}
+                                                titleAccess="Upload failed"
+                                                color="error"
+                                            />
+                                        )}
+                                        {upload.status === UploadStatus.PENDING && (
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ mr: 1 }}>
+                                                Starting...
+                                            </Typography>
+                                        )}
 
-                                    {/* Status indicators */}
-                                    {upload.status === UploadStatus.COMPLETED && (
-                                        <CheckCircleIcon
-                                            sx={{ color: 'success.main', mr: 1 }}
-                                            titleAccess="Upload completed"
-                                        />
-                                    )}
-                                    {upload.status === UploadStatus.ERROR && (
-                                        <ErrorIcon
-                                            sx={{ color: 'error.main', mr: 1 }}
-                                            titleAccess="Upload failed"
-                                        />
-                                    )}
+                                        {/* Status indicators */}
+                                        {upload.status === UploadStatus.COMPLETED && (
+                                            <CheckCircleIcon
+                                                sx={{ color: 'success.main', mr: 1 }}
+                                                titleAccess="Upload completed"
+                                            />
+                                        )}
+                                        {upload.status === UploadStatus.ERROR && (
+                                            <ErrorIcon
+                                                sx={{ color: 'error.main', mr: 1 }}
+                                                titleAccess="Upload failed"
+                                            />
+                                        )}
 
-                                    {upload.status === UploadStatus.PENDING && (
-                                        <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                            sx={{ mr: 1 }}>
-                                            Starting...
-                                        </Typography>
-                                    )}
+                                        {upload.status === UploadStatus.PENDING && (
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ mr: 1 }}>
+                                                Starting...
+                                            </Typography>
+                                        )}
 
-                                    {/* Cancel or Remove button */}
-                                    <IconButton
-                                        size="small"
-                                        onClick={() =>
-                                            upload.status === UploadStatus.UPLOADING
-                                                ? onCancelUpload(index)
-                                                : onRemoveFileUpload(index)
-                                        }
-                                        disabled={disabled}
-                                        sx={{ ml: 'auto' }}
-                                        title={
-                                            upload.status === UploadStatus.UPLOADING
-                                                ? 'Cancel upload'
-                                                : 'Remove file'
-                                        }>
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
+                                        {/* Cancel button */}
+                                        {upload.status === UploadStatus.UPLOADING && (
+                                            <Button
+                                                size="small"
+                                                onClick={() => onCancelUpload(index)}
+                                                disabled={disabled}
+                                                sx={{ ml: 'auto' }}
+                                                startIcon={
+                                                    <StopCircleOutlinedIcon color="error" />
+                                                }>
+                                                Cancel
+                                            </Button>
+                                        )}
+
+                                        {/* Remove button */}
+                                        {upload.status !== UploadStatus.UPLOADING && (
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => onRemoveFileUpload(index)}
+                                                disabled={disabled}
+                                                sx={{ ml: 'auto' }}
+                                                title="Remove file">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                    </FileHeaderRight>
                                 </FileHeader>
 
                                 {/* Progress bar - only show during upload */}
@@ -339,6 +371,7 @@ const FileHeader = styled(Box)(({ theme }) => ({
     borderBottom: `1px solid ${theme.color['cream-10'].rgba.toString()}`,
     color: theme.color['cream-60'].rgba.toString(),
     display: 'flex',
+    justifyContent: 'space-between',
     gap: theme.spacing(1),
     padding: theme.spacing(2),
 
@@ -358,6 +391,23 @@ const FileHeader = styled(Box)(({ theme }) => ({
             color: theme.color['cream-100'].hex,
         },
     },
+}));
+
+const FileHeaderLeft = styled(Box)(({ theme }) => ({
+    display: 'flex',
+}));
+
+const FileHeaderRight = styled(Box)(({ theme }) => ({
+    display: 'flex',
+}));
+
+const FileHeaderFilename = styled(Typography)(({ theme }) => ({
+    fontWeight: 'bold',
+    color: theme.color['cream-100'].hex,
+}));
+
+const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
+    opacity: 0.6,
 }));
 
 const FileDescription = styled(Box)(({ theme }) => ({

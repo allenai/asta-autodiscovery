@@ -7,12 +7,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import time
 
 from autodiscovery.agents import get_agents
-from autodiscovery.mcts import MCTSNode, default_mcts_selection, beam_search, progressive_widening, progressive_widening_all, \
-    ucb1_recursive
+from autodiscovery.mcts import (
+    MCTSNode,
+    default_mcts_selection,
+    beam_search,
+    progressive_widening,
+    progressive_widening_all,
+    ucb1_recursive,
+)
 from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
 from autodiscovery.logger import TreeLogger
 
-from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
+from autodiscovery.beliefs import BeliefTrueFalseCat, calculate_prior_and_posterior_beliefs
 from datetime import datetime
 import shutil
 
@@ -29,11 +35,68 @@ from autodiscovery.mcts_utils import (
     save_mcts_node,
 )
 
+def _theoretical_max_boolean_cat(n_samples: int, evidence_weight: float) -> float:
+    """Compute the theoretical maximum belief change for boolean_cat."""
+    prior_true = BeliefTrueFalseCat.DistributionFormat(
+        n=float(n_samples),
+        definitely_true=float(n_samples),
+        maybe_true=0.0,
+        uncertain=0.0,
+        maybe_false=0.0,
+        definitely_false=0.0,
+    )
+    prior_false = BeliefTrueFalseCat.DistributionFormat(
+        n=float(n_samples),
+        definitely_true=0.0,
+        maybe_true=0.0,
+        uncertain=0.0,
+        maybe_false=0.0,
+        definitely_false=float(n_samples),
+    )
+    posterior_true = BeliefTrueFalseCat.DistributionFormat(
+        n=float(n_samples) * evidence_weight,
+        definitely_true=float(n_samples) * evidence_weight,
+        maybe_true=0.0,
+        uncertain=0.0,
+        maybe_false=0.0,
+        definitely_false=0.0,
+    )
+    posterior_false = BeliefTrueFalseCat.DistributionFormat(
+        n=float(n_samples) * evidence_weight,
+        definitely_true=0.0,
+        maybe_true=0.0,
+        uncertain=0.0,
+        maybe_false=0.0,
+        definitely_false=float(n_samples) * evidence_weight,
+    )
 
-def compute_and_store_reward(node, belief_model_name, belief_temperature, reasoning_effort,
-                             n_belief_samples, implicit_bayes_posterior, surprisal_width, belief_mode,
-                             use_binary_reward, all_surprisals=None, use_online_beliefs=False,
-                             evidence_weight=1.0, kl_scale=20.0, reward_mode="belief", TEMP_LOG=None):
+    prior_true_mean = prior_true.get_mean_belief(recompute=True)
+    prior_false_mean = prior_false.get_mean_belief(recompute=True)
+    posterior_false_mean = posterior_false.get_mean_belief(prior=prior_true, recompute=True)
+    posterior_true_mean = posterior_true.get_mean_belief(prior=prior_false, recompute=True)
+
+    diff_true_to_false = abs(posterior_false_mean - prior_true_mean)
+    diff_false_to_true = abs(posterior_true_mean - prior_false_mean)
+    return max(diff_true_to_false, diff_false_to_true)
+
+
+def compute_and_store_reward(
+    node,
+    belief_model_name,
+    belief_temperature,
+    reasoning_effort,
+    n_belief_samples,
+    implicit_bayes_posterior,
+    surprisal_width,
+    belief_mode,
+    use_binary_reward,
+    all_surprisals=None,
+    use_online_beliefs=False,
+    evidence_weight=1.0,
+    kl_scale=20.0,
+    reward_mode="belief",
+    TEMP_LOG=None,
+):
     s_conditioned_prior = None
     evidence_msg = []
 
@@ -111,6 +174,14 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
         node.success = False
         return
 
+    normalized_surprisal = None
+    if belief_mode == "boolean_cat" and prior is not None and posterior is not None:
+        theoretical_max = _theoretical_max_boolean_cat(n_belief_samples, evidence_weight)
+        if theoretical_max != 0:
+            prior_mean = prior.get_mean_belief(recompute=True)
+            posterior_mean = posterior.get_mean_belief(prior=prior, recompute=True)
+            normalized_surprisal = (posterior_mean - prior_mean) / theoretical_max
+
     # TEMPORARY LOGGING
     if TEMP_LOG is not None and len(TEMP_LOG) > 0:
         # Generate the posterior without surprisals
@@ -144,6 +215,7 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
     node.prior = prior
     node.posterior = posterior
     node.belief_change = belief_change
+    node.normalized_surprisal = normalized_surprisal
     node.kl_divergence = kl_divergence
     # Compute reward and surprisal
     node.self_value, node.surprising = get_self_value(belief_change=node.belief_change,

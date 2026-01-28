@@ -393,11 +393,11 @@ const FileHeader = styled(Box)(({ theme }) => ({
     },
 }));
 
-const FileHeaderLeft = styled(Box)(({ theme }) => ({
+const FileHeaderLeft = styled(Box)(() => ({
     display: 'flex',
 }));
 
-const FileHeaderRight = styled(Box)(({ theme }) => ({
+const FileHeaderRight = styled(Box)(() => ({
     display: 'flex',
 }));
 
@@ -406,7 +406,7 @@ const FileHeaderFilename = styled(Typography)(({ theme }) => ({
     color: theme.color['cream-100'].hex,
 }));
 
-const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
+const FileHeaderFileMeta = styled(Typography)(() => ({
     opacity: 0.6,
 }));
 

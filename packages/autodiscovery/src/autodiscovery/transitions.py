@@ -10,11 +10,11 @@ class SpeakerSelector:
 
     def select_next_speaker(self, last_speaker: Agent, groupchat: GroupChat) -> Optional[Agent]:
         """Define a customized speaker selection function for the data exploration workflow.
-        
+
         Args:
             last_speaker: The previous speaker in the conversation
             groupchat: The GroupChat instance containing conversation history
-            
+
         Returns:
             The next agent to speak or None to end the conversation
         """

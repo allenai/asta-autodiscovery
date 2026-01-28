@@ -7,12 +7,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import time
 
 from autodiscovery.agents import get_agents
-from autodiscovery.mcts import MCTSNode, default_mcts_selection, beam_search, progressive_widening, progressive_widening_all, \
-    ucb1_recursive
+from autodiscovery.mcts import (
+    MCTSNode,
+    default_mcts_selection,
+    beam_search,
+    progressive_widening,
+    progressive_widening_all,
+    ucb1_recursive,
+)
 from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
 from autodiscovery.logger import TreeLogger
 
-from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
+from autodiscovery.beliefs import BeliefTrueFalseCat, calculate_prior_and_posterior_beliefs
 from datetime import datetime
 import shutil
 
@@ -30,26 +36,73 @@ from autodiscovery.mcts_utils import (
 )
 
 
-def compute_and_store_reward(node, belief_model_name, belief_temperature, reasoning_effort,
-                             n_belief_samples, implicit_bayes_posterior, surprisal_width, belief_mode,
-                             use_binary_reward, all_surprisals=None, use_online_beliefs=False,
-                             evidence_weight=1.0, kl_scale=20.0, reward_mode="belief", TEMP_LOG=None):
+def _theoretical_max_boolean_cat(
+    n_samples: int, evidence_weight: float, prior_params: tuple[float, float] = (0.5, 0.5)
+) -> float:
+    """Compute the maximum possible mean shift for boolean_cat beliefs.
+
+    Args:
+        n_samples: Maximum number of prior-stage samples (N).
+        evidence_weight: Weight applied to stage-2 (evidence) samples.
+        prior_params: Beta prior parameters (alpha, beta).
+
+    Returns:
+        Theoretical maximum |mu2 - mu1| over all nodes given N and evidence weight.
+    """
+    n = float(n_samples)
+    w = float(evidence_weight)
+    if n <= 0 or w <= 0:
+        return 0.0
+
+    alpha, beta = prior_params
+    s = alpha + beta
+    d = min(alpha, beta)
+    t = w * n
+
+    # Unconstrained (relaxed) optimum in u = S + n space.
+    u_star = d + math.sqrt(d * (d + t))
+    # Clamp to feasible interval u in [S, S + N] because n in [0, N].
+    u_opt = min(max(u_star, s), s + n)
+    return (t * (u_opt - d)) / (u_opt * (u_opt + t))
+
+
+def compute_and_store_reward(
+    node,
+    belief_model_name,
+    belief_temperature,
+    reasoning_effort,
+    n_belief_samples,
+    implicit_bayes_posterior,
+    surprisal_width,
+    belief_mode,
+    use_binary_reward,
+    all_surprisals=None,
+    use_online_beliefs=False,
+    evidence_weight=1.0,
+    kl_scale=20.0,
+    reward_mode="belief",
+    TEMP_LOG=None,
+):
     s_conditioned_prior = None
     evidence_msg = []
 
     # If there are past surprisal, computed the s-conditioned prior
     if all_surprisals is not None and len(all_surprisals) > 0 and use_online_beliefs:
         # Build evidence message for prior belief elicitation
-        evidence_msg = [{
-            "role": "user",
-            "content": "Previous study:\n\n" + get_context_string(
-                hyp_exp_query=f"Hypothesis: {nodes_by_level[level_index[0]][level_index[1]].hypothesis}",
-                analysis=nodes_by_level[level_index[0]][level_index[1]].analysis,
-                review=nodes_by_level[level_index[0]][level_index[1]].review,
-                belief_mean=nodes_by_level[level_index[0]][level_index[1]].posterior.mean,
-                include_code_output=False
-            )
-        } for level_index in all_surprisals]
+        evidence_msg = [
+            {
+                "role": "user",
+                "content": "Previous study:\n\n"
+                + get_context_string(
+                    hyp_exp_query=f"Hypothesis: {nodes_by_level[level_index[0]][level_index[1]].hypothesis}",
+                    analysis=nodes_by_level[level_index[0]][level_index[1]].analysis,
+                    review=nodes_by_level[level_index[0]][level_index[1]].review,
+                    belief_mean=nodes_by_level[level_index[0]][level_index[1]].posterior.mean,
+                    include_code_output=False,
+                ),
+            }
+            for level_index in all_surprisals
+        ]
         try:
             pt_prior, s_conditioned_prior, _, _ = calculate_prior_and_posterior_beliefs(
                 node,
@@ -60,7 +113,7 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
                 implicit_bayes_posterior=implicit_bayes_posterior,
                 surprisal_width=surprisal_width,
                 belief_mode=belief_mode,
-                evidence_msg=evidence_msg
+                evidence_msg=evidence_msg,
             )
         except ValueError as e:
             print(f"Error for node {node.id}: {e}")
@@ -69,27 +122,32 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
 
         # TEMPORARY LOGGING
         if TEMP_LOG is not None:
-            TEMP_LOG.append({
-                'node_id': node.id,
-                'belief_change': None,
-                'kl_divergence': None,
-                'hypothesis': node.hypothesis,
-                'pt_prior': pt_prior.to_dict(),
-                'surprisal_evidence': [e['content'] for e in evidence_msg],
-                's_conditioned_prior': s_conditioned_prior.to_dict(),
-            })
+            TEMP_LOG.append(
+                {
+                    "node_id": node.id,
+                    "belief_change": None,
+                    "kl_divergence": None,
+                    "hypothesis": node.hypothesis,
+                    "pt_prior": pt_prior.to_dict(),
+                    "surprisal_evidence": [e["content"] for e in evidence_msg],
+                    "s_conditioned_prior": s_conditioned_prior.to_dict(),
+                }
+            )
 
     # Build the evidence message for the current node
-    evidence_msg.append({
-        "role": "user",
-        "content": "Current experiment:\n\n" + get_context_string(
-            hyp_exp_query=node.query,
-            code_output=node.code_output,
-            analysis=node.analysis,
-            review=node.review,
-            include_code_output=False
-        )
-    })
+    evidence_msg.append(
+        {
+            "role": "user",
+            "content": "Current experiment:\n\n"
+            + get_context_string(
+                hyp_exp_query=node.query,
+                code_output=node.code_output,
+                analysis=node.analysis,
+                review=node.review,
+                include_code_output=False,
+            ),
+        }
+    )
 
     # Compute the prior and posterior beliefs for the current node
     try:
@@ -104,12 +162,23 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
             belief_mode=belief_mode,
             prior=s_conditioned_prior,
             evidence_msg=evidence_msg,
-            evidence_weight=evidence_weight
+            evidence_weight=evidence_weight,
         )
     except ValueError as e:
         print(f"Error for node {node.id}: {e}")
         node.success = False
         return
+
+    normalized_surprisal = None
+    if belief_mode == "boolean_cat" and prior is not None and posterior is not None:
+        prior_params = getattr(prior, "prior_params", (0.5, 0.5))
+        theoretical_max = _theoretical_max_boolean_cat(
+            n_belief_samples, evidence_weight, prior_params=prior_params
+        )
+        if theoretical_max != 0:
+            prior_mean = prior.get_mean_belief(recompute=True)
+            posterior_mean = posterior.get_mean_belief(prior=prior, recompute=True)
+            normalized_surprisal = (posterior_mean - prior_mean) / theoretical_max
 
     # TEMPORARY LOGGING
     if TEMP_LOG is not None and len(TEMP_LOG) > 0:
@@ -125,31 +194,45 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
             belief_mode=belief_mode,
             prior=pt_prior,
             evidence_msg=evidence_msg[-1:],
-            evidence_weight=evidence_weight
+            evidence_weight=evidence_weight,
         )
 
-        TEMP_LOG[-1]['current_evidence'] = evidence_msg[-1]['content']
-        TEMP_LOG[-1]['online_posterior'] = posterior.to_dict()
-        TEMP_LOG[-1]['belief_change'] = belief_change
-        TEMP_LOG[-1]['kl_divergence'] = kl_divergence
-        TEMP_LOG[-1]['offline_posterior'] = _posterior.to_dict()
-        TEMP_LOG[-1]['offline_belief_change'] = _belief_change
-        TEMP_LOG[-1]['offline_kl_divergence'] = _kl_divergence
-        TEMP_LOG[-1]['current_surprisals'] = all_surprisals.copy()
+        TEMP_LOG[-1]["current_evidence"] = evidence_msg[-1]["content"]
+        TEMP_LOG[-1]["online_posterior"] = posterior.to_dict()
+        TEMP_LOG[-1]["belief_change"] = belief_change
+        TEMP_LOG[-1]["kl_divergence"] = kl_divergence
+        TEMP_LOG[-1]["offline_posterior"] = _posterior.to_dict()
+        TEMP_LOG[-1]["offline_belief_change"] = _belief_change
+        TEMP_LOG[-1]["offline_kl_divergence"] = _kl_divergence
+        TEMP_LOG[-1]["current_surprisals"] = all_surprisals.copy()
 
         print(f"\n\n======================= SURPRISAL-CONDITION BELIEFS =======================\n")
-        print(json.dumps({k: v for k, v in TEMP_LOG[-1].items() if
-                          k in ["pt_prior", "s_conditioned_prior", "online_posterior", "offline_posterior"]}, indent=2))
+        print(
+            json.dumps(
+                {
+                    k: v
+                    for k, v in TEMP_LOG[-1].items()
+                    if k
+                    in ["pt_prior", "s_conditioned_prior", "online_posterior", "offline_posterior"]
+                },
+                indent=2,
+            )
+        )
 
     node.prior = prior
     node.posterior = posterior
     node.belief_change = belief_change
+    node.normalized_surprisal = normalized_surprisal
     node.kl_divergence = kl_divergence
     # Compute reward and surprisal
-    node.self_value, node.surprising = get_self_value(belief_change=node.belief_change,
-                                                      kl_divergence=node.kl_divergence,
-                                                      binary=use_binary_reward, width=surprisal_width,
-                                                      kl_scale=kl_scale, mode=reward_mode)
+    node.self_value, node.surprising = get_self_value(
+        belief_change=node.belief_change,
+        kl_divergence=node.kl_divergence,
+        binary=use_binary_reward,
+        width=surprisal_width,
+        kl_scale=kl_scale,
+        mode=reward_mode,
+    )
     if node.surprising:
         # Store the surprisal
         all_surprisals.append((node.level, node.node_idx))
@@ -157,42 +240,42 @@ def compute_and_store_reward(node, belief_model_name, belief_temperature, reason
 
 
 def run_mcts(
-        root,
-        nodes_by_level,
-        dataset_paths,
-        log_dirname,
-        work_dir,
-        model_name="gpt-4o",
-        belief_model_name="gpt-4o",
-        max_iterations=100,
-        branching_factor=8,
-        max_rounds=100000,
-        selection_method=None,
-        allow_generate_experiments=False,
-        n_belief_samples=30,
-        k_parents=3,
-        temperature=1.0,
-        belief_temperature=1.0,
-        reasoning_effort="medium",
-        implicit_bayes_posterior=False,
-        surprisal_width=0.2,
-        user_query=None,
-        belief_mode="categorical",
-        use_binary_reward=True,
-        run_dedupe=True,
-        experiment_first=False,
-        code_timeout=30 * 60,
-        n_warmstart=0,
-        use_online_beliefs=False,
-        evidence_weight=1.0,
-        kl_scale=20.0,
-        reward_mode="belief_and_kl",
-        warmstart_experiments=None,
-        use_modal_sandbox=False,
-        bucket_path=None,
-        vision_model="gpt-4o",
-        batch_size=1,
-        n_threads=1,
+    root,
+    nodes_by_level,
+    dataset_paths,
+    log_dirname,
+    work_dir,
+    model_name="gpt-4o",
+    belief_model_name="gpt-4o",
+    max_iterations=100,
+    branching_factor=8,
+    max_rounds=100000,
+    selection_method=None,
+    allow_generate_experiments=False,
+    n_belief_samples=30,
+    k_parents=3,
+    temperature=1.0,
+    belief_temperature=1.0,
+    reasoning_effort="medium",
+    implicit_bayes_posterior=False,
+    surprisal_width=0.2,
+    user_query=None,
+    belief_mode="categorical",
+    use_binary_reward=True,
+    run_dedupe=True,
+    experiment_first=False,
+    code_timeout=30 * 60,
+    n_warmstart=0,
+    use_online_beliefs=False,
+    evidence_weight=1.0,
+    kl_scale=20.0,
+    reward_mode="belief_and_kl",
+    warmstart_experiments=None,
+    use_modal_sandbox=False,
+    bucket_path=None,
+    vision_model="gpt-4o",
+    batch_size=1,
+    n_threads=1,
 ):
     """
     Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
@@ -235,6 +318,7 @@ def run_mcts(
         batch_size: Number of nodes to select and expand per iteration.
         n_threads: Number of threads to use for parallel node expansion.
     """
+
     def _get_executor_rich_outputs(code_executor_agent) -> list:
         """Return the most recent rich outputs from the code executor, if available."""
         executor = getattr(code_executor_agent, "code_executor", None)
@@ -249,6 +333,7 @@ def run_mcts(
         output_path = os.path.join(rich_outputs_dir, f"ro_{level}_{node_idx}.json")
         with open(output_path, "w") as f:
             json.dump(rich_outputs, f, indent=2)
+
     # Setup logger
     logger = TreeLogger(log_dirname)
 
@@ -304,9 +389,7 @@ def run_mcts(
     total_to_sample = max_iterations
     n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
     warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
-    remaining_after_warmstart = max(
-        0, total_to_sample - n_root_iteration - warmstart_remaining
-    )
+    remaining_after_warmstart = max(0, total_to_sample - n_root_iteration - warmstart_remaining)
     n_iterations = (
         n_root_iteration
         + math.ceil(warmstart_remaining / batch_size)
@@ -386,13 +469,17 @@ def run_mcts(
                 # Load previous explorations (make sure the root is always included)
                 node_context = []
                 if node.level > 1:
-                    node_context = [root.children[0].get_context(include_code_output=True)] + node.get_path_context(
-                        k=k_parents - 1, skip_root=True
-                    )
+                    node_context = [
+                        root.children[0].get_context(include_code_output=True)
+                    ] + node.get_path_context(k=k_parents - 1, skip_root=True)
                 node_messages = []
                 if node_context is not None:
                     node_messages += [
-                        {"name": "user_proxy", "role": "user", "content": "PREVIOUS EXPLORATION:\n\n" + n}
+                        {
+                            "name": "user_proxy",
+                            "role": "user",
+                            "content": "PREVIOUS EXPLORATION:\n\n" + n,
+                        }
                         for n in node_context
                     ]
                 node_messages += [
@@ -593,7 +680,9 @@ def run_mcts(
     time_elapsed = end_time - start_time
 
     # Save all MCTS nodes
-    save_nodes(nodes_by_level, log_dirname, run_dedupe, belief_model_name, time_elapsed=time_elapsed)
+    save_nodes(
+        nodes_by_level, log_dirname, run_dedupe, belief_model_name, time_elapsed=time_elapsed
+    )
 
 
 if __name__ == "__main__":
@@ -607,7 +696,9 @@ if __name__ == "__main__":
         print("Warning: Setting temperature for o4-mini is not permitted. Using default None.")
         args.temperature = None
     if "o4-mini" in args.belief_model and args.belief_temperature is not None:
-        print("Warning: Setting temperature for o4-mini belief model is not permitted. Using default None.")
+        print(
+            "Warning: Setting temperature for o4-mini belief model is not permitted. Using default None."
+        )
         args.belief_temperature = None
 
     # Create log directory
@@ -625,10 +716,15 @@ if __name__ == "__main__":
     print(f"\nArguments saved to {args_file}\n")
 
     # Get dataset paths
-    dataset_paths, dataset_metadata = get_datasets_fpaths(args.dataset_metadata,
-                                                          is_blade=args.dataset_metadata_type == 'blade')
-    load_dataset_experiment = get_load_dataset_experiment(dataset_paths, dataset_metadata, run_eda=args.run_eda,
-                                                          dataset_metadata_type=args.dataset_metadata_type)
+    dataset_paths, dataset_metadata = get_datasets_fpaths(
+        args.dataset_metadata, is_blade=args.dataset_metadata_type == "blade"
+    )
+    load_dataset_experiment = get_load_dataset_experiment(
+        dataset_paths,
+        dataset_metadata,
+        run_eda=args.run_eda,
+        dataset_metadata_type=args.dataset_metadata_type,
+    )
 
     if args.continue_from_dir or args.continue_from_json:
         if args.continue_from_dir is not None:
@@ -637,7 +733,10 @@ if __name__ == "__main__":
             # Copy all files except args.json from continue_from_dir to the new log directory
             for filename in os.listdir(args.continue_from_dir):
                 if filename != "args.json":
-                    shutil.copy(os.path.join(args.continue_from_dir, filename), os.path.join(log_dirname, filename))
+                    shutil.copy(
+                        os.path.join(args.continue_from_dir, filename),
+                        os.path.join(log_dirname, filename),
+                    )
         else:
             # Load from a JSON file that contains all the nodes (not de-duplicated)
             root, nodes_by_level = load_mcts_from_json(args.continue_from_json, args)
@@ -651,7 +750,10 @@ if __name__ == "__main__":
             # Copy all files except args.json from continue_from_dir to the new log directory
             for filename in os.listdir(args.continue_from_dir):
                 if filename != "args.json":
-                    shutil.copy(os.path.join(args.continue_from_dir, filename), os.path.join(log_dirname, filename))
+                    shutil.copy(
+                        os.path.join(args.continue_from_dir, filename),
+                        os.path.join(log_dirname, filename),
+                    )
         else:
             # Create the individual node files in the log directory
             for node in nodes_by_level.values():
@@ -667,10 +769,17 @@ if __name__ == "__main__":
             print(f"Already reached or exceeded target of {args.n_experiments} experiments")
             exit(0)
         print(
-            f"RESUMING: Running {remaining_iters} more experiments to reach the target experiment count of {args.n_experiments}.\n")
+            f"RESUMING: Running {remaining_iters} more experiments to reach the target experiment count of {args.n_experiments}.\n"
+        )
     else:
-        root = MCTSNode(level=0, node_idx=0, hypothesis=None, query=None,
-                        allow_generate_experiments=False, untried_experiments=[load_dataset_experiment])
+        root = MCTSNode(
+            level=0,
+            node_idx=0,
+            hypothesis=None,
+            query=None,
+            allow_generate_experiments=False,
+            untried_experiments=[load_dataset_experiment],
+        )
         nodes_by_level = defaultdict(list)
         nodes_by_level[0].append(root)
         remaining_iters = args.n_experiments + 1  # + 1 to account for root node
@@ -683,7 +792,9 @@ if __name__ == "__main__":
     elif args.mcts_selection == "pw_all":
         # Progressive Widening
         assert args.pw_k is not None and args.pw_alpha is not None
-        selection_method = progressive_widening_all(args.pw_k, args.pw_alpha, args.exploration_weight)
+        selection_method = progressive_widening_all(
+            args.pw_k, args.pw_alpha, args.exploration_weight
+        )
     elif args.mcts_selection == "beam_search":
         # Beam Search
         selection_method = beam_search(args.k_experiments, args.beam_width, args.out_dir)

@@ -197,7 +197,9 @@ def get_job_status(execution_id: str, config: JobConfig | None = None) -> dict[s
     job_name = _infer_job_name_from_execution_id(execution_id, config.job_name)
 
     # Build execution resource name
-    execution_name = f"projects/{project_id}/locations/{config.region}/jobs/{job_name}/executions/{execution_id}"
+    execution_name = (
+        f"projects/{project_id}/locations/{config.region}/jobs/{job_name}/executions/{execution_id}"
+    )
 
     try:
         # Create ExecutionsClient and get execution details
@@ -301,7 +303,9 @@ def cancel_job(execution_id: str, config: JobConfig | None = None) -> None:
     job_name = _infer_job_name_from_execution_id(execution_id, config.job_name)
 
     # Build execution resource name
-    execution_name = f"projects/{project_id}/locations/{config.region}/jobs/{job_name}/executions/{execution_id}"
+    execution_name = (
+        f"projects/{project_id}/locations/{config.region}/jobs/{job_name}/executions/{execution_id}"
+    )
 
     try:
         # Create ExecutionsClient and cancel the execution

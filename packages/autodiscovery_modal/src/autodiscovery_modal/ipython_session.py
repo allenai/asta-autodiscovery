@@ -11,6 +11,8 @@ APP_NAME = "autodiscovery"
 RUN_IPYTHON_CELL_FUNCTION_NAME = "run_ipython_cell"
 
 app = modal.App(APP_NAME)
+
+
 def build_sandbox_image(
     extra_packages: Iterable[str] | None = None,
     *,

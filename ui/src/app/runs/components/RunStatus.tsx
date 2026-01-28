@@ -14,6 +14,7 @@ import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { getRelativeTime } from '@/utils/timeUtils';
 
 interface RunStatusProps {
     runid: string;
@@ -33,12 +34,14 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     const api = getRunsApi();
 
     const [run, setRun] = useState<Run | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [, setTick] = useState(0);
 
     const fetchStatus = async () => {
-        setLoading(true);
+        setIsLoading(true);
         setError(null);
 
         try {
@@ -46,11 +49,12 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
             const run = getRunFromApi(response.data);
 
             setRun(run);
+            setLastUpdated(new Date());
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -69,7 +73,16 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         }, 30000);
 
         return () => clearInterval(interval);
-    }, [runid]);
+    }, [run?.details?.status]);
+
+    // Update relative time display every 10 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTick((prev) => prev + 1);
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const handleStop = async () => {
         if (!confirm('Are you sure you want to stop this run?')) {
@@ -121,7 +134,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     const canStop = run?.details?.status === 'RUNNING';
     const experimentsLabel = run?.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments';
 
-    if (loading) {
+    if (isLoading && !run) {
         return (
             <Box
                 sx={{
@@ -153,6 +166,7 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                 handleStop={handleStop}
                 getStatusColor={getStatusColor}
                 experimentsLabel={experimentsLabel}
+                lastUpdated={lastUpdated}
             />
         </RunExperimentsProvider>
     );
@@ -166,6 +180,7 @@ interface RunStatusContentProps {
     handleStop: () => void;
     getStatusColor: (status: string) => any;
     experimentsLabel: string;
+    lastUpdated: Date | null;
 }
 
 function RunStatusContent({
@@ -176,6 +191,7 @@ function RunStatusContent({
     handleStop,
     getStatusColor,
     experimentsLabel,
+    lastUpdated,
 }: RunStatusContentProps) {
     const { selectedExperiment, selectExperiment } = useRunExperiments();
     const [isTableExpanded, setIsTableExpanded] = useState(false);
@@ -190,7 +206,23 @@ function RunStatusContent({
                     $isExpanded={isTableExpanded}
                     key={`${isTableExpanded ? 'expanded' : 'collapsed'} ${selectedExperiment?.experimentId ?? ''}`}>
                     <RunHeader>
-                        <RunHeaderName>{run.name}</RunHeaderName>
+                        <Box>
+                            <RunHeaderName>{run.name}</RunHeaderName>
+                            <Timestamp>
+                                Started{' '}
+                                {new Date(run.details.createdAt).toLocaleString(undefined, {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                })}{' '}
+                                • Last updated {getRelativeTime(lastUpdated)}
+                            </Timestamp>
+                            {!!run.stats?.pendingExperiments && (
+                                <Typography variant="caption">
+                                    It’s safe to close this tab, you will be notified by email when
+                                    complete.
+                                </Typography>
+                            )}
+                        </Box>
                         <RunHeaderExpandButton onClick={() => setIsTableExpanded(!isTableExpanded)}>
                             {isTableExpanded ? 'Collapse' : 'Expand'}
                         </RunHeaderExpandButton>
@@ -348,18 +380,20 @@ const StopButton = styled(Button)`
 
 const RunHeader = styled('div')`
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
     justify-content: space-between;
     padding: ${({ theme }) => theme.spacing(3)};
 `;
 
 const RunHeaderName = styled('div')`
+    color: ${({ theme }) => theme.color['green-100'].hex};
     flex: 1 1 auto;
+    font-size: 1.25rem;
+    font-weight: 700;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: ${({ theme }) => theme.color['green-100'].hex};
-    font-size: 1.25rem;
 `;
 
 const RunHeaderExpandButton = styled(Button)`
@@ -380,4 +414,9 @@ const ExperimentCount = styled('div')`
     .MuiSvgIcon-root {
         font-size: 1.2rem;
     }
+`;
+
+const Timestamp = styled(Typography)`
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    font-weight: 700;
 `;

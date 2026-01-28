@@ -16,7 +16,6 @@ import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
-import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Run, getRunFromApi } from '@/types/Run';
@@ -87,11 +86,11 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         return () => clearInterval(interval);
     }, [run?.details?.status]);
 
-    // Update relative time display every 10 seconds
+    // Update relative time display every 30 seconds
     useEffect(() => {
         const interval = setInterval(() => {
             setTick((prev) => prev + 1);
-        }, 10000);
+        }, 30000);
 
         return () => clearInterval(interval);
     }, []);
@@ -219,20 +218,20 @@ function RunStatusContent({
                                 </StyledListItem>
                             </RunHeaderSubtitle>
 
-                            {/* {!!run.stats?.pendingExperiments && ( */}
-                            <>
-                                <Typography variant="caption">
-                                    AutoDiscovery is running. New findings will populate the table
-                                    below automatically. You can click on any hypothesis to review
-                                    the details while the run continues.
-                                </Typography>
-                                <br />
-                                <Typography variant="caption">
-                                    Feel free to close this tab. We will email you when the full
-                                    analysis is complete.
-                                </Typography>
-                            </>
-                            {/* )} */}
+                            {!!run.stats?.pendingExperiments && (
+                                <>
+                                    <Typography variant="caption">
+                                        AutoDiscovery is running. New findings will populate the
+                                        table below automatically. You can click on any hypothesis
+                                        to review the details while the run continues.
+                                    </Typography>
+                                    <br />
+                                    <Typography variant="caption">
+                                        Feel free to close this tab. We will email you when the full
+                                        analysis is complete.
+                                    </Typography>
+                                </>
+                            )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         {ENABLE_GRAPH_VIZ && (
@@ -246,24 +245,17 @@ function RunStatusContent({
                     <Box sx={{ padding: 3 }}>
                         <RunStats>
                             {run.stats && (
-                                <Box display="flex" gap={1.5}>
-                                    <ExperimentCount>
-                                        <ScienceOutlinedIcon />
-                                        {run.stats.requestedExperiments ? (
-                                            <>
-                                                {run.stats.requestedExperiments} {experimentsLabel}
-                                            </>
-                                        ) : (
-                                            'Loading experiments...'
-                                        )}
-                                    </ExperimentCount>
-                                    {!!run.stats.pendingExperiments && (
-                                        <ExperimentCount>
-                                            <HourglassTopOutlinedIcon />
-                                            {run.stats.pendingExperiments} pending
-                                        </ExperimentCount>
+                                <ExperimentCount>
+                                    <HourglassTopOutlinedIcon />
+                                    {run.stats.requestedExperiments ? (
+                                        <>
+                                            {run.stats.pendingExperiments}/
+                                            {run.stats.requestedExperiments} {experimentsLabel}
+                                        </>
+                                    ) : (
+                                        'Loading experiments...'
                                     )}
-                                </Box>
+                                </ExperimentCount>
                             )}
                             {canStop && (
                                 <StopButton

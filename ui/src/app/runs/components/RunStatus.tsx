@@ -278,7 +278,7 @@ function RunStatusContent({
                                 {cancelling ? 'Stopping...' : 'Stop'}
                             </StopButton>
                         )}
-                        <ExperimentsTable />
+                        <ExperimentsTable runStats={run.stats} />
                     </Box>
                 </TablePanel>
 

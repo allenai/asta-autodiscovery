@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useRuns } from '@/contexts/RunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
+import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 
 export const MCTS_SELECTION = {
     UCB1: { value: 'ucb1', label: 'UCB1' },
@@ -47,6 +48,28 @@ export interface SelectedFile {
     description: string;
 }
 
+export enum UploadStatus {
+    PENDING = 'pending',
+    UPLOADING = 'uploading',
+    COMPLETED = 'completed',
+    ERROR = 'error',
+}
+
+export interface FileUploadState {
+    file: File;
+    description: string;
+    status: UploadStatus;
+    progress: number; // 0-100
+    uploadedBytes: number;
+    totalBytes: number;
+    secondsRemaining: number | null; // seconds, null while calculating
+    uploadStartTime: number | null;
+    uploadUrl: string | null;
+    gcsPath: string | null;
+    error: string | null;
+    abortController: AbortController | null;
+}
+
 interface FieldErrors {
     name?: string;
     datasets?: string;
@@ -62,9 +85,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const creditsRemaining = credits?.remaining ?? 500;
 
     // Dataset upload state
-    const [datasets, setDatasets] = useState<Dataset[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-    const [uploading, setUploading] = useState(false);
+    const [fileUploads, setFileUploads] = useState<FileUploadState[]>([]);
     const [settings, setSettings] = useState<Settings>({
         name: '',
         datasetsDescription: '',
@@ -114,6 +135,38 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                             args?.warmstartExperiments || prev.warmstartExperiments,
                         nWarmstart: args?.nWarmstart || prev.nWarmstart,
                     }));
+
+                    // Populate fileUploads from saved datasets
+                    if (metadata?.datasets && metadata.datasets.length > 0) {
+                        const uploadStates: FileUploadState[] = metadata.datasets.map((dataset) => {
+                            // Use saved content_type and file_size_bytes if available
+                            const contentType = dataset.contentType || 'application/octet-stream';
+                            const fileSize = dataset.fileSizeBytes || 0;
+
+                            // Create placeholder File object from filename
+                            // The actual file content is already in GCS, so we just need the metadata
+                            const placeholderFile = new File([], dataset.name, {
+                                type: contentType,
+                            });
+
+                            return {
+                                file: placeholderFile,
+                                description: dataset.description || '',
+                                status: UploadStatus.COMPLETED,
+                                progress: 100,
+                                uploadedBytes: fileSize,
+                                totalBytes: fileSize,
+                                secondsRemaining: 0,
+                                uploadStartTime: null,
+                                uploadUrl: null,
+                                gcsPath: null, // Could reconstruct from userid/runid/filename if needed
+                                error: null,
+                                abortController: null,
+                            };
+                        });
+
+                        setFileUploads(uploadStates);
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching run metadata:', err);
@@ -125,15 +178,224 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         fetchRunMetadata();
     }, [runid, api]);
 
-    const handleFileSelect = (file: File) => {
-        if (file) {
-            setSelectedFiles((prev) => [...prev, { file, description: '' }]);
-            setFieldErrors((prev) => {
-                const { datasets, datasetFileDescriptions, ...rest } = prev;
-                return rest;
-            });
-            setFormError(null);
+    // Warn user before leaving page if uploads are in progress
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            const hasActiveUploads = fileUploads.some((u) => u.status === UploadStatus.UPLOADING);
+            if (hasActiveUploads) {
+                e.preventDefault();
+                e.returnValue = true;
+                return e.returnValue;
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [fileUploads]);
+
+    // Auto-start pending uploads with ref to track started uploads by filename+size
+    const startedUploadsRef = useRef<Set<string>>(new Set());
+
+    // Track if metadata save is in progress to prevent concurrent saves
+    const isSavingMetadata = useRef<boolean>(false);
+
+    // Keep refs to latest state for saveDatasetMetadata to avoid stale closures
+    const fileUploadsRef = useRef(fileUploads);
+    const settingsRef = useRef(settings);
+
+    useEffect(() => {
+        fileUploadsRef.current = fileUploads;
+    }, [fileUploads]);
+
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
+
+    useEffect(() => {
+        fileUploads.forEach((upload, index) => {
+            // Create unique key for this upload
+            const uploadKey = `${upload.file.name}-${upload.file.size}-${index}`;
+
+            if (
+                upload.status === UploadStatus.PENDING &&
+                !startedUploadsRef.current.has(uploadKey)
+            ) {
+                startedUploadsRef.current.add(uploadKey);
+                // Use setTimeout to ensure state is fully committed
+                setTimeout(() => {
+                    startUpload(index);
+                    // Clean up ref after starting
+                    startedUploadsRef.current.delete(uploadKey);
+                }, 10);
+            }
+        });
+    }, [fileUploads]);
+
+    const updateUploadState = (index: number, updates: Partial<FileUploadState>) => {
+        setFileUploads((prev) =>
+            prev.map((upload, i) => (i === index ? { ...upload, ...updates } : upload))
+        );
+    };
+
+    const saveDatasetMetadata = useCallback(async () => {
+        // Prevent concurrent saves
+        if (isSavingMetadata.current) {
+            return;
         }
+
+        try {
+            isSavingMetadata.current = true;
+
+            // Build datasets array from current fileUploads state (via ref to get latest)
+            // Only include COMPLETED uploads (not PENDING/UPLOADING/ERROR)
+            const datasets = fileUploadsRef.current
+                .filter((upload) => upload.status === UploadStatus.COMPLETED)
+                .map((upload) => ({
+                    name: upload.file.name,
+                    description: upload.description || '',
+                    content_type: upload.file.type || 'application/octet-stream',
+                    file_size_bytes: upload.file.size,
+                }));
+
+            // Build metadata from current settings (via ref to get latest)
+            const currentSettings = settingsRef.current;
+            const metadata = {
+                name: currentSettings.name.trim(),
+                description: currentSettings.datasetsDescription.trim(),
+                domain: currentSettings.domain.trim(),
+                intent: currentSettings.intent.trim(),
+                datasets,
+            };
+
+            await api.saveMetadata(runid, metadata);
+        } catch (err) {
+            console.error('Failed to save dataset metadata:', err);
+            // Show error notification to user
+            setFormError(
+                `Failed to save file metadata: ${err instanceof Error ? err.message : 'Unknown error'}`
+            );
+            // Note: Don't throw - this is a background save, shouldn't block workflow
+        } finally {
+            isSavingMetadata.current = false;
+        }
+    }, [api, runid]);
+
+    const uploadToGCS = async (
+        index: number,
+        uploadUrl: string,
+        file: File,
+        uploadStartTime: number
+    ): Promise<void> => {
+        const abortController = new AbortController();
+        updateUploadState(index, { abortController });
+
+        await uploadFileToGCS({
+            file,
+            uploadUrl,
+            uploadStartTime,
+            onProgress: (progressEvent) => {
+                updateUploadState(index, {
+                    progress: progressEvent.progress,
+                    uploadedBytes: progressEvent.uploadedBytes,
+                    secondsRemaining: progressEvent.secondsRemaining,
+                });
+            },
+            onComplete: () => {
+                updateUploadState(index, {
+                    status: UploadStatus.COMPLETED,
+                    progress: 100,
+                    secondsRemaining: 0,
+                });
+                // Save metadata immediately after upload completes
+                // Use setTimeout to ensure state update completes first
+                setTimeout(() => saveDatasetMetadata(), 100);
+            },
+            onError: (error) => {
+                updateUploadState(index, {
+                    status: UploadStatus.ERROR,
+                    error: error.message,
+                });
+            },
+            abortSignal: abortController.signal,
+        });
+    };
+
+    const startUpload = useCallback(
+        async (index: number) => {
+            const currentUpload: FileUploadState = fileUploads[index];
+            if (!currentUpload) {
+                // Upload not found - may have been removed or timing issue
+                return;
+            }
+
+            // Skip if already uploading or completed
+            if (currentUpload.status !== UploadStatus.PENDING) {
+                return;
+            }
+
+            // Store file info before async operations
+            const { file } = currentUpload;
+            const uploadStartTime = Date.now();
+
+            try {
+                updateUploadState(index, {
+                    status: UploadStatus.UPLOADING,
+                    uploadStartTime,
+                    error: null,
+                });
+
+                // Request presigned URL from backend
+                const { data } = await api.generateUploadUrl({
+                    runid,
+                    filename: file.name,
+                    contentType: file.type || 'application/octet-stream',
+                    fileSizeBytes: file.size,
+                });
+
+                updateUploadState(index, {
+                    uploadUrl: data.upload_url,
+                    gcsPath: data.gcs_path,
+                });
+
+                // Upload directly to GCS
+                await uploadToGCS(index, data.upload_url, file, uploadStartTime);
+            } catch (err) {
+                console.error('Upload failed:', err);
+                const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+                updateUploadState(index, {
+                    status: UploadStatus.ERROR,
+                    error: errorMessage,
+                });
+            }
+        },
+        [fileUploads, runid]
+    );
+
+    const handleFileSelect = (file: File) => {
+        if (!file) return;
+
+        const newUpload: FileUploadState = {
+            file,
+            description: '',
+            status: UploadStatus.PENDING,
+            progress: 0,
+            uploadedBytes: 0,
+            totalBytes: file.size,
+            secondsRemaining: null,
+            uploadStartTime: null,
+            uploadUrl: null,
+            gcsPath: null,
+            error: null,
+            abortController: null,
+        };
+
+        setFileUploads((prev) => [...prev, newUpload]);
+
+        setFieldErrors((prev) => {
+            const { datasets, datasetFileDescriptions, ...rest } = prev;
+            return rest;
+        });
+        setFormError(null);
     };
 
     const handleFileDescriptionChange = (index: number, description: string) => {
@@ -142,54 +404,48 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             return rest;
         });
         setFormError(null);
-        setSelectedFiles((prev) =>
-            prev.map((selectedFile, i) =>
-                i === index ? { ...selectedFile, description } : selectedFile
-            )
-        );
+        updateUploadState(index, { description });
     };
 
-    const handleUploadDataset = async (): Promise<boolean> => {
-        setUploading(true);
+    const handleFileDescriptionBlur = () => {
+        // Save metadata when description field loses focus
+        saveDatasetMetadata();
+    };
 
-        try {
-            // Upload all selected files
-            const uploadReq = selectedFiles.map((selectedFile) => {
-                return api.uploadDataset(runid, selectedFile.file);
-            });
-            const uploadResp = await Promise.all(uploadReq);
-            const datasets = uploadResp.map(({ data }, i) => {
-                return {
-                    filename: data.filename,
-                    description: selectedFiles[i].description.trim(),
-                    path: data.path,
-                };
-            });
-            setDatasets(datasets);
+    const handleRemoveFileUpload = (index: number) => {
+        const upload = fileUploads[index];
 
-            // Reset form
-            setSelectedFiles([]);
-            return true;
-        } catch (err) {
-            console.error('Error uploading dataset:', err);
-            setFieldErrors((prev) => ({
-                ...prev,
-                datasets: err instanceof Error ? err.message : 'Failed to upload dataset',
-            }));
-            return false;
-        } finally {
-            setUploading(false);
+        if (upload && upload.status === UploadStatus.UPLOADING && upload.abortController) {
+            upload.abortController.abort();
+        }
+
+        setFileUploads((prev) => prev.filter((_, i) => i !== index));
+
+        // Save metadata to reflect removed file
+        // Use setTimeout to ensure state update completes first
+        setTimeout(() => saveDatasetMetadata(), 100);
+    };
+
+    const cancelUpload = (index: number) => {
+        const upload = fileUploads[index];
+
+        if (upload && upload.abortController) {
+            upload.abortController.abort();
         }
     };
 
-    const handleRemoveDataset = (index: number) => {
-        const newDatasets = datasets.filter((_, i) => i !== index);
-        setDatasets(newDatasets);
-    };
+    const retryUpload = async (index: number) => {
+        updateUploadState(index, {
+            status: UploadStatus.PENDING,
+            progress: 0,
+            uploadedBytes: 0,
+            error: null,
+            abortController: null,
+            uploadStartTime: null,
+            uploadUrl: null,
+        });
 
-    const handleRemoveSelectedFile = (index: number) => {
-        const newFiles = selectedFiles.filter((_, i) => i !== index);
-        setSelectedFiles(newFiles);
+        await startUpload(index);
     };
 
     const updateSettings = <K extends keyof Settings>(key: K, value: Settings[K]) => {
@@ -207,9 +463,11 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             description: settings.datasetsDescription.trim(),
             domain: settings.domain.trim(),
             intent: settings.intent.trim(),
-            datasets: selectedFiles.map((ds) => ({
-                name: ds.file.name,
-                description: ds.description,
+            datasets: fileUploads.map((upload) => ({
+                name: upload.file.name,
+                description: upload.description,
+                content_type: upload.file.type || 'application/octet-stream',
+                file_size_bytes: upload.file.size,
             })),
         };
 
@@ -261,12 +519,12 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             errors.name = 'Run name is required';
         }
 
-        if (!selectedFiles.length) {
+        if (!fileUploads.length) {
             errors.datasets = 'Please upload at least one dataset';
         }
 
         // Validate file descriptions
-        const fileValidation = validateFileDescriptions(selectedFiles);
+        const fileValidation = validateFileDescriptions(fileUploads);
         const hasValidationErrors = Object.values(errors).length > 0 || !fileValidation.isValid;
 
         if (!fileValidation.isValid) {
@@ -287,15 +545,28 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
+
         if (isFormInvalid()) {
             setIsSubmitting(false);
             return;
         }
 
         try {
-            // upload files
-            const isSuccessfulUpload = await handleUploadDataset();
-            if (!isSuccessfulUpload) {
+            // Check if all uploads are complete
+            const pendingUploads = fileUploads.filter(
+                (u) => u.status === UploadStatus.UPLOADING || u.status === UploadStatus.PENDING
+            );
+
+            if (pendingUploads.length > 0) {
+                setFormError('Please wait for all uploads to complete');
+                setIsSubmitting(false);
+                return;
+            }
+
+            const failedUploads = fileUploads.filter((u) => u.status === UploadStatus.ERROR);
+            if (failedUploads.length > 0) {
+                setFormError('Some uploads failed. Please remove failed files or retry them.');
+                setIsSubmitting(false);
                 return;
             }
 
@@ -305,7 +576,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Update the run name in the sidebar list
             updateViewerRun({ id: runid, name: settings.name.trim() });
 
-            // // Submit run
+            // Submit run
             await api.submitRun(runid, {
                 n_experiments: settings.nExperiments,
                 intent: settings.intent,
@@ -314,9 +585,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Notify parent of success
             onSubmitSuccess();
         } catch (err) {
-            console.error('Error isSubmitting run:', err);
+            console.error('Error submitting run:', err);
             setFormError(err instanceof Error ? err.message : 'Failed to submit run');
-            setIsSubmitting(false);
         } finally {
             setIsSubmitting(false);
         }
@@ -327,9 +597,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         creditsRemaining,
 
         // Dataset upload state
-        datasets,
-        selectedFiles,
-        uploading,
+        fileUploads,
 
         // Run configuration state
         settings,
@@ -350,9 +618,10 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         // Handlers
         handleFileSelect,
         handleFileDescriptionChange,
-        handleUploadDataset,
-        handleRemoveDataset,
-        handleRemoveSelectedFile,
+        handleFileDescriptionBlur,
+        handleRemoveFileUpload,
+        cancelUpload,
+        retryUpload,
         handleExperimentsChange,
         handleSubmit,
     };
@@ -361,8 +630,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 // Helpers
 
 // Validates that all selected files have non-empty descriptions
-const validateFileDescriptions = (selectedFiles: SelectedFile[]) => {
-    const filesWithoutDescription = selectedFiles.filter((file) => !file.description.trim());
+const validateFileDescriptions = (fileUploads: FileUploadState[]) => {
+    const filesWithoutDescription = fileUploads.filter((upload) => !upload.description.trim());
 
     return {
         isValid: filesWithoutDescription.length === 0,

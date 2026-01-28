@@ -24,6 +24,8 @@ export interface RunMetadataFromApi {
     datasets: {
         name: string;
         description: string | null;
+        content_type: string | null;
+        file_size_bytes: number | null;
     }[];
 }
 
@@ -58,6 +60,7 @@ export interface UploadDatasetResponseBody {
 
 export interface GenerateUploadUrlResponseBody {
     upload_url: string;
+    gcs_path: string;
     filename: string;
     expires_at_unix: number;
 }
@@ -110,6 +113,8 @@ export interface GetRunExperimentDetailsResponseBody {
 export interface MetadataDatasetFromApi {
     name: string;
     description: string | null;
+    content_type: string | null;
+    file_size_bytes: number | null;
 }
 
 export interface MetadataFromApi {

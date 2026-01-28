@@ -44,9 +44,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         saveJobArgs,
         settings,
         creditsRemaining,
-        datasets,
-        selectedFiles,
-        uploading,
+        fileUploads,
         fieldErrors,
         isSubmitting,
         formError,
@@ -54,13 +52,15 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         updateSettings,
         handleFileSelect,
         handleFileDescriptionChange,
-        handleRemoveDataset,
-        handleRemoveSelectedFile,
+        handleFileDescriptionBlur,
+        handleRemoveFileUpload,
         handleExperimentsChange,
         handleSubmit,
+        cancelUpload,
+        retryUpload,
     } = useRunSetup({ runid, onSubmitSuccess });
 
-    const isFormDisabled = uploading || isSubmitting || isLoading;
+    const isFormDisabled = isSubmitting || isLoading;
     const datasetErrors = fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
 
     if (isLoading) {
@@ -139,12 +139,13 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 <FormControl fullWidth>
                     <StyledFormLabel>Upload source files</StyledFormLabel>
                     <DatasetUpload
-                        datasets={datasets}
-                        selectedFiles={selectedFiles}
+                        fileUploads={fileUploads}
                         onFileSelect={handleFileSelect}
-                        onRemove={handleRemoveDataset}
-                        onRemoveSelectedFile={handleRemoveSelectedFile}
+                        onRemoveFileUpload={handleRemoveFileUpload}
                         onDescriptionChange={handleFileDescriptionChange}
+                        onDescriptionBlur={handleFileDescriptionBlur}
+                        onCancelUpload={cancelUpload}
+                        onRetryUpload={retryUpload}
                         disabled={isFormDisabled}
                         error={datasetErrors}
                     />
@@ -396,7 +397,7 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
         '&.Mui-disabled': {
             backgroundColor: theme.color['cream-10'].rgba.toString(),
             color: theme.color['cream-60'].rgba.toString(),
-            '-webkit-text-fill-color': theme.color['cream-60'].rgba.toString(),
+            WebkitTextFillColor: theme.color['cream-60'].rgba.toString(),
 
             '&:hover': {
                 border: '1px solid ' + theme.color['cream-20'].rgba.toString(),

@@ -1,12 +1,29 @@
 'use client';
 
 import { useState, useRef, DragEvent } from 'react';
-import { Box, Stack, Typography, styled, alpha, TextField, IconButton } from '@mui/material';
+import {
+    Box,
+    Stack,
+    Typography,
+    styled,
+    alpha,
+    TextField,
+    IconButton,
+    LinearProgress,
+    Alert,
+    Button,
+} from '@mui/material';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
+import prettyBytes from 'pretty-bytes';
+import prettyMs from 'pretty-ms';
 
-import { SelectedFile } from '../hooks/useRunSetup';
+import { FileUploadState, UploadStatus } from '@/runs/hooks/useRunSetup';
+import { getFriendlyMimeType } from '@/utils/mimeType';
 
 export interface Dataset {
     filename: string;
@@ -14,13 +31,44 @@ export interface Dataset {
     path?: string;
 }
 
+/**
+ * Displays upload progress with percentage, bytes transferred, and time remaining
+ */
+const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
+    return (
+        <Box sx={{ mt: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <LinearProgress
+                    variant="determinate"
+                    value={upload.progress}
+                    sx={{ flex: 1, mr: 2 }}
+                />
+                <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'right' }}>
+                    {Math.round(upload.progress)}%
+                </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="text">
+                    {prettyBytes(upload.uploadedBytes)} / {prettyBytes(upload.totalBytes)}
+                </Typography>
+                {upload.secondsRemaining !== null && (
+                    <Typography variant="caption" color="text">
+                        {prettyMs(upload.secondsRemaining * 1000)} remaining
+                    </Typography>
+                )}
+            </Box>
+        </Box>
+    );
+};
+
 interface DatasetUploadProps {
-    datasets: Dataset[];
-    selectedFiles: SelectedFile[];
+    fileUploads: FileUploadState[];
     onFileSelect: (file: File) => void;
-    onRemove: (index: number) => void;
-    onRemoveSelectedFile: (index: number) => void;
+    onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
+    onDescriptionBlur: () => void;
+    onCancelUpload: (index: number) => void;
+    onRetryUpload: (index: number) => void;
     disabled?: boolean;
     error?: string;
 }
@@ -35,11 +83,13 @@ interface DatasetUploadProps {
  * - Remove files by clicking on chip
  */
 export default function DatasetUpload({
-    datasets,
-    selectedFiles,
+    fileUploads,
     onFileSelect,
-    onRemoveSelectedFile,
+    onRemoveFileUpload,
     onDescriptionChange,
+    onDescriptionBlur,
+    onCancelUpload,
+    onRetryUpload,
     disabled = false,
     error,
 }: DatasetUploadProps) {
@@ -104,7 +154,7 @@ export default function DatasetUpload({
                 type="file"
                 onChange={handleFileInputChange}
                 style={{ display: 'none' }}
-                accept=".csv,.json,.txt,.tsv"
+                accept=".csv,.json,.jsonl,.txt,.tsv"
             />
 
             <DropZone
@@ -125,29 +175,97 @@ export default function DatasetUpload({
                 </Typography>
             </DropZone>
 
-            {(selectedFiles.length > 0 || datasets.length > 0) && (
+            {fileUploads.length > 0 && (
                 <FilesContainer>
-                    {selectedFiles.map((selectedFile, index) => {
-                        const fileSizeMB = (selectedFile.file.size / (1024 * 1024)).toFixed(2);
-                        const fileType = selectedFile.file.type || 'Unknown';
+                    {fileUploads.map((upload, index) => {
+                        const fileType = upload.file.type || 'Unknown';
+                        const friendlyType = getFriendlyMimeType(fileType);
 
                         return (
-                            <File key={`selected-${index}`}>
+                            <File key={`upload-${index}`}>
                                 <FileHeader>
                                     <DescriptionOutlinedIcon />
-                                    <Typography variant="subtitle2">
-                                        {selectedFile.file.name}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        {fileType} • {fileSizeMB} MB
-                                    </Typography>
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => onRemoveSelectedFile(index)}
-                                        sx={{ ml: 'auto' }}>
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
+                                    <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
+                                    <FileHeaderFileMeta>
+                                        {friendlyType} • {prettyBytes(upload.totalBytes)}
+                                    </FileHeaderFileMeta>
+                                    <FileHeaderActions>
+                                        {/* Status indicators */}
+                                        {upload.status === UploadStatus.COMPLETED && (
+                                            <CheckCircleIcon
+                                                sx={{ color: 'success.main', mr: 1 }}
+                                                titleAccess="Upload completed"
+                                            />
+                                        )}
+                                        {upload.status === UploadStatus.ERROR && (
+                                            <ErrorIcon
+                                                sx={{ color: 'error.main', mr: 1 }}
+                                                titleAccess="Upload failed"
+                                            />
+                                        )}
+
+                                        {upload.status === UploadStatus.PENDING && (
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ mr: 1 }}>
+                                                Starting...
+                                            </Typography>
+                                        )}
+
+                                        {/* Cancel button */}
+                                        {upload.status === UploadStatus.UPLOADING && (
+                                            <Button
+                                                size="small"
+                                                onClick={() => onCancelUpload(index)}
+                                                disabled={disabled}
+                                                sx={{ ml: 'auto' }}
+                                                startIcon={
+                                                    <StopCircleOutlinedIcon color="error" />
+                                                }>
+                                                Cancel
+                                            </Button>
+                                        )}
+
+                                        {/* Remove button */}
+                                        {upload.status !== UploadStatus.UPLOADING && (
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => onRemoveFileUpload(index)}
+                                                disabled={disabled}
+                                                sx={{ ml: 'auto' }}
+                                                title="Remove file">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                    </FileHeaderActions>
                                 </FileHeader>
+
+                                {/* Progress bar - only show during upload */}
+                                {upload.status === UploadStatus.UPLOADING && (
+                                    <Box sx={{ px: 2, py: 1 }}>
+                                        <UploadProgress upload={upload} />
+                                    </Box>
+                                )}
+
+                                {/* Error message with retry button */}
+                                {upload.status === UploadStatus.ERROR && (
+                                    <Alert
+                                        severity="error"
+                                        sx={{ mx: 2, mt: 1 }}
+                                        action={
+                                            <Button
+                                                size="small"
+                                                onClick={() => onRetryUpload(index)}
+                                                sx={{ ml: 1 }}>
+                                                Retry
+                                            </Button>
+                                        }>
+                                        {upload.error || 'Upload failed'}
+                                    </Alert>
+                                )}
+
+                                {/* Description field */}
                                 <FileDescription>
                                     <DatasetSchemaTitle>
                                         Dataset Schema (Optional)
@@ -160,12 +278,14 @@ export default function DatasetUpload({
                                         multiline
                                         maxRows={3}
                                         fullWidth
-                                        value={selectedFile.description}
+                                        value={upload.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
+                                        onBlur={onDescriptionBlur}
+                                        disabled={disabled}
                                         sx={{ mt: 1 }}
-                                        placeholder='e.g., 
+                                        placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,
-2. "final_choice_new" - “parcipants final choice in the treatment condition”
+2. "final_choice_new" - "parcipants final choice in the treatment condition"
 3. Each row in this file represents a time-series'
                                     />
                                 </FileDescription>
@@ -178,7 +298,10 @@ export default function DatasetUpload({
     );
 }
 
-const DropZone = styled(Box)<{ isDragging: boolean; disabled: boolean; hasError: boolean }>(
+const DropZone = styled(Box, {
+    shouldForwardProp: (prop) =>
+        prop !== 'isDragging' && prop !== 'disabled' && prop !== 'hasError',
+})<{ isDragging: boolean; disabled: boolean; hasError: boolean }>(
     ({ theme, isDragging, disabled, hasError }) => ({
         border: `1px dashed ${
             hasError
@@ -243,6 +366,28 @@ const FileHeader = styled(Box)(({ theme }) => ({
             color: theme.color['cream-100'].hex,
         },
     },
+}));
+
+const FileHeaderActions = styled(Box)(() => ({
+    display: 'flex',
+    alignItems: 'center',
+    marginLeft: 'auto',
+}));
+
+const FileHeaderFilename = styled(Typography)(({ theme }) => ({
+    fontWeight: 'bold',
+    color: theme.color['cream-100'].hex,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+}));
+
+const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
+    flex: '0 0 auto',
+    alignItems: 'end',
+    marginLeft: theme.spacing(1),
+    marginRight: theme.spacing(1),
+    opacity: 0.6,
 }));
 
 const FileDescription = styled(Box)(({ theme }) => ({

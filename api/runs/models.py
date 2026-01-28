@@ -58,6 +58,12 @@ class ExperimentModel(BaseModel):
         None, description="Results of the experiment in human-readable format"
     )
     code: str | None = Field(None, description="Code generated for the experiment")
+    code_output: str | None = Field(
+        None, description="Raw output from the code executor for the experiment"
+    )
+    rich_outputs: list[dict[str, Any]] | None = Field(
+        None, description="Rich output bundles generated during code execution"
+    )
 
 
 class MetadataDatasetModel(BaseModel):

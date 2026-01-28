@@ -24,6 +24,8 @@ export interface RunExperimentsState {
     lastError: string | null;
     hasJobCompleted: boolean;
     selectedExperiment: Experiment | null;
+    selectedExperimentError: string | null;
+    isLoadingSelectedExperiment: boolean;
     selectExperiment: (experiment: Experiment | null) => void;
 }
 
@@ -37,6 +39,8 @@ export const DEFAULT_STATE: RunExperimentsState = {
     lastError: null,
     hasJobCompleted: false,
     selectedExperiment: null,
+    selectedExperimentError: null,
+    isLoadingSelectedExperiment: false,
     selectExperiment: () => {},
 };
 
@@ -73,8 +77,11 @@ export const RunExperimentsProvider = ({
     const [lastError, setLastError] = useState<string | null>(null);
     const [hasJobCompleted, setHasJobCompleted] = useState<boolean>(false);
     const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
+    const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
+    const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
 
     const afterExperimentId = useRef<string | null>(null);
+    const selectedExperimentRequestId = useRef<number>(0);
 
     const startPolling = useCallback(() => {
         if (!runid) {
@@ -90,9 +97,56 @@ export const RunExperimentsProvider = ({
         setIsPolling(false);
     }, [runid]);
 
-    const selectExperiment = useCallback((experiment: Experiment | null) => {
-        setSelectedExperiment(experiment);
-    }, []);
+    const selectExperiment = useCallback(
+        (experiment: Experiment | null) => {
+            setSelectedExperiment(experiment);
+            setSelectedExperimentError(null);
+
+            if (!experiment || !runid) {
+                selectedExperimentRequestId.current += 1;
+                setIsLoadingSelectedExperiment(false);
+                return;
+            }
+
+            selectedExperimentRequestId.current += 1;
+            const requestId = selectedExperimentRequestId.current;
+            setIsLoadingSelectedExperiment(true);
+
+            runsApi
+                .getRunExperimentDetails({
+                    runid,
+                    experimentId: experiment.experimentId,
+                })
+                .then(({ data }) => {
+                    if (selectedExperimentRequestId.current !== requestId) {
+                        return;
+                    }
+                    if (data?.experiment) {
+                        const detailedExperiment = getExperimentFromApi(data.experiment);
+                        setSelectedExperiment((prev) =>
+                            prev?.experimentId === detailedExperiment.experimentId
+                                ? detailedExperiment
+                                : prev
+                        );
+                    }
+                })
+                .catch((error: any) => {
+                    if (selectedExperimentRequestId.current !== requestId) {
+                        return;
+                    }
+                    setSelectedExperimentError(
+                        error?.message || 'Failed to fetch experiment details'
+                    );
+                })
+                .finally(() => {
+                    if (selectedExperimentRequestId.current !== requestId) {
+                        return;
+                    }
+                    setIsLoadingSelectedExperiment(false);
+                });
+        },
+        [runid, runsApi]
+    );
 
     // Auto-start polling on mount if autoStart is true
     useEffect(() => {
@@ -109,7 +163,10 @@ export const RunExperimentsProvider = ({
             setLastError(DEFAULT_STATE.lastError);
             setHasJobCompleted(DEFAULT_STATE.hasJobCompleted);
             setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
+            setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
+            setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
             afterExperimentId.current = null;
+            selectedExperimentRequestId.current += 1;
             return;
         }
         if (!isPolling) {
@@ -164,6 +221,8 @@ export const RunExperimentsProvider = ({
             lastError,
             hasJobCompleted,
             selectedExperiment,
+            selectedExperimentError,
+            isLoadingSelectedExperiment,
             startPolling,
             stopPolling,
             selectExperiment,
@@ -176,6 +235,8 @@ export const RunExperimentsProvider = ({
             lastError,
             hasJobCompleted,
             selectedExperiment,
+            selectedExperimentError,
+            isLoadingSelectedExperiment,
             startPolling,
             stopPolling,
             selectExperiment,

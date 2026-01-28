@@ -62,7 +62,11 @@ export type Experiment = {
     experimentPlan: Record<string, any> | null;
     review: string | null;
     code: string | null;
+    codeOutput: string | null;
+    richOutputs: RichOutputBundle[] | null;
 };
+
+export type RichOutputBundle = Record<string, string>;
 
 export type MetadataDataset = {
     name: string;
@@ -142,6 +146,8 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         experimentPlan: experimentFromApi.experiment_plan,
         review: experimentFromApi.review,
         code: experimentFromApi.code,
+        codeOutput: experimentFromApi.code_output ?? null,
+        richOutputs: experimentFromApi.rich_outputs ?? null,
     };
 };
 

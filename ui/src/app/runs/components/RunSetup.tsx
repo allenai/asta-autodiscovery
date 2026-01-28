@@ -397,7 +397,7 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
         '&.Mui-disabled': {
             backgroundColor: theme.color['cream-10'].rgba.toString(),
             color: theme.color['cream-60'].rgba.toString(),
-            '-webkit-text-fill-color': theme.color['cream-60'].rgba.toString(),
+            WebkitTextFillColor: theme.color['cream-60'].rgba.toString(),
 
             '&:hover': {
                 border: '1px solid ' + theme.color['cream-20'].rgba.toString(),

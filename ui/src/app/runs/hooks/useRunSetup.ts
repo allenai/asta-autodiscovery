@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useRuns } from '@/contexts/RunsContext';
@@ -161,25 +161,45 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [fileUploads]);
 
+    // Auto-start pending uploads with ref to track started uploads by filename+size
+    const startedUploadsRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        fileUploads.forEach((upload, index) => {
+            // Create unique key for this upload
+            const uploadKey = `${upload.file.name}-${upload.file.size}-${index}`;
+
+            if (upload.status === UploadStatus.PENDING && !startedUploadsRef.current.has(uploadKey)) {
+                startedUploadsRef.current.add(uploadKey);
+                // Use setTimeout to ensure state is fully committed
+                setTimeout(() => {
+                    startUpload(index);
+                    // Clean up ref after starting
+                    startedUploadsRef.current.delete(uploadKey);
+                }, 10);
+            }
+        });
+    }, [fileUploads]);
+
     const updateUploadState = (index: number, updates: Partial<FileUploadState>) => {
         setFileUploads((prev) =>
             prev.map((upload, i) => (i === index ? { ...upload, ...updates } : upload))
         );
     };
 
-    const uploadToGCS = async (index: number, uploadUrl: string): Promise<void> => {
-        const upload = fileUploads[index];
-        if (!upload || !upload.uploadStartTime) {
-            throw new Error('Upload not found or not started');
-        }
-
+    const uploadToGCS = async (
+        index: number,
+        uploadUrl: string,
+        file: File,
+        uploadStartTime: number
+    ): Promise<void> => {
         const abortController = new AbortController();
         updateUploadState(index, { abortController });
 
         await uploadFileToGCS({
-            file: upload.file,
+            file,
             uploadUrl,
-            uploadStartTime: upload.uploadStartTime,
+            uploadStartTime,
             onProgress: (progressEvent) => {
                 updateUploadState(index, {
                     progress: progressEvent.progress,
@@ -205,25 +225,40 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     };
 
     const startUpload = async (index: number) => {
-        const upload = fileUploads[index];
-        if (!upload) {
-            console.error('Upload not found at index:', index);
+        // Get current upload state to avoid stale closure
+        let currentUpload: FileUploadState | undefined;
+        setFileUploads((prev) => {
+            currentUpload = prev[index];
+            return prev;
+        });
+
+        if (!currentUpload) {
+            // Upload not found - may have been removed or timing issue
             return;
         }
+
+        // Skip if already uploading or completed
+        if (currentUpload.status !== UploadStatus.PENDING) {
+            return;
+        }
+
+        // Store file info before async operations
+        const { file } = currentUpload;
+        const uploadStartTime = Date.now();
 
         try {
             updateUploadState(index, {
                 status: UploadStatus.UPLOADING,
-                uploadStartTime: Date.now(),
+                uploadStartTime,
                 error: null,
             });
 
             // Request presigned URL from backend
             const { data } = await api.generateUploadUrl({
                 runid,
-                filename: upload.file.name,
-                contentType: upload.file.type || 'application/octet-stream',
-                fileSizeBytes: upload.file.size,
+                filename: file.name,
+                contentType: file.type || 'application/octet-stream',
+                fileSizeBytes: file.size,
             });
 
             updateUploadState(index, {
@@ -232,7 +267,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             });
 
             // Upload directly to GCS
-            await uploadToGCS(index, data.upload_url);
+            await uploadToGCS(index, data.upload_url, file, uploadStartTime);
         } catch (err) {
             console.error('Upload failed:', err);
             const errorMessage = err instanceof Error ? err.message : 'Upload failed';
@@ -261,12 +296,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             abortController: null,
         };
 
-        setFileUploads((prev) => {
-            const newUploads = [...prev, newUpload];
-            const newIndex = newUploads.length - 1;
-            setTimeout(() => startUpload(newIndex), 0);
-            return newUploads;
-        });
+        setFileUploads((prev) => [...prev, newUpload]);
 
         setFieldErrors((prev) => {
             const { datasets, datasetFileDescriptions, ...rest } = prev;

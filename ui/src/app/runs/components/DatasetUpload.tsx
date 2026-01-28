@@ -52,7 +52,7 @@ const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
                     {prettyBytes(upload.uploadedBytes)} / {prettyBytes(upload.totalBytes)}
                 </Typography>
                 {upload.secondsRemaining !== null && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text">
                         {prettyMs(upload.secondsRemaining * 1000)} remaining
                     </Typography>
                 )}
@@ -182,14 +182,12 @@ export default function DatasetUpload({
                         return (
                             <File key={`upload-${index}`}>
                                 <FileHeader>
-                                    <FileHeaderLeft>
-                                        <DescriptionOutlinedIcon />
-                                        <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
-                                        <FileHeaderFileMeta>
-                                            {friendlyType} • {prettyBytes(upload.file.size)}
-                                        </FileHeaderFileMeta>
-                                    </FileHeaderLeft>
-                                    <FileHeaderRight>
+                                    <DescriptionOutlinedIcon />
+                                    <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
+                                    <FileHeaderFileMeta>
+                                        {friendlyType} • {prettyBytes(upload.file.size)}
+                                    </FileHeaderFileMeta>
+                                    <FileHeaderActions>
                                         {/* Status indicators */}
                                         {upload.status === UploadStatus.COMPLETED && (
                                             <CheckCircleIcon
@@ -238,7 +236,7 @@ export default function DatasetUpload({
                                                 <CloseIcon fontSize="small" />
                                             </IconButton>
                                         )}
-                                    </FileHeaderRight>
+                                    </FileHeaderActions>
                                 </FileHeader>
 
                                 {/* Progress bar - only show during upload */}
@@ -348,10 +346,8 @@ const FileHeader = styled(Box)(({ theme }) => ({
     borderBottom: `1px solid ${theme.color['cream-10'].rgba.toString()}`,
     color: theme.color['cream-60'].rgba.toString(),
     display: 'flex',
-    justifyContent: 'space-between',
     gap: theme.spacing(1),
     padding: theme.spacing(2),
-    container: 'file-header / inline-size',
 
     h6: {
         fontSize: '1rem',
@@ -371,27 +367,22 @@ const FileHeader = styled(Box)(({ theme }) => ({
     },
 }));
 
-const FileHeaderLeft = styled(Box)(() => ({
+const FileHeaderActions = styled(Box)(() => ({
     display: 'flex',
     alignItems: 'center',
-}));
-
-const FileHeaderRight = styled(Box)(() => ({
-    display: 'flex',
-    alignItems: 'center',
+    alignSelf: 'flex-end',
 }));
 
 const FileHeaderFilename = styled(Typography)(({ theme }) => ({
     fontWeight: 'bold',
     color: theme.color['cream-100'].hex,
-    maxWidth: '50cqw',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
 }));
 
 const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
-    display: 'inline-flex',
+    flex: '0 0 auto',
     alignItems: 'end',
     marginLeft: theme.spacing(1),
     marginRight: theme.spacing(1),

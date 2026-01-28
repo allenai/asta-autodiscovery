@@ -14,7 +14,7 @@ import ClientProviders from './components/ClientProviders';
 import AuthErrorDialog from './components/AuthErrorDialog';
 
 export const metadata: Metadata = {
-    title: 'AutoDiscovery',
+    title: 'Asta AutoDiscovery',
 };
 
 // This layout will be applied to every page in the app.

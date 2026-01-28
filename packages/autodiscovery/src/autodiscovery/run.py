@@ -36,49 +36,34 @@ from autodiscovery.mcts_utils import (
 )
 
 
-def _theoretical_max_boolean_cat(n_samples: int, evidence_weight: float) -> float:
-    """Compute the theoretical maximum belief change for boolean_cat."""
-    prior_true = BeliefTrueFalseCat.DistributionFormat(
-        n=float(n_samples),
-        definitely_true=float(n_samples),
-        maybe_true=0.0,
-        uncertain=0.0,
-        maybe_false=0.0,
-        definitely_false=0.0,
-    )
-    prior_false = BeliefTrueFalseCat.DistributionFormat(
-        n=float(n_samples),
-        definitely_true=0.0,
-        maybe_true=0.0,
-        uncertain=0.0,
-        maybe_false=0.0,
-        definitely_false=float(n_samples),
-    )
-    posterior_true = BeliefTrueFalseCat.DistributionFormat(
-        n=float(n_samples) * evidence_weight,
-        definitely_true=float(n_samples) * evidence_weight,
-        maybe_true=0.0,
-        uncertain=0.0,
-        maybe_false=0.0,
-        definitely_false=0.0,
-    )
-    posterior_false = BeliefTrueFalseCat.DistributionFormat(
-        n=float(n_samples) * evidence_weight,
-        definitely_true=0.0,
-        maybe_true=0.0,
-        uncertain=0.0,
-        maybe_false=0.0,
-        definitely_false=float(n_samples) * evidence_weight,
-    )
+def _theoretical_max_boolean_cat(
+    n_samples: int, evidence_weight: float, prior_params: tuple[float, float] = (0.5, 0.5)
+) -> float:
+    """Compute the maximum possible mean shift for boolean_cat beliefs.
 
-    prior_true_mean = prior_true.get_mean_belief(recompute=True)
-    prior_false_mean = prior_false.get_mean_belief(recompute=True)
-    posterior_false_mean = posterior_false.get_mean_belief(prior=prior_true, recompute=True)
-    posterior_true_mean = posterior_true.get_mean_belief(prior=prior_false, recompute=True)
+    Args:
+        n_samples: Maximum number of prior-stage samples (N).
+        evidence_weight: Weight applied to stage-2 (evidence) samples.
+        prior_params: Beta prior parameters (alpha, beta).
 
-    diff_true_to_false = abs(posterior_false_mean - prior_true_mean)
-    diff_false_to_true = abs(posterior_true_mean - prior_false_mean)
-    return max(diff_true_to_false, diff_false_to_true)
+    Returns:
+        Theoretical maximum |mu2 - mu1| over all nodes given N and evidence weight.
+    """
+    n = float(n_samples)
+    w = float(evidence_weight)
+    if n <= 0 or w <= 0:
+        return 0.0
+
+    alpha, beta = prior_params
+    s = alpha + beta
+    d = min(alpha, beta)
+    t = w * n
+
+    # Unconstrained (relaxed) optimum in u = S + n space.
+    u_star = d + math.sqrt(d * (d + t))
+    # Clamp to feasible interval u in [S, S + N] because n in [0, N].
+    u_opt = min(max(u_star, s), s + n)
+    return (t * (u_opt - d)) / (u_opt * (u_opt + t))
 
 
 def compute_and_store_reward(
@@ -186,7 +171,10 @@ def compute_and_store_reward(
 
     normalized_surprisal = None
     if belief_mode == "boolean_cat" and prior is not None and posterior is not None:
-        theoretical_max = _theoretical_max_boolean_cat(n_belief_samples, evidence_weight)
+        prior_params = getattr(prior, "prior_params", (0.5, 0.5))
+        theoretical_max = _theoretical_max_boolean_cat(
+            n_belief_samples, evidence_weight, prior_params=prior_params
+        )
         if theoretical_max != 0:
             prior_mean = prior.get_mean_belief(recompute=True)
             posterior_mean = posterior.get_mean_belief(prior=prior, recompute=True)

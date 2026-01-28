@@ -3,12 +3,12 @@ import { Box, Typography, styled } from '@mui/material';
 export const IntroBox = () => {
     return (
         <Wrapper>
-            <Title>AutoDiscovery</Title>
+            <Title>Uncover surprising insights hidden in your data.</Title>
             <Description>
-                Uncover surprising insights hidden in your data. AutoDiscovery uses Bayesian
-                surprise (a measure of how much a finding shifts our beliefs) to autonomously
-                explore your datasets and identify discoveries that genuinely change what we know,
-                not just what's obvious or diverse.
+                AutoDiscovery uses Bayesian surprise (a measure of how much new experimental
+                evidence shifts our beliefs) to autonomously explore your datasets. It identifies
+                discoveries that genuinely change what we know, challenging assumptions to inspire
+                entirely new lines of inquiry.
             </Description>
         </Wrapper>
     );

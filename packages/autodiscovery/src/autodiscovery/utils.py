@@ -73,7 +73,11 @@ def get_vertex_openai_base_url() -> str:
             f"({VERTEX_LOCATION_ENV_VAR})."
         )
 
-    api_host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
+    api_host = (
+        "aiplatform.googleapis.com"
+        if location == "global"
+        else f"{location}-aiplatform.googleapis.com"
+    )
     return f"https://{api_host}/v1/projects/{project_id}/locations/{location}/endpoints/openapi"
 
 
@@ -94,7 +98,9 @@ def get_vertex_access_token() -> str:
         import google.auth
         import google.auth.transport.requests
 
-        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        credentials, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
         credentials.refresh(google.auth.transport.requests.Request())
         if credentials.token:
             return credentials.token
@@ -102,9 +108,9 @@ def get_vertex_access_token() -> str:
         pass
 
     raise ValueError(
-            "Vertex AI access token is required for Gemini models. Set "
-            f"{VERTEX_ACCESS_TOKEN_ENV} or GOOGLE_OAUTH_ACCESS_TOKEN "
-            "to an OAuth access token, or configure Application Default Credentials."
+        "Vertex AI access token is required for Gemini models. Set "
+        f"{VERTEX_ACCESS_TOKEN_ENV} or GOOGLE_OAUTH_ACCESS_TOKEN "
+        "to an OAuth access token, or configure Application Default Credentials."
     )
 
 
@@ -174,7 +180,9 @@ def query_llm(
 
         try:
             if response_format is not None:
-                response = client.beta.chat.completions.parse(**kwargs, response_format=response_format)
+                response = client.beta.chat.completions.parse(
+                    **kwargs, response_format=response_format
+                )
             else:
                 response = client.chat.completions.create(**kwargs)
         except ValidationError:

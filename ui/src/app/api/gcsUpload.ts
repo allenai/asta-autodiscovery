@@ -9,7 +9,7 @@ export interface UploadProgressEvent {
     progress: number; // 0-100
     uploadedBytes: number;
     totalBytes: number;
-    timeRemaining: number | null; // seconds, null while calculating
+    secondsRemaining: number | null; // seconds, null while calculating
 }
 
 export interface UploadOptions {
@@ -45,13 +45,13 @@ export function uploadToGCS(options: UploadOptions): Promise<void> {
                 const elapsedTime = (Date.now() - uploadStartTime) / 1000; // seconds
                 const uploadSpeed = uploadedBytes / elapsedTime; // bytes per second
                 const remainingBytes = event.total - uploadedBytes;
-                const timeRemaining = uploadSpeed > 0 ? remainingBytes / uploadSpeed : null;
+                const secondsRemaining = uploadSpeed > 0 ? remainingBytes / uploadSpeed : null;
 
                 onProgress({
                     progress,
                     uploadedBytes,
                     totalBytes: event.total,
-                    timeRemaining,
+                    secondsRemaining,
                 });
             }
         });

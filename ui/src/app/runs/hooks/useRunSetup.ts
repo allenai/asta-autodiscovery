@@ -48,14 +48,21 @@ export interface SelectedFile {
     description: string;
 }
 
+export enum UploadStatus {
+    PENDING = 'pending',
+    UPLOADING = 'uploading',
+    COMPLETED = 'completed',
+    ERROR = 'error',
+}
+
 export interface FileUploadState {
     file: File;
     description: string;
-    status: 'pending' | 'uploading' | 'completed' | 'error';
+    status: UploadStatus;
     progress: number; // 0-100
     uploadedBytes: number;
     totalBytes: number;
-    timeRemaining: number | null; // seconds, null while calculating
+    secondsRemaining: number | null; // seconds, null while calculating
     uploadStartTime: number | null;
     uploadUrl: string | null;
     gcsPath: string | null;
@@ -142,7 +149,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     // Warn user before leaving page if uploads are in progress
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            const hasActiveUploads = fileUploads.some((u) => u.status === 'uploading');
+            const hasActiveUploads = fileUploads.some((u) => u.status === UploadStatus.UPLOADING);
 
             if (hasActiveUploads) {
                 e.preventDefault();
@@ -178,19 +185,19 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                 updateUploadState(index, {
                     progress: progressEvent.progress,
                     uploadedBytes: progressEvent.uploadedBytes,
-                    timeRemaining: progressEvent.timeRemaining,
+                    secondsRemaining: progressEvent.secondsRemaining,
                 });
             },
             onComplete: () => {
                 updateUploadState(index, {
-                    status: 'completed',
+                    status: UploadStatus.COMPLETED,
                     progress: 100,
-                    timeRemaining: 0,
+                    secondsRemaining: 0,
                 });
             },
             onError: (error) => {
                 updateUploadState(index, {
-                    status: 'error',
+                    status: UploadStatus.ERROR,
                     error: error.message,
                 });
             },
@@ -207,7 +214,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         try {
             updateUploadState(index, {
-                status: 'uploading',
+                status: UploadStatus.UPLOADING,
                 uploadStartTime: Date.now(),
                 error: null,
             });
@@ -231,7 +238,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             console.error('Upload failed:', err);
             const errorMessage = err instanceof Error ? err.message : 'Upload failed';
             updateUploadState(index, {
-                status: 'error',
+                status: UploadStatus.ERROR,
                 error: errorMessage,
             });
         }
@@ -243,11 +250,11 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         const newUpload: FileUploadState = {
             file,
             description: '',
-            status: 'pending',
+            status: UploadStatus.PENDING,
             progress: 0,
             uploadedBytes: 0,
             totalBytes: file.size,
-            timeRemaining: null,
+            secondsRemaining: null,
             uploadStartTime: null,
             uploadUrl: null,
             gcsPath: null,
@@ -281,7 +288,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const handleRemoveFileUpload = (index: number) => {
         const upload = fileUploads[index];
 
-        if (upload && upload.status === 'uploading' && upload.abortController) {
+        if (upload && upload.status === UploadStatus.UPLOADING && upload.abortController) {
             upload.abortController.abort();
         }
 
@@ -298,7 +305,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     const retryUpload = async (index: number) => {
         updateUploadState(index, {
-            status: 'pending',
+            status: UploadStatus.PENDING,
             progress: 0,
             uploadedBytes: 0,
             error: null,
@@ -414,7 +421,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         try {
             // Check if all uploads are complete
             const pendingUploads = fileUploads.filter(
-                (u) => u.status === 'uploading' || u.status === 'pending'
+                (u) => u.status === UploadStatus.UPLOADING || u.status === UploadStatus.PENDING
             );
 
             if (pendingUploads.length > 0) {
@@ -423,7 +430,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                 return;
             }
 
-            const failedUploads = fileUploads.filter((u) => u.status === 'error');
+            const failedUploads = fileUploads.filter((u) => u.status === UploadStatus.ERROR);
             if (failedUploads.length > 0) {
                 setFormError('Some uploads failed. Please remove failed files or retry them.');
                 setIsSubmitting(false);

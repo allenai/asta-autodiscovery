@@ -21,6 +21,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
+import { useRuns } from '@/contexts/RunsContext';
 import { saveMetadata, submitRun } from '../actions';
 import type { Dataset } from './DatasetUpload';
 
@@ -64,6 +65,7 @@ export default function RunConfiguration({
 }: RunConfigurationProps) {
     const { getAccessToken } = useAuth0();
     const { credits } = useViewerCredits();
+    const { updateViewerRun } = useRuns();
 
     const [title, setTitle] = useState('');
     const [nExperiments, setNExperiments] = useState(4);
@@ -103,10 +105,10 @@ export default function RunConfiguration({
 
         try {
             const token = await getAccessToken();
-
+            const trimmedTitle = title.trim();
             // Prepare metadata
             const metadata = {
-                title: title.trim() || undefined,
+                title: trimmedTitle || undefined,
                 datasets: datasets.map((ds) => ({
                     name: ds.filename,
                     description: ds.description,
@@ -115,6 +117,11 @@ export default function RunConfiguration({
 
             // Save metadata
             await saveMetadata(runid, metadata, token);
+
+            // Update the run name in the sidebar list
+            if (trimmedTitle) {
+                updateViewerRun({ id: runid, name: trimmedTitle });
+            }
 
             // Submit run
             await submitRun(

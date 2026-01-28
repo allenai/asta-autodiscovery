@@ -125,8 +125,7 @@ interface ExperimentsTableProps {
 }
 
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
-    const { experiments, isLoading, lastError, selectExperiment, hasJobCompleted } =
-        useRunExperiments();
+    const { experiments, lastError, selectExperiment, hasJobCompleted } = useRunExperiments();
 
     // Create a map for O(1) lookups when clicking rows
     const experimentsMap = useMemo(() => {
@@ -207,7 +206,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
             <StyledDataGrid
                 rows={rows}
                 columns={columns}
-                loading={isLoading || (!runStats?.pendingExperiments && !experiments.length)}
+                loading={!runStats?.pendingExperiments && !experiments.length}
                 initialState={{ pagination: { paginationModel } }}
                 pageSizeOptions={[5, 10, 25]}
                 sx={{ border: 0 }}

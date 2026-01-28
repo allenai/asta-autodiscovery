@@ -73,7 +73,7 @@ export interface FileUploadState {
 interface FieldErrors {
     name?: string;
     datasets?: string;
-    datasetFileDescriptions?: string;
+    datasetsDescription?: string;
     nExperiments?: string;
 }
 
@@ -392,7 +392,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         setFileUploads((prev) => [...prev, newUpload]);
 
         setFieldErrors((prev) => {
-            const { datasets, datasetFileDescriptions, ...rest } = prev;
+            const { datasets, ...rest } = prev;
             return rest;
         });
         setFormError(null);
@@ -400,7 +400,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     const handleFileDescriptionChange = (index: number, description: string) => {
         setFieldErrors((prev) => {
-            const { datasets, datasetFileDescriptions, ...rest } = prev;
+            const { datasets, ...rest } = prev;
             return rest;
         });
         setFormError(null);
@@ -519,17 +519,16 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             errors.name = 'Run name is required';
         }
 
+        if (!settings.datasetsDescription.trim()) {
+            errors.datasetsDescription = 'Description for datasets is required';
+        }
+
         if (!fileUploads.length) {
             errors.datasets = 'Please upload at least one dataset';
         }
 
         // Validate file descriptions
-        const fileValidation = validateFileDescriptions(fileUploads);
-        const hasValidationErrors = Object.values(errors).length > 0 || !fileValidation.isValid;
-
-        if (!fileValidation.isValid) {
-            errors.datasetFileDescriptions = 'Please provide a description for all selected files';
-        }
+        const hasValidationErrors = Object.values(errors).length > 0;
 
         if (settings.nExperiments < 1 || settings.nExperiments > creditsRemaining) {
             errors.nExperiments = `Number of experiments must be between 1 and ${creditsRemaining}`;
@@ -626,16 +625,3 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         handleSubmit,
     };
 }
-
-// Helpers
-
-// Validates that all selected files have non-empty descriptions
-const validateFileDescriptions = (fileUploads: FileUploadState[]) => {
-    const filesWithoutDescription = fileUploads.filter((upload) => !upload.description.trim());
-
-    return {
-        isValid: filesWithoutDescription.length === 0,
-        filesWithoutDescription,
-        missingCount: filesWithoutDescription.length,
-    };
-};

@@ -281,9 +281,7 @@ export default function DatasetUpload({
                                         value={upload.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
                                         onBlur={onDescriptionBlur}
-                                        disabled={
-                                            upload.status === UploadStatus.UPLOADING || disabled
-                                        }
+                                        disabled={disabled}
                                         sx={{ mt: 1 }}
                                         placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,

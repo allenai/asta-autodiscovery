@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "ts-check": "tsc --noEmit",
+    "verify": "yarn ts-check && yarn lint"
   },
   "dependencies": {
     "@allenai/varnish2": "^3.0.8-alpha.0",

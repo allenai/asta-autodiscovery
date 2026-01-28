@@ -60,10 +60,8 @@ const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
 };
 
 interface DatasetUploadProps {
-    datasets: Dataset[];
     fileUploads: FileUploadState[];
     onFileSelect: (file: File) => void;
-    onRemove: (index: number) => void;
     onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
     onCancelUpload: (index: number) => void;
@@ -82,7 +80,6 @@ interface DatasetUploadProps {
  * - Remove files by clicking on chip
  */
 export default function DatasetUpload({
-    datasets,
     fileUploads,
     onFileSelect,
     onRemoveFileUpload,
@@ -174,7 +171,7 @@ export default function DatasetUpload({
                 </Typography>
             </DropZone>
 
-            {(fileUploads.length > 0 || datasets.length > 0) && (
+            {fileUploads.length > 0 && (
                 <FilesContainer>
                     {fileUploads.map((upload, index) => {
                         const fileType = upload.file.type || 'Unknown';

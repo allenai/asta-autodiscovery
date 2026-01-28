@@ -821,13 +821,11 @@ def create() -> Blueprint:
                 execution_id = manager.run_job(
                     userid,
                     runid,
-                    n_experiments=n_experiments,
-                    model=model,
-                    belief_model=belief_model,
+                    user_query=intent,
                     **{
                         k: v
                         for k, v in data.items()
-                        if k not in ["runid", "n_experiments", "model", "belief_model"]
+                        if k not in ["runid", "intent"]
                     },
                 )
 

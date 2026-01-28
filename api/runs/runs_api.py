@@ -822,13 +822,13 @@ def create() -> Blueprint:
                 execution_id = manager.run_job(
                     userid,
                     runid,
-                    n_experiments=n_experiments,
-                    model=model,
-                    belief_model=belief_model,
+                    # Remap UI parameters to equivalent AutoDiscovery name
+                    user_query=intent,
                     **{
                         k: v
                         for k, v in data.items()
-                        if k not in ["runid", "n_experiments", "model", "belief_model"]
+                        # Exclude parameters that are meaningless to AutoDiscovery job
+                        if k not in ["runid", "intent"]
                     },
                 )
 

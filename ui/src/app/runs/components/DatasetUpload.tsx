@@ -370,7 +370,7 @@ const FileHeader = styled(Box)(({ theme }) => ({
 const FileHeaderActions = styled(Box)(() => ({
     display: 'flex',
     alignItems: 'center',
-    alignSelf: 'flex-end',
+    marginLeft: 'auto',
 }));
 
 const FileHeaderFilename = styled(Typography)(({ theme }) => ({

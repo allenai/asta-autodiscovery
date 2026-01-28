@@ -161,8 +161,34 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [fileUploads]);
 
+    // Clean up debounce timers on unmount
+    useEffect(() => {
+        return () => {
+            descriptionDebounceTimers.current.forEach((timer) => clearTimeout(timer));
+            descriptionDebounceTimers.current.clear();
+        };
+    }, []);
+
     // Auto-start pending uploads with ref to track started uploads by filename+size
     const startedUploadsRef = useRef<Set<string>>(new Set());
+
+    // Debounce timers for description changes (one per file index)
+    const descriptionDebounceTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
+
+    // Track if metadata save is in progress to prevent concurrent saves
+    const isSavingMetadata = useRef<boolean>(false);
+
+    // Keep refs to latest state for saveDatasetMetadata to avoid stale closures
+    const fileUploadsRef = useRef(fileUploads);
+    const settingsRef = useRef(settings);
+
+    useEffect(() => {
+        fileUploadsRef.current = fileUploads;
+    }, [fileUploads]);
+
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
 
     useEffect(() => {
         fileUploads.forEach((upload, index) => {
@@ -190,6 +216,47 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         );
     };
 
+    const saveDatasetMetadata = useCallback(async () => {
+        // Prevent concurrent saves
+        if (isSavingMetadata.current) {
+            return;
+        }
+
+        try {
+            isSavingMetadata.current = true;
+
+            // Build datasets array from current fileUploads state (via ref to get latest)
+            // Only include COMPLETED uploads (not PENDING/UPLOADING/ERROR)
+            const datasets = fileUploadsRef.current
+                .filter((upload) => upload.status === UploadStatus.COMPLETED)
+                .map((upload) => ({
+                    name: upload.file.name,
+                    description: upload.description || '',
+                }));
+
+            // Build metadata from current settings (via ref to get latest)
+            const currentSettings = settingsRef.current;
+            const metadata = {
+                name: currentSettings.name.trim(),
+                description: currentSettings.datasetsDescription.trim(),
+                domain: currentSettings.domain.trim(),
+                intent: currentSettings.intent.trim(),
+                datasets,
+            };
+
+            await api.saveMetadata(runid, metadata);
+        } catch (err) {
+            console.error('Failed to save dataset metadata:', err);
+            // Show error notification to user
+            setFormError(
+                `Failed to save file metadata: ${err instanceof Error ? err.message : 'Unknown error'}`
+            );
+            // Note: Don't throw - this is a background save, shouldn't block workflow
+        } finally {
+            isSavingMetadata.current = false;
+        }
+    }, [api, runid]);
+
     const uploadToGCS = async (
         index: number,
         uploadUrl: string,
@@ -216,6 +283,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                     progress: 100,
                     secondsRemaining: 0,
                 });
+                // Save metadata immediately after upload completes
+                // Use setTimeout to ensure state update completes first
+                setTimeout(() => saveDatasetMetadata(), 100);
             },
             onError: (error) => {
                 updateUploadState(index, {
@@ -312,6 +382,20 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         });
         setFormError(null);
         updateUploadState(index, { description });
+
+        // Clear existing timeout for this file index
+        const existingTimeout = descriptionDebounceTimers.current.get(index);
+        if (existingTimeout) {
+            clearTimeout(existingTimeout);
+        }
+
+        // Set new timeout to save after 5 seconds of no changes
+        const timeoutId = setTimeout(() => {
+            saveDatasetMetadata();
+            descriptionDebounceTimers.current.delete(index);
+        }, 5000); // 5 second debounce as requested
+
+        descriptionDebounceTimers.current.set(index, timeoutId);
     };
 
     const handleRemoveFileUpload = (index: number) => {
@@ -321,7 +405,18 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             upload.abortController.abort();
         }
 
+        // Clear any pending debounce timer for this file
+        const existingTimeout = descriptionDebounceTimers.current.get(index);
+        if (existingTimeout) {
+            clearTimeout(existingTimeout);
+            descriptionDebounceTimers.current.delete(index);
+        }
+
         setFileUploads((prev) => prev.filter((_, i) => i !== index));
+
+        // Save metadata to reflect removed file
+        // Use setTimeout to ensure state update completes first
+        setTimeout(() => saveDatasetMetadata(), 100);
     };
 
     const cancelUpload = (index: number) => {

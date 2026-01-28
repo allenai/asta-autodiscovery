@@ -230,6 +230,7 @@ class GenerateUploadUrlResponseModel(BaseModel):
     """Model for the response containing the presigned upload URL"""
 
     upload_url: str = Field(..., description="Presigned URL for uploading the file to GCS")
+    gcs_path: str = Field(..., description="GCS path where file will be stored")
     filename: str = Field(..., description="Name of the file")
     expires_at_unix: int = Field(
         ..., description="Unix timestamp (seconds since epoch) when the URL expires"

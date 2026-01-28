@@ -47,6 +47,21 @@ export interface SelectedFile {
     description: string;
 }
 
+export interface FileUploadState {
+    file: File;
+    description: string;
+    status: 'pending' | 'uploading' | 'completed' | 'error';
+    progress: number; // 0-100
+    uploadedBytes: number;
+    totalBytes: number;
+    timeRemaining: number | null; // seconds, null while calculating
+    uploadStartTime: number | null;
+    uploadUrl: string | null;
+    gcsPath: string | null;
+    error: string | null;
+    abortController: AbortController | null;
+}
+
 interface FieldErrors {
     name?: string;
     datasets?: string;
@@ -62,9 +77,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const creditsRemaining = credits?.remaining ?? 500;
 
     // Dataset upload state
-    const [datasets, setDatasets] = useState<Dataset[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-    const [uploading, setUploading] = useState(false);
+    const [fileUploads, setFileUploads] = useState<FileUploadState[]>([]);
     const [settings, setSettings] = useState<Settings>({
         name: '',
         datasetsDescription: '',
@@ -125,15 +138,174 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         fetchRunMetadata();
     }, [runid, api]);
 
-    const handleFileSelect = (file: File) => {
-        if (file) {
-            setSelectedFiles((prev) => [...prev, { file, description: '' }]);
-            setFieldErrors((prev) => {
-                const { datasets, datasetFileDescriptions, ...rest } = prev;
-                return rest;
+    // Warn user before leaving page if uploads are in progress
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            const hasActiveUploads = fileUploads.some((u) => u.status === 'uploading');
+
+            if (hasActiveUploads) {
+                e.preventDefault();
+                e.returnValue = 'Uploads in progress will be cancelled if you leave';
+                return e.returnValue;
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [fileUploads]);
+
+    const updateUploadState = (index: number, updates: Partial<FileUploadState>) => {
+        setFileUploads((prev) =>
+            prev.map((upload, i) => (i === index ? { ...upload, ...updates } : upload))
+        );
+    };
+
+    const uploadToGCS = (index: number, uploadUrl: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const upload = fileUploads[index];
+            if (!upload) {
+                reject(new Error('Upload not found'));
+                return;
+            }
+
+            const xhr = new XMLHttpRequest();
+            const abortController = new AbortController();
+
+            updateUploadState(index, { abortController });
+
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const progress = (event.loaded / event.total) * 100;
+                    const uploadedBytes = event.loaded;
+
+                    const uploadStartTime = fileUploads[index]?.uploadStartTime;
+                    if (uploadStartTime) {
+                        const elapsedTime = (Date.now() - uploadStartTime) / 1000;
+                        const uploadSpeed = uploadedBytes / elapsedTime;
+                        const remainingBytes = event.total - uploadedBytes;
+                        const timeRemaining = uploadSpeed > 0 ? remainingBytes / uploadSpeed : null;
+
+                        updateUploadState(index, {
+                            progress,
+                            uploadedBytes,
+                            timeRemaining,
+                        });
+                    }
+                }
             });
-            setFormError(null);
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    updateUploadState(index, {
+                        status: 'completed',
+                        progress: 100,
+                        timeRemaining: 0,
+                    });
+                    resolve();
+                } else {
+                    updateUploadState(index, {
+                        status: 'error',
+                        error: `Upload failed with status ${xhr.status}`,
+                    });
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                updateUploadState(index, {
+                    status: 'error',
+                    error: 'Network error during upload',
+                });
+                reject(new Error('Network error during upload'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                updateUploadState(index, {
+                    status: 'error',
+                    error: 'Upload cancelled',
+                });
+                reject(new Error('Upload cancelled'));
+            });
+
+            abortController.signal.addEventListener('abort', () => {
+                xhr.abort();
+            });
+
+            xhr.open('PUT', uploadUrl, true);
+            xhr.setRequestHeader('Content-Type', upload.file.type || 'application/octet-stream');
+            xhr.send(upload.file);
+        });
+    };
+
+    const startUpload = async (index: number) => {
+        const upload = fileUploads[index];
+        if (!upload) {
+            console.error('Upload not found at index:', index);
+            return;
         }
+
+        try {
+            updateUploadState(index, {
+                status: 'uploading',
+                uploadStartTime: Date.now(),
+                error: null,
+            });
+
+            // Request presigned URL from backend
+            const { data } = await api.generateUploadUrl({
+                runid,
+                filename: upload.file.name,
+                contentType: upload.file.type || 'application/octet-stream',
+                fileSizeBytes: upload.file.size,
+            });
+
+            updateUploadState(index, {
+                uploadUrl: data.upload_url,
+                gcsPath: data.gcs_path,
+            });
+
+            // Upload directly to GCS
+            await uploadToGCS(index, data.upload_url);
+        } catch (err) {
+            console.error('Upload failed:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+            updateUploadState(index, {
+                status: 'error',
+                error: errorMessage,
+            });
+        }
+    };
+
+    const handleFileSelect = (file: File) => {
+        if (!file) return;
+
+        const newUpload: FileUploadState = {
+            file,
+            description: '',
+            status: 'pending',
+            progress: 0,
+            uploadedBytes: 0,
+            totalBytes: file.size,
+            timeRemaining: null,
+            uploadStartTime: null,
+            uploadUrl: null,
+            gcsPath: null,
+            error: null,
+            abortController: null,
+        };
+
+        setFileUploads((prev) => {
+            const newUploads = [...prev, newUpload];
+            const newIndex = newUploads.length - 1;
+            setTimeout(() => startUpload(newIndex), 0);
+            return newUploads;
+        });
+
+        setFieldErrors((prev) => {
+            const { datasets, datasetFileDescriptions, ...rest } = prev;
+            return rest;
+        });
+        setFormError(null);
     };
 
     const handleFileDescriptionChange = (index: number, description: string) => {
@@ -142,54 +314,39 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             return rest;
         });
         setFormError(null);
-        setSelectedFiles((prev) =>
-            prev.map((selectedFile, i) =>
-                i === index ? { ...selectedFile, description } : selectedFile
-            )
-        );
+        updateUploadState(index, { description });
     };
 
-    const handleUploadDataset = async (): Promise<boolean> => {
-        setUploading(true);
+    const handleRemoveFileUpload = (index: number) => {
+        const upload = fileUploads[index];
 
-        try {
-            // Upload all selected files
-            const uploadReq = selectedFiles.map((selectedFile) => {
-                return api.uploadDataset(runid, selectedFile.file);
-            });
-            const uploadResp = await Promise.all(uploadReq);
-            const datasets = uploadResp.map(({ data }, i) => {
-                return {
-                    filename: data.filename,
-                    description: selectedFiles[i].description.trim(),
-                    path: data.path,
-                };
-            });
-            setDatasets(datasets);
+        if (upload && upload.status === 'uploading' && upload.abortController) {
+            upload.abortController.abort();
+        }
 
-            // Reset form
-            setSelectedFiles([]);
-            return true;
-        } catch (err) {
-            console.error('Error uploading dataset:', err);
-            setFieldErrors((prev) => ({
-                ...prev,
-                datasets: err instanceof Error ? err.message : 'Failed to upload dataset',
-            }));
-            return false;
-        } finally {
-            setUploading(false);
+        setFileUploads((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const cancelUpload = (index: number) => {
+        const upload = fileUploads[index];
+
+        if (upload && upload.abortController) {
+            upload.abortController.abort();
         }
     };
 
-    const handleRemoveDataset = (index: number) => {
-        const newDatasets = datasets.filter((_, i) => i !== index);
-        setDatasets(newDatasets);
-    };
+    const retryUpload = async (index: number) => {
+        updateUploadState(index, {
+            status: 'pending',
+            progress: 0,
+            uploadedBytes: 0,
+            error: null,
+            abortController: null,
+            uploadStartTime: null,
+            uploadUrl: null,
+        });
 
-    const handleRemoveSelectedFile = (index: number) => {
-        const newFiles = selectedFiles.filter((_, i) => i !== index);
-        setSelectedFiles(newFiles);
+        await startUpload(index);
     };
 
     const updateSettings = <K extends keyof Settings>(key: K, value: Settings[K]) => {
@@ -207,9 +364,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             description: settings.datasetsDescription.trim(),
             domain: settings.domain.trim(),
             intent: settings.intent.trim(),
-            datasets: selectedFiles.map((ds) => ({
-                name: ds.file.name,
-                description: ds.description,
+            datasets: fileUploads.map((upload) => ({
+                name: upload.file.name,
+                description: upload.description,
             })),
         };
 
@@ -261,12 +418,12 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             errors.name = 'Run name is required';
         }
 
-        if (!selectedFiles.length) {
+        if (!fileUploads.length) {
             errors.datasets = 'Please upload at least one dataset';
         }
 
         // Validate file descriptions
-        const fileValidation = validateFileDescriptions(selectedFiles);
+        const fileValidation = validateFileDescriptions(fileUploads);
         const hasValidationErrors = Object.values(errors).length > 0 || !fileValidation.isValid;
 
         if (!fileValidation.isValid) {
@@ -287,15 +444,28 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
+
         if (isFormInvalid()) {
             setIsSubmitting(false);
             return;
         }
 
         try {
-            // upload files
-            const isSuccessfulUpload = await handleUploadDataset();
-            if (!isSuccessfulUpload) {
+            // Check if all uploads are complete
+            const pendingUploads = fileUploads.filter(
+                (u) => u.status === 'uploading' || u.status === 'pending'
+            );
+
+            if (pendingUploads.length > 0) {
+                setFormError('Please wait for all uploads to complete');
+                setIsSubmitting(false);
+                return;
+            }
+
+            const failedUploads = fileUploads.filter((u) => u.status === 'error');
+            if (failedUploads.length > 0) {
+                setFormError('Some uploads failed. Please remove failed files or retry them.');
+                setIsSubmitting(false);
                 return;
             }
 
@@ -305,7 +475,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Update the run name in the sidebar list
             updateViewerRun({ id: runid, name: settings.name.trim() });
 
-            // // Submit run
+            // Submit run
             await api.submitRun(runid, {
                 n_experiments: settings.nExperiments,
                 intent: settings.intent,
@@ -314,9 +484,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Notify parent of success
             onSubmitSuccess();
         } catch (err) {
-            console.error('Error isSubmitting run:', err);
+            console.error('Error submitting run:', err);
             setFormError(err instanceof Error ? err.message : 'Failed to submit run');
-            setIsSubmitting(false);
         } finally {
             setIsSubmitting(false);
         }
@@ -327,9 +496,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         creditsRemaining,
 
         // Dataset upload state
-        datasets,
-        selectedFiles,
-        uploading,
+        fileUploads,
 
         // Run configuration state
         settings,
@@ -350,9 +517,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         // Handlers
         handleFileSelect,
         handleFileDescriptionChange,
-        handleUploadDataset,
-        handleRemoveDataset,
-        handleRemoveSelectedFile,
+        handleRemoveFileUpload,
+        cancelUpload,
+        retryUpload,
         handleExperimentsChange,
         handleSubmit,
     };
@@ -361,8 +528,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 // Helpers
 
 // Validates that all selected files have non-empty descriptions
-const validateFileDescriptions = (selectedFiles: SelectedFile[]) => {
-    const filesWithoutDescription = selectedFiles.filter((file) => !file.description.trim());
+const validateFileDescriptions = (fileUploads: FileUploadState[]) => {
+    const filesWithoutDescription = fileUploads.filter((upload) => !upload.description.trim());
 
     return {
         isValid: filesWithoutDescription.length === 0,

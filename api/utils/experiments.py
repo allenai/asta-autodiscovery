@@ -51,6 +51,7 @@ class ExperimentNode:
         self.experiment_plan: dict | None = node_data.get("experiment_plan")
         self.review: str | None = node_data.get("review")
         self.code: str | None = node_data.get("code")
+        self.code_output: str | None = node_data.get("code_output")
 
         # Status derived from success field
         success = node_data.get("success")

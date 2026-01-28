@@ -1,4 +1,4 @@
-name: Docker Compose Build
+name: "CI: Docker Compose Build"
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚨 Docker Build Failed on main branch\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "🚨 CI: Docker Compose Build failed\nAuthor: ${{ github.actor }}\nCommit: ${{ github.event.head_commit.message }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

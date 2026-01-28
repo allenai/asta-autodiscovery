@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
+import { useRuns } from '@/contexts/RunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
 
@@ -55,6 +56,7 @@ interface FieldErrors {
 
 export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
+    const { updateViewerRun } = useRuns();
     const api = getRunsApi();
 
     const creditsRemaining = credits?.remaining ?? 500;
@@ -299,6 +301,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
             // Save metadata
             await saveMetadata();
+
+            // Update the run name in the sidebar list
+            updateViewerRun({ id: runid, name: settings.name.trim() });
 
             // // Submit run
             await api.submitRun(runid, {

@@ -80,23 +80,20 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     return (
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
             <SectionHeader>
-                <SectionHeaderTitle>Configure a new discovery session</SectionHeaderTitle>
-                Provide datasets and describe your discovery context. The system will autonomously
-                explore these datasets to find surprising patterns and hypotheses based on Bayesian
-                surprise.
+                <SectionHeaderTitle>Create a new discovery session</SectionHeaderTitle>
+                Define your context and upload source files. AutoDiscovery will use your data
+                appropriately to generate hypotheses, run experiments to statistically refute or
+                accept them and reveal surprising insights.
             </SectionHeader>
 
             <ConfigurationBox>
                 <FormControl fullWidth>
                     <StyledFormLabel>Discovery session name</StyledFormLabel>
-                    <HelperText>
-                        A name to help you identify this session later. This doesn't affect the
-                        results.
-                    </HelperText>
+                    <HelperText>Create a unique name to identify these results later.</HelperText>
                     <TextField
                         value={settings.name}
                         onChange={(e) => updateSettings('name', e.target.value)}
-                        placeholder="Name"
+                        placeholder="New Session 1"
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.name}
@@ -106,10 +103,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 </FormControl>
 
                 <FormControl fullWidth>
-                    <StyledFormLabel>Description of datasets</StyledFormLabel>
+                    <StyledFormLabel>Dataset context</StyledFormLabel>
                     <HelperText>
-                        Describe what your datasets contain. This context helps the system generate
-                        more meaningful hypotheses.
+                        Describe the origin and nature of the data. Explain how the data was
+                        gathered (e.g., collection methods, known gaps). This background helps the
+                        system generate more meaningful hypotheses.
                     </HelperText>
                     <TextField
                         multiline
@@ -118,15 +116,14 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         onChange={(e) => updateSettings('datasetsDescription', e.target.value)}
                         placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023"
                         disabled={isFormDisabled}
-                        required
-                        error={!!fieldErrors.datasetsDescription}
-                        helperText={fieldErrors.datasetsDescription}
                         onBlur={saveMetadata}
                     />
                 </FormControl>
 
                 <FormControl fullWidth>
-                    <StyledFormLabel>Domain of datasets (Optional)</StyledFormLabel>
+                    <StyledFormLabel>
+                        Domain of datasets <OptionalText>(Optional)</OptionalText>
+                    </StyledFormLabel>
                     <HelperText>
                         Specify the research domain to help contextualize hypothesis generation.
                     </HelperText>
@@ -140,7 +137,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 </FormControl>
 
                 <FormControl fullWidth>
-                    <StyledFormLabel>Dataset Files</StyledFormLabel>
+                    <StyledFormLabel>Upload source files</StyledFormLabel>
                     <DatasetUpload
                         datasets={datasets}
                         selectedFiles={selectedFiles}
@@ -162,15 +159,16 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
 
             <SectionHeader sx={{ mt: 3 }}>
                 <SectionHeaderTitle>Session settings</SectionHeaderTitle>
-                How AutoDiscovery explores the hypothesis space. If this is your first session, we
-                suggest starting with a smaller experiment budget to learn how the system works.
+                Define the scope and cost of your discovery session.
             </SectionHeader>
             <ConfigurationBox>
                 <FormControl>
                     <StyledFormLabel>Experiment Budget</StyledFormLabel>
                     <HelperText>
-                        Maximum number of experiments to execute during this run. Each experiment
-                        costs 1 experiment credit.
+                        Set the maximum number of experiments to generate (
+                        <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
+                        your first session, we recommend starting with a smaller budget (50–100
+                        experiments) to learn how the system works.
                     </HelperText>
                     <TextField
                         type="number"
@@ -196,7 +194,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </AccordionSummary>
 
                     <FormControl fullWidth>
-                        <StyledFormLabel>Intent</StyledFormLabel>
+                        <StyledFormLabel>
+                            Intent <OptionalText>(Optional)</OptionalText>
+                        </StyledFormLabel>
                         <HelperText>
                             Provide high-level guidance to loosely condition the exploration without
                             specifying exact hypotheses. The system will still autonomously navigate
@@ -301,7 +301,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </FormControl>
 
                     <FormControl fullWidth>
-                        <StyledFormLabel>Warmstart Experiments</StyledFormLabel>
+                        <StyledFormLabel>
+                            Warmstart Experiments <OptionalText>(Optional)</OptionalText>
+                        </StyledFormLabel>
                         <HelperText>
                             Initial experiments to run before autonomous exploration begins. These
                             "seed" the system with baseline findings that inform subsequent
@@ -318,7 +320,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </FormControl>
 
                     <FormControl fullWidth>
-                        <StyledFormLabel>Number of warmstarts</StyledFormLabel>
+                        <StyledFormLabel>
+                            Number of warmstarts <OptionalText>(Optional)</OptionalText>
+                        </StyledFormLabel>
                         <HelperText>
                             How many initial experiments to run before autonomous exploration
                             begins. These provide the system with baseline findings to inform its
@@ -411,12 +415,17 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
 
 const StyledFormLabel = styled(FormLabel)(({ theme }) => ({
     color: theme.color['green-40'].hex,
+    fontWeight: 700,
 }));
 
 const HelperText = styled(FormHelperText)(({ theme }) => ({
     color: theme.color['cream-80'].rgba.toString(),
     margin: theme.spacing(0.5, 0, 1, 0),
 }));
+
+const OptionalText = styled('span')({
+    fontWeight: 400,
+});
 
 const SubmitButton = styled(Button)(({ theme }) => ({
     '&.MuiButton-root': {

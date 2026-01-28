@@ -219,12 +219,20 @@ function RunStatusContent({
                                 </StyledListItem>
                             </RunHeaderSubtitle>
 
-                            {!!run.stats?.pendingExperiments && (
+                            {/* {!!run.stats?.pendingExperiments && ( */}
+                            <>
                                 <Typography variant="caption">
-                                    It’s safe to close this tab, you will be notified by email when
-                                    complete.
+                                    AutoDiscovery is running. New findings will populate the table
+                                    below automatically. You can click on any hypothesis to review
+                                    the details while the run continues.
                                 </Typography>
-                            )}
+                                <br />
+                                <Typography variant="caption">
+                                    Feel free to close this tab. We will email you when the full
+                                    analysis is complete.
+                                </Typography>
+                            </>
+                            {/* )} */}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         {ENABLE_GRAPH_VIZ && (

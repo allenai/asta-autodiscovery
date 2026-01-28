@@ -150,11 +150,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             const hasActiveUploads = fileUploads.some((u) => u.status === UploadStatus.UPLOADING);
-
             if (hasActiveUploads) {
                 e.preventDefault();
-                e.returnValue =
-                    'Your file is still uploading. Leaving now will cancel the process.';
+                e.returnValue = true;
                 return e.returnValue;
             }
         };

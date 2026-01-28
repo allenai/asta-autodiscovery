@@ -46,6 +46,7 @@ try:
         JobAlreadyExistsError,
         JobNotFoundError,
     )
+    from autodiscovery_jobs.gcs import read_rich_outputs
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -967,6 +968,24 @@ def create() -> Blueprint:
         node = tree.get_node(experiment_id)
 
         experiment_node = node.to_dict() if node else None
+        if experiment_node and node:
+            experiment_node["code_output"] = node.code_output
+            if node.level is not None and node.index is not None:
+                try:
+                    experiment_node["rich_outputs"] = read_rich_outputs(
+                        userid,
+                        runid,
+                        node.level,
+                        node.index,
+                        config=job_manager.config,
+                    )
+                except Exception as e:
+                    current_app.logger.warning(
+                        "Failed to read rich outputs for %s: %s", experiment_id, e
+                    )
+                    experiment_node["rich_outputs"] = []
+            else:
+                experiment_node["rich_outputs"] = []
         experiment_model = ExperimentModel(**experiment_node) if experiment_node else None
 
         resp = GetExperimentStatusResponseModel(

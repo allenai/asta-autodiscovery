@@ -730,6 +730,67 @@ def read_experiment_node(
         return None
 
 
+def read_rich_outputs(
+    userid: str,
+    jobid: str,
+    level: int,
+    index: int,
+    config: JobConfig | None = None,
+) -> list[dict[str, Any]]:
+    """Read rich output bundles for a specific experiment node.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        level: Node level in the MCTS tree
+        index: Node index in the MCTS tree
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of rich output bundles (each bundle is a MIME-type keyed dict).
+        Returns an empty list when no rich outputs are found or parsing fails.
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    filename = f"ro_{level}_{index}.json"
+    blob_path = f"users/{userid}/jobs/{jobid}/output/rich_outputs/{filename}"
+
+    try:
+        blob = bucket.blob(blob_path)
+        if not blob.exists():
+            import logging
+
+            logging.warning(
+                "Rich output file not found: %s for job %s", filename, jobid
+            )
+            return []
+
+        content = blob.download_as_text()
+        parsed = json.loads(content)
+        if not isinstance(parsed, list):
+            import logging
+
+            logging.warning(
+                "Invalid rich output payload in %s for job %s: expected list",
+                filename,
+                jobid,
+            )
+            return []
+        return parsed
+    except json.JSONDecodeError as e:
+        import logging
+
+        logging.warning(f"Invalid JSON in {filename} for job {jobid}: {e}")
+        return []
+    except Exception as e:
+        import logging
+
+        logging.error(f"Failed to read rich outputs {filename} for job {jobid}: {e}")
+        return []
+
+
 def generate_upload_url(
     userid: str,
     jobid: str,

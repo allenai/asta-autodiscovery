@@ -153,7 +153,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
             if (hasActiveUploads) {
                 e.preventDefault();
-                e.returnValue = 'Uploads in progress will be cancelled if you leave';
+                e.returnValue =
+                    'Your file is still uploading. Leaving now will cancel the process.';
                 return e.returnValue;
             }
         };

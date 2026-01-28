@@ -58,7 +58,7 @@ SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB
 
 # Allowed file extensions for uploads
-UPLOAD_ALLOWED_EXTENSIONS = {'.csv', '.json', '.txt', '.tsv'}
+UPLOAD_ALLOWED_EXTENSIONS = {".csv", ".json", ".txt", ".tsv"}
 
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
@@ -345,7 +345,9 @@ def create() -> Blueprint:
 
             max_workers = min(8, len(sliced_run_ids))
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                run_models = [model for model in executor.map(_build_run_model, sliced_run_ids) if model]
+                run_models = [
+                    model for model in executor.map(_build_run_model, sliced_run_ids) if model
+                ]
 
         resp = GetViewerRunsResponseModel(
             runs=run_models,
@@ -403,7 +405,6 @@ def create() -> Blueprint:
             runs=runs,
         )
         return jsonify(resp.model_dump()), 200
-
 
     @api.route("/<runid>")
     @requires_enrollment
@@ -752,8 +753,6 @@ def create() -> Blueprint:
             metadata=metadata_model,
         )
         return jsonify(resp.model_dump()), 200
-
-
 
     @api.route("/submit", methods=["POST"])
     @requires_enrollment

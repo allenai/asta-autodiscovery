@@ -58,6 +58,7 @@ export interface UploadDatasetResponseBody {
 
 export interface GenerateUploadUrlResponseBody {
     upload_url: string;
+    gcs_path: string;
     filename: string;
     expires_at_unix: number;
 }

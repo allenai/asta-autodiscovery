@@ -639,6 +639,7 @@ def create() -> Blueprint:
             # Return response using Pydantic model
             resp = GenerateUploadUrlResponseModel(
                 upload_url=result["upload_url"],
+                gcs_path=result["gcs_path"],
                 filename=req.filename,
                 expires_at_unix=expires_at_unix,
             )

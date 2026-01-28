@@ -33,6 +33,34 @@ const columns: GridColDef[] = [
         },
     },
     {
+        field: 'surprisal',
+        headerName: 'Surprisal',
+        width: 150,
+        renderHeader: () => (
+            <ColumnHeaderWrapper>
+                <span>Surprisal</span>
+                <LightbulbOutlinedIcon fontSize="small" />
+            </ColumnHeaderWrapper>
+        ),
+        renderCell: (params: GridRenderCellParams) => {
+            if (params.row.isSkeleton) {
+                return <StyledSkeleton variant="text" width="70%" />;
+            }
+            const isSurprising = params.row.isSurprising;
+            return (
+                <Box
+                    sx={(theme) => ({
+                        color: isSurprising
+                            ? theme.color['warning-orange-100'].hex
+                            : theme.color['cream-100'].hex,
+                        fontWeight: isSurprising ? 700 : 'normal',
+                    })}>
+                    {params.value?.toFixed(3) ?? 'N/A'}
+                </Box>
+            );
+        },
+    },
+    {
         field: 'prior',
         headerName: 'Before',
         width: 150,
@@ -75,34 +103,6 @@ const columns: GridColDef[] = [
                 <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
                     <Box sx={{ cursor: 'pointer' }}>{label}</Box>
                 </Tooltip>
-            );
-        },
-    },
-    {
-        field: 'surprisal',
-        headerName: 'Surprisal',
-        width: 150,
-        renderHeader: () => (
-            <ColumnHeaderWrapper>
-                <span>Surprisal</span>
-                <LightbulbOutlinedIcon fontSize="small" />
-            </ColumnHeaderWrapper>
-        ),
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="70%" />;
-            }
-            const isSurprising = params.row.isSurprising;
-            return (
-                <Box
-                    sx={(theme) => ({
-                        color: isSurprising
-                            ? theme.color['warning-orange-100'].hex
-                            : theme.color['cream-100'].hex,
-                        fontWeight: isSurprising ? 700 : 'normal',
-                    })}>
-                    {params.value?.toFixed(3) ?? 'N/A'}
-                </Box>
             );
         },
     },
@@ -187,7 +187,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         return [...experimentRows, ...skeletonRows];
     }, [experiments, runStats, hasJobCompleted]);
 
-    const paginationModel = { page: 0, pageSize: 10 };
+    const paginationModel = { page: 0, pageSize: 50 };
 
     const handleRowClick = (params: any) => {
         // Don't allow clicking on skeleton rows

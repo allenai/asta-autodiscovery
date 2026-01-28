@@ -48,7 +48,6 @@ export interface SelectedFile {
 
 interface FieldErrors {
     name?: string;
-    datasetsDescription?: string;
     datasets?: string;
     datasetFileDescriptions?: string;
     nExperiments?: string;
@@ -258,10 +257,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         if (!settings.name.trim()) {
             errors.name = 'Run name is required';
-        }
-
-        if (!settings.datasetsDescription.trim()) {
-            errors.datasetsDescription = 'Description for datasets is required';
         }
 
         if (!selectedFiles.length) {

@@ -207,16 +207,16 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
     };
 
     const handleExperimentsChange = (value: string) => {
-        const num = parseInt(value, 10);
-
         if (value === '') {
             setFieldErrors((prev) => ({
                 ...prev,
                 nExperiments: 'Number of experiments is required',
             }));
-
+            setSettings((prev) => ({ ...prev, nExperiments: '' as any }));
             return;
         }
+
+        const num = parseInt(value, 10);
 
         if (isNaN(num) || num < 1 || num > creditsRemaining) {
             setFieldErrors((prev) => ({

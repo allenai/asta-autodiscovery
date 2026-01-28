@@ -31,6 +31,8 @@ interface RunStatusProps {
     onRunCancelled?: () => void;
 }
 
+const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implement
+
 /**
  * Component for displaying the status of a submitted run.
  *
@@ -179,14 +181,18 @@ function RunStatusContent({
     lastUpdated,
 }: RunStatusContentProps) {
     const { selectedExperiment, selectExperiment } = useRunExperiments();
-    const [isTableExpanded, setIsTableExpanded] = useState(false);
+    // const [isTableExpanded, setIsTableExpanded] = useState(false);
+    const isTableExpanded = true;
+    const setIsTableExpanded = (...args: any[]) => {}; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     return (
         <Container>
             <PanelLayout>
-                <Background>
-                    <ExperimentGraph />
-                </Background>
+                {ENABLE_GRAPH_VIZ && (
+                    <Background>
+                        <ExperimentGraph />
+                    </Background>
+                )}
                 <TablePanel
                     $isExpanded={isTableExpanded}
                     key={`${isTableExpanded ? 'expanded' : 'collapsed'} ${selectedExperiment?.experimentId ?? ''}`}>
@@ -221,9 +227,12 @@ function RunStatusContent({
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
-                        <RunHeaderExpandButton onClick={() => setIsTableExpanded(!isTableExpanded)}>
-                            {isTableExpanded ? 'Collapse' : 'Expand'}
-                        </RunHeaderExpandButton>
+                        {ENABLE_GRAPH_VIZ && (
+                            <RunHeaderExpandButton
+                                onClick={() => setIsTableExpanded(!isTableExpanded)}>
+                                {isTableExpanded ? 'Collapse' : 'Expand'}
+                            </RunHeaderExpandButton>
+                        )}
                     </RunHeader>
 
                     <Box sx={{ padding: 3 }}>

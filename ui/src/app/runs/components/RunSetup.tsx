@@ -52,6 +52,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         updateSettings,
         handleFileSelect,
         handleFileDescriptionChange,
+        handleFileDescriptionBlur,
         handleRemoveFileUpload,
         handleExperimentsChange,
         handleSubmit,
@@ -142,6 +143,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         onFileSelect={handleFileSelect}
                         onRemoveFileUpload={handleRemoveFileUpload}
                         onDescriptionChange={handleFileDescriptionChange}
+                        onDescriptionBlur={handleFileDescriptionBlur}
                         onCancelUpload={cancelUpload}
                         onRetryUpload={retryUpload}
                         disabled={isFormDisabled}

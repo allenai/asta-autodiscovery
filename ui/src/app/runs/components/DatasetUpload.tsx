@@ -66,6 +66,7 @@ interface DatasetUploadProps {
     onFileSelect: (file: File) => void;
     onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
+    onDescriptionBlur: () => void;
     onCancelUpload: (index: number) => void;
     onRetryUpload: (index: number) => void;
     disabled?: boolean;
@@ -86,6 +87,7 @@ export default function DatasetUpload({
     onFileSelect,
     onRemoveFileUpload,
     onDescriptionChange,
+    onDescriptionBlur,
     onCancelUpload,
     onRetryUpload,
     disabled = false,
@@ -278,13 +280,14 @@ export default function DatasetUpload({
                                         fullWidth
                                         value={upload.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
+                                        onBlur={onDescriptionBlur}
                                         disabled={
                                             upload.status === UploadStatus.UPLOADING || disabled
                                         }
                                         sx={{ mt: 1 }}
                                         placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,
-2. "final_choice_new" - “parcipants final choice in the treatment condition”
+2. "final_choice_new" - "parcipants final choice in the treatment condition"
 3. Each row in this file represents a time-series'
                                     />
                                 </FileDescription>

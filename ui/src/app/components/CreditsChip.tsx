@@ -18,7 +18,7 @@ export default function CreditsChip() {
                 ref={anchorRef}
                 label={
                     <span>
-                        Your Experiment Credits:{' '}
+                        Experiment Credits:{' '}
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
                         ) : credits !== null ? (
@@ -58,7 +58,7 @@ export default function CreditsChip() {
                             session.
                         </li>
                         <li>
-                            <b>Expiration:</b> Credits are valid until Feb 28, 2026.
+                            <b>Expiration:</b> Credits are valid until <b>Feb 28, 2026</b>.
                         </li>
                     </ul>
 

@@ -87,6 +87,10 @@ def requires_auth(required_permission=None):
 
             try:
                 payload = verify_token(token, auth0_domain, auth0_audience)
+                # Dev override: masquerade as another user
+                masquerade_user = os.environ.get("DEV_MASQUERADE_USER")
+                if masquerade_user:
+                    payload["sub"] = masquerade_user
                 request.user = payload
 
                 # Check for required permission if specified

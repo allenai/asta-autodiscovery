@@ -111,7 +111,9 @@ export function ExperimentsTable() {
                 priorValue: experiment.prior,
                 posterior: getPriorAndPosteriorLabel(experiment.posterior),
                 posteriorValue: experiment.posterior,
-                surprisal: experiment.surprise,
+                surprisal: experiment.surprise
+                    ? Math.abs(experiment.surprise)
+                    : experiment.surprise,
                 isSurprising: experiment.isSurprising,
                 direction: getSurprisalDirection(experiment.surprise),
                 creationIdx: experiment.creationIdx,

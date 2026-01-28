@@ -71,6 +71,8 @@ class MetadataDatasetModel(BaseModel):
 
     name: str | None = Field(None, description="Filename of the dataset")
     description: str | None = Field(None, description="Description of the dataset")
+    content_type: str | None = Field(None, description="MIME type of the dataset file")
+    file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
 
 
 class RunArgsModel(BaseModel):
@@ -117,6 +119,8 @@ class MetadataModel(BaseModel):
             MetadataDatasetModel(
                 name=ds.get("name"),
                 description=ds.get("description"),
+                content_type=ds.get("content_type"),
+                file_size_bytes=ds.get("file_size_bytes"),
             )
             for ds in datasets_data
         ]
@@ -230,6 +234,7 @@ class GenerateUploadUrlResponseModel(BaseModel):
     """Model for the response containing the presigned upload URL"""
 
     upload_url: str = Field(..., description="Presigned URL for uploading the file to GCS")
+    gcs_path: str = Field(..., description="GCS path where file will be stored")
     filename: str = Field(..., description="Name of the file")
     expires_at_unix: int = Field(
         ..., description="Unix timestamp (seconds since epoch) when the URL expires"

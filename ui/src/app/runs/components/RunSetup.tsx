@@ -61,7 +61,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     } = useRunSetup({ runid, onSubmitSuccess });
 
     const isFormDisabled = isSubmitting || isLoading;
-    const datasetErrors = fieldErrors.datasets || fieldErrors.datasetFileDescriptions;
+    const datasetErrors = fieldErrors.datasets || fieldErrors.datasetsDescription;
 
     if (isLoading) {
         return (
@@ -117,6 +117,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023"
                         disabled={isFormDisabled}
                         onBlur={saveMetadata}
+                        required
+                        error={!!fieldErrors.datasetsDescription}
+                        helperText={fieldErrors.datasetsDescription}
                     />
                 </FormControl>
 

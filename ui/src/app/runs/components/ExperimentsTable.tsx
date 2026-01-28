@@ -25,7 +25,7 @@ const columns: GridColDef[] = [
             const value = params.row.priorValue;
             const label = params.value;
             return (
-                <Tooltip title={value != null ? value.toFixed(3) : 'N/A'} arrow>
+                <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
                     <Box sx={{ cursor: 'pointer' }}>{label}</Box>
                 </Tooltip>
             );
@@ -45,7 +45,7 @@ const columns: GridColDef[] = [
             const value = params.row.posteriorValue;
             const label = params.value;
             return (
-                <Tooltip title={value != null ? value.toFixed(3) : 'N/A'} arrow>
+                <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
                     <Box sx={{ cursor: 'pointer' }}>{label}</Box>
                 </Tooltip>
             );
@@ -71,7 +71,7 @@ const columns: GridColDef[] = [
                             : theme.color['cream-100'].hex,
                         fontWeight: isSurprising ? 700 : 'normal',
                     })}>
-                    {params.value.toFixed(3)}
+                    {params.value?.toFixed(3) ?? 'N/A'}
                 </Box>
             );
         },
@@ -82,7 +82,7 @@ const columns: GridColDef[] = [
         width: 120,
         renderCell: (params: GridRenderCellParams) => {
             const direction = params.value;
-            return <Box>{direction}</Box>;
+            return <Box>{direction ?? 'N/A'}</Box>;
         },
     },
 ];

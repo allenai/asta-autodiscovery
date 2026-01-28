@@ -90,6 +90,8 @@ export interface ExperimentFromApi {
     experiment_plan: Record<string, any> | null;
     review: string | null;
     code: string | null;
+    code_output?: string | null;
+    rich_outputs?: Record<string, string>[] | null;
 }
 
 export interface GetRunExperimentsResponseBody {

@@ -78,8 +78,7 @@ export const RunExperimentsProvider = ({
     const [hasJobCompleted, setHasJobCompleted] = useState<boolean>(false);
     const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
     const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
-    const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] =
-        useState<boolean>(false);
+    const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
 
     const afterExperimentId = useRef<string | null>(null);
     const selectedExperimentRequestId = useRef<number>(0);
@@ -98,53 +97,56 @@ export const RunExperimentsProvider = ({
         setIsPolling(false);
     }, [runid]);
 
-    const selectExperiment = useCallback((experiment: Experiment | null) => {
-        setSelectedExperiment(experiment);
-        setSelectedExperimentError(null);
+    const selectExperiment = useCallback(
+        (experiment: Experiment | null) => {
+            setSelectedExperiment(experiment);
+            setSelectedExperimentError(null);
 
-        if (!experiment || !runid) {
-            selectedExperimentRequestId.current += 1;
-            setIsLoadingSelectedExperiment(false);
-            return;
-        }
-
-        selectedExperimentRequestId.current += 1;
-        const requestId = selectedExperimentRequestId.current;
-        setIsLoadingSelectedExperiment(true);
-
-        runsApi
-            .getRunExperimentDetails({
-                runid,
-                experimentId: experiment.experimentId,
-            })
-            .then(({ data }) => {
-                if (selectedExperimentRequestId.current !== requestId) {
-                    return;
-                }
-                if (data?.experiment) {
-                    const detailedExperiment = getExperimentFromApi(data.experiment);
-                    setSelectedExperiment((prev) =>
-                        prev?.experimentId === detailedExperiment.experimentId
-                            ? detailedExperiment
-                            : prev
-                    );
-                }
-            })
-            .catch((error: any) => {
-                if (selectedExperimentRequestId.current !== requestId) {
-                    return;
-                }
-                setSelectedExperimentError(
-                    error?.message || 'Failed to fetch experiment details'
-                );
-            })
-            .finally(() => {
-                if (selectedExperimentRequestId.current !== requestId) {
-                    return;
-                }
+            if (!experiment || !runid) {
+                selectedExperimentRequestId.current += 1;
                 setIsLoadingSelectedExperiment(false);
-            });
-    }, [runid, runsApi]);
+                return;
+            }
+
+            selectedExperimentRequestId.current += 1;
+            const requestId = selectedExperimentRequestId.current;
+            setIsLoadingSelectedExperiment(true);
+
+            runsApi
+                .getRunExperimentDetails({
+                    runid,
+                    experimentId: experiment.experimentId,
+                })
+                .then(({ data }) => {
+                    if (selectedExperimentRequestId.current !== requestId) {
+                        return;
+                    }
+                    if (data?.experiment) {
+                        const detailedExperiment = getExperimentFromApi(data.experiment);
+                        setSelectedExperiment((prev) =>
+                            prev?.experimentId === detailedExperiment.experimentId
+                                ? detailedExperiment
+                                : prev
+                        );
+                    }
+                })
+                .catch((error: any) => {
+                    if (selectedExperimentRequestId.current !== requestId) {
+                        return;
+                    }
+                    setSelectedExperimentError(
+                        error?.message || 'Failed to fetch experiment details'
+                    );
+                })
+                .finally(() => {
+                    if (selectedExperimentRequestId.current !== requestId) {
+                        return;
+                    }
+                    setIsLoadingSelectedExperiment(false);
+                });
+        },
+        [runid, runsApi]
+    );
 
     // Auto-start polling on mount if autoStart is true
     useEffect(() => {

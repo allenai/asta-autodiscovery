@@ -62,9 +62,7 @@ const getPreferredRichOutput = (bundle: RichOutputBundle): RichOutputPreview => 
             return { kind: 'text', mime, text: payload };
         }
         const src =
-            mime === 'image/svg+xml'
-                ? buildSvgDataUri(payload)
-                : `data:${mime};base64,${payload}`;
+            mime === 'image/svg+xml' ? buildSvgDataUri(payload) : `data:${mime};base64,${payload}`;
         return { kind: 'image', mime, src };
     }
     return null;
@@ -75,8 +73,7 @@ const extractPlotAnalyses = (codeOutput: string | null) => {
         return [];
     }
     const analyses: string[] = [];
-    const pattern =
-        /=== Plot Analysis \(figure (\d+)\) ===\s*([\s\S]*?)(?:\n=+|\r\n=+|$)/g;
+    const pattern = /=== Plot Analysis \(figure (\d+)\) ===\s*([\s\S]*?)(?:\n=+|\r\n=+|$)/g;
     let match = pattern.exec(codeOutput);
     while (match) {
         const index = Number(match[1]);
@@ -197,7 +194,6 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                     </Typography>
                 </Box>
             )}
-
         </DetailsWrapper>
     );
 }

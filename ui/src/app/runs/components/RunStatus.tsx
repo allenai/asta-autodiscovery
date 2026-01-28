@@ -179,7 +179,7 @@ function RunStatusContent({
     experimentsLabel,
     lastUpdated,
 }: RunStatusContentProps) {
-    const { selectedExperiment, selectExperiment } = useRunExperiments();
+    const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
     // const [isTableExpanded, setIsTableExpanded] = useState(false);
     const isTableExpanded = true;
     const setIsTableExpanded = (...args: any[]) => {}; // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -249,8 +249,8 @@ function RunStatusContent({
                                     <HourglassTopOutlinedIcon />
                                     {run.stats.requestedExperiments ? (
                                         <>
-                                            {run.stats.pendingExperiments}/
-                                            {run.stats.requestedExperiments} {experimentsLabel}
+                                            {experiments.length}/{run.stats.requestedExperiments}{' '}
+                                            {experimentsLabel}
                                         </>
                                     ) : (
                                         'Loading experiments...'

@@ -48,7 +48,7 @@ const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
                 </Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text">
                     {prettyBytes(upload.uploadedBytes)} / {prettyBytes(upload.totalBytes)}
                 </Typography>
                 {upload.secondsRemaining !== null && (
@@ -152,7 +152,7 @@ export default function DatasetUpload({
                 type="file"
                 onChange={handleFileInputChange}
                 style={{ display: 'none' }}
-                accept=".csv,.json,.txt,.tsv"
+                accept=".csv,.json,.jsonl,.txt,.tsv"
             />
 
             <DropZone
@@ -185,34 +185,11 @@ export default function DatasetUpload({
                                     <FileHeaderLeft>
                                         <DescriptionOutlinedIcon />
                                         <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
-                                        <FileHeaderFileMeta variant="body2" sx={{ mr: 2 }}>
+                                        <FileHeaderFileMeta>
                                             {friendlyType} • {prettyBytes(upload.file.size)}
                                         </FileHeaderFileMeta>
                                     </FileHeaderLeft>
                                     <FileHeaderRight>
-                                        {/* Status indicators */}
-                                        {upload.status === UploadStatus.COMPLETED && (
-                                            <CheckCircleIcon
-                                                sx={{ color: 'success.main', mr: 1 }}
-                                                titleAccess="Upload completed"
-                                            />
-                                        )}
-                                        {upload.status === UploadStatus.ERROR && (
-                                            <ErrorIcon
-                                                sx={{ mr: 1 }}
-                                                titleAccess="Upload failed"
-                                                color="error"
-                                            />
-                                        )}
-                                        {upload.status === UploadStatus.PENDING && (
-                                            <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                                sx={{ mr: 1 }}>
-                                                Starting...
-                                            </Typography>
-                                        )}
-
                                         {/* Status indicators */}
                                         {upload.status === UploadStatus.COMPLETED && (
                                             <CheckCircleIcon
@@ -374,6 +351,7 @@ const FileHeader = styled(Box)(({ theme }) => ({
     justifyContent: 'space-between',
     gap: theme.spacing(1),
     padding: theme.spacing(2),
+    container: 'file-header / inline-size',
 
     h6: {
         fontSize: '1rem',
@@ -395,18 +373,28 @@ const FileHeader = styled(Box)(({ theme }) => ({
 
 const FileHeaderLeft = styled(Box)(() => ({
     display: 'flex',
+    alignItems: 'center',
 }));
 
 const FileHeaderRight = styled(Box)(() => ({
     display: 'flex',
+    alignItems: 'center',
 }));
 
 const FileHeaderFilename = styled(Typography)(({ theme }) => ({
     fontWeight: 'bold',
     color: theme.color['cream-100'].hex,
+    maxWidth: '50cqw',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
 }));
 
-const FileHeaderFileMeta = styled(Typography)(() => ({
+const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
+    display: 'inline-flex',
+    alignItems: 'end',
+    marginLeft: theme.spacing(1),
+    marginRight: theme.spacing(1),
     opacity: 0.6,
 }));
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useRuns } from '@/contexts/RunsContext';
@@ -227,59 +227,56 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         });
     };
 
-    const startUpload = async (index: number) => {
-        // Get current upload state to avoid stale closure
-        let currentUpload: FileUploadState | undefined;
-        setFileUploads((prev) => {
-            currentUpload = prev[index];
-            return prev;
-        });
+    const startUpload = useCallback(
+        async (index: number) => {
+            const currentUpload: FileUploadState = fileUploads[index];
+            if (!currentUpload) {
+                // Upload not found - may have been removed or timing issue
+                return;
+            }
 
-        if (!currentUpload) {
-            // Upload not found - may have been removed or timing issue
-            return;
-        }
+            // Skip if already uploading or completed
+            if (currentUpload.status !== UploadStatus.PENDING) {
+                return;
+            }
 
-        // Skip if already uploading or completed
-        if (currentUpload.status !== UploadStatus.PENDING) {
-            return;
-        }
+            // Store file info before async operations
+            const { file } = currentUpload;
+            const uploadStartTime = Date.now();
 
-        // Store file info before async operations
-        const { file } = currentUpload;
-        const uploadStartTime = Date.now();
+            try {
+                updateUploadState(index, {
+                    status: UploadStatus.UPLOADING,
+                    uploadStartTime,
+                    error: null,
+                });
 
-        try {
-            updateUploadState(index, {
-                status: UploadStatus.UPLOADING,
-                uploadStartTime,
-                error: null,
-            });
+                // Request presigned URL from backend
+                const { data } = await api.generateUploadUrl({
+                    runid,
+                    filename: file.name,
+                    contentType: file.type || 'application/octet-stream',
+                    fileSizeBytes: file.size,
+                });
 
-            // Request presigned URL from backend
-            const { data } = await api.generateUploadUrl({
-                runid,
-                filename: file.name,
-                contentType: file.type || 'application/octet-stream',
-                fileSizeBytes: file.size,
-            });
+                updateUploadState(index, {
+                    uploadUrl: data.upload_url,
+                    gcsPath: data.gcs_path,
+                });
 
-            updateUploadState(index, {
-                uploadUrl: data.upload_url,
-                gcsPath: data.gcs_path,
-            });
-
-            // Upload directly to GCS
-            await uploadToGCS(index, data.upload_url, file, uploadStartTime);
-        } catch (err) {
-            console.error('Upload failed:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Upload failed';
-            updateUploadState(index, {
-                status: UploadStatus.ERROR,
-                error: errorMessage,
-            });
-        }
-    };
+                // Upload directly to GCS
+                await uploadToGCS(index, data.upload_url, file, uploadStartTime);
+            } catch (err) {
+                console.error('Upload failed:', err);
+                const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+                updateUploadState(index, {
+                    status: UploadStatus.ERROR,
+                    error: errorMessage,
+                });
+            }
+        },
+        [fileUploads, runid]
+    );
 
     const handleFileSelect = (file: File) => {
         if (!file) return;

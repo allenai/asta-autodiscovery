@@ -93,7 +93,7 @@ def discover_files(source_path: str, project_id: str | None = None) -> list[Blob
 
     for blob in blobs:
         # Extract just the filename from the full blob path
-        filename = blob.name[len(blob_prefix):]
+        filename = blob.name[len(blob_prefix) :]
 
         # Skip if this is a directory marker or empty
         if not filename or filename.endswith("/"):

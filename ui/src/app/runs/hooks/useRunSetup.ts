@@ -193,19 +193,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [fileUploads]);
 
-    // Clean up debounce timers on unmount
-    useEffect(() => {
-        return () => {
-            descriptionDebounceTimers.current.forEach((timer) => clearTimeout(timer));
-            descriptionDebounceTimers.current.clear();
-        };
-    }, []);
-
     // Auto-start pending uploads with ref to track started uploads by filename+size
     const startedUploadsRef = useRef<Set<string>>(new Set());
-
-    // Debounce timers for description changes (one per file index)
-    const descriptionDebounceTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
     // Track if metadata save is in progress to prevent concurrent saves
     const isSavingMetadata = useRef<boolean>(false);
@@ -416,20 +405,11 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         });
         setFormError(null);
         updateUploadState(index, { description });
+    };
 
-        // Clear existing timeout for this file index
-        const existingTimeout = descriptionDebounceTimers.current.get(index);
-        if (existingTimeout) {
-            clearTimeout(existingTimeout);
-        }
-
-        // Set new timeout to save after 5 seconds of no changes
-        const timeoutId = setTimeout(() => {
-            saveDatasetMetadata();
-            descriptionDebounceTimers.current.delete(index);
-        }, 5000); // 5 second debounce as requested
-
-        descriptionDebounceTimers.current.set(index, timeoutId);
+    const handleFileDescriptionBlur = () => {
+        // Save metadata when description field loses focus
+        saveDatasetMetadata();
     };
 
     const handleRemoveFileUpload = (index: number) => {
@@ -437,13 +417,6 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
         if (upload && upload.status === UploadStatus.UPLOADING && upload.abortController) {
             upload.abortController.abort();
-        }
-
-        // Clear any pending debounce timer for this file
-        const existingTimeout = descriptionDebounceTimers.current.get(index);
-        if (existingTimeout) {
-            clearTimeout(existingTimeout);
-            descriptionDebounceTimers.current.delete(index);
         }
 
         setFileUploads((prev) => prev.filter((_, i) => i !== index));
@@ -645,6 +618,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         // Handlers
         handleFileSelect,
         handleFileDescriptionChange,
+        handleFileDescriptionBlur,
         handleRemoveFileUpload,
         cancelUpload,
         retryUpload,

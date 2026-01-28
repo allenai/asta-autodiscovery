@@ -289,6 +289,8 @@ def create() -> Blueprint:
         job_manager = get_job_manager()
         run_ids = job_manager.list_jobs(req.userid)
 
+        # TODO the order at this point is meaningless (UUID-sorted) so truncating before
+        # fetching details will be confusing. FIXME
         sliced_run_ids = run_ids[: req.limit]
         run_models: list[RunModel] = []
         app_logger = current_app.logger
@@ -349,6 +351,12 @@ def create() -> Blueprint:
                 run_models = [
                     model for model in executor.map(_build_run_model, sliced_run_ids) if model
                 ]
+
+        # Sort by created_at descending (newest first)
+        run_models.sort(
+            key=lambda r: r.run_details.created_at if r.run_details else "",
+            reverse=True,
+        )
 
         resp = GetViewerRunsResponseModel(
             runs=run_models,

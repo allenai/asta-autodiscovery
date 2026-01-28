@@ -333,6 +333,7 @@ def create() -> Blueprint:
                 if run_metadata_model
                 else f"Description for Run {run_id}",
                 path=None,
+                run_args=None,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
@@ -390,6 +391,7 @@ def create() -> Blueprint:
                 name=run_metadata_model.name,
                 path=None,
                 description=run_metadata_model.description,
+                run_args=None,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,

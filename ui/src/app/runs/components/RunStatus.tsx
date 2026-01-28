@@ -1,7 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Box, Button, Typography, CircularProgress, Alert, Chip, styled } from '@mui/material';
+import {
+    Box,
+    Button,
+    Typography,
+    CircularProgress,
+    Alert,
+    Chip,
+    styled,
+    List,
+    ListItem,
+} from '@mui/material';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
@@ -109,28 +119,6 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
         }
     };
 
-    const getStatusColor = (status: string) => {
-        const upperStatus = status.toUpperCase();
-        switch (upperStatus) {
-            case 'CREATED':
-                return 'default';
-            case 'RUNNING':
-            case 'PENDING':
-            case 'QUEUED':
-                return 'primary';
-            case 'COMPLETED':
-            case 'SUCCEEDED':
-                return 'success';
-            case 'FAILED':
-            case 'ERROR':
-                return 'error';
-            case 'CANCELLED':
-                return 'warning';
-            default:
-                return 'default';
-        }
-    };
-
     const canStop = run?.details?.status === 'RUNNING';
     const experimentsLabel = run?.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments';
 
@@ -164,7 +152,6 @@ export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
                 canStop={canStop}
                 cancelling={cancelling}
                 handleStop={handleStop}
-                getStatusColor={getStatusColor}
                 experimentsLabel={experimentsLabel}
                 lastUpdated={lastUpdated}
             />
@@ -178,7 +165,6 @@ interface RunStatusContentProps {
     canStop: boolean;
     cancelling: boolean;
     handleStop: () => void;
-    getStatusColor: (status: string) => any;
     experimentsLabel: string;
     lastUpdated: Date | null;
 }
@@ -189,7 +175,6 @@ function RunStatusContent({
     canStop,
     cancelling,
     handleStop,
-    getStatusColor,
     experimentsLabel,
     lastUpdated,
 }: RunStatusContentProps) {
@@ -208,20 +193,33 @@ function RunStatusContent({
                     <RunHeader>
                         <Box>
                             <RunHeaderName>{run.name}</RunHeaderName>
-                            <Timestamp>
-                                Started{' '}
-                                {new Date(run.details.createdAt).toLocaleString(undefined, {
-                                    dateStyle: 'short',
-                                    timeStyle: 'short',
-                                })}{' '}
-                                • Last updated {getRelativeTime(lastUpdated)}
-                            </Timestamp>
+                            <RunHeaderSubtitle>
+                                <StyledListItem>
+                                    Started{' '}
+                                    {new Date(run.details.createdAt).toLocaleString(undefined, {
+                                        dateStyle: 'short',
+                                        timeStyle: 'short',
+                                    })}
+                                </StyledListItem>
+                                <StyledListItem>
+                                    Last updated {getRelativeTime(lastUpdated)}
+                                </StyledListItem>
+                                <StyledListItem>
+                                    <StatusChip
+                                        label={run.details.status}
+                                        size="small"
+                                        $status={run.details.status}
+                                    />
+                                </StyledListItem>
+                            </RunHeaderSubtitle>
+
                             {!!run.stats?.pendingExperiments && (
                                 <Typography variant="caption">
                                     It’s safe to close this tab, you will be notified by email when
                                     complete.
                                 </Typography>
                             )}
+                            {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         <RunHeaderExpandButton onClick={() => setIsTableExpanded(!isTableExpanded)}>
                             {isTableExpanded ? 'Collapse' : 'Expand'}
@@ -229,55 +227,44 @@ function RunStatusContent({
                     </RunHeader>
 
                     <Box sx={{ padding: 3 }}>
-                        {error && <Alert severity="error">{error}</Alert>}
-                        <Chip
-                            label={run.details.status.toUpperCase()}
-                            color={getStatusColor(run.details.status)}
-                            size="medium"
-                        />
-                        {run.details.statusCheckedAt && (
-                            <Box>
-                                <Typography variant="caption">
-                                    Last Checked:{' '}
-                                    {new Date(run.details.statusCheckedAt).toLocaleString()}
-                                </Typography>
-                            </Box>
-                        )}
-                        {run.stats && (
-                            <Box display="flex" gap={1.5}>
-                                <ExperimentCount>
-                                    <ScienceOutlinedIcon />
-                                    {run.stats.requestedExperiments ? (
-                                        <>
-                                            {run.stats.requestedExperiments} {experimentsLabel}
-                                        </>
-                                    ) : (
-                                        'Loading experiments...'
-                                    )}
-                                </ExperimentCount>
-                                {!!run.stats.pendingExperiments && (
+                        <RunStats>
+                            {run.stats && (
+                                <Box display="flex" gap={1.5}>
                                     <ExperimentCount>
-                                        <HourglassTopOutlinedIcon />
-                                        {run.stats.pendingExperiments} pending
+                                        <ScienceOutlinedIcon />
+                                        {run.stats.requestedExperiments ? (
+                                            <>
+                                                {run.stats.requestedExperiments} {experimentsLabel}
+                                            </>
+                                        ) : (
+                                            'Loading experiments...'
+                                        )}
                                     </ExperimentCount>
-                                )}
-                            </Box>
-                        )}
-                        {canStop && (
-                            <StopButton
-                                variant="text"
-                                startIcon={
-                                    cancelling ? (
-                                        <CircularProgress size={16} />
-                                    ) : (
-                                        <StopCircleOutlinedIcon />
-                                    )
-                                }
-                                onClick={handleStop}
-                                disabled={cancelling}>
-                                {cancelling ? 'Stopping...' : 'Stop'}
-                            </StopButton>
-                        )}
+                                    {!!run.stats.pendingExperiments && (
+                                        <ExperimentCount>
+                                            <HourglassTopOutlinedIcon />
+                                            {run.stats.pendingExperiments} pending
+                                        </ExperimentCount>
+                                    )}
+                                </Box>
+                            )}
+                            {canStop && (
+                                <StopButton
+                                    variant="outlined"
+                                    startIcon={
+                                        cancelling ? (
+                                            <CircularProgress size={16} />
+                                        ) : (
+                                            <StopCircleOutlinedIcon />
+                                        )
+                                    }
+                                    onClick={handleStop}
+                                    disabled={cancelling}>
+                                    {cancelling ? 'Stopping...' : 'Stop run'}
+                                </StopButton>
+                            )}
+                        </RunStats>
+
                         <ExperimentsTable runStats={run.stats} />
                     </Box>
                 </TablePanel>
@@ -371,6 +358,7 @@ const CloseDetailButton = styled(IconButton)`
 `;
 
 const StopButton = styled(Button)`
+    border: 1px solid ${({ theme }) => theme.color['error-red-60'].rgba.toString()};
     color: ${({ theme }) => theme.color['error-red-100'].hex};
 
     &.Mui-disabled {
@@ -416,7 +404,46 @@ const ExperimentCount = styled('div')`
     }
 `;
 
-const Timestamp = styled(Typography)`
+const RunHeaderSubtitle = styled(List)`
+    align-items: center;
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    display: flex;
+    flex-direction: row;
     font-weight: 700;
+    gap: ${({ theme }) => theme.spacing(1)};
+    padding: 0;
+`;
+
+const StyledListItem = styled(ListItem)`
+    display: inline-flex;
+    padding: 0;
+    width: auto;
+
+    &:not(:last-child)::after {
+        content: '•';
+        margin-left: ${({ theme }) => theme.spacing(1)};
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+    }
+`;
+
+const RunStats = styled('div')`
+    display: flex;
+    justify-content: space-between;
+`;
+
+const StatusChip = styled(Chip)<{ $status: string }>`
+    background-color: ${({ theme, $status }) => {
+        const status = $status.toUpperCase();
+        switch (status) {
+            case 'FAILED':
+            case 'ERROR':
+                return theme.color['error-red-100'].hex;
+            case 'CANCELLED':
+                return theme.color['warning-orange-100'].hex;
+            default:
+                return theme.color['extra-dark-teal-100'].hex;
+        }
+    }};
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    padding: ${({ theme }) => theme.spacing(1)};
 `;

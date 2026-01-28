@@ -281,7 +281,7 @@ def create() -> Blueprint:
             JSON response containing run metadata, details, and stats.
         """
         req = GetViewerRunsRequestModel(
-            limit=int(request.args.get("limit", 10)),
+            limit=int(request.args.get("limit", 1000)),
             userid=request.user.get("sub"),
         )
 

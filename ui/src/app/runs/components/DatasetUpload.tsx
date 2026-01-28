@@ -185,7 +185,7 @@ export default function DatasetUpload({
                                     <DescriptionOutlinedIcon />
                                     <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
                                     <FileHeaderFileMeta>
-                                        {friendlyType} • {prettyBytes(upload.file.size)}
+                                        {friendlyType} • {prettyBytes(upload.totalBytes)}
                                     </FileHeaderFileMeta>
                                     <FileHeaderActions>
                                         {/* Status indicators */}

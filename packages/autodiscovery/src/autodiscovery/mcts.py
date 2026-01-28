@@ -7,23 +7,46 @@ from datetime import datetime
 
 import numpy as np
 
-from autodiscovery.mcts_utils import get_query_from_experiment, get_experiment_from_query, get_node_level_idx, get_context_string
+from autodiscovery.mcts_utils import (
+    get_query_from_experiment,
+    get_experiment_from_query,
+    get_node_level_idx,
+    get_context_string,
+)
 from autodiscovery.utils import try_loading_dict
 
 
 class MCTSNode(object):
     _creation_counter = 0
 
-    def __init__(self, level=None, node_idx=None, hypothesis=None, query=None, parent_idx=None, parent=None,
-                 untried_experiments=None, allow_generate_experiments=False, experiment_plan=None, code=None,
-                 code_output=None, analysis=None, review=None, creation_idx=None):
+    def __init__(
+        self,
+        level=None,
+        node_idx=None,
+        hypothesis=None,
+        query=None,
+        parent_idx=None,
+        parent=None,
+        untried_experiments=None,
+        allow_generate_experiments=False,
+        experiment_plan=None,
+        code=None,
+        code_output=None,
+        analysis=None,
+        review=None,
+        creation_idx=None,
+    ):
         # Tree attributes
         self.creation_idx = creation_idx if creation_idx is not None else MCTSNode._creation_counter
         MCTSNode._creation_counter += 1  # Used to replay MCTS from log files
         self.time_elapsed = None
         self.level = level
         self.node_idx = node_idx
-        self.id = f"node_{self.level}_{self.node_idx}" if self.level is not None and self.node_idx is not None else None
+        self.id = (
+            f"node_{self.level}_{self.node_idx}"
+            if self.level is not None and self.node_idx is not None
+            else None
+        )
         self.children = []
         self.parent = parent  # MCTSNode
         if self.parent is not None:
@@ -32,13 +55,17 @@ class MCTSNode(object):
             self.parent.children.append(self)
         else:
             self.parent_idx = parent_idx
-            self.parent_id = f"node_{self.level - 1}_{self.parent_idx}" if self.parent_idx is not None else None
+            self.parent_id = (
+                f"node_{self.level - 1}_{self.parent_idx}" if self.parent_idx is not None else None
+            )
         self.success = None
 
         # Agent attributes
         self.query = query
         self.messages = []
-        self.untried_experiments = copy.deepcopy(untried_experiments) if untried_experiments is not None else []
+        self.untried_experiments = (
+            copy.deepcopy(untried_experiments) if untried_experiments is not None else []
+        )
         self.tried_experiments = []  # Track all tried experiments
         self.allow_generate_experiments = allow_generate_experiments
 
@@ -52,8 +79,8 @@ class MCTSNode(object):
 
         # MCTS attributes
         self.visits = 0  # Visits to this node or its children
-        self.value = 0.  # Number of surprising hypotheses
-        self.self_value = 0.  # Value of this node only (not aggregated from children)
+        self.value = 0.0  # Number of surprising hypotheses
+        self.self_value = 0.0  # Value of this node only (not aggregated from children)
 
         # Belief attributes
         self.surprising: Optional[bool] = None
@@ -66,58 +93,59 @@ class MCTSNode(object):
     def init_from_dict(self, data):
         """Initialize node attributes from a dictionary."""
         # Tree attributes
-        self.creation_idx = data.get('creation_idx', MCTSNode._creation_counter)
-        self.time_elapsed = data.get('time_elapsed', self.time_elapsed)
-        self.id = data.get('id', None)
+        self.creation_idx = data.get("creation_idx", MCTSNode._creation_counter)
+        self.time_elapsed = data.get("time_elapsed", self.time_elapsed)
+        self.id = data.get("id", None)
         if self.id is not None:
             self.level, self.node_idx = get_node_level_idx(self.id)
         else:
-            self.level = data['level']
-            self.node_idx = data['node_idx']
+            self.level = data["level"]
+            self.node_idx = data["node_idx"]
             self.id = f"node_{self.level}_{self.node_idx}"
-        self.parent_id = data.get('parent_id', self.parent_id)
+        self.parent_id = data.get("parent_id", self.parent_id)
         if self.parent_id is not None:
             _, self.parent_idx = get_node_level_idx(self.parent_id)
         else:
-            self.parent_idx = data.get('parent_idx', self.parent_idx)
+            self.parent_idx = data.get("parent_idx", self.parent_idx)
             if self.parent_idx is not None:
                 self.parent_id = f"node_{self.level - 1}_{self.parent_idx}"
-        self.success = data.get('success', self.success)
+        self.success = data.get("success", self.success)
 
         # Agent attributes
-        self.query = data.get('query', "N/A")
-        self.messages = data.get('messages', self.messages)
-        self.untried_experiments = data.get('untried_experiments', self.untried_experiments)
+        self.query = data.get("query", "N/A")
+        self.messages = data.get("messages", self.messages)
+        self.untried_experiments = data.get("untried_experiments", self.untried_experiments)
         # self.tried_experiments = data.get('tried_experiments', self.tried_experiments)
         self.allow_generate_experiments = self.allow_generate_experiments and self.level > 0
 
         # Experiment attributes
-        self.hypothesis = data.get('hypothesis', self.hypothesis)
-        self.experiment_plan = data.get('experiment_plan', self.experiment_plan)
-        self.code = data.get('code', self.code)
-        self.code_output = data.get('code_output', self.code_output)
-        self.analysis = data.get('analysis', self.analysis)
-        self.review = data.get('review', self.review)
+        self.hypothesis = data.get("hypothesis", self.hypothesis)
+        self.experiment_plan = data.get("experiment_plan", self.experiment_plan)
+        self.code = data.get("code", self.code)
+        self.code_output = data.get("code_output", self.code_output)
+        self.analysis = data.get("analysis", self.analysis)
+        self.review = data.get("review", self.review)
 
         # MCTS attributes
-        self.visits = data.get('visits', self.visits)
-        self.value = data.get('value', self.value)
-        self.self_value = data.get('self_value', self.self_value)
+        self.visits = data.get("visits", self.visits)
+        self.value = data.get("value", self.value)
+        self.self_value = data.get("self_value", self.self_value)
 
         # Belief attributes
-        self.surprising = data.get('surprising', self.surprising)
-        from autodiscovery.beliefs import BELIEF_MODE_TO_CLS  # Import here to avoid circular import issues
-        if 'prior' in data and data['prior']:
-            belief_cls = BELIEF_MODE_TO_CLS[data['prior']['_type']]
-            self.prior = belief_cls.DistributionFormat(**data['prior'])
-        if 'posterior' in data and data['posterior']:
-            belief_cls = BELIEF_MODE_TO_CLS[data['posterior']['_type']]
-            self.posterior = belief_cls.DistributionFormat(**data['posterior'])
-        self.belief_change = data.get('belief_change', self.belief_change)
-        self.normalized_surprisal = data.get(
-            'normalized_surprisal', self.normalized_surprisal
-        )
-        self.kl_divergence = data.get('kl_divergence', self.kl_divergence)
+        self.surprising = data.get("surprising", self.surprising)
+        from autodiscovery.beliefs import (
+            BELIEF_MODE_TO_CLS,
+        )  # Import here to avoid circular import issues
+
+        if "prior" in data and data["prior"]:
+            belief_cls = BELIEF_MODE_TO_CLS[data["prior"]["_type"]]
+            self.prior = belief_cls.DistributionFormat(**data["prior"])
+        if "posterior" in data and data["posterior"]:
+            belief_cls = BELIEF_MODE_TO_CLS[data["posterior"]["_type"]]
+            self.posterior = belief_cls.DistributionFormat(**data["posterior"])
+        self.belief_change = data.get("belief_change", self.belief_change)
+        self.normalized_surprisal = data.get("normalized_surprisal", self.normalized_surprisal)
+        self.kl_divergence = data.get("kl_divergence", self.kl_divergence)
 
     def get_next_experiment(self, experiment_generator=None, n_retry=3):
         """
@@ -133,10 +161,12 @@ class MCTSNode(object):
                 self.tried_experiments.append(new_experiment)
             elif self.allow_generate_experiments and experiment_generator is not None:
                 # Generate new experiments on-demand, providing all previous experiments as context
-                _messages = self.messages + [{
-                    "role": "user",
-                    "content": f"Generate new experiments given these previously attempted experiments: {json.dumps(self.tried_experiments)}"
-                }]
+                _messages = self.messages + [
+                    {
+                        "role": "user",
+                        "content": f"Generate new experiments given these previously attempted experiments: {json.dumps(self.tried_experiments)}",
+                    }
+                ]
                 _reply = experiment_generator.generate_reply(messages=_messages)
                 try:
                     experiments = try_loading_dict(_reply).get("experiments", [])
@@ -154,7 +184,9 @@ class MCTSNode(object):
                 except:
                     pass
             if new_query is None:
-                return self.get_next_experiment(experiment_generator=experiment_generator, n_retry=n_retry - 1)
+                return self.get_next_experiment(
+                    experiment_generator=experiment_generator, n_retry=n_retry - 1
+                )
 
         return new_experiment, new_query
 
@@ -210,7 +242,10 @@ class MCTSNode(object):
                 latest_programmer = try_loading_dict(msg.get("content")).get("code", "N/A")
             elif not latest_code_executor and msg.get("name") == "code_executor":
                 latest_code_executor = msg.get("content")
-            elif not latest_analyst and msg.get("name") in ["experiment_analyst", "experiment_code_analyst"]:
+            elif not latest_analyst and msg.get("name") in [
+                "experiment_analyst",
+                "experiment_code_analyst",
+            ]:
                 latest_analyst = try_loading_dict(msg.get("content")).get("analysis", "N/A")
             elif not latest_reviewer and msg.get("name") == "experiment_reviewer":
                 latest_reviewer = try_loading_dict(msg.get("content"))
@@ -219,10 +254,17 @@ class MCTSNode(object):
                     latest_reviewer_feedback = "N/A"
                 latest_reviewer_success = latest_reviewer.get("success", False)
             elif not latest_experiment_generator and msg.get("name") == "experiment_generator":
-                latest_experiment_generator = try_loading_dict(msg.get("content")).get("experiments", [])
+                latest_experiment_generator = try_loading_dict(msg.get("content")).get(
+                    "experiments", []
+                )
 
-            if (latest_experiment and latest_programmer and
-                    latest_code_executor and latest_analyst and latest_reviewer):
+            if (
+                latest_experiment
+                and latest_programmer
+                and latest_code_executor
+                and latest_analyst
+                and latest_reviewer
+            ):
                 break
 
         if was_revised:
@@ -230,7 +272,9 @@ class MCTSNode(object):
             # Change what the query should now be based on the revised experiment
             self.query = get_query_from_experiment(latest_experiment_obj)
         else:
-            latest_experiment_obj = get_experiment_from_query(latest_experiment)  # assuming it is a query string
+            latest_experiment_obj = get_experiment_from_query(
+                latest_experiment
+            )  # assuming it is a query string
 
         self.hypothesis = latest_experiment_obj.get("hypothesis", "N/A")
         self.experiment_plan = latest_experiment_obj.get("experiment_plan", "N/A")
@@ -248,8 +292,13 @@ class MCTSNode(object):
         """Returns the node's hypothesis, experiment, output, analysis, and review."""
         if len(self.messages) == 0:
             return None
-        context_str = get_context_string(self.query, self.code_output, self.analysis, self.review,
-                                         include_code_output=include_code_output)
+        context_str = get_context_string(
+            self.query,
+            self.code_output,
+            self.analysis,
+            self.review,
+            include_code_output=include_code_output,
+        )
         return context_str
 
     def get_path_context(self, k: Optional[int] = None, skip_root=True) -> None | list:
@@ -265,7 +314,11 @@ class MCTSNode(object):
                 return []
             context = [context]
         k_remaining = None if k is None else k - 1
-        if context is not None and self.parent is not None and (k_remaining is None or k_remaining > 0):
+        if (
+            context is not None
+            and self.parent is not None
+            and (k_remaining is None or k_remaining > 0)
+        ):
             parent_context = self.parent.get_path_context(k=k_remaining, skip_root=skip_root)
             if parent_context is not None:
                 context = parent_context + context
@@ -330,7 +383,7 @@ def progressive_widening(k, alpha, exploration_weight=1.0):
             num_visits = current_node.visits
             num_children = len(current_node.children)
             if (
-                num_children == 0 or num_children < k * (num_visits ** alpha)
+                num_children == 0 or num_children < k * (num_visits**alpha)
             ) and current_node.has_untried_experiments():
                 return_nodes.append(current_node)
                 if len(return_nodes) >= return_n:
@@ -365,14 +418,16 @@ def progressive_widening_all(k, alpha, exploration_weight=1.0):
         return_nodes = []
         all_nodes = [n for level, nodes in nodes_by_level.items() if level > 0 for n in nodes]
         # Sort all nodes by UCB1 value
-        all_nodes_sorted = sorted(all_nodes, key=lambda n: ucb1(n, exploration_weight), reverse=True)
+        all_nodes_sorted = sorted(
+            all_nodes, key=lambda n: ucb1(n, exploration_weight), reverse=True
+        )
 
         for _node in all_nodes_sorted:
             num_visits = _node.visits
             num_children = len(_node.children)
             # If we can add a new child based on the progressive widening condition
             if (
-                num_children == 0 or num_children < k * (num_visits ** alpha)
+                num_children == 0 or num_children < k * (num_visits**alpha)
             ) and _node.has_untried_experiments():
                 return_nodes.append(_node)
                 if len(return_nodes) >= return_n:
@@ -427,6 +482,7 @@ def beam_search(branching_factor, beam_width, log_dirname=None):
     Returns:
         A callable function that accepts a root node and returns selected nodes.
     """
+
     def select(root, nodes_by_level, return_n=1):
         return_nodes = []
         beam = [root]
@@ -474,7 +530,7 @@ def beam_search(branching_factor, beam_width, log_dirname=None):
 def ucb1(node, exploration_weight=1.0):
     """Upper Confidence Bound 1 calculation for node selection"""
     if node.visits == 0:
-        return float('inf')
+        return float("inf")
     exploitation_term = node.value / node.visits
     exploration_term = 0
     if node.parent:

@@ -434,9 +434,7 @@ def upload_job_args(
         raise GCSError(f"Failed to save job args: {e}")
 
 
-def get_metadata(
-    userid: str, jobid: str, config: JobConfig | None = None
-) -> dict[str, Any]:
+def get_metadata(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
     """Download and parse metadata.json from job directory.
 
     Args:

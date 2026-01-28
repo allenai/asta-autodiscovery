@@ -1,13 +1,17 @@
 from typing import Any
 from pydantic import BaseModel, Field
 
+
 class RunDetailsModel(BaseModel):
     """Model representing detailed information about a run"""
 
     execution_id: str | None = Field(None, description="Identifier for the execution")
     created_at: str = Field(..., description="Timestamp when the run was created")
     status: str = Field(..., description="Current status of the run")
-    status_checked_at: str | None = Field(None, description="Timestamp when the status was last checked")
+    status_checked_at: str | None = Field(
+        None, description="Timestamp when the status was last checked"
+    )
+
 
 class RunStatsModel(BaseModel):
     """Model representing statistics of a run"""
@@ -22,6 +26,7 @@ class RunStatsModel(BaseModel):
     num_surprising_experiments: int = Field(
         ..., description="Number of experiments that are considered surprising"
     )
+
 
 class ExperimentModel(BaseModel):
     """Model representing an experiment with its attributes"""
@@ -46,17 +51,21 @@ class ExperimentModel(BaseModel):
     runtime_ms: float | None = Field(None, description="Runtime of the experiment in milliseconds")
     hypothesis: str | None = Field(None, description="Hypothesis associated with the experiment")
     analysis: str | None = Field(None, description="Analysis details of the experiment")
-    experiment_plan: dict[str, Any] | None = Field(None, description="Plan details of the experiment")
+    experiment_plan: dict[str, Any] | None = Field(
+        None, description="Plan details of the experiment"
+    )
     review: str | None = Field(
         None, description="Results of the experiment in human-readable format"
     )
     code: str | None = Field(None, description="Code generated for the experiment")
+
 
 class MetadataDatasetModel(BaseModel):
     """Model representing dataset metadata for a run"""
 
     name: str | None = Field(None, description="Filename of the dataset")
     description: str | None = Field(None, description="Description of the dataset")
+
 
 class RunArgsModel(BaseModel):
     """Model representing run arguments/configuration"""
@@ -81,6 +90,7 @@ class RunArgsModel(BaseModel):
             warmstart_experiments=data.get("warmstart_experiments"),
             n_warmstart=data.get("n_warmstart"),
         )
+
 
 class MetadataModel(BaseModel):
     """Model representing metadata for a run"""
@@ -112,6 +122,7 @@ class MetadataModel(BaseModel):
             datasets=datasets,
         )
 
+
 class RunModel(BaseModel):
     """Model representing a run with its attributes"""
 
@@ -126,15 +137,12 @@ class RunModel(BaseModel):
     run_stats: RunStatsModel | None = Field(
         None, description="Statistical information about the run"
     )
-    execution_status: dict[str, Any] | None = Field(
-        None, description="Execution status of the run"
-    )
-    run_metadata: MetadataModel | None = Field(
-        None, description="Metadata associated with the run"
-    )
+    execution_status: dict[str, Any] | None = Field(None, description="Execution status of the run")
+    run_metadata: MetadataModel | None = Field(None, description="Metadata associated with the run")
     run_args: RunArgsModel | None = Field(
         None, description="Arguments and configuration for the run"
     )
+
 
 class GetRunMetadataRequestModel(BaseModel):
     """Model for the request to get run metadata"""
@@ -144,21 +152,25 @@ class GetRunMetadataRequestModel(BaseModel):
         None, description="User identifier for whom to retrieve metadata; defaults to the viewer"
     )
 
+
 class GetRunMetadataResponseModel(BaseModel):
     """Model for the response containing run metadata"""
 
     runid: str = Field(..., description="Identifier of the run")
     metadata: MetadataModel = Field(..., description="Metadata associated with the run")
 
+
 class GetExampleRunsRequestModel(BaseModel):
     """Model for the request to get example runs"""
 
     limit: int = Field(..., description="Maximum number of example runs to retrieve")
 
+
 class GetExampleRunsResponseModel(BaseModel):
     """Model for the response containing a list of example runs"""
 
     runs: list[RunModel] = Field(..., description="List of example runs")
+
 
 class GetViewerRunsRequestModel(BaseModel):
     """Model for the request to get runs for the viewer"""
@@ -167,6 +179,7 @@ class GetViewerRunsRequestModel(BaseModel):
     userid: str = Field(
         ..., description="User identifier for whom to retrieve runs; defaults to the viewer"
     )
+
 
 class GetViewerRunsResponseModel(BaseModel):
     """Model for the response containing a list of runs for the viewer"""
@@ -198,12 +211,12 @@ class GetExperimentStatusResponseModel(BaseModel):
 class GenerateUploadUrlRequestModel(BaseModel):
     """Model for the request to generate a presigned upload URL"""
 
-    runid: str = Field(..., description="Identifier of the run for which to generate the upload URL")
+    runid: str = Field(
+        ..., description="Identifier of the run for which to generate the upload URL"
+    )
     userid: str = Field(..., description="User identifier for whom to generate the upload URL")
     filename: str = Field(..., description="Name of the file to upload")
-    content_type: str = Field(
-        ..., description="MIME type of the file"
-    )
+    content_type: str = Field(..., description="MIME type of the file")
     file_size_bytes: int = Field(..., description="Size of the file in bytes")
 
 
@@ -212,4 +225,6 @@ class GenerateUploadUrlResponseModel(BaseModel):
 
     upload_url: str = Field(..., description="Presigned URL for uploading the file to GCS")
     filename: str = Field(..., description="Name of the file")
-    expires_at_unix: int = Field(..., description="Unix timestamp (seconds since epoch) when the URL expires")
+    expires_at_unix: int = Field(
+        ..., description="Unix timestamp (seconds since epoch) when the URL expires"
+    )

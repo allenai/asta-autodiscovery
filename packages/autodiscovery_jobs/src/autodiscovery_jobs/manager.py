@@ -227,7 +227,7 @@ class JobManager:
             Dictionary of job arguments, or None if not found
         """
         return gcs.get_job_args(userid, jobid, self.config)
-        
+
     # Job execution
 
     def run_job(

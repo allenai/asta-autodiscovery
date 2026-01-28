@@ -138,10 +138,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 <FormControl fullWidth>
                     <StyledFormLabel>Upload source files</StyledFormLabel>
                     <DatasetUpload
-                        datasets={[]}
                         fileUploads={fileUploads}
                         onFileSelect={handleFileSelect}
-                        onRemove={() => {}}
                         onRemoveFileUpload={handleRemoveFileUpload}
                         onDescriptionChange={handleFileDescriptionChange}
                         onCancelUpload={cancelUpload}

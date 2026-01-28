@@ -19,7 +19,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 
-import { FileUploadState } from '../hooks/useRunSetup';
+import { FileUploadState, UploadStatus } from '../hooks/useRunSetup';
 
 export interface Dataset {
     filename: string;
@@ -193,10 +193,6 @@ export default function DatasetUpload({
                     {fileUploads.map((upload, index) => {
                         const fileSizeMB = (upload.file.size / (1024 * 1024)).toFixed(2);
                         const fileType = upload.file.type || 'Unknown';
-                        const isUploading = upload.status === 'uploading';
-                        const isCompleted = upload.status === 'completed';
-                        const isError = upload.status === 'error';
-                        const isPending = upload.status === 'pending';
 
                         return (
                             <File key={`upload-${index}`}>
@@ -213,19 +209,20 @@ export default function DatasetUpload({
                                     </Typography>
 
                                     {/* Status indicators */}
-                                    {isCompleted && (
+                                    {upload.status === UploadStatus.COMPLETED && (
                                         <CheckCircleIcon
                                             sx={{ color: 'success.main', mr: 1 }}
                                             titleAccess="Upload completed"
                                         />
                                     )}
-                                    {isError && (
+                                    {upload.status === UploadStatus.ERROR && (
                                         <ErrorIcon
                                             sx={{ color: 'error.main', mr: 1 }}
                                             titleAccess="Upload failed"
                                         />
                                     )}
-                                    {isPending && (
+
+                                    {upload.status === UploadStatus.PENDING && (
                                         <Typography
                                             variant="caption"
                                             color="text.secondary"
@@ -238,26 +235,30 @@ export default function DatasetUpload({
                                     <IconButton
                                         size="small"
                                         onClick={() =>
-                                            isUploading
+                                            upload.status === UploadStatus.UPLOADING
                                                 ? onCancelUpload(index)
                                                 : onRemoveFileUpload(index)
                                         }
                                         disabled={disabled}
                                         sx={{ ml: 'auto' }}
-                                        title={isUploading ? 'Cancel upload' : 'Remove file'}>
+                                        title={
+                                            upload.status === UploadStatus.UPLOADING
+                                                ? 'Cancel upload'
+                                                : 'Remove file'
+                                        }>
                                         <CloseIcon fontSize="small" />
                                     </IconButton>
                                 </FileHeader>
 
                                 {/* Progress bar - only show during upload */}
-                                {isUploading && (
+                                {upload.status === UploadStatus.UPLOADING && (
                                     <Box sx={{ px: 2, py: 1 }}>
                                         <UploadProgress upload={upload} />
                                     </Box>
                                 )}
 
                                 {/* Error message with retry button */}
-                                {isError && (
+                                {upload.status === UploadStatus.ERROR && (
                                     <Alert
                                         severity="error"
                                         sx={{ mx: 2, mt: 1 }}
@@ -288,6 +289,9 @@ export default function DatasetUpload({
                                         fullWidth
                                         value={upload.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
+                                        disabled={
+                                            upload.status === UploadStatus.UPLOADING || disabled
+                                        }
                                         sx={{ mt: 1 }}
                                         placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,

@@ -24,6 +24,8 @@ export interface RunMetadataFromApi {
     datasets: {
         name: string;
         description: string | null;
+        content_type: string | null;
+        file_size_bytes: number | null;
     }[];
 }
 
@@ -111,6 +113,8 @@ export interface GetRunExperimentDetailsResponseBody {
 export interface MetadataDatasetFromApi {
     name: string;
     description: string | null;
+    content_type: string | null;
+    file_size_bytes: number | null;
 }
 
 export interface MetadataFromApi {

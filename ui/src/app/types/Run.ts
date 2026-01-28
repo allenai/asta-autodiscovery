@@ -71,6 +71,8 @@ export type RichOutputBundle = Record<string, string>;
 export type MetadataDataset = {
     name: string;
     description: string | null;
+    contentType: string | null;
+    fileSizeBytes: number | null;
 };
 
 export type Metadata = {
@@ -155,6 +157,8 @@ export const getMetadataDatasetFromApi = (datasetFromApi: any): MetadataDataset 
     return {
         name: datasetFromApi.name,
         description: datasetFromApi.description,
+        contentType: datasetFromApi.content_type || null,
+        fileSizeBytes: datasetFromApi.file_size_bytes || null,
     };
 };
 

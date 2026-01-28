@@ -139,10 +139,14 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                     // Populate fileUploads from saved datasets
                     if (metadata?.datasets && metadata.datasets.length > 0) {
                         const uploadStates: FileUploadState[] = metadata.datasets.map((dataset) => {
+                            // Use saved content_type and file_size_bytes if available
+                            const contentType = dataset.contentType || 'application/octet-stream';
+                            const fileSize = dataset.fileSizeBytes || 0;
+
                             // Create placeholder File object from filename
                             // The actual file content is already in GCS, so we just need the metadata
                             const placeholderFile = new File([], dataset.name, {
-                                type: 'application/octet-stream',
+                                type: contentType,
                             });
 
                             return {
@@ -150,8 +154,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                                 description: dataset.description || '',
                                 status: UploadStatus.COMPLETED,
                                 progress: 100,
-                                uploadedBytes: 0,
-                                totalBytes: 0,
+                                uploadedBytes: fileSize,
+                                totalBytes: fileSize,
                                 secondsRemaining: 0,
                                 uploadStartTime: null,
                                 uploadUrl: null,
@@ -260,6 +264,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                 .map((upload) => ({
                     name: upload.file.name,
                     description: upload.description || '',
+                    content_type: upload.file.type || 'application/octet-stream',
+                    file_size_bytes: upload.file.size,
                 }));
 
             // Build metadata from current settings (via ref to get latest)
@@ -487,6 +493,8 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             datasets: fileUploads.map((upload) => ({
                 name: upload.file.name,
                 description: upload.description,
+                content_type: upload.file.type || 'application/octet-stream',
+                file_size_bytes: upload.file.size,
             })),
         };
 

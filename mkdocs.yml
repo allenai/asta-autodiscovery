@@ -31,6 +31,8 @@ plugins:
 
 nav:
   - Home: index.md
+  - Autodiscovery:
+      - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md
       - IPython Executor: code_execution/ipython_executor.md
@@ -44,7 +46,13 @@ nav:
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.superfences
 
 extra_css:
   - assets/styles/asta.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

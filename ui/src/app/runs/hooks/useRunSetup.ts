@@ -135,6 +135,34 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
                             args?.warmstartExperiments || prev.warmstartExperiments,
                         nWarmstart: args?.nWarmstart || prev.nWarmstart,
                     }));
+
+                    // Populate fileUploads from saved datasets
+                    if (metadata?.datasets && metadata.datasets.length > 0) {
+                        const uploadStates: FileUploadState[] = metadata.datasets.map((dataset) => {
+                            // Create placeholder File object from filename
+                            // The actual file content is already in GCS, so we just need the metadata
+                            const placeholderFile = new File([], dataset.name, {
+                                type: 'application/octet-stream',
+                            });
+
+                            return {
+                                file: placeholderFile,
+                                description: dataset.description || '',
+                                status: UploadStatus.COMPLETED,
+                                progress: 100,
+                                uploadedBytes: 0,
+                                totalBytes: 0,
+                                secondsRemaining: 0,
+                                uploadStartTime: null,
+                                uploadUrl: null,
+                                gcsPath: null, // Could reconstruct from userid/runid/filename if needed
+                                error: null,
+                                abortController: null,
+                            };
+                        });
+
+                        setFileUploads(uploadStates);
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching run metadata:', err);

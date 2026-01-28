@@ -197,6 +197,40 @@ def create() -> Blueprint:
 
         return run_details
 
+    def _get_run_detail_with_updated_status(run_details: dict, userid: str, runid: str) -> tuple[dict, dict] | None:
+        """Update run details with the job status from Cloud Run.
+
+        Args:
+            run_details: Current run details dictionary
+            userid: User ID
+            runid: Run ID
+
+        Returns:
+            Tuple of updated run details with status and the status response itself
+        """
+        manager = get_job_manager()
+        if run_details.get("execution_id"):
+            execution_id = run_details["execution_id"]
+
+            # Get status from Cloud Run
+            status_response = manager.get_job_status(execution_id)
+
+            # Extract phase from execution status (e.g., "RUNNING", "SUCCEEDED", "FAILED")
+            phase = status_response.get("phase", status_response.get("status", "unknown"))
+
+            # Update run_details with new status
+            run_details = _update_run_details(
+                userid,
+                runid,
+                {
+                    "status": phase,
+                    "status_checked_at": datetime.now(UTC).isoformat(),
+                },
+            )
+            return run_details, status_response
+             
+        return run_details, None
+
     @api.route("/health")
     def health():
         """Health check endpoint.
@@ -433,6 +467,13 @@ def create() -> Blueprint:
             run_details = _get_run_details(userid, runid) or {}
             path = manager.get_job_path(userid, runid)
 
+            # Get the latest run status
+            try:
+                [updated_run_details, _] = _get_run_detail_with_updated_status(run_details, userid, runid)
+            except Exception as e:
+                current_app.logger.error(f"Failed to update run status for {runid}: {e}")
+                updated_run_details = run_details
+                
             # Get job stats
             try:
                 job_stats = get_job_stats(userid=userid, jobid=runid, config=manager.config)
@@ -456,10 +497,10 @@ def create() -> Blueprint:
 
             # Build RunModel
             run_details_model = RunDetailsModel(
-                execution_id=run_details.get("execution_id"),
-                created_at=run_details.get("created_at", ""),
-                status=run_details.get("status", "UNKNOWN"),
-                status_checked_at=run_details.get("status_checked_at"),
+                execution_id=updated_run_details.get("execution_id"),
+                created_at=updated_run_details.get("created_at", ""),
+                status=updated_run_details.get("status", "UNKNOWN"),
+                status_checked_at=updated_run_details.get("status_checked_at"),
             )
             run_stats_model = RunStatsModel(
                 requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
@@ -471,7 +512,7 @@ def create() -> Blueprint:
             run_args_model = RunArgsModel.from_dict(args_dict) if args_dict else None
             run_model = RunModel(
                 runid=runid,
-                status=run_details.get("status", "UNKNOWN"),
+                status=updated_run_details.get("status", "UNKNOWN"),
                 name=run_metadata_model.name if run_metadata_model else f"Run {runid}",
                 description=run_metadata_model.description if run_metadata_model else None,
                 path=path,
@@ -874,55 +915,29 @@ def create() -> Blueprint:
             return jsonify({"error": "User ID not found in token"}), 401
 
         try:
-            manager = get_job_manager()
-
             # Get run details
             run_details = _get_run_details(userid, runid)
             if not run_details:
                 return jsonify({"error": "Run details not found"}), 404
 
-            # If run has been submitted, check execution status
-            if run_details.get("execution_id"):
-                execution_id = run_details["execution_id"]
+            [updated_run_details, status_response] = _get_run_detail_with_updated_status(run_details, userid, runid)
 
-                try:
-                    # Get status from Cloud Run
-                    status_response = manager.get_job_status(execution_id)
-
-                    # Extract phase from execution status (e.g., "RUNNING", "SUCCEEDED", "FAILED")
-                    phase = status_response.get("phase", status_response.get("status", "unknown"))
-
-                    # Update run_details with new status
-                    run_details = _update_run_details(
-                        userid,
-                        runid,
-                        {
-                            "status": phase,
-                            "status_checked_at": datetime.now(UTC).isoformat(),
-                        },
-                    )
-
-                    return jsonify(
-                        {
-                            "runid": runid,
-                            "run_details": run_details,
-                            "execution_status": status_response,
-                        }
-                    )
-                except Exception as e:
-                    current_app.logger.error(f"Failed to get execution status: {e}")
-                    # Return current run_details even if status check fails
-                    return jsonify(
-                        {
-                            "runid": runid,
-                            "run_details": run_details,
-                            "error": f"Failed to check execution status: {str(e)}",
-                        }
-                    )
-
-            # Run hasn't been submitted yet
-            return jsonify({"runid": runid, "run_details": run_details})
-
+            if status_response:
+                return jsonify(
+                    {
+                        "runid": runid,
+                        "run_details": updated_run_details,
+                        "execution_status": status_response,
+                    }
+                )
+            else:
+                # Run hasn't been submitted yet
+                return jsonify(
+                    {
+                        "runid": runid,
+                        "run_details": run_details,
+                    }
+                )
         except Exception as e:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500

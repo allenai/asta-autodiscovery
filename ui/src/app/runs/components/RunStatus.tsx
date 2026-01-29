@@ -15,6 +15,7 @@ import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Run, getRunFromApi } from '@/types/Run';
@@ -24,6 +25,7 @@ import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
+import { RunParametersModal } from '@/runs/components/RunParametersModal';
 import { useAuth0 } from '@/contexts/Auth0Context';
 
 interface RunStatusProps {
@@ -186,6 +188,7 @@ function RunStatusContent({
     lastUpdated,
 }: RunStatusContentProps) {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
+    const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     // const [isTableExpanded, setIsTableExpanded] = useState(false);
     const isTableExpanded = true;
     const setIsTableExpanded = (...args: any[]) => {}; // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -249,7 +252,7 @@ function RunStatusContent({
                     </RunHeader>
 
                     <Box sx={{ padding: 3 }}>
-                        <RunStats>
+                        <RunToolbar>
                             {run.stats && (
                                 <ExperimentCount>
                                     <HourglassTopOutlinedIcon />
@@ -263,22 +266,30 @@ function RunStatusContent({
                                     )}
                                 </ExperimentCount>
                             )}
-                            {canStop && (
-                                <StopButton
+                            <RunToolbarButtons>
+                                <ParametersButton
                                     variant="outlined"
-                                    startIcon={
-                                        cancelling ? (
-                                            <CircularProgress size={16} />
-                                        ) : (
-                                            <StopCircleOutlinedIcon />
-                                        )
-                                    }
-                                    onClick={handleStop}
-                                    disabled={cancelling}>
-                                    {cancelling ? 'Stopping...' : 'Stop run'}
-                                </StopButton>
-                            )}
-                        </RunStats>
+                                    startIcon={<SettingsOutlinedIcon />}
+                                    onClick={() => setIsParametersModalOpen(true)}>
+                                    Exploration Parameters
+                                </ParametersButton>
+                                {canStop && (
+                                    <StopButton
+                                        variant="outlined"
+                                        startIcon={
+                                            cancelling ? (
+                                                <CircularProgress size={16} />
+                                            ) : (
+                                                <StopCircleOutlinedIcon />
+                                            )
+                                        }
+                                        onClick={handleStop}
+                                        disabled={cancelling}>
+                                        {cancelling ? 'Stopping...' : 'Stop run'}
+                                    </StopButton>
+                                )}
+                            </RunToolbarButtons>
+                        </RunToolbar>
 
                         <ExperimentsTable runStats={run.stats} />
                     </Box>
@@ -295,6 +306,13 @@ function RunStatusContent({
                     </DetailsPanel>
                 )}
             </PanelLayout>
+
+            <RunParametersModal
+                open={isParametersModalOpen}
+                onClose={() => setIsParametersModalOpen(false)}
+                metadata={run.metadata}
+                args={run.args}
+            />
         </Container>
     );
 }
@@ -381,6 +399,16 @@ const StopButton = styled(Button)`
     }
 `;
 
+const RunToolbarButtons = styled('div')`
+    display: flex;
+    gap: ${({ theme }) => theme.spacing(1)};
+`;
+
+const ParametersButton = styled(Button)`
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+`;
+
 const RunHeader = styled('div')`
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     color: ${({ theme }) => theme.color['cream-100'].hex};
@@ -441,7 +469,7 @@ const StyledListItem = styled(ListItem)`
     }
 `;
 
-const RunStats = styled('div')`
+const RunToolbar = styled('div')`
     display: flex;
     justify-content: space-between;
 `;

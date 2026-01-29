@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
-import { useRouter } from 'next/navigation';
 
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useRouter } from 'next/navigation';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import RunSetup from '@/runs/components/RunSetup';
@@ -19,9 +18,7 @@ interface RunPageProps {
 }
 
 /**
- * Individual run page - shows RunSetup or RunStatus based on run state.
- * This page is for the current user's own runs only.
- * For viewing shared/public runs, use /shared/{userid}/{runid} instead.
+ * Individual run page - shows RunSetup or RunStatus based on run state
  */
 export default function RunPage({ params }: RunPageProps) {
     const { isAuthenticated, isLoading, getAccessToken } = useAuth0();
@@ -74,7 +71,17 @@ export default function RunPage({ params }: RunPageProps) {
     };
 
     if (isLoading) {
-        return <LoadingSpinner />;
+        return (
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    minHeight: '100%',
+                }}>
+                <CircularProgress />
+            </Box>
+        );
     }
 
     if (!isAuthenticated) {

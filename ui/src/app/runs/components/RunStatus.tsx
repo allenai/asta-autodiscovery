@@ -24,13 +24,10 @@ import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
-import { useAuth0 } from '@/contexts/Auth0Context';
 
 interface RunStatusProps {
     runid: string;
     onRunCancelled?: () => void;
-    /** Optional user ID for viewing public runs (e.g., "samples") */
-    userid?: string;
 }
 
 const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implement
@@ -44,9 +41,8 @@ const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implemen
  * - Stop Run button (only shown when status is RUNNING)
  * - Auto-refresh every 30 seconds for active runs
  */
-export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusProps) {
+export default function RunStatus({ runid, onRunCancelled }: RunStatusProps) {
     const api = getRunsApi();
-    const { user: authUser } = useAuth0();
 
     const [run, setRun] = useState<Run | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +56,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
         setError(null);
 
         try {
-            const response = await api.getRun(runid, { userid });
+            const response = await api.getRun(runid);
             const run = getRunFromApi(response.data);
 
             setRun(run);
@@ -124,9 +120,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
         }
     };
 
-    // Run is read-only if it belongs to a different user
-    const isReadOnly = run ? run.userid !== authUser?.sub : false;
-    const canStop = !isReadOnly && run?.details?.status === 'RUNNING';
+    const canStop = run?.details?.status === 'RUNNING';
     const experimentsLabel = run?.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments';
 
     if (isLoading && !run) {
@@ -152,7 +146,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
     }
 
     return (
-        <RunExperimentsProvider runid={runid} userid={userid} autoStart>
+        <RunExperimentsProvider runid={runid} autoStart>
             <RunStatusContent
                 run={run as Run & { details: NonNullable<Run['details']> }}
                 error={error}

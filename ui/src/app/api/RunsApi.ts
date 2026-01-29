@@ -67,15 +67,9 @@ export interface GenerateUploadUrlResponseBody {
 
 export interface RunResponseBody extends RunFromApi {}
 
-export interface GetAllRunsResponseBody {
-    runs: string[];
-}
-
 export interface GetViewerRunsResponseBody {
     runs: RunFromApi[];
 }
-
-export interface GetExampleRunsResponseBody extends GetViewerRunsResponseBody {}
 
 export interface ExperimentFromApi {
     experiment_id: string;
@@ -139,22 +133,8 @@ export class RunsApi extends BaseApi {
     }
 
     async listRuns() {
-        return this.request<GetAllRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/list`,
-            method: 'GET',
-        });
-    }
-
-    async listViewerRuns() {
         return this.request<GetViewerRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/list/me`,
-            method: 'GET',
-        });
-    }
-
-    async listExampleRuns() {
-        return this.request<GetExampleRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/list/examples`,
+            url: `${RUNS_URL_PREFIX}/list`,
             method: 'GET',
         });
     }

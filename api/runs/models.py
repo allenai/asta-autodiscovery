@@ -170,18 +170,6 @@ class GetRunMetadataResponseModel(BaseModel):
     metadata: MetadataModel = Field(..., description="Metadata associated with the run")
 
 
-class GetExampleRunsRequestModel(BaseModel):
-    """Model for the request to get example runs"""
-
-    limit: int = Field(..., description="Maximum number of example runs to retrieve")
-
-
-class GetExampleRunsResponseModel(BaseModel):
-    """Model for the response containing a list of example runs"""
-
-    runs: list[RunModel] = Field(..., description="List of example runs")
-
-
 class GetViewerRunsRequestModel(BaseModel):
     """Model for the request to get runs for the viewer"""
 

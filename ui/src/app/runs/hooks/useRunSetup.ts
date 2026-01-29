@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import debounce from 'lodash.debounce';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useRuns } from '@/contexts/RunsContext';
@@ -41,6 +42,7 @@ type Settings = {
 interface UseRunSetupProps {
     runid: string;
     onSubmitSuccess: () => void;
+    debounceSaveMs?: number;
 }
 
 export interface SelectedFile {
@@ -77,7 +79,7 @@ interface FieldErrors {
     nExperiments?: string;
 }
 
-export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
+export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
     const { updateViewerRun } = useRuns();
     const api = getRunsApi();
@@ -110,6 +112,10 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     // Loading state for initial run fetch
     const [isLoading, setIsLoading] = useState(true);
+
+    // Saving state for debounced saves
+    const [isSaving, setIsSaving] = useState(false);
+    const savingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Fetch run metadata on mount and prepopulate form
     useEffect(() => {
@@ -243,6 +249,9 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             return;
         }
 
+        const saveStartTime = Date.now();
+        setIsSaving(true);
+
         try {
             isSavingMetadata.current = true;
 
@@ -277,6 +286,18 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             // Note: Don't throw - this is a background save, shouldn't block workflow
         } finally {
             isSavingMetadata.current = false;
+
+            // Ensure indicator shows for at least 1000ms
+            const elapsed = Date.now() - saveStartTime;
+            const remainingTime = Math.max(0, 1000 - elapsed);
+
+            if (savingTimeoutRef.current) {
+                clearTimeout(savingTimeoutRef.current);
+            }
+
+            savingTimeoutRef.current = setTimeout(() => {
+                setIsSaving(false);
+            }, remainingTime);
         }
     }, [api, runid]);
 
@@ -408,11 +429,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         });
         setFormError(null);
         updateUploadState(index, { description });
-    };
-
-    const handleFileDescriptionBlur = () => {
-        // Save metadata when description field loses focus
-        saveDatasetMetadata();
+        debouncedSaveDatasetMetadata();
     };
 
     const handleRemoveFileUpload = (index: number) => {
@@ -460,36 +477,107 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         setFormError(null);
     };
 
-    const saveMetadata = async () => {
-        const metadata = {
-            name: settings.name.trim(),
-            description: settings.datasetsDescription.trim(),
-            domain: settings.domain.trim(),
-            intent: settings.intent.trim(),
-            datasets: fileUploads.map((upload) => ({
-                name: upload.file.name,
-                description: upload.description,
-                content_type: upload.file.type || 'application/octet-stream',
-                file_size_bytes: upload.file.size,
-            })),
-        };
+    const saveMetadata = useCallback(async () => {
+        const saveStartTime = Date.now();
+        setIsSaving(true);
 
-        await api.saveMetadata(runid, metadata);
-    };
+        try {
+            // Use refs to get latest state
+            const currentSettings = settingsRef.current;
+            const currentFileUploads = fileUploadsRef.current;
 
-    const saveJobArgs = async (overrides?: Partial<Settings>) => {
-        const effectiveSettings = { ...settings, ...overrides };
-        const jobArgs = {
-            n_experiments: effectiveSettings.nExperiments,
-            exploration_weight: effectiveSettings.explorationWeight,
-            mcts_selection: effectiveSettings.mctsSelection,
-            surprisal_width: effectiveSettings.surprisalWidth,
-            evidence_weight: effectiveSettings.evidenceWeight,
-            warmstart_experiments: effectiveSettings.warmstartExperiments,
-            n_warmstart: effectiveSettings.nWarmstart,
+            const metadata = {
+                name: currentSettings.name.trim(),
+                description: currentSettings.datasetsDescription.trim(),
+                domain: currentSettings.domain.trim(),
+                intent: currentSettings.intent.trim(),
+                datasets: currentFileUploads.map((upload) => ({
+                    name: upload.file.name,
+                    description: upload.description,
+                    content_type: upload.file.type || 'application/octet-stream',
+                    file_size_bytes: upload.file.size,
+                })),
+            };
+
+            await api.saveMetadata(runid, metadata);
+        } finally {
+            // Ensure indicator shows for at least 1000ms
+            const elapsed = Date.now() - saveStartTime;
+            const remainingTime = Math.max(0, 1000 - elapsed);
+
+            if (savingTimeoutRef.current) {
+                clearTimeout(savingTimeoutRef.current);
+            }
+
+            savingTimeoutRef.current = setTimeout(() => {
+                setIsSaving(false);
+            }, remainingTime);
+        }
+    }, [api, runid]);
+
+    const saveJobArgs = useCallback(
+        async (overrides?: Partial<Settings>) => {
+            const saveStartTime = Date.now();
+            setIsSaving(true);
+
+            try {
+                // Use ref to get latest state
+                const currentSettings = settingsRef.current;
+                const effectiveSettings = { ...currentSettings, ...overrides };
+                const jobArgs = {
+                    n_experiments: effectiveSettings.nExperiments,
+                    exploration_weight: effectiveSettings.explorationWeight,
+                    mcts_selection: effectiveSettings.mctsSelection,
+                    surprisal_width: effectiveSettings.surprisalWidth,
+                    evidence_weight: effectiveSettings.evidenceWeight,
+                    warmstart_experiments: effectiveSettings.warmstartExperiments,
+                    n_warmstart: effectiveSettings.nWarmstart,
+                };
+                await api.saveJobArgs(runid, jobArgs);
+            } finally {
+                // Ensure indicator shows for at least 1000ms
+                const elapsed = Date.now() - saveStartTime;
+                const remainingTime = Math.max(0, 1000 - elapsed);
+
+                if (savingTimeoutRef.current) {
+                    clearTimeout(savingTimeoutRef.current);
+                }
+
+                savingTimeoutRef.current = setTimeout(() => {
+                    setIsSaving(false);
+                }, remainingTime);
+            }
+        },
+        [api, runid]
+    );
+
+    // Create debounced versions of save functions
+    const debouncedSaveMetadata = useMemo(
+        () => debounce(() => saveMetadata(), debounceSaveMs),
+        [saveMetadata, debounceSaveMs]
+    );
+
+    const debouncedSaveJobArgs = useMemo(
+        () => debounce(() => saveJobArgs(), debounceSaveMs),
+        [saveJobArgs, debounceSaveMs]
+    );
+
+    const debouncedSaveDatasetMetadata = useMemo(
+        () => debounce(() => saveDatasetMetadata(), debounceSaveMs),
+        [saveDatasetMetadata, debounceSaveMs]
+    );
+
+    // Cleanup debounced functions and saving timeout on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSaveMetadata.cancel();
+            debouncedSaveJobArgs.cancel();
+            debouncedSaveDatasetMetadata.cancel();
+            if (savingTimeoutRef.current) {
+                clearTimeout(savingTimeoutRef.current);
+            }
         };
-        await api.saveJobArgs(runid, jobArgs);
-    };
+    }, [debouncedSaveMetadata, debouncedSaveJobArgs, debouncedSaveDatasetMetadata]);
 
     const handleExperimentsChange = (value: string) => {
         if (value === '') {
@@ -548,6 +636,11 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
+
+        // Flush any pending debounced saves
+        debouncedSaveMetadata.flush();
+        debouncedSaveJobArgs.flush();
+        debouncedSaveDatasetMetadata.flush();
 
         if (isFormInvalid()) {
             setIsSubmitting(false);
@@ -613,15 +706,22 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         // Loading state
         isLoading,
 
+        // Saving state
+        isSaving,
+
         // Setters
         updateSettings,
         saveMetadata,
         saveJobArgs,
 
+        // Debounced save functions
+        debouncedSaveMetadata,
+        debouncedSaveJobArgs,
+        debouncedSaveDatasetMetadata,
+
         // Handlers
         handleFileSelect,
         handleFileDescriptionChange,
-        handleFileDescriptionBlur,
         handleRemoveFileUpload,
         cancelUpload,
         retryUpload,

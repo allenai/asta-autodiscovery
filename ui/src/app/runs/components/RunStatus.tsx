@@ -252,7 +252,7 @@ function RunStatusContent({
                     </RunHeader>
 
                     <Box sx={{ padding: 3 }}>
-                        <RunStats>
+                        <RunToolbar>
                             {run.stats && (
                                 <ExperimentCount>
                                     <HourglassTopOutlinedIcon />
@@ -266,7 +266,7 @@ function RunStatusContent({
                                     )}
                                 </ExperimentCount>
                             )}
-                            <RunStatsButtons>
+                            <RunToolbarButtons>
                                 <ParametersButton
                                     variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}
@@ -288,8 +288,8 @@ function RunStatusContent({
                                         {cancelling ? 'Stopping...' : 'Stop run'}
                                     </StopButton>
                                 )}
-                            </RunStatsButtons>
-                        </RunStats>
+                            </RunToolbarButtons>
+                        </RunToolbar>
 
                         <ExperimentsTable runStats={run.stats} />
                     </Box>
@@ -399,7 +399,7 @@ const StopButton = styled(Button)`
     }
 `;
 
-const RunStatsButtons = styled('div')`
+const RunToolbarButtons = styled('div')`
     display: flex;
     gap: ${({ theme }) => theme.spacing(1)};
 `;
@@ -469,7 +469,7 @@ const StyledListItem = styled(ListItem)`
     }
 `;
 
-const RunStats = styled('div')`
+const RunToolbar = styled('div')`
     display: flex;
     justify-content: space-between;
 `;

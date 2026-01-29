@@ -1,13 +1,4 @@
-import {
-    styled,
-    Typography,
-    Box,
-    Chip,
-    Stack,
-    Dialog,
-    DialogContent,
-    IconButton,
-} from '@mui/material';
+import { styled, Typography, Box, Stack, Dialog, DialogContent, IconButton } from '@mui/material';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import CloseIcon from '@mui/icons-material/Close';
@@ -17,6 +8,7 @@ import { Experiment, RichOutputBundle } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { StatusChip } from '@/runs/components/StatusChip';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
@@ -96,9 +88,13 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
             <ExperimentName>{experiment.experimentId}</ExperimentName>
 
             <Box>
-                <Typography variant="caption">Status</Typography>
+                <SectionHeader>Status</SectionHeader>
                 <Box sx={{ mt: 0.5 }}>
-                    <Chip label={experiment.status} size="small" color="primary" />
+                    <StatusChip
+                        label={experiment.status}
+                        size="small"
+                        $status={experiment.status}
+                    />
                 </Box>
             </Box>
 

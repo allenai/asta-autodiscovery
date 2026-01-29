@@ -459,8 +459,6 @@ def get_openai_config(
         project_id = os.getenv("VERTEX_PROJECT_ID")
         location = os.getenv("VERTEX_LOCATION")
         google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        gemini_api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
-
         model = model_name.split("/")[-1]
         config = {
             "api_type": "google",
@@ -469,15 +467,12 @@ def get_openai_config(
             "max_retries": 3,
             "cache_seed": None,
         }
-        if gemini_api_key:
-            config["api_key"] = gemini_api_key
-        else:
-            if project_id:
-                config["project_id"] = project_id
-            if location:
-                config["location"] = location
-            if google_application_credentials:
-                config["google_application_credentials"] = google_application_credentials
+        if project_id:
+            config["project_id"] = project_id
+        if location:
+            config["location"] = location
+        if google_application_credentials:
+            config["google_application_credentials"] = google_application_credentials
         if temperature is not None:
             config["temperature"] = temperature
     else:

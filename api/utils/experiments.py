@@ -56,11 +56,11 @@ class ExperimentNode:
         # Status derived from success field
         success = node_data.get("success")
         if success is None:
-            self.status: str = "pending"
+            self.status: str = "PENDING"
         elif success:
-            self.status = "success"
+            self.status = "SUCCEEDED"
         else:
-            self.status = "failed"
+            self.status = "FAILED"
 
         # Metrics
         self.prior: float | None = node_data.get("prior", {}).get("mean")

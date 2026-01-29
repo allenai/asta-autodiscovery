@@ -1,8 +1,6 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { useCallback, useMemo } from 'react';
-import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
-import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 
 import { Experiment, RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
@@ -36,12 +34,6 @@ const columns: GridColDef[] = [
         field: 'surprisal',
         headerName: 'Surprisal',
         width: 150,
-        renderHeader: () => (
-            <ColumnHeaderWrapper>
-                <span>Surprisal</span>
-                <LightbulbOutlinedIcon fontSize="small" />
-            </ColumnHeaderWrapper>
-        ),
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="70%" />;
@@ -64,12 +56,6 @@ const columns: GridColDef[] = [
         field: 'prior',
         headerName: 'Belief Before',
         width: 150,
-        renderHeader: () => (
-            <ColumnHeaderWrapper>
-                <span>Before</span>
-                <ScienceOutlinedIcon fontSize="small" />
-            </ColumnHeaderWrapper>
-        ),
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -87,12 +73,6 @@ const columns: GridColDef[] = [
         field: 'posterior',
         headerName: 'Belief After',
         width: 150,
-        renderHeader: () => (
-            <ColumnHeaderWrapper>
-                <span>After</span>
-                <ScienceOutlinedIcon fontSize="small" />
-            </ColumnHeaderWrapper>
-        ),
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -221,10 +201,18 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     backgroundColor: theme.color['extra-dark-teal-100'].hex,
     margin: theme.spacing(0.5, 0, 1, 0),
 
-    '.MuiDataGrid-cell, .MuiDataGrid-columnHeaders, .MuiDataGrid-row, .MuiDataGrid-columnSeparator':
+    '.MuiDataGrid-cell, .MuiDataGrid-row, .MuiDataGrid-columnSeparator, .MuiDataGrid-columnHeader, .MuiDataGrid-filler, .MuiDataGrid-footerContainer, .MuiDataGrid-withBorderColor':
         {
             borderColor: theme.color['cream-4'].rgba.toString(),
         },
+
+    '.MuiDataGrid-columnHeader, .MuiDataGrid-columnHeaders .MuiDataGrid-filler': {
+        backgroundColor: theme.color['extra-dark-teal-100'].hex,
+
+        '.MuiDataGrid-sortButton': {
+            backgroundColor: theme.color['cream-4'].rgba.toString(),
+        },
+    },
 
     '.MuiDataGrid-columnHeaderTitle, .MuiDataGrid-columnHeader svg': {
         color: theme.color['green-40'].hex,
@@ -235,18 +223,16 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         color: theme.color['cream-100'].hex,
     },
 
+    '.MuiDataGrid-row:hover, .MuiDataGrid-row.Mui-hovered': {
+        backgroundColor: theme.color['cream-4'].rgba.toString(),
+        cursor: 'pointer',
+    },
+
     '.MuiTablePagination-root, .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows, .MuiTablePagination-select, .MuiTablePagination-selectIcon':
         {
             color: theme.color['cream-100'].hex,
         },
 }));
-
-const ColumnHeaderWrapper = styled(Box)`
-    align-items: center;
-    color: ${({ theme }) => theme.color['green-40'].hex};
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(0.5)};
-`;
 
 const StyledSkeleton = styled(Skeleton)(({ theme }) => ({
     backgroundColor: theme.color['cream-10'].rgba.toString(),

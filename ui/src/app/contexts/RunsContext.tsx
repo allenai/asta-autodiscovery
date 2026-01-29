@@ -81,7 +81,7 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const updateViewerRuns = useCallback(async () => {
         setIsViewerRunsLoading(true);
         try {
-            const { data } = await runsApi.listRuns();
+            const { data } = await runsApi.listViewerRuns();
             const runs = data.runs.map((runData) => getRunFromApi(runData));
             setViewerRuns(runs);
         } catch (error: any) {
@@ -94,12 +94,11 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const updateExampleRuns = useCallback(async () => {
         setIsExampleRunsLoading(true);
         try {
-            const { data } = await runsApi.listRuns({ userid: 'samples' });
+            const { data } = await runsApi.listExampleRuns();
             const runs = data.runs.map((runData) => getRunFromApi(runData));
             setExampleRuns(runs);
         } catch (error: any) {
-            // Sample runs are optional - don't set error if they fail
-            setExampleRuns([]);
+            setLastError(error.message || 'Failed to fetch example runs');
         } finally {
             setIsExampleRunsLoading(false);
         }

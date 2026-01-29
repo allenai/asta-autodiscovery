@@ -123,7 +123,9 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
 
                     <FieldRow>
                         <FieldLabel>Search Strategy</FieldLabel>
-                        <FieldValue>{getMctsSelectionLabel(args?.mctsSelection ?? null)}</FieldValue>
+                        <FieldValue>
+                            {getMctsSelectionLabel(args?.mctsSelection ?? null)}
+                        </FieldValue>
                     </FieldRow>
 
                     <FieldRow>

@@ -38,6 +38,7 @@ pythonpath = [
 ]
 markers = [
     "modal: integration tests that run against Modal",
+    "adc: tests that require Application Default Credentials",
 ]
 
 [tool.uv.workspace]

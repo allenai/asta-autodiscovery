@@ -22,7 +22,7 @@ const columns: GridColDef[] = [
     },
     {
         field: 'hypothesis',
-        headerName: 'Hypothesis',
+        headerName: 'Experiment Hypothesis',
         width: 200,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
@@ -62,7 +62,7 @@ const columns: GridColDef[] = [
     },
     {
         field: 'prior',
-        headerName: 'Before',
+        headerName: 'Belief Before',
         width: 150,
         renderHeader: () => (
             <ColumnHeaderWrapper>
@@ -85,7 +85,7 @@ const columns: GridColDef[] = [
     },
     {
         field: 'posterior',
-        headerName: 'After',
+        headerName: 'Belief After',
         width: 150,
         renderHeader: () => (
             <ColumnHeaderWrapper>
@@ -208,7 +208,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 columns={columns}
                 loading={!runStats?.pendingExperiments && !experiments.length}
                 initialState={{ pagination: { paginationModel } }}
-                pageSizeOptions={[5, 10, 25]}
+                pageSizeOptions={[5, 10, 25, 50]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
             />

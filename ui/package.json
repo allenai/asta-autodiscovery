@@ -22,7 +22,7 @@
     "@mui/material": "^5.15.6",
     "@mui/material-nextjs": "^5.15.7",
     "@mui/system": "^5.15.11",
-    "@mui/x-data-grid": "^6.0.0",
+    "@mui/x-data-grid": "^8.26.0",
     "@mui/x-date-pickers": "^6.19.5",
     "next": "^14.1.1",
     "pretty-bytes": "^7.1.0",

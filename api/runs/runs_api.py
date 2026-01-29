@@ -62,6 +62,9 @@ UPLOAD_ALLOWED_EXTENSIONS = {".csv", ".json", ".txt", ".tsv"}
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 
+# Users whose runs are publicly accessible (can be queried by anyone)
+PUBLIC_USERS = {"samples"}
+
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -284,9 +287,6 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
-
-    # Users whose runs are publicly accessible (can be queried by anyone)
-    PUBLIC_USERS = {"samples"}
 
     def _get_userid_for_read(allow_public: bool = True) -> tuple[str | None, tuple | None]:
         """Get the user ID to use for read operations.

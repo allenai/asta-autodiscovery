@@ -1,11 +1,9 @@
 """Vertex AI OpenAI-compatible clients.
 
-This module provides two adapters:
-- VertexOpenAIClientRefresher: for direct OpenAI client usage.
-- VertexRefreshingModelClient: for AG2/AutoGen ModelClient usage.
+This module provides a client adapter for direct OpenAI client usage.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 import os
 import threading
 
@@ -25,7 +23,8 @@ class _VertexADCRefresherBase:
             base_url: Optional Vertex OpenAI-compatible base URL override.
             **kwargs: Additional keyword arguments for OpenAI client.
         """
-        self._base_url = base_url or get_vertex_openai_base_url()
+        normalized_base_url = base_url if base_url is None else str(base_url)
+        self._base_url = normalized_base_url or get_vertex_openai_base_url()
         self._client = OpenAI(api_key="PLACEHOLDER", base_url=self._base_url, **kwargs)
         self._static_token = (
             api_key
@@ -70,7 +69,7 @@ class _VertexADCRefresherBase:
             self._client.api_key = self._creds.token
 
 
-class VertexOpenAIClientRefresher(_VertexADCRefresherBase):
+class OpenAICredentialsRefresher(_VertexADCRefresherBase):
     """OpenAI client wrapper that refreshes Vertex AI ADC credentials.
 
     Use this when code calls `client.chat.completions.create(...)` directly (e.g., query_llm,
@@ -94,85 +93,3 @@ class VertexOpenAIClientRefresher(_VertexADCRefresherBase):
     def __getattr__(self, name: str) -> Any:
         self._refresh_if_needed()
         return getattr(self._client, name)
-
-
-class VertexRefreshingModelClient(_VertexADCRefresherBase):
-    """AG2 ModelClient that refreshes Vertex AI ADC credentials.
-
-    Use this with AutoGen/AG2 `ModelClient` registration. AG2 expects a `create(params)` method
-    plus usage helpers, so this class adapts refresh logic to that interface.
-
-    Reference:
-        https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/auth-and-credentials
-    """
-
-    def __init__(self, config: Dict[str, Any], **kwargs: Any) -> None:
-        """Initialize the Vertex refreshing model client.
-
-        Args:
-            config: Model configuration provided by AG2/Autogen.
-            **kwargs: Additional keyword arguments (unused).
-        """
-        self._config = dict(config or {})
-        self._base_url = self._config.get("base_url") or get_vertex_openai_base_url()
-        self._model = self._config.get("model")
-        super().__init__(api_key=None, base_url=self._base_url, **kwargs)
-
-    def create(self, params: Dict[str, Any] | None = None, **kwargs: Any) -> Any:
-        """Create a chat completion using refreshed Vertex credentials.
-
-        Args:
-            params: Parameters for the OpenAI-compatible chat completion call.
-            **kwargs: Additional parameters merged into params.
-
-        Returns:
-            OpenAI-compatible response object.
-        """
-        self._refresh_if_needed()
-        merged_params = dict(params or {})
-        if kwargs:
-            merged_params.update(kwargs)
-        if "model" not in merged_params and self._model:
-            merged_params["model"] = self._model
-        return self._client.chat.completions.create(**merged_params)
-
-    def message_retrieval(self, response: Any) -> List[Any]:
-        """Extract messages from a chat completion response.
-
-        Args:
-            response: OpenAI-compatible response.
-
-        Returns:
-            List of message objects.
-        """
-        return [choice.message for choice in getattr(response, "choices", [])]
-
-    def cost(self, response: Any) -> float:
-        """Return the cost for a response when available.
-
-        Args:
-            response: OpenAI-compatible response.
-
-        Returns:
-            Cost in USD if known, else 0.0.
-        """
-        _ = response
-        return 0.0
-
-    def get_usage(self, response: Any) -> Dict[str, Any]:
-        """Return token usage information from a response.
-
-        Args:
-            response: OpenAI-compatible response.
-
-        Returns:
-            Usage dict with token counts when available.
-        """
-        usage = getattr(response, "usage", None)
-        if usage is None:
-            return {}
-        return {
-            "prompt_tokens": getattr(usage, "prompt_tokens", 0),
-            "completion_tokens": getattr(usage, "completion_tokens", 0),
-            "total_tokens": getattr(usage, "total_tokens", 0),
-        }

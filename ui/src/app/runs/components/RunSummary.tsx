@@ -8,11 +8,14 @@ import { RunPills } from '@/runs/components/RunPills';
 
 export type RunSummaryProps = {
     run: Run;
+    /** Optional user ID for viewing public runs (e.g., "samples") */
+    user?: string;
 };
 
-export const RunSummary = ({ run }: RunSummaryProps) => {
+export const RunSummary = ({ run, user }: RunSummaryProps) => {
     const { id, name, description } = run;
     const status = run.details?.status ?? RunStatus.UNKNOWN;
+    const href = user ? `/runs/${id}?user=${user}` : `/runs/${id}`;
 
     return (
         <Layout>
@@ -22,7 +25,7 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
                 </IconWrapper>
             </LayoutIcon>
             <LayoutContent>
-                <TitleLink href={`/runs/${id}`} passHref>
+                <TitleLink href={href} passHref>
                     <Title>{name}</Title>
                 </TitleLink>
                 {description && <Description>{description}</Description>}

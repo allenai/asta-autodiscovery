@@ -288,6 +288,30 @@ def create() -> Blueprint:
     # Users whose runs are publicly accessible (can be queried by anyone)
     PUBLIC_USERS = {"samples"}
 
+    def _get_userid_for_read(allow_public: bool = True) -> tuple[str | None, tuple | None]:
+        """Get the user ID to use for read operations.
+
+        Checks for a 'user' query parameter. If provided and the user is in PUBLIC_USERS,
+        returns that user ID. Otherwise, returns the authenticated user's ID.
+
+        Args:
+            allow_public: Whether to allow public user access (default True)
+
+        Returns:
+            Tuple of (userid, error_response). If error_response is not None,
+            it should be returned directly from the endpoint.
+        """
+        user_param = request.args.get("user")
+        if user_param:
+            if not allow_public or user_param not in PUBLIC_USERS:
+                return None, (jsonify({"error": f"Access denied. Cannot query runs for user: {user_param}"}), 403)
+            return user_param, None
+
+        userid = request.user.get("sub")
+        if not userid:
+            return None, (jsonify({"error": "User ID not found in token"}), 401)
+        return userid, None
+
     @api.route("/list", methods=["GET"])
     @requires_enrollment
     def list_runs():
@@ -301,14 +325,9 @@ def create() -> Blueprint:
         Returns:
             JSON response containing run metadata, details, and stats.
         """
-        # Determine which user's runs to fetch
-        user_param = request.args.get("user")
-        if user_param:
-            if user_param not in PUBLIC_USERS:
-                return jsonify({"error": f"Access denied. Cannot query runs for user: {user_param}"}), 403
-            userid = user_param
-        else:
-            userid = request.user.get("sub")
+        userid, error = _get_userid_for_read()
+        if error:
+            return error
 
         req = GetViewerRunsRequestModel(
             limit=int(request.args.get("limit", 1000)),
@@ -400,12 +419,15 @@ def create() -> Blueprint:
         Args:
             runid: Run identifier.
 
+        Query Parameters:
+            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+
         Returns:
             JSON response with run details as RunModel.
         """
-        userid = request.user.get("sub")
-        if not userid:
-            return jsonify({"error": "User ID not found in token"}), 401
+        userid, error = _get_userid_for_read()
+        if error:
+            return error
 
         try:
             manager = get_job_manager()
@@ -729,10 +751,17 @@ def create() -> Blueprint:
 
         Args:
             runid: Run identifier
+
+        Query Parameters:
+            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
+        userid, error = _get_userid_for_read()
+        if error:
+            return error
+
         req = GetRunMetadataRequestModel(
             runid=runid,
-            userid=request.user.get("sub"),
+            userid=userid,
         )
 
         job_manager = get_job_manager()
@@ -858,12 +887,15 @@ def create() -> Blueprint:
         Args:
             runid: Run identifier
 
+        Query Parameters:
+            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+
         Returns:
             JSON response with run status details
         """
-        userid = request.user.get("sub")
-        if not userid:
-            return jsonify({"error": "User ID not found in token"}), 401
+        userid, error = _get_userid_for_read()
+        if error:
+            return error
 
         try:
             # Get run details
@@ -901,9 +933,14 @@ def create() -> Blueprint:
 
         Args:
             runid: Run identifier
+
+        Query Parameters:
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
+            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
-        userid = request.user.get("sub")
+        userid, error = _get_userid_for_read()
+        if error:
+            return error
         after_experiment_id = request.args.get("after_experiment_id", None)
 
         # Get job status to determine if polling can stop
@@ -927,8 +964,14 @@ def create() -> Blueprint:
     @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
     def get_run_experiment_details(runid: str, experiment_id: str):
-        """Fetch details about a specific experiment within a run."""
-        userid = request.user.get("sub")
+        """Fetch details about a specific experiment within a run.
+
+        Query Parameters:
+            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+        """
+        userid, error = _get_userid_for_read()
+        if error:
+            return error
 
         job_manager = get_job_manager()
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)

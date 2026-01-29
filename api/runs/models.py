@@ -137,6 +137,7 @@ class RunModel(BaseModel):
     """Model representing a run with its attributes"""
 
     runid: str = Field(..., description="Unique identifier for the run")
+    userid: str = Field(..., description="User identifier who owns the run")
     status: str = Field(..., description="Current status of the run")
     name: str | None = Field(None, description="Name of the run")
     description: str | None = Field(None, description="Description of the run")
@@ -168,18 +169,6 @@ class GetRunMetadataResponseModel(BaseModel):
 
     runid: str = Field(..., description="Identifier of the run")
     metadata: MetadataModel = Field(..., description="Metadata associated with the run")
-
-
-class GetExampleRunsRequestModel(BaseModel):
-    """Model for the request to get example runs"""
-
-    limit: int = Field(..., description="Maximum number of example runs to retrieve")
-
-
-class GetExampleRunsResponseModel(BaseModel):
-    """Model for the response containing a list of example runs"""
-
-    runs: list[RunModel] = Field(..., description="List of example runs")
 
 
 class GetViewerRunsRequestModel(BaseModel):

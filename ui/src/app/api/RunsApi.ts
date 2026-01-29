@@ -132,10 +132,15 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async listRuns() {
+    async listRuns(options?: { user?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.user) {
+            query.user = options.user;
+        }
         return this.request<GetViewerRunsResponseBody>({
             url: `${RUNS_URL_PREFIX}/list`,
             method: 'GET',
+            query,
         });
     }
 

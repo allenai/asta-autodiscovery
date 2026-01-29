@@ -24,6 +24,7 @@ import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getRelativeTime } from '@/utils/timeUtils';
+import { StatusChip } from '@/runs/components/StatusChip';
 
 interface RunStatusProps {
     runid: string;
@@ -438,21 +439,4 @@ const StyledListItem = styled(ListItem)`
 const RunStats = styled('div')`
     display: flex;
     justify-content: space-between;
-`;
-
-const StatusChip = styled(Chip)<{ $status: string }>`
-    background-color: ${({ theme, $status }) => {
-        const status = $status.toUpperCase();
-        switch (status) {
-            case 'FAILED':
-            case 'ERROR':
-                return theme.color['error-red-100'].hex;
-            case 'CANCELLED':
-                return theme.color['warning-orange-100'].hex;
-            default:
-                return theme.color['extra-dark-teal-100'].hex;
-        }
-    }};
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    padding: ${({ theme }) => theme.spacing(1)};
 `;

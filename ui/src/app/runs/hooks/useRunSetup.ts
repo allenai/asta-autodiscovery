@@ -371,25 +371,28 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         [fileUploads, runid]
     );
 
-    const handleFileSelect = (file: File) => {
-        if (!file) return;
+    const handleFileSelect = (files: File[]) => {
+        if (!files.length) return;
 
-        const newUpload: FileUploadState = {
-            file,
-            description: '',
-            status: UploadStatus.PENDING,
-            progress: 0,
-            uploadedBytes: 0,
-            totalBytes: file.size,
-            secondsRemaining: null,
-            uploadStartTime: null,
-            uploadUrl: null,
-            gcsPath: null,
-            error: null,
-            abortController: null,
-        };
+        const newUploads = Array.from(files).map((file) => {
+            const newUpload: FileUploadState = {
+                file,
+                description: '',
+                status: UploadStatus.PENDING,
+                progress: 0,
+                uploadedBytes: 0,
+                totalBytes: file.size,
+                secondsRemaining: null,
+                uploadStartTime: null,
+                uploadUrl: null,
+                gcsPath: null,
+                error: null,
+                abortController: null,
+            };
+            return newUpload;
+        });
 
-        setFileUploads((prev) => [...prev, newUpload]);
+        setFileUploads((prev) => [...prev, ...newUploads]);
 
         setFieldErrors((prev) => {
             const { datasets, ...rest } = prev;
@@ -474,15 +477,16 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         await api.saveMetadata(runid, metadata);
     };
 
-    const saveJobArgs = async () => {
+    const saveJobArgs = async (overrides?: Partial<Settings>) => {
+        const effectiveSettings = { ...settings, ...overrides };
         const jobArgs = {
-            n_experiments: settings.nExperiments,
-            exploration_weight: settings.explorationWeight,
-            mcts_selection: settings.mctsSelection,
-            surprisal_width: settings.surprisalWidth,
-            evidence_weight: settings.evidenceWeight,
-            warmstart_experiments: settings.warmstartExperiments,
-            n_warmstart: settings.nWarmstart,
+            n_experiments: effectiveSettings.nExperiments,
+            exploration_weight: effectiveSettings.explorationWeight,
+            mcts_selection: effectiveSettings.mctsSelection,
+            surprisal_width: effectiveSettings.surprisalWidth,
+            evidence_weight: effectiveSettings.evidenceWeight,
+            warmstart_experiments: effectiveSettings.warmstartExperiments,
+            n_warmstart: effectiveSettings.nWarmstart,
         };
         await api.saveJobArgs(runid, jobArgs);
     };
@@ -506,7 +510,7 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
             }));
         } else {
             updateSettings('nExperiments', num);
-            saveJobArgs();
+            saveJobArgs({ nExperiments: num });
             setFormError(null);
         }
     };

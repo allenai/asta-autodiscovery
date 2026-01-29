@@ -515,38 +515,41 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         }
     }, [api, runid]);
 
-    const saveJobArgs = useCallback(async (overrides?: Partial<Settings>) => {
-        const saveStartTime = Date.now();
-        setIsSaving(true);
+    const saveJobArgs = useCallback(
+        async (overrides?: Partial<Settings>) => {
+            const saveStartTime = Date.now();
+            setIsSaving(true);
 
-        try {
-            // Use ref to get latest state
-            const currentSettings = settingsRef.current;
-            const effectiveSettings = { ...currentSettings, ...overrides };
-            const jobArgs = {
-                n_experiments: effectiveSettings.nExperiments,
-                exploration_weight: effectiveSettings.explorationWeight,
-                mcts_selection: effectiveSettings.mctsSelection,
-                surprisal_width: effectiveSettings.surprisalWidth,
-                evidence_weight: effectiveSettings.evidenceWeight,
-                warmstart_experiments: effectiveSettings.warmstartExperiments,
-                n_warmstart: effectiveSettings.nWarmstart,
-            };
-            await api.saveJobArgs(runid, jobArgs);
-        } finally {
-            // Ensure indicator shows for at least 1000ms
-            const elapsed = Date.now() - saveStartTime;
-            const remainingTime = Math.max(0, 1000 - elapsed);
+            try {
+                // Use ref to get latest state
+                const currentSettings = settingsRef.current;
+                const effectiveSettings = { ...currentSettings, ...overrides };
+                const jobArgs = {
+                    n_experiments: effectiveSettings.nExperiments,
+                    exploration_weight: effectiveSettings.explorationWeight,
+                    mcts_selection: effectiveSettings.mctsSelection,
+                    surprisal_width: effectiveSettings.surprisalWidth,
+                    evidence_weight: effectiveSettings.evidenceWeight,
+                    warmstart_experiments: effectiveSettings.warmstartExperiments,
+                    n_warmstart: effectiveSettings.nWarmstart,
+                };
+                await api.saveJobArgs(runid, jobArgs);
+            } finally {
+                // Ensure indicator shows for at least 1000ms
+                const elapsed = Date.now() - saveStartTime;
+                const remainingTime = Math.max(0, 1000 - elapsed);
 
-            if (savingTimeoutRef.current) {
-                clearTimeout(savingTimeoutRef.current);
+                if (savingTimeoutRef.current) {
+                    clearTimeout(savingTimeoutRef.current);
+                }
+
+                savingTimeoutRef.current = setTimeout(() => {
+                    setIsSaving(false);
+                }, remainingTime);
             }
-
-            savingTimeoutRef.current = setTimeout(() => {
-                setIsSaving(false);
-            }, remainingTime);
-        }
-    }, [api, runid]);
+        },
+        [api, runid]
+    );
 
     // Create debounced versions of save functions
     const debouncedSaveMetadata = useMemo(

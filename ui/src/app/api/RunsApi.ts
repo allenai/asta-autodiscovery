@@ -41,6 +41,7 @@ export interface RunArgsFromApi {
 
 export interface RunFromApi {
     runid: string;
+    userid: string;
     path?: string;
     status: string;
     name?: string;
@@ -67,15 +68,9 @@ export interface GenerateUploadUrlResponseBody {
 
 export interface RunResponseBody extends RunFromApi {}
 
-export interface GetAllRunsResponseBody {
-    runs: string[];
-}
-
 export interface GetViewerRunsResponseBody {
     runs: RunFromApi[];
 }
-
-export interface GetExampleRunsResponseBody extends GetViewerRunsResponseBody {}
 
 export interface ExperimentFromApi {
     experiment_id: string;
@@ -138,44 +133,45 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async listRuns() {
-        return this.request<GetAllRunsResponseBody>({
+    async listRuns(options?: { userid?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.userid) {
+            query.userid = options.userid;
+        }
+        return this.request<GetViewerRunsResponseBody>({
             url: `${RUNS_URL_PREFIX}/list`,
             method: 'GET',
+            query,
         });
     }
 
-    async listViewerRuns() {
-        return this.request<GetViewerRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/list/me`,
-            method: 'GET',
-        });
-    }
-
-    async listExampleRuns() {
-        return this.request<GetExampleRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/list/examples`,
-            method: 'GET',
-        });
-    }
-
-    async getRunMetadata(runid: string) {
+    async getRunMetadata(runid: string, options?: { userid?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.userid) {
+            query.userid = options.userid;
+        }
         return this.request<GetRunMetadataResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
+            query,
         });
     }
 
     async getRunExperiments({
         runid,
         afterExperimentId,
+        userid,
     }: {
         runid: string;
         afterExperimentId?: string;
+        userid?: string;
     }) {
         const query: Record<string, string> = {};
         if (afterExperimentId) {
             query.after_experiment_id = afterExperimentId;
+        }
+        if (userid) {
+            query.userid = userid;
         }
 
         return this.request<GetRunExperimentsResponseBody>({
@@ -188,29 +184,46 @@ export class RunsApi extends BaseApi {
     async getRunExperimentDetails({
         runid,
         experimentId,
+        userid,
     }: {
         runid: string;
         experimentId: string;
+        userid?: string;
     }) {
+        const query: Record<string, string> = {};
+        if (userid) {
+            query.userid = userid;
+        }
         return this.request<GetRunExperimentDetailsResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,
             method: 'GET',
+            query,
         });
     }
 
-    async getRun(runId: string) {
+    async getRun(runId: string, options?: { userid?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.userid) {
+            query.userid = options.userid;
+        }
         return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/${runId}`,
             method: 'GET',
+            query,
         });
     }
 
-    async getRunStatus(runId: string) {
+    async getRunStatus(runId: string, options?: { userid?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.userid) {
+            query.userid = options.userid;
+        }
         return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/${runId}/status`,
             method: 'GET',
+            query,
         });
     }
 

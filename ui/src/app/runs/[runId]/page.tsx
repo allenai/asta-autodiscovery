@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import RunSetup from '@/runs/components/RunSetup';
@@ -18,20 +18,15 @@ interface RunPageProps {
 }
 
 /**
- * Individual run page - shows RunSetup or RunStatus based on run state
- *
- * Query params:
- *   user: Optional user ID for viewing public runs (e.g., "samples")
+ * Individual run page - shows RunSetup or RunStatus based on run state.
+ * This page is for the current user's own runs only.
+ * For viewing shared/public runs, use /shared/{userid}/{runid} instead.
  */
 export default function RunPage({ params }: RunPageProps) {
     const { isAuthenticated, isLoading, getAccessToken } = useAuth0();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const runId = params.runId;
     const api = getRunsApi();
-
-    // Get user from query param (for viewing public/sample runs)
-    const userParam = searchParams.get('user') || undefined;
 
     const [checkingRun, setCheckingRun] = useState(true);
     const [runState, setRunState] = useState<'setup' | 'submitted'>('setup');
@@ -45,7 +40,7 @@ export default function RunPage({ params }: RunPageProps) {
             setError(null);
 
             try {
-                const response = await api.getRun(runId, { user: userParam });
+                const response = await api.getRun(runId);
                 const run = getRunFromApi(response.data);
 
                 // Check if run has been submitted
@@ -67,7 +62,7 @@ export default function RunPage({ params }: RunPageProps) {
         };
 
         checkRunStatus();
-    }, [runId, isAuthenticated, getAccessToken, userParam]);
+    }, [runId, isAuthenticated, getAccessToken]);
 
     const handleSubmitSuccess = () => {
         setRunState('submitted');
@@ -76,9 +71,6 @@ export default function RunPage({ params }: RunPageProps) {
     const handleRunCancelled = () => {
         router.push('/runs');
     };
-
-    // Sample runs are read-only - don't allow setup
-    const isReadOnly = !!userParam;
 
     if (isLoading) {
         return (
@@ -129,11 +121,11 @@ export default function RunPage({ params }: RunPageProps) {
 
     return (
         <>
-            {runState === 'setup' && !isReadOnly && (
+            {runState === 'setup' && (
                 <RunSetup runid={runId} onSubmitSuccess={handleSubmitSuccess} />
             )}
-            {(runState === 'submitted' || isReadOnly) && (
-                <RunStatus runid={runId} onRunCancelled={handleRunCancelled} user={userParam} />
+            {runState === 'submitted' && (
+                <RunStatus runid={runId} onRunCancelled={handleRunCancelled} />
             )}
         </>
     );

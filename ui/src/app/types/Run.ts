@@ -22,7 +22,6 @@ export enum RunStatus {
 
 export type Run = {
     id: string;
-    userid: string;
     name: string;
     description: string | null;
     path: string;
@@ -97,7 +96,6 @@ export type RunArgs = {
 export const getRunFromApi = (runFromApi: RunFromApi): Run => {
     return {
         id: runFromApi.runid,
-        userid: runFromApi.userid,
         name: runFromApi.name || `Run ${runFromApi.runid}`,
         description: runFromApi.description || '',
         path: runFromApi.path || '',

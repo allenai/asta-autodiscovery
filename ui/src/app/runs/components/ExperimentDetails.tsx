@@ -1,13 +1,4 @@
-import {
-    styled,
-    Typography,
-    Box,
-    Chip,
-    Stack,
-    Dialog,
-    DialogContent,
-    IconButton,
-} from '@mui/material';
+import { styled, Typography, Box, Stack, Dialog, DialogContent, IconButton } from '@mui/material';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import CloseIcon from '@mui/icons-material/Close';

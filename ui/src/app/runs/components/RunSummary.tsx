@@ -5,17 +5,20 @@ import Link from 'next/link';
 
 import { Run, RunStatus } from '@/types/Run';
 import { RunPills } from '@/runs/components/RunPills';
+import { useAuth0 } from '@/contexts/Auth0Context';
 
 export type RunSummaryProps = {
     run: Run;
-    /** Optional user ID for viewing public runs (e.g., "samples") */
-    user?: string;
 };
 
-export const RunSummary = ({ run, user }: RunSummaryProps) => {
-    const { id, name, description } = run;
+export const RunSummary = ({ run }: RunSummaryProps) => {
+    const { user: authUser } = useAuth0();
+    const { id, userid, name, description } = run;
     const status = run.details?.status ?? RunStatus.UNKNOWN;
-    const href = user ? `/runs/${id}?user=${user}` : `/runs/${id}`;
+
+    // If the run belongs to a different user, include the user param in the URL
+    const isExternalRun = authUser?.sub !== userid;
+    const href = isExternalRun ? `/runs/${id}?user=${userid}` : `/runs/${id}`;
 
     return (
         <Layout>

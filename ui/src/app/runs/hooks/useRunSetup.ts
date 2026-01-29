@@ -371,25 +371,28 @@ export function useRunSetup({ runid, onSubmitSuccess }: UseRunSetupProps) {
         [fileUploads, runid]
     );
 
-    const handleFileSelect = (file: File) => {
-        if (!file) return;
+    const handleFileSelect = (files: File[]) => {
+        if (!files.length) return;
 
-        const newUpload: FileUploadState = {
-            file,
-            description: '',
-            status: UploadStatus.PENDING,
-            progress: 0,
-            uploadedBytes: 0,
-            totalBytes: file.size,
-            secondsRemaining: null,
-            uploadStartTime: null,
-            uploadUrl: null,
-            gcsPath: null,
-            error: null,
-            abortController: null,
-        };
+        const newUploads = Array.from(files).map((file) => {
+            const newUpload: FileUploadState = {
+                file,
+                description: '',
+                status: UploadStatus.PENDING,
+                progress: 0,
+                uploadedBytes: 0,
+                totalBytes: file.size,
+                secondsRemaining: null,
+                uploadStartTime: null,
+                uploadUrl: null,
+                gcsPath: null,
+                error: null,
+                abortController: null,
+            };
+            return newUpload;
+        });
 
-        setFileUploads((prev) => [...prev, newUpload]);
+        setFileUploads((prev) => [...prev, ...newUploads]);
 
         setFieldErrors((prev) => {
             const { datasets, ...rest } = prev;

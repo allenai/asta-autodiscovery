@@ -21,7 +21,6 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
 import DatasetUpload from '@/runs/components/DatasetUpload';

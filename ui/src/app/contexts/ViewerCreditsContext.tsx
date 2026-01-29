@@ -48,15 +48,13 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
     const { isAuthenticated } = useAuth0();
 
     const updateViewerCredits = useCallback(async () => {
-        if (lastError) {
-            setLastError(null);
-        }
         if (!isAuthenticated) {
             return;
         }
         try {
             const { data } = await userApi.getViewerCredits();
             setCredits(data.credits);
+            setLastError(null);
         } catch (error: any) {
             setLastError(error.message);
         }

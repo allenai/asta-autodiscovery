@@ -231,7 +231,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                                 updateSettings('explorationWeight', parseFloat(e.target.value))
                             }
                             disabled={isFormDisabled}
-                            onBlur={saveJobArgs}
+                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
 
@@ -246,7 +246,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <Select
                             value={settings.mctsSelection}
                             onChange={(e) => updateSettings('mctsSelection', e.target.value)}
-                            onClose={saveJobArgs}>
+                            onClose={() => saveJobArgs()}>
                             {Object.values(MCTS_SELECTION).map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
                                     {option.label}
@@ -275,7 +275,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(_, value) =>
                                 updateSettings('surprisalWidth', value as number)
                             }
-                            onChangeCommitted={saveJobArgs}
+                            onChangeCommitted={() => saveJobArgs()}
                             min={0}
                             max={1}
                             step={0.01}
@@ -300,7 +300,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                                 updateSettings('evidenceWeight', parseFloat(e.target.value))
                             }
                             disabled={isFormDisabled}
-                            onBlur={saveJobArgs}
+                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
 
@@ -319,7 +319,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             onChange={(e) => updateSettings('warmstartExperiments', e.target.value)}
                             disabled={isFormDisabled}
                             placeholder="Path to json file"
-                            onBlur={saveJobArgs}
+                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
 
@@ -337,7 +337,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.nWarmstart}
                             onChange={(e) => updateSettings('nWarmstart', parseInt(e.target.value))}
                             disabled={isFormDisabled}
-                            onBlur={saveJobArgs}
+                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
                 </StyledAccordian>

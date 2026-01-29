@@ -144,23 +144,33 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async getRunMetadata(runid: string) {
+    async getRunMetadata(runid: string, options?: { user?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.user) {
+            query.user = options.user;
+        }
         return this.request<GetRunMetadataResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
+            query,
         });
     }
 
     async getRunExperiments({
         runid,
         afterExperimentId,
+        user,
     }: {
         runid: string;
         afterExperimentId?: string;
+        user?: string;
     }) {
         const query: Record<string, string> = {};
         if (afterExperimentId) {
             query.after_experiment_id = afterExperimentId;
+        }
+        if (user) {
+            query.user = user;
         }
 
         return this.request<GetRunExperimentsResponseBody>({
@@ -173,29 +183,46 @@ export class RunsApi extends BaseApi {
     async getRunExperimentDetails({
         runid,
         experimentId,
+        user,
     }: {
         runid: string;
         experimentId: string;
+        user?: string;
     }) {
+        const query: Record<string, string> = {};
+        if (user) {
+            query.user = user;
+        }
         return this.request<GetRunExperimentDetailsResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,
             method: 'GET',
+            query,
         });
     }
 
-    async getRun(runId: string) {
+    async getRun(runId: string, options?: { user?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.user) {
+            query.user = options.user;
+        }
         return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/${runId}`,
             method: 'GET',
+            query,
         });
     }
 
-    async getRunStatus(runId: string) {
+    async getRunStatus(runId: string, options?: { user?: string }) {
+        const query: Record<string, string> = {};
+        if (options?.user) {
+            query.user = options.user;
+        }
         return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/${runId}/status`,
             method: 'GET',
+            query,
         });
     }
 

@@ -59,12 +59,15 @@ export const useRunExperiments = () => {
 
 export type RunExperimentsProps = PropsWithChildren<{
     runid: string | null;
+    /** Optional user ID for viewing public runs (e.g., "samples") */
+    user?: string;
     autoStart?: boolean;
     refreshIntervalMs?: number;
 }>;
 
 export const RunExperimentsProvider = ({
     runid,
+    user,
     children,
     autoStart = false,
     refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS,
@@ -116,6 +119,7 @@ export const RunExperimentsProvider = ({
                 .getRunExperimentDetails({
                     runid,
                     experimentId: experiment.experimentId,
+                    user,
                 })
                 .then(({ data }) => {
                     if (selectedExperimentRequestId.current !== requestId) {
@@ -145,7 +149,7 @@ export const RunExperimentsProvider = ({
                     setIsLoadingSelectedExperiment(false);
                 });
         },
-        [runid, runsApi]
+        [runid, user, runsApi]
     );
 
     // Auto-start polling on mount if autoStart is true
@@ -182,6 +186,7 @@ export const RunExperimentsProvider = ({
                 const { data } = await runsApi.getRunExperiments({
                     runid,
                     afterExperimentId: afterExperimentId.current ?? undefined,
+                    user,
                 });
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
                 if (newExperiments.length > 0) {
@@ -210,7 +215,7 @@ export const RunExperimentsProvider = ({
         return () => {
             clearInterval(interval);
         };
-    }, [runid, isPolling]);
+    }, [runid, user, isPolling]);
 
     const memoizedState = useMemo<RunExperimentsState>(
         () => ({

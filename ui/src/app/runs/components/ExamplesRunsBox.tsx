@@ -12,7 +12,7 @@ export const ExamplesRunsBox = () => {
                 <Wrapper>
                     {exampleRuns.map((run) => (
                         <RunItem key={run.id}>
-                            <RunSummary run={run} />
+                            <RunSummary run={run} user="samples" />
                         </RunItem>
                     ))}
                 </Wrapper>

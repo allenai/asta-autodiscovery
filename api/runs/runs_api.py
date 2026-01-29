@@ -22,8 +22,6 @@ from runs.models import (
     MetadataModel,
     GetRunMetadataRequestModel,
     GetRunMetadataResponseModel,
-    GetExampleRunsRequestModel,
-    GetExampleRunsResponseModel,
     RunDetailsModel,
     RunModel,
     ExperimentModel,
@@ -287,29 +285,9 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/list")
+    @api.route("/list", methods=["GET"])
     @requires_enrollment
     def list_runs():
-        """List all runs for the authenticated user.
-
-        Returns:
-            JSON response with array of run IDs.
-        """
-        userid = request.user.get("sub")
-        if not userid:
-            return jsonify({"error": "User ID not found in token"}), 401
-
-        try:
-            manager = get_job_manager()
-            runs = manager.list_jobs(userid)
-            return jsonify({"runs": runs})
-        except Exception as e:
-            current_app.logger.error(f"Failed to list runs: {e}")
-            return jsonify({"error": str(e)}), 500
-
-    @api.route("/list/me", methods=["GET"])
-    @requires_enrollment
-    def list_viewer_runs():
         """List runs available to the authenticated viewer.
 
         Returns:
@@ -394,58 +372,6 @@ def create() -> Blueprint:
 
         resp = GetViewerRunsResponseModel(
             runs=run_models,
-        )
-        return jsonify(resp.model_dump()), 200
-
-    @api.route("/list/examples", methods=["GET"])
-    def list_example_runs():
-        """List example runs available to all users.
-
-        Returns:
-            JSON response with array of example run IDs.
-        """
-
-        req = GetExampleRunsRequestModel(
-            limit=int(request.args.get("limit", 5)),
-        )
-
-        runs: list[RunModel] = []
-        # TODO: Fetch real example runs from a predefined source
-        for i in range(1, req.limit + 1):
-            run_stats_model = RunStatsModel(
-                requested_experiments=0,
-                completed_experiments=0,
-                pending_experiments=0,
-                num_surprising_experiments=0,
-            )
-            run_details_model = RunDetailsModel(
-                execution_id=None,
-                created_at=datetime.now(UTC).isoformat(),
-                status="COMPLETED",
-                status_checked_at=datetime.now(UTC).isoformat(),
-            )
-            run_metadata_model = MetadataModel(
-                name=f"Example Run {i}",
-                description=f"This is the metadata for example run {i}.",
-                domain=None,
-                datasets=[],
-            )
-            run_model = RunModel(
-                runid=f"example-run-{i}",
-                status="COMPLETED",
-                name=run_metadata_model.name,
-                path=None,
-                description=run_metadata_model.description,
-                run_args=None,
-                run_stats=run_stats_model,
-                run_details=run_details_model,
-                run_metadata=run_metadata_model,
-                execution_status={},
-            )
-            runs.append(run_model)
-
-        resp = GetExampleRunsResponseModel(
-            runs=runs,
         )
         return jsonify(resp.model_dump()), 200
 

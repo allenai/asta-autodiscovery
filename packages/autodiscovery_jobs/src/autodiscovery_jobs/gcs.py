@@ -584,11 +584,11 @@ def count_experiment_results(userid: str, jobid: str, config: JobConfig | None =
     pattern = re.compile(r"mcts_node_\d+_\d+\.json$")
 
     try:
-        blobs = bucket.list_blobs(prefix=prefix, max_results=1000)
+        blobs = bucket.list_blobs(prefix=prefix, max_results=10000)
         count = 0
         for blob in blobs:
             filename = blob.name.split("/")[-1]
-            if pattern.match(filename):
+            if pattern.match(filename) and filename != "mcts_node_1_0.json":
                 count += 1
         return count
     except Exception as e:

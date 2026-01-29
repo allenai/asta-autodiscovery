@@ -154,7 +154,6 @@ export default function DatasetUpload({
                 type="file"
                 onChange={handleFileInputChange}
                 style={{ display: 'none' }}
-                accept=".csv,.json,.jsonl,.txt,.tsv"
                 multiple
             />
 

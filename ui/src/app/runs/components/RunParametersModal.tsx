@@ -8,7 +8,6 @@ import {
     Typography,
     Box,
     Divider,
-    Chip,
     styled,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -82,9 +81,16 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
                                 {metadata.datasets.map((dataset, index) => (
                                     <DatasetItem key={index}>
                                         <DatasetName>{dataset.name}</DatasetName>
-                                        {dataset.fileSizeBytes && (
+                                        {(dataset.fileSizeBytes || dataset.contentType) && (
                                             <DatasetSize>
-                                                {prettyBytes(dataset.fileSizeBytes)}
+                                                {[
+                                                    dataset.contentType,
+                                                    dataset.fileSizeBytes
+                                                        ? prettyBytes(dataset.fileSizeBytes)
+                                                        : null,
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' · ')}
                                             </DatasetSize>
                                         )}
                                         {dataset.description && (
@@ -108,11 +114,9 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
                     <FieldRow>
                         <FieldLabel>Experiment Budget</FieldLabel>
                         <FieldValue>
-                            {args?.nExperiments != null ? (
-                                <Chip label={`${args.nExperiments} experiments`} size="small" />
-                            ) : (
-                                'Not set'
-                            )}
+                            {args?.nExperiments != null
+                                ? `${args.nExperiments} experiments`
+                                : 'Not set'}
                         </FieldValue>
                     </FieldRow>
 

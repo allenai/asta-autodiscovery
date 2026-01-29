@@ -1,8 +1,9 @@
 'use client';
 
-import { Box, CircularProgress, Alert } from '@mui/material';
+import { Box, Alert } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import RunStatus from '@/runs/components/RunStatus';
 
 interface SharedRunPageProps {
@@ -21,17 +22,7 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
     const { userid, runid } = params;
 
     if (isLoading) {
-        return (
-            <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: '100%',
-                }}>
-                <CircularProgress />
-            </Box>
-        );
+        return <LoadingSpinner />;
     }
 
     if (!isAuthenticated) {

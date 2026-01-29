@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from openai import OpenAI
 
 from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
-from autodiscovery.vertex_client import VertexOpenAIClientRefresher
+from autodiscovery.vertex_client import OpenAICredentialsRefresher
 
 
 def is_gemini_model(model: str) -> bool:
@@ -85,7 +85,7 @@ def get_vertex_access_token() -> str:
 def get_openai_client_for_model(model: str, api_key: str | None = None) -> Any:
     """Create an OpenAI-compatible client for the given model."""
     if is_gemini_model(model):
-        return VertexOpenAIClientRefresher(
+        return OpenAICredentialsRefresher(
             api_key=api_key, base_url=get_vertex_openai_base_url()
         )
     return OpenAI(api_key=api_key) if api_key else OpenAI()

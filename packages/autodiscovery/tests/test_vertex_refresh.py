@@ -18,33 +18,6 @@ class DummyOpenAI:
         return self.api_key
 
 
-class DummyCompletions:
-    def __init__(self, on_create):
-        self._on_create = on_create
-
-    def create(self, **kwargs):
-        self._on_create(kwargs)
-        return types.SimpleNamespace(choices=[], usage=None)
-
-
-class DummyChat:
-    def __init__(self, completions):
-        self.completions = completions
-
-
-class DummyOpenAIWithChat:
-    def __init__(self, api_key: str, base_url: str | None = None, **kwargs):
-        self.api_key = api_key
-        self.base_url = base_url
-        self.kwargs = kwargs
-        self.last_call = None
-        completions = DummyCompletions(self._record_call)
-        self.chat = DummyChat(completions)
-
-    def _record_call(self, payload):
-        self.last_call = payload
-
-
 class DummyCreds:
     def __init__(self, token: str):
         self.valid = False
@@ -100,8 +73,8 @@ def test_get_openai_client_for_model_gemini_returns_refresher(monkeypatch: pytes
     monkeypatch.setenv("VERTEX_OPENAI_BASE_URL", "https://example.test")
     gemini_client = get_openai_client_for_model("gemini-3-flash-preview")
     fq_client = get_openai_client_for_model("google/gemini-3-flash-preview")
-    assert isinstance(gemini_client, vertex_client.VertexOpenAIClientRefresher)
-    assert isinstance(fq_client, vertex_client.VertexOpenAIClientRefresher)
+    assert isinstance(gemini_client, vertex_client.OpenAICredentialsRefresher)
+    assert isinstance(fq_client, vertex_client.OpenAICredentialsRefresher)
 
 
 def test_vertex_openai_client_refresher_uses_adc(monkeypatch: pytest.MonkeyPatch):
@@ -110,7 +83,7 @@ def test_vertex_openai_client_refresher_uses_adc(monkeypatch: pytest.MonkeyPatch
     holder = install_fake_google_auth(monkeypatch, token="adc-token")
     monkeypatch.setattr(vertex_client, "OpenAI", DummyOpenAI)
 
-    client = vertex_client.VertexOpenAIClientRefresher(base_url="https://example.test")
+    client = vertex_client.OpenAICredentialsRefresher(base_url="https://example.test")
     assert client.ping() == "adc-token"
     assert holder["creds"].refresh_count == 1
 
@@ -119,23 +92,8 @@ def test_vertex_openai_client_refresher_uses_static_token(monkeypatch: pytest.Mo
     monkeypatch.setenv("VERTEX_ACCESS_TOKEN", "static-token")
     monkeypatch.setattr(vertex_client, "OpenAI", DummyOpenAI)
 
-    client = vertex_client.VertexOpenAIClientRefresher(base_url="https://example.test")
+    client = vertex_client.OpenAICredentialsRefresher(base_url="https://example.test")
     assert client.ping() == "static-token"
-
-
-def test_vertex_refreshing_model_client_create_refreshes(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("VERTEX_ACCESS_TOKEN", raising=False)
-    monkeypatch.delenv("GOOGLE_OAUTH_ACCESS_TOKEN", raising=False)
-    holder = install_fake_google_auth(monkeypatch, token="adc-token")
-    monkeypatch.setattr(vertex_client, "OpenAI", DummyOpenAIWithChat)
-
-    client = vertex_client.VertexRefreshingModelClient(
-        {"model": "google/gemini-3-flash-preview", "base_url": "https://example.test"}
-    )
-    client.create({"messages": [{"role": "user", "content": "ping"}]})
-    assert client._client.api_key == "adc-token"
-    assert client._client.last_call["model"] == "google/gemini-3-flash-preview"
-    assert holder["creds"].refresh_count == 1
 
 
 @pytest.mark.adc
@@ -157,7 +115,7 @@ def test_vertex_openai_client_refresher_adc_integration():
         pytest.skip("Vertex base URL is not configured.")
 
     model = os.getenv("VERTEX_TEST_MODEL", "gemini-3-flash-preview")
-    client = vertex_client.VertexOpenAIClientRefresher(base_url=base_url)
+    client = vertex_client.OpenAICredentialsRefresher(base_url=base_url)
     response = client.chat.completions.create(
         model=normalize_vertex_model_name(model),
         messages=[{"role": "user", "content": "ping"}],

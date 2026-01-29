@@ -9,10 +9,7 @@ from autodiscovery.structured_outputs import (
 )
 from autodiscovery.utils import is_gemini_model, normalize_vertex_model_name
 from autodiscovery.vertex_config import get_vertex_openai_base_url
-from autodiscovery.vertex_client import (
-    VertexOpenAIClientRefresher,
-    VertexRefreshingModelClient,
-)
+from autodiscovery.vertex_client import OpenAICredentialsRefresher
 import os
 import json
 from autogen.coding import LocalCommandLineCodeExecutor, CodeBlock, CodeResult, CodeExecutor
@@ -74,7 +71,7 @@ class ModalSandboxExecutor(CodeExecutor):
                     f"Image analysis skipped: OPENAI_API_KEY is not set for {self.vision_model}.",
                 )
         if is_gemini:
-            return VertexOpenAIClientRefresher(base_url=base_url), None
+            return OpenAICredentialsRefresher(base_url=base_url), None
         return OpenAI(api_key=api_key), None
 
     def _analyze_image(self, image_data: str) -> str:
@@ -458,17 +455,29 @@ def get_openai_config(
     is_gemini = is_gemini_model(model_name)
 
     if is_gemini:
-        # Configure Gemini via the OpenAI-compatible endpoint (Vertex AI).
+        # Configure Gemini via AG2's native Google/Vertex client.
+        project_id = os.getenv("VERTEX_PROJECT_ID")
+        location = os.getenv("VERTEX_LOCATION")
+        google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        gemini_api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
+
+        model = model_name.split("/")[-1]
         config = {
-            "api_type": "openai",
-            "model": normalize_vertex_model_name(model_name),
+            "api_type": "google",
+            "model": model,
             "timeout": timeout,
-            "api_key": "PLACEHOLDER",
-            "base_url": get_vertex_openai_base_url(),
-            "model_client_cls": "VertexRefreshingModelClient",
             "max_retries": 3,
             "cache_seed": None,
         }
+        if gemini_api_key:
+            config["api_key"] = gemini_api_key
+        else:
+            if project_id:
+                config["project_id"] = project_id
+            if location:
+                config["location"] = location
+            if google_application_credentials:
+                config["google_application_credentials"] = google_application_credentials
         if temperature is not None:
             config["temperature"] = temperature
     else:
@@ -750,17 +759,6 @@ def install(package):
         code_executor,
         user_proxy,
     ]
-
-    if is_gemini:
-        llm_agents = [
-            experiment_generator,
-            experiment_programmer,
-            experiment_analyst,
-            experiment_reviewer,
-            experiment_reviser,
-        ]
-        for agent in llm_agents:
-            agent.register_model_client(VertexRefreshingModelClient)
 
     # Apply token limit to all agents
     for agent in agents:

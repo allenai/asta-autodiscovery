@@ -92,11 +92,18 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     }, [runsApi]);
 
     const updateExampleRuns = useCallback(async () => {
-        // TODO: Implement sample runs - will call listRuns with userid="samples"
         setIsExampleRunsLoading(true);
-        setExampleRuns([]);
-        setIsExampleRunsLoading(false);
-    }, []);
+        try {
+            const { data } = await runsApi.listRuns({ user: 'samples' });
+            const runs = data.runs.map((runData) => getRunFromApi(runData));
+            setExampleRuns(runs);
+        } catch (error: any) {
+            // Sample runs are optional - don't set error if they fail
+            setExampleRuns([]);
+        } finally {
+            setIsExampleRunsLoading(false);
+        }
+    }, [runsApi]);
 
     useEffect(() => {
         if (isAuthenticated) {

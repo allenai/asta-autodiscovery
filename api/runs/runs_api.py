@@ -285,17 +285,34 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
 
+    # Users whose runs are publicly accessible (can be queried by anyone)
+    PUBLIC_USERS = {"samples"}
+
     @api.route("/list", methods=["GET"])
     @requires_enrollment
     def list_runs():
-        """List runs available to the authenticated viewer.
+        """List runs for a user.
+
+        Query Parameters:
+            user: Optional user ID to query. If not provided, uses the authenticated user.
+                  Only users in PUBLIC_USERS can be queried by others.
+            limit: Maximum number of runs to return (default: 1000)
 
         Returns:
             JSON response containing run metadata, details, and stats.
         """
+        # Determine which user's runs to fetch
+        user_param = request.args.get("user")
+        if user_param:
+            if user_param not in PUBLIC_USERS:
+                return jsonify({"error": f"Access denied. Cannot query runs for user: {user_param}"}), 403
+            userid = user_param
+        else:
+            userid = request.user.get("sub")
+
         req = GetViewerRunsRequestModel(
             limit=int(request.args.get("limit", 1000)),
-            userid=request.user.get("sub"),
+            userid=userid,
         )
 
         job_manager = get_job_manager()

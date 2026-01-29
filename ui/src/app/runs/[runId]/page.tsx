@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
-
 import { useRouter } from 'next/navigation';
+
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import RunSetup from '@/runs/components/RunSetup';
@@ -73,17 +74,7 @@ export default function RunPage({ params }: RunPageProps) {
     };
 
     if (isLoading) {
-        return (
-            <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: '100%',
-                }}>
-                <CircularProgress />
-            </Box>
-        );
+        return <LoadingSpinner />;
     }
 
     if (!isAuthenticated) {

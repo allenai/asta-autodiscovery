@@ -17,8 +17,8 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
     const status = run.details?.status ?? RunStatus.UNKNOWN;
 
     // If the run belongs to a different user, use the /shared route
-    const isExternalRun = authUser?.sub !== userid;
-    const href = isExternalRun ? `/shared/${userid}/${id}` : `/runs/${id}`;
+    const isSharedRun = authUser?.sub !== userid;
+    const href = isSharedRun ? `/shared/${userid}/${id}` : `/runs/${id}`;
 
     return (
         <Layout>

@@ -63,7 +63,7 @@ const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
 
 interface DatasetUploadProps {
     fileUploads: FileUploadState[];
-    onFileSelect: (file: File) => void;
+    onFileSelect: (files: File[]) => void;
     onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
     onDescriptionBlur: () => void;
@@ -124,13 +124,13 @@ export default function DatasetUpload({
 
         const files = e.dataTransfer.files;
         if (files && files.length > 0) {
-            const file = files[0];
             // Check file type
             const validTypes = ['.csv', '.json', '.txt', '.tsv'];
-            const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-            if (validTypes.includes(fileExtension)) {
-                onFileSelect(file);
-            }
+            const validFiles = Array.from(files).filter((file) => {
+                const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+                return validTypes.includes(fileExtension);
+            });
+            onFileSelect(validFiles);
         }
     };
 
@@ -141,9 +141,9 @@ export default function DatasetUpload({
     };
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            onFileSelect(file);
+        const files = e.target.files;
+        if (files?.length) {
+            onFileSelect(Array.from(files));
         }
     };
 
@@ -155,6 +155,7 @@ export default function DatasetUpload({
                 onChange={handleFileInputChange}
                 style={{ display: 'none' }}
                 accept=".csv,.json,.jsonl,.txt,.tsv"
+                multiple
             />
 
             <DropZone

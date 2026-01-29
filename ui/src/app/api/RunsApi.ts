@@ -41,6 +41,7 @@ export interface RunArgsFromApi {
 
 export interface RunFromApi {
     runid: string;
+    userid: string;
     path?: string;
     status: string;
     name?: string;

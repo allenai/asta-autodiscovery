@@ -137,6 +137,7 @@ class RunModel(BaseModel):
     """Model representing a run with its attributes"""
 
     runid: str = Field(..., description="Unique identifier for the run")
+    userid: str = Field(..., description="User identifier who owns the run")
     status: str = Field(..., description="Current status of the run")
     name: str | None = Field(None, description="Name of the run")
     description: str | None = Field(None, description="Description of the run")

@@ -24,6 +24,7 @@ import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
+import { useAuth0 } from '@/contexts/Auth0Context';
 
 interface RunStatusProps {
     runid: string;
@@ -45,7 +46,7 @@ const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implemen
  */
 export default function RunStatus({ runid, onRunCancelled, user }: RunStatusProps) {
     const api = getRunsApi();
-    const isReadOnly = !!user; // Public runs are read-only
+    const { user: authUser } = useAuth0();
 
     const [run, setRun] = useState<Run | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -123,6 +124,8 @@ export default function RunStatus({ runid, onRunCancelled, user }: RunStatusProp
         }
     };
 
+    // Run is read-only if it belongs to a different user
+    const isReadOnly = run ? run.userid !== authUser?.sub : false;
     const canStop = !isReadOnly && run?.details?.status === 'RUNNING';
     const experimentsLabel = run?.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments';
 

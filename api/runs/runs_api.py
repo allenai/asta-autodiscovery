@@ -378,6 +378,7 @@ def create() -> Blueprint:
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
             return RunModel(
                 runid=run_id,
+                userid=req.userid,
                 status=run_details.get("status", "UNKNOWN"),
                 name=run_metadata_model.name if run_metadata_model else f"Run {run_id}",
                 description=run_metadata_model.description
@@ -485,6 +486,7 @@ def create() -> Blueprint:
             run_args_model = RunArgsModel.from_dict(args_dict) if args_dict else None
             run_model = RunModel(
                 runid=runid,
+                userid=userid,
                 status=updated_run_details.get("status", "UNKNOWN"),
                 name=run_metadata_model.name if run_metadata_model else f"Run {runid}",
                 description=run_metadata_model.description if run_metadata_model else None,

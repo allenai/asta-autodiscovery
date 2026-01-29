@@ -30,7 +30,7 @@ interface RunStatusProps {
     runid: string;
     onRunCancelled?: () => void;
     /** Optional user ID for viewing public runs (e.g., "samples") */
-    user?: string;
+    userid?: string;
 }
 
 const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implement
@@ -44,7 +44,7 @@ const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implemen
  * - Stop Run button (only shown when status is RUNNING)
  * - Auto-refresh every 30 seconds for active runs
  */
-export default function RunStatus({ runid, onRunCancelled, user }: RunStatusProps) {
+export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusProps) {
     const api = getRunsApi();
     const { user: authUser } = useAuth0();
 
@@ -60,7 +60,7 @@ export default function RunStatus({ runid, onRunCancelled, user }: RunStatusProp
         setError(null);
 
         try {
-            const response = await api.getRun(runid, { user });
+            const response = await api.getRun(runid, { userid });
             const run = getRunFromApi(response.data);
 
             setRun(run);
@@ -152,7 +152,7 @@ export default function RunStatus({ runid, onRunCancelled, user }: RunStatusProp
     }
 
     return (
-        <RunExperimentsProvider runid={runid} user={user} autoStart>
+        <RunExperimentsProvider runid={runid} userid={userid} autoStart>
             <RunStatusContent
                 run={run as Run & { details: NonNullable<Run['details']> }}
                 error={error}

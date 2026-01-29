@@ -477,17 +477,21 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         setFormError(null);
     };
 
-    const saveMetadata = async () => {
+    const saveMetadata = useCallback(async () => {
         const saveStartTime = Date.now();
         setIsSaving(true);
 
         try {
+            // Use refs to get latest state
+            const currentSettings = settingsRef.current;
+            const currentFileUploads = fileUploadsRef.current;
+
             const metadata = {
-                name: settings.name.trim(),
-                description: settings.datasetsDescription.trim(),
-                domain: settings.domain.trim(),
-                intent: settings.intent.trim(),
-                datasets: fileUploads.map((upload) => ({
+                name: currentSettings.name.trim(),
+                description: currentSettings.datasetsDescription.trim(),
+                domain: currentSettings.domain.trim(),
+                intent: currentSettings.intent.trim(),
+                datasets: currentFileUploads.map((upload) => ({
                     name: upload.file.name,
                     description: upload.description,
                     content_type: upload.file.type || 'application/octet-stream',
@@ -509,14 +513,16 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 setIsSaving(false);
             }, remainingTime);
         }
-    };
+    }, [api, runid]);
 
-    const saveJobArgs = async (overrides?: Partial<Settings>) => {
+    const saveJobArgs = useCallback(async (overrides?: Partial<Settings>) => {
         const saveStartTime = Date.now();
         setIsSaving(true);
 
         try {
-            const effectiveSettings = { ...settings, ...overrides };
+            // Use ref to get latest state
+            const currentSettings = settingsRef.current;
+            const effectiveSettings = { ...currentSettings, ...overrides };
             const jobArgs = {
                 n_experiments: effectiveSettings.nExperiments,
                 exploration_weight: effectiveSettings.explorationWeight,
@@ -540,17 +546,17 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 setIsSaving(false);
             }, remainingTime);
         }
-    };
+    }, [api, runid]);
 
     // Create debounced versions of save functions
     const debouncedSaveMetadata = useMemo(
         () => debounce(() => saveMetadata(), debounceSaveMs),
-        [debounceSaveMs]
+        [saveMetadata, debounceSaveMs]
     );
 
     const debouncedSaveJobArgs = useMemo(
         () => debounce(() => saveJobArgs(), debounceSaveMs),
-        [debounceSaveMs]
+        [saveJobArgs, debounceSaveMs]
     );
 
     const debouncedSaveDatasetMetadata = useMemo(

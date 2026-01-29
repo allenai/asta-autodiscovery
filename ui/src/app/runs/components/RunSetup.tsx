@@ -17,12 +17,16 @@ import {
     Accordion,
     AccordionSummary,
     Slider,
+    Fade,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
 import DatasetUpload from '@/runs/components/DatasetUpload';
+
+const DEBOUNCE_SAVE_MS = 3000;
 
 interface RunSetupProps {
     runid: string;
@@ -40,8 +44,6 @@ interface RunSetupProps {
  */
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
-        saveMetadata,
-        saveJobArgs,
         settings,
         creditsRemaining,
         fileUploads,
@@ -49,16 +51,18 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         isSubmitting,
         formError,
         isLoading,
+        isSaving,
         updateSettings,
+        debouncedSaveMetadata,
+        debouncedSaveJobArgs,
         handleFileSelect,
         handleFileDescriptionChange,
-        handleFileDescriptionBlur,
         handleRemoveFileUpload,
         handleExperimentsChange,
         handleSubmit,
         cancelUpload,
         retryUpload,
-    } = useRunSetup({ runid, onSubmitSuccess });
+    } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
 
     const isFormDisabled = isSubmitting || isLoading;
     const datasetErrors = fieldErrors.datasets;
@@ -92,13 +96,15 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     <HelperText>Create a unique name to identify these results later.</HelperText>
                     <TextField
                         value={settings.name}
-                        onChange={(e) => updateSettings('name', e.target.value)}
+                        onChange={(e) => {
+                            updateSettings('name', e.target.value);
+                            debouncedSaveMetadata();
+                        }}
                         placeholder="New Session 1"
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.name}
                         helperText={fieldErrors.name}
-                        onBlur={saveMetadata}
                     />
                 </FormControl>
 
@@ -113,10 +119,12 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         multiline
                         rows={3}
                         value={settings.datasetsDescription}
-                        onChange={(e) => updateSettings('datasetsDescription', e.target.value)}
+                        onChange={(e) => {
+                            updateSettings('datasetsDescription', e.target.value);
+                            debouncedSaveMetadata();
+                        }}
                         placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023"
                         disabled={isFormDisabled}
-                        onBlur={saveMetadata}
                         required
                         error={!!fieldErrors.datasetsDescription}
                         helperText={fieldErrors.datasetsDescription}
@@ -132,10 +140,12 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </HelperText>
                     <TextField
                         value={settings.domain}
-                        onChange={(e) => updateSettings('domain', e.target.value)}
+                        onChange={(e) => {
+                            updateSettings('domain', e.target.value);
+                            debouncedSaveMetadata();
+                        }}
                         placeholder="e.g., Computer Science"
                         disabled={isFormDisabled}
-                        onBlur={saveMetadata}
                     />
                 </FormControl>
 
@@ -146,7 +156,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         onFileSelect={handleFileSelect}
                         onRemoveFileUpload={handleRemoveFileUpload}
                         onDescriptionChange={handleFileDescriptionChange}
-                        onDescriptionBlur={handleFileDescriptionBlur}
                         onCancelUpload={cancelUpload}
                         onRetryUpload={retryUpload}
                         disabled={isFormDisabled}
@@ -209,10 +218,12 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         </HelperText>
                         <TextField
                             value={settings.intent}
-                            onChange={(e) => updateSettings('intent', e.target.value)}
+                            onChange={(e) => {
+                                updateSettings('intent', e.target.value);
+                                debouncedSaveMetadata();
+                            }}
                             placeholder="e.g., Focus on relationships between demographic factors and outcomes"
                             disabled={isFormDisabled}
-                            onBlur={saveMetadata}
                         />
                     </FormControl>
 
@@ -227,11 +238,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <TextField
                             type="number"
                             value={settings.explorationWeight}
-                            onChange={(e) =>
-                                updateSettings('explorationWeight', parseFloat(e.target.value))
-                            }
+                            onChange={(e) => {
+                                updateSettings('explorationWeight', parseFloat(e.target.value));
+                                debouncedSaveJobArgs();
+                            }}
                             disabled={isFormDisabled}
-                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
 
@@ -245,8 +256,10 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         </HelperText>
                         <Select
                             value={settings.mctsSelection}
-                            onChange={(e) => updateSettings('mctsSelection', e.target.value)}
-                            onClose={() => saveJobArgs()}>
+                            onChange={(e) => {
+                                updateSettings('mctsSelection', e.target.value);
+                                debouncedSaveJobArgs();
+                            }}>
                             {Object.values(MCTS_SELECTION).map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
                                     {option.label}
@@ -272,10 +285,10 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         </HelperText>
                         <SurpriseSlider
                             value={settings.surprisalWidth ?? 0}
-                            onChange={(_, value) =>
-                                updateSettings('surprisalWidth', value as number)
-                            }
-                            onChangeCommitted={() => saveJobArgs()}
+                            onChange={(_, value) => {
+                                updateSettings('surprisalWidth', value as number);
+                                debouncedSaveJobArgs();
+                            }}
                             min={0}
                             max={1}
                             step={0.01}
@@ -296,11 +309,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <TextField
                             type="number"
                             value={settings.evidenceWeight}
-                            onChange={(e) =>
-                                updateSettings('evidenceWeight', parseFloat(e.target.value))
-                            }
+                            onChange={(e) => {
+                                updateSettings('evidenceWeight', parseFloat(e.target.value));
+                                debouncedSaveJobArgs();
+                            }}
                             disabled={isFormDisabled}
-                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
 
@@ -316,10 +329,12 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         </HelperText>
                         <TextField
                             value={settings.warmstartExperiments}
-                            onChange={(e) => updateSettings('warmstartExperiments', e.target.value)}
+                            onChange={(e) => {
+                                updateSettings('warmstartExperiments', e.target.value);
+                                debouncedSaveJobArgs();
+                            }}
                             disabled={isFormDisabled}
                             placeholder="Path to json file"
-                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
 
@@ -335,9 +350,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <TextField
                             type="number"
                             value={settings.nWarmstart}
-                            onChange={(e) => updateSettings('nWarmstart', parseInt(e.target.value))}
+                            onChange={(e) => {
+                                updateSettings('nWarmstart', parseInt(e.target.value));
+                                debouncedSaveJobArgs();
+                            }}
                             disabled={isFormDisabled}
-                            onBlur={() => saveJobArgs()}
                         />
                     </FormControl>
                 </StyledAccordian>
@@ -363,6 +380,14 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 disabled={isFormDisabled || Object.keys(fieldErrors).length > 0}>
                 {isSubmitting ? 'Starting...' : 'Start Run'}
             </SubmitButton>
+
+            {/* Save indicator */}
+            <Fade in={isSaving} timeout={{ enter: 300, exit: 500 }}>
+                <SaveIndicator>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    <Typography variant="body2">Saving...</Typography>
+                </SaveIndicator>
+            </Fade>
         </Box>
     );
 }
@@ -494,5 +519,23 @@ const SurpriseSlider = styled(Slider)(({ theme }) => ({
             background: 'transparent',
             color: theme.color['cream-100'].hex,
         },
+    },
+}));
+
+const SaveIndicator = styled(Box)(({ theme }) => ({
+    position: 'fixed',
+    bottom: theme.spacing(3),
+    right: theme.spacing(3),
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: theme.color['cream-10'].rgba.toString(),
+    color: theme.color['cream-100'].hex,
+    padding: theme.spacing(1.5, 2.5),
+    borderRadius: theme.shape.borderRadius * 2,
+    boxShadow: `0 4px 12px rgba(0, 0, 0, 0.15)`,
+    zIndex: 1000,
+
+    '.MuiCircularProgress-root': {
+        color: theme.color['green-100'].hex,
     },
 }));

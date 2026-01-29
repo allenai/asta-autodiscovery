@@ -66,7 +66,6 @@ interface DatasetUploadProps {
     onFileSelect: (files: File[]) => void;
     onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
-    onDescriptionBlur: () => void;
     onCancelUpload: (index: number) => void;
     onRetryUpload: (index: number) => void;
     disabled?: boolean;
@@ -87,7 +86,6 @@ export default function DatasetUpload({
     onFileSelect,
     onRemoveFileUpload,
     onDescriptionChange,
-    onDescriptionBlur,
     onCancelUpload,
     onRetryUpload,
     disabled = false,
@@ -281,7 +279,6 @@ export default function DatasetUpload({
                                         fullWidth
                                         value={upload.description}
                                         onChange={(e) => onDescriptionChange(index, e.target.value)}
-                                        onBlur={onDescriptionBlur}
                                         disabled={disabled}
                                         sx={{ mt: 1 }}
                                         placeholder='e.g.,

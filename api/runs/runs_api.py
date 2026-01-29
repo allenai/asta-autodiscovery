@@ -291,7 +291,7 @@ def create() -> Blueprint:
     def _get_userid_for_read(allow_public: bool = True) -> tuple[str | None, tuple | None]:
         """Get the user ID to use for read operations.
 
-        Checks for a 'user' query parameter. If provided and the user is in PUBLIC_USERS,
+        Checks for a 'userid' query parameter. If provided and the user is in PUBLIC_USERS,
         returns that user ID. Otherwise, returns the authenticated user's ID.
 
         Args:
@@ -301,11 +301,11 @@ def create() -> Blueprint:
             Tuple of (userid, error_response). If error_response is not None,
             it should be returned directly from the endpoint.
         """
-        user_param = request.args.get("user")
-        if user_param:
-            if not allow_public or user_param not in PUBLIC_USERS:
-                return None, (jsonify({"error": f"Access denied. Cannot query runs for user: {user_param}"}), 403)
-            return user_param, None
+        userid_param = request.args.get("userid")
+        if userid_param:
+            if not allow_public or userid_param not in PUBLIC_USERS:
+                return None, (jsonify({"error": f"Access denied. Cannot query runs for userid: {userid_param}"}), 403)
+            return userid_param, None
 
         userid = request.user.get("sub")
         if not userid:
@@ -318,7 +318,7 @@ def create() -> Blueprint:
         """List runs for a user.
 
         Query Parameters:
-            user: Optional user ID to query. If not provided, uses the authenticated user.
+            userid: Optional user ID to query. If not provided, uses the authenticated user.
                   Only users in PUBLIC_USERS can be queried by others.
             limit: Maximum number of runs to return (default: 1000)
 
@@ -421,7 +421,7 @@ def create() -> Blueprint:
             runid: Run identifier.
 
         Query Parameters:
-            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
 
         Returns:
             JSON response with run details as RunModel.
@@ -755,7 +755,7 @@ def create() -> Blueprint:
             runid: Run identifier
 
         Query Parameters:
-            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
         userid, error = _get_userid_for_read()
         if error:
@@ -890,7 +890,7 @@ def create() -> Blueprint:
             runid: Run identifier
 
         Query Parameters:
-            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
 
         Returns:
             JSON response with run status details
@@ -938,7 +938,7 @@ def create() -> Blueprint:
 
         Query Parameters:
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
-            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
         userid, error = _get_userid_for_read()
         if error:
@@ -969,7 +969,7 @@ def create() -> Blueprint:
         """Fetch details about a specific experiment within a run.
 
         Query Parameters:
-            user: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
         userid, error = _get_userid_for_read()
         if error:

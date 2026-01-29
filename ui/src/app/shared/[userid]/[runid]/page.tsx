@@ -42,5 +42,5 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
         );
     }
 
-    return <RunStatus runid={runid} user={userid} />;
+    return <RunStatus runid={runid} userid={userid} />;
 }

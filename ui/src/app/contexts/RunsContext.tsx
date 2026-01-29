@@ -94,7 +94,7 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const updateExampleRuns = useCallback(async () => {
         setIsExampleRunsLoading(true);
         try {
-            const { data } = await runsApi.listRuns({ user: 'samples' });
+            const { data } = await runsApi.listRuns({ userid: 'samples' });
             const runs = data.runs.map((runData) => getRunFromApi(runData));
             setExampleRuns(runs);
         } catch (error: any) {

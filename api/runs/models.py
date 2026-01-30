@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -72,6 +74,11 @@ class ExperimentModel(BaseModel):
 
     @model_validator(mode="after")
     def set_id_in_run(self) -> ExperimentModel:
+        """Set a stable experiment identifier based on creation order.
+
+        Returns:
+            ExperimentModel: The updated model with a populated id_in_run.
+        """
         if self.id_in_run is None:
             self.id_in_run = self.creation_idx - 1
         return self

@@ -149,7 +149,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const rows = useMemo(() => {
         const experimentRows = experiments.map((experiment) => {
             return {
-                id: experiment.experimentId,
+                id: experiment.idInRun,
                 hypothesis: experiment.hypothesis ?? 'N/A',
                 prior: getPriorAndPosteriorLabel(experiment.prior),
                 priorValue: experiment.prior,

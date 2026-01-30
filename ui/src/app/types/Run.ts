@@ -52,6 +52,7 @@ export type Experiment = {
     parentId: string | null;
     childIds: string[] | null;
     creationIdx: number;
+    idInRun: number;
     status: string;
     isSurprising: boolean;
     surprise: number | null;
@@ -139,6 +140,7 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         parentId: experimentFromApi.parent_id,
         childIds: experimentFromApi.child_ids,
         creationIdx: experimentFromApi.creation_idx,
+        idInRun: experimentFromApi.id_in_run,
         status: experimentFromApi.status,
         isSurprising: experimentFromApi.is_surprising,
         surprise: experimentFromApi.surprise,

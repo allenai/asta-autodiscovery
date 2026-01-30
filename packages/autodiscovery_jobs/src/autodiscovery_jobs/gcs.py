@@ -762,9 +762,7 @@ def read_rich_outputs(
         if not blob.exists():
             import logging
 
-            logging.warning(
-                "Rich output file not found: %s for job %s", filename, jobid
-            )
+            logging.warning("Rich output file not found: %s for job %s", filename, jobid)
             return []
 
         content = blob.download_as_text()

@@ -1,6 +1,6 @@
-from autogen import GroupChat, Agent
-from typing import Optional
 import json
+
+from autogen import Agent, GroupChat
 
 
 class SpeakerSelector:
@@ -8,7 +8,7 @@ class SpeakerSelector:
         self.code_failure_count = 0
         self.experiment_revision_count = 0
 
-    def select_next_speaker(self, last_speaker: Agent, groupchat: GroupChat) -> Optional[Agent]:
+    def select_next_speaker(self, last_speaker: Agent, groupchat: GroupChat) -> Agent | None:
         """Define a customized speaker selection function for the data exploration workflow.
 
         Args:

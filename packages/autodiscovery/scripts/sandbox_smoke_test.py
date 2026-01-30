@@ -1,9 +1,9 @@
-from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
-from code_execution import IPythonExecutor
 import logging
-import modal
 import os
 
+import modal
+from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
+from code_execution import IPythonExecutor
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 app_name = os.environ.get("MODAL_APP_NAME", "asta-autodiscovery")

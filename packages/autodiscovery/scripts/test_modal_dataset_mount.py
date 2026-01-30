@@ -1,6 +1,7 @@
 """Test script for Modal sandbox dataset mounting."""
 
 import os
+
 import modal
 from autodiscovery_modal import ModalSandboxIPythonBackend
 from code_execution import IPythonExecutor
@@ -8,7 +9,6 @@ from code_execution import IPythonExecutor
 
 def test_mount():
     """Test mounting a specific dataset directory."""
-
     # Configuration
     app_name = os.environ.get("MODAL_APP_NAME", "asta-autodiscovery")
     bucket = "example-gcp-project"
@@ -24,7 +24,7 @@ def test_mount():
     mount_path = "/data"
     working_dir = "/data/nls_ses"
 
-    print(f"Testing mount configuration:")
+    print("Testing mount configuration:")
     print(f"  Bucket: gs://{bucket}/{key_prefix}")
     print(f"  Mount at: {mount_path}")
     print(f"  Working directory: {working_dir}")

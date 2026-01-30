@@ -3,9 +3,9 @@
 This module provides a client adapter for direct OpenAI client usage.
 """
 
-from typing import Any
 import os
 import threading
+from typing import Any
 
 from openai import OpenAI
 

@@ -1,26 +1,23 @@
+import copy
+import json
+import os
+
+import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
+from autogen.agentchat.contrib.capabilities import transform_messages
+from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
+
 from autodiscovery.structured_outputs import (
-    ExperimentList,
-    ExperimentCode,
-    ExperimentAnalyst,
-    ExperimentReviewer,
     Experiment,
+    ExperimentAnalyst,
+    ExperimentCode,
     ExperimentHypothesisList,
+    ExperimentList,
+    ExperimentReviewer,
 )
 from autodiscovery.utils import is_gemini_model, normalize_vertex_model_name
-from autodiscovery.vertex_config import get_vertex_openai_base_url
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
-import os
-import json
-from autogen.coding import LocalCommandLineCodeExecutor, CodeBlock, CodeResult, CodeExecutor
-from typing import Dict, List, Tuple
-import re
-from urllib.parse import urlparse
-
-import copy
-import autogen.agentchat.contrib.capabilities.transforms as transforms
-from autogen.agentchat.contrib.capabilities import transform_messages
-
+from autodiscovery.vertex_config import get_vertex_openai_base_url
 
 IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the following:
 
@@ -114,7 +111,7 @@ class ModalSandboxExecutor(CodeExecutor):
 
         return response.choices[0].message.content
 
-    def execute_code_blocks(self, code_blocks: List[CodeBlock]) -> CodeResult:
+    def execute_code_blocks(self, code_blocks: list[CodeBlock]) -> CodeResult:
         """Execute code blocks using Modal sandbox.
 
         Args:
@@ -126,13 +123,13 @@ class ModalSandboxExecutor(CodeExecutor):
         # Combine all code blocks into a single execution
         code = "\n".join(block.code for block in code_blocks)
 
-        print(f"\n[ModalSandboxExecutor] Executing code in Modal sandbox...")
+        print("\n[ModalSandboxExecutor] Executing code in Modal sandbox...")
         print(f"[ModalSandboxExecutor] Code length: {len(code)} characters")
 
         try:
             result = self._executor.run_cell(code)
 
-            print(f"[ModalSandboxExecutor] Execution completed")
+            print("[ModalSandboxExecutor] Execution completed")
             print(f"[ModalSandboxExecutor] Result keys: {list(result.keys())}")
             print(f"[ModalSandboxExecutor] Success: {result.get('success', True)}")
 
@@ -156,7 +153,7 @@ class ModalSandboxExecutor(CodeExecutor):
             # If output is empty, add a note
             if not output.strip():
                 output = "[ModalSandboxExecutor] Code executed but produced no output"
-                print(f"[ModalSandboxExecutor] Warning: No output produced")
+                print("[ModalSandboxExecutor] Warning: No output produced")
 
             # Store rich outputs for later access
             self._last_rich_outputs = result.get("rich_outputs", [])
@@ -378,7 +375,7 @@ class CodeBlockWrapperTransform(transforms.MessageTransform):
     def __init__(self, vision_model: str = "gpt-4o"):
         self.image_analysis_patch = build_image_analysis_patch(vision_model)
 
-    def apply_transform(self, messages: List[Dict]) -> List[Dict]:
+    def apply_transform(self, messages: list[dict]) -> list[dict]:
         # Deep copy messages to avoid modifying the original
         transformed_messages = copy.deepcopy(messages)
         message = transformed_messages[-1]
@@ -393,8 +390,8 @@ class CodeBlockWrapperTransform(transforms.MessageTransform):
         return transformed_messages
 
     def get_logs(
-        self, pre_transform_messages: List[Dict], post_transform_messages: List[Dict]
-    ) -> Tuple[str, bool]:
+        self, pre_transform_messages: list[dict], post_transform_messages: list[dict]
+    ) -> tuple[str, bool]:
         return "CodeBlockWrapperTransform", True
 
 
@@ -405,7 +402,7 @@ class SimpleCodeBlockTransform(transforms.MessageTransform):
         """Initialize with optional working directory to change to before executing code."""
         self.working_dir = working_dir
 
-    def apply_transform(self, messages: List[Dict]) -> List[Dict]:
+    def apply_transform(self, messages: list[dict]) -> list[dict]:
         # Deep copy messages to avoid modifying the original
         transformed_messages = copy.deepcopy(messages)
         message = transformed_messages[-1]
@@ -427,8 +424,8 @@ class SimpleCodeBlockTransform(transforms.MessageTransform):
         return transformed_messages
 
     def get_logs(
-        self, pre_transform_messages: List[Dict], post_transform_messages: List[Dict]
-    ) -> Tuple[str, bool]:
+        self, pre_transform_messages: list[dict], post_transform_messages: list[dict]
+    ) -> tuple[str, bool]:
         return "SimpleCodeBlockTransform", True
 
 
@@ -649,8 +646,8 @@ def install(package):
         if not bucket_path:
             raise ValueError("bucket_path is required when use_modal_sandbox is True")
 
-        from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
         import modal
+        from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
 
         # Parse bucket path
         bucket_name, key_prefix = parse_bucket_path(bucket_path)

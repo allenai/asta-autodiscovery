@@ -1,19 +1,16 @@
-from typing import List, Dict, Tuple, Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
+from scipy.special import betaln, gammaln, psi  # betaln = log Beta function, psi = digamma
 
 from autodiscovery.mcts import MCTSNode
 from autodiscovery.mcts_utils import get_context_string
-from autodiscovery.utils import query_llm, fuse_gaussians
-
-from scipy.special import betaln, gammaln, psi  # betaln = log Beta function, psi = digamma
+from autodiscovery.utils import fuse_gaussians, query_llm
 
 
 class BeliefTrueFalse:
     class DistributionFormat:
-        """
-        A distribution of beliefs about the hypothesis using true/false responses (Bernoulli).
+        """A distribution of beliefs about the hypothesis using true/false responses (Bernoulli).
 
         Attributes:
             n: Number of samples used to compute the distribution
@@ -29,7 +26,7 @@ class BeliefTrueFalse:
             n_true: float = Field(..., description='Number of "true" responses'),
             n_false: float = Field(..., description='Number of "false" responses'),
             mean: float | None = None,
-            prior_params: Tuple[float, float] = (0.5, 0.5),
+            prior_params: tuple[float, float] = (0.5, 0.5),
             **kwargs,
         ):
             self.n = n
@@ -54,11 +51,12 @@ class BeliefTrueFalse:
             }
 
         def get_mean_belief(self, prior=None, recompute=False) -> float:
-            """
-            Get the mean of the prior/posterior belief distribution.
+            """Get the mean of the prior/posterior belief distribution.
+
             Args:
                 prior (BeliefTrueFalse.DistributionFormat): Prior distribution format object.
                 recompute (bool): Whether to recompute the mean even if it is already set.
+
             Returns:
                 float: The mean belief probability.
             """
@@ -78,8 +76,7 @@ class BeliefTrueFalse:
             return self.mean
 
         def update(self, n_true: int = 0, n_false: int = 0, distr=None, normalize: bool = False):
-            """
-            Update the distribution with new counts.
+            """Update the distribution with new counts.
             """
             if distr is not None:
                 self.n_true += distr.n_true
@@ -97,17 +94,16 @@ class BeliefTrueFalse:
             # Reset mean
             _ = self.get_mean_belief(recompute=True)
 
-        def get_params(self) -> Tuple[float, float]:
-            """
-            Get the parameters of the Beta distribution.
+        def get_params(self) -> tuple[float, float]:
+            """Get the parameters of the Beta distribution.
+
             Returns:
                 Tuple[float, float]: Parameters (alpha, beta) of the Beta distribution.
             """
             return self.prior_params[0] + self.n_true, self.prior_params[1] + self.n_false
 
     class ResponseFormat(BaseModel):
-        """
-        Belief about the support for the hypothesis.
+        """Belief about the support for the hypothesis.
 
         Attributes:
             belief (bool | None): Whether the hypothesis is true or false. If you do not have enough information to
@@ -118,10 +114,9 @@ class BeliefTrueFalse:
 
     @staticmethod
     def parse_response(
-        response: List[dict], prior_params: Tuple[float, float] = (0.5, 0.5), weight: float = 1.0
-    ) -> "BeliefTrueFalse.DistributionFormat":
-        """
-        Parse the response from the LLM into a DistributionFormat.
+        response: list[dict], prior_params: tuple[float, float] = (0.5, 0.5), weight: float = 1.0
+    ) -> BeliefTrueFalse.DistributionFormat:
+        """Parse the response from the LLM into a DistributionFormat.
 
         Args:
             response (dict): The response from the LLM containing belief counts.
@@ -147,13 +142,14 @@ class BeliefTrueFalse:
 
     @staticmethod
     def kl_divergence(
-        distr1: "BeliefTrueFalse.DistributionFormat", distr2: "BeliefTrueFalse.DistributionFormat"
+        distr1: BeliefTrueFalse.DistributionFormat, distr2: BeliefTrueFalse.DistributionFormat
     ) -> float:
-        """
-        Compute the KL divergence between two distributions.
+        """Compute the KL divergence between two distributions.
+
         Args:
             distr1 (BeliefTrueFalse.DistributionFormat): First distribution.
             distr2 (BeliefTrueFalse.DistributionFormat): Second distribution.
+
         Returns:
             float: KL divergence between the two distributions.
         """
@@ -176,8 +172,8 @@ class BeliefCategorical:
     }
 
     class DistributionFormat:
-        """
-        A distribution of beliefs about the hypothesis using categorical buckets (Categorical).
+        """A distribution of beliefs about the hypothesis using categorical buckets (Categorical).
+
         Attributes:
             n: Number of samples used to compute the distribution
             definitely_true: Number of "definitely true" responses
@@ -202,7 +198,7 @@ class BeliefCategorical:
                 ..., description='Number of "definitely false" responses'
             ),
             mean: float | None = None,
-            prior_params: Tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
+            prior_params: tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
             **kwargs,
         ):
             self.n = n
@@ -237,11 +233,12 @@ class BeliefCategorical:
             }
 
         def get_mean_belief(self, prior=None, recompute=False) -> float:
-            """
-            Get the mean of the prior/posterior belief distribution.
+            """Get the mean of the prior/posterior belief distribution.
+
             Args:
                 prior (BeliefCategorical.DistributionFormat): Prior distribution format object.
                 recompute (bool): Whether to recompute the mean even if it is already set.
+
             Returns:
                 float: The mean belief probability.
             """
@@ -313,8 +310,7 @@ class BeliefCategorical:
             distr=None,
             normalize: bool = False,
         ):
-            """
-            Update the distribution with new counts.
+            """Update the distribution with new counts.
             """
             if distr is not None:
                 self.definitely_true += distr.definitely_true
@@ -345,9 +341,9 @@ class BeliefCategorical:
             # Reset mean
             _ = self.get_mean_belief(recompute=True)
 
-        def get_params(self) -> Tuple[float, float, float, float, float]:
-            """
-            Get the parameters of the Dirichlet distribution.
+        def get_params(self) -> tuple[float, float, float, float, float]:
+            """Get the parameters of the Dirichlet distribution.
+
             Returns:
                 Tuple[float, float, float, float, float]: Parameters (alpha1, alpha2, alpha3, alpha4, alpha5) of the Dirichlet distribution.
             """
@@ -360,8 +356,7 @@ class BeliefCategorical:
             )
 
     class ResponseFormat(BaseModel):
-        """
-        Belief about the support for the hypothesis.
+        """Belief about the support for the hypothesis.
 
         Attributes:
             belief (str): Belief about the support for the hypothesis. Choices are:
@@ -388,12 +383,11 @@ class BeliefCategorical:
 
     @staticmethod
     def parse_response(
-        response: List[dict],
-        prior_params: Tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
+        response: list[dict],
+        prior_params: tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
         weight=1.0,
-    ) -> "BeliefCategorical.DistributionFormat":
-        """
-        Parse the response from the LLM into a DistributionFormat.
+    ) -> BeliefCategorical.DistributionFormat:
+        """Parse the response from the LLM into a DistributionFormat.
 
         Args:
             response (dict): The response from the LLM containing belief counts.
@@ -427,14 +421,15 @@ class BeliefCategorical:
 
     @staticmethod
     def kl_divergence(
-        distr1: "BeliefCategorical.DistributionFormat",
-        distr2: "BeliefCategorical.DistributionFormat",
+        distr1: BeliefCategorical.DistributionFormat,
+        distr2: BeliefCategorical.DistributionFormat,
     ) -> float:
-        """
-        Compute the KL divergence between two distributions.
+        """Compute the KL divergence between two distributions.
+
         Args:
             distr1 (BeliefCategorical.DistributionFormat): First distribution.
             distr2 (BeliefCategorical.DistributionFormat): Second distribution.
+
         Returns:
             float: KL divergence between the two distributions.
         """
@@ -461,8 +456,8 @@ class BeliefCategoricalNumeric:
     }
 
     class DistributionFormat:
-        """
-        A distribution of beliefs about the hypothesis using numerical buckets (Categorical).
+        """A distribution of beliefs about the hypothesis using numerical buckets (Categorical).
+
         Attributes:
             n: Number of samples used to compute the distribution
             bucket_02: Number of responses that fall in the range [0.0, 0.2)
@@ -493,7 +488,7 @@ class BeliefCategoricalNumeric:
                 ..., description="Number of responses that fall in the range [0.8, 1.0)"
             ),
             mean: float | None = None,
-            prior_params: Tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
+            prior_params: tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
             **kwargs,
         ):
             self.n = n
@@ -528,11 +523,12 @@ class BeliefCategoricalNumeric:
             }
 
         def get_mean_belief(self, prior=None, recompute=False) -> float:
-            """
-            Get the mean of the prior/posterior belief distribution.
+            """Get the mean of the prior/posterior belief distribution.
+
             Args:
                 prior (BeliefCategoricalNumeric.DistributionFormat): Prior distribution format object.
                 recompute (bool): Whether to recompute the mean even if it is already set.
+
             Returns:
                 float: The mean belief probability.
             """
@@ -599,8 +595,7 @@ class BeliefCategoricalNumeric:
             distr=None,
             normalize: bool = False,
         ):
-            """
-            Update the distribution with new counts.
+            """Update the distribution with new counts.
             """
             if distr is not None:
                 self.bucket_02 += distr.bucket_02
@@ -631,9 +626,9 @@ class BeliefCategoricalNumeric:
             # Reset mean
             _ = self.get_mean_belief(recompute=True)
 
-        def get_params(self) -> Tuple[float, float, float, float, float]:
-            """
-            Get the parameters of the Dirichlet distribution.
+        def get_params(self) -> tuple[float, float, float, float, float]:
+            """Get the parameters of the Dirichlet distribution.
+
             Returns:
                 Tuple[float, float, float, float, float]: Parameters (alpha1, alpha2, alpha3, alpha4, alpha5) of the Dirichlet distribution.
             """
@@ -646,8 +641,7 @@ class BeliefCategoricalNumeric:
             )
 
     class ResponseFormat(BaseModel):
-        """
-        Belief about the support for the hypothesis.
+        """Belief about the support for the hypothesis.
 
         Attributes:
             belief (str): Belief about the support for the hypothesis. Choices are:
@@ -667,12 +661,11 @@ class BeliefCategoricalNumeric:
 
     @staticmethod
     def parse_response(
-        response: List[dict],
-        prior_params: Tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
+        response: list[dict],
+        prior_params: tuple[float, float, float, float, float] = (0.2, 0.2, 0.2, 0.2, 0.2),
         weight: float = 1.0,
-    ) -> "BeliefCategoricalNumeric.DistributionFormat":
-        """
-        Parse the response from the LLM into a DistributionFormat.
+    ) -> BeliefCategoricalNumeric.DistributionFormat:
+        """Parse the response from the LLM into a DistributionFormat.
 
         Args:
             response (dict): The response from the LLM containing belief counts.
@@ -702,14 +695,15 @@ class BeliefCategoricalNumeric:
 
     @staticmethod
     def kl_divergence(
-        distr1: "BeliefCategoricalNumeric.DistributionFormat",
-        distr2: "BeliefCategoricalNumeric.DistributionFormat",
+        distr1: BeliefCategoricalNumeric.DistributionFormat,
+        distr2: BeliefCategoricalNumeric.DistributionFormat,
     ) -> float:
-        """
-        Compute the KL divergence between two distributions.
+        """Compute the KL divergence between two distributions.
+
         Args:
             distr1 (BeliefCategoricalNumeric.DistributionFormat): First distribution.
             distr2 (BeliefCategoricalNumeric.DistributionFormat): Second distribution.
+
         Returns:
             float: KL divergence between the two distributions.
         """
@@ -727,8 +721,7 @@ class BeliefCategoricalNumeric:
 
 
 class BeliefGauss:
-    """
-    A distribution of beliefs about the hypothesis using Gaussian mean and standard deviation samples.
+    """A distribution of beliefs about the hypothesis using Gaussian mean and standard deviation samples.
 
     Attributes:
         n: Number of samples used to compute the distribution
@@ -745,7 +738,7 @@ class BeliefGauss:
             n: float = Field(..., description="Number of samples used to compute the distribution"),
             mean: float = Field(..., description="Mean probability of the hypothesis being true"),
             stddev: float = Field(..., description="Standard deviation of the probabilities"),
-            prior_params: Tuple[float, float] = (0.5, 5),
+            prior_params: tuple[float, float] = (0.5, 5),
             samples=None,
             weight=1.0,
             **kwargs,
@@ -778,11 +771,12 @@ class BeliefGauss:
             }
 
         def get_mean_belief(self, prior=None, recompute=False) -> float:
-            """
-            Get the mean of the prior/posterior belief distribution.
+            """Get the mean of the prior/posterior belief distribution.
+
             Args:
                 prior (BeliefGauss.DistributionFormat): Prior distribution format object.
                 recompute (bool): Whether to recompute the mean even if it is already set.
+
             Returns:
                 float: The mean belief probability.
             """
@@ -807,13 +801,12 @@ class BeliefGauss:
 
         def update(
             self,
-            means: List[float] = None,
-            stddevs: List[float] = None,
+            means: list[float] = None,
+            stddevs: list[float] = None,
             distr=None,
             normalize: bool = False,
         ):
-            """
-            Update the distribution with new samples or another distribution.
+            """Update the distribution with new samples or another distribution.
             """
             if distr is not None:
                 self.n += distr.n
@@ -838,17 +831,16 @@ class BeliefGauss:
                     [self.mean] + means, [self.stddev] + stddevs
                 )
 
-        def get_params(self) -> Tuple[float, float]:
-            """
-            Get the parameters of the Gaussian distribution.
+        def get_params(self) -> tuple[float, float]:
+            """Get the parameters of the Gaussian distribution.
+
             Returns:
                 Tuple[float, float]: Parameters (mean, stddev) of the Gaussian distribution.
             """
             return self.mean, self.stddev
 
     class ResponseFormat(BaseModel):
-        """
-        Belief (Gaussian) distribution about the support for the hypothesis.
+        """Belief (Gaussian) distribution about the support for the hypothesis.
 
         Attributes:
             belief_mean (float): Mean of the belief distribution (0.0 to 1.0). <0.2: the hypothesis is most likely
@@ -871,10 +863,9 @@ class BeliefGauss:
 
     @staticmethod
     def parse_response(
-        response: List[dict], prior_params: Tuple[float, float] = (0.5, 5), weight: float = 1.0
-    ) -> "BeliefGauss.DistributionFormat":
-        """
-        Parse the response from the LLM into a DistributionFormat.
+        response: list[dict], prior_params: tuple[float, float] = (0.5, 5), weight: float = 1.0
+    ) -> BeliefGauss.DistributionFormat:
+        """Parse the response from the LLM into a DistributionFormat.
 
         Args:
             response (dict): The response from the LLM containing belief probabilities.
@@ -904,13 +895,14 @@ class BeliefGauss:
 
     @staticmethod
     def kl_divergence(
-        distr1: "BeliefGauss.DistributionFormat", distr2: "BeliefGauss.DistributionFormat"
+        distr1: BeliefGauss.DistributionFormat, distr2: BeliefGauss.DistributionFormat
     ) -> float:
-        """
-        Compute the KL divergence between two Gaussian distributions.
+        """Compute the KL divergence between two Gaussian distributions.
+
         Args:
             distr1 (BeliefGauss.DistributionFormat): First distribution.
             distr2 (BeliefGauss.DistributionFormat): Second distribution.
+
         Returns:
             float: KL divergence between the two distributions.
         """
@@ -932,8 +924,8 @@ class BeliefTrueFalseCat:
     }
 
     class DistributionFormat:
-        """
-        A distribution of beliefs about the hypothesis using categorical buckets (Categorical).
+        """A distribution of beliefs about the hypothesis using categorical buckets (Categorical).
+
         Attributes:
             n: Number of samples used to compute the distribution
             definitely_true: Number of "definitely true" responses
@@ -958,7 +950,7 @@ class BeliefTrueFalseCat:
                 ..., description='Number of "definitely false" responses'
             ),
             mean: float | None = None,
-            prior_params: Tuple[float, float] = (0.5, 0.5),
+            prior_params: tuple[float, float] = (0.5, 0.5),
             **kwargs,
         ):
             self.n = n
@@ -993,11 +985,12 @@ class BeliefTrueFalseCat:
             }
 
         def get_mean_belief(self, prior=None, recompute=False) -> float:
-            """
-            Get the mean of the prior/posterior belief distribution.
+            """Get the mean of the prior/posterior belief distribution.
+
             Args:
                 prior (BeliefTrueFalseCat.DistributionFormat): Prior distribution format object.
                 recompute (bool): Whether to recompute the mean even if it is already set.
+
             Returns:
                 float: The mean belief probability.
             """
@@ -1040,8 +1033,7 @@ class BeliefTrueFalseCat:
             distr=None,
             normalize: bool = False,
         ):
-            """
-            Update the distribution with new counts.
+            """Update the distribution with new counts.
             """
             if distr is not None:
                 self.definitely_true += distr.definitely_true
@@ -1072,9 +1064,9 @@ class BeliefTrueFalseCat:
             # Reset mean
             _ = self.get_mean_belief(recompute=True)
 
-        def get_params(self) -> Tuple[float, float]:
-            """
-            Get the parameters of the Beta distribution.
+        def get_params(self) -> tuple[float, float]:
+            """Get the parameters of the Beta distribution.
+
             Returns:
                 Tuple[float, float]: Parameters (alpha, beta) of the Beta distribution.
             """
@@ -1088,8 +1080,7 @@ class BeliefTrueFalseCat:
             return self.prior_params[0] + alpha1, self.prior_params[1] + alpha2
 
     class ResponseFormat(BaseModel):
-        """
-        Belief about the support for the hypothesis.
+        """Belief about the support for the hypothesis.
 
         Attributes:
             belief (str): Belief about the support for the hypothesis. Choices are:
@@ -1116,10 +1107,9 @@ class BeliefTrueFalseCat:
 
     @staticmethod
     def parse_response(
-        response: List[dict], prior_params: Tuple[float, float] = (0.5, 0.5), weight: float = 1.0
-    ) -> "BeliefTrueFalseCat.DistributionFormat":
-        """
-        Parse the response from the LLM into a DistributionFormat.
+        response: list[dict], prior_params: tuple[float, float] = (0.5, 0.5), weight: float = 1.0
+    ) -> BeliefTrueFalseCat.DistributionFormat:
+        """Parse the response from the LLM into a DistributionFormat.
 
         Args:
             response (dict): The response from the LLM containing belief counts.
@@ -1153,14 +1143,15 @@ class BeliefTrueFalseCat:
 
     @staticmethod
     def kl_divergence(
-        distr1: "BeliefTrueFalseCat.DistributionFormat",
-        distr2: "BeliefTrueFalseCat.DistributionFormat",
+        distr1: BeliefTrueFalseCat.DistributionFormat,
+        distr2: BeliefTrueFalseCat.DistributionFormat,
     ) -> float:
-        """
-        Compute the KL divergence between two distributions.
+        """Compute the KL divergence between two distributions.
+
         Args:
             distr1 (BeliefTrueFalseCat.DistributionFormat): First distribution.
             distr2 (BeliefTrueFalseCat.DistributionFormat): Second distribution.
+
         Returns:
             float: KL divergence between the two distributions.
         """
@@ -1179,9 +1170,8 @@ class BeliefTrueFalseCat:
         uncertain: float,
         maybe_false: float,
         definitely_false: float,
-    ) -> Tuple[float, float]:
-        """
-        Convert categorical counts into parameters for a Beta distribution.
+    ) -> tuple[float, float]:
+        """Convert categorical counts into parameters for a Beta distribution.
 
         Args:
             definitely_true: Count of "definitely true" responses.
@@ -1216,7 +1206,7 @@ BELIEF_MODE_TO_CLS = {
 
 def get_belief(
     hypothesis: str,
-    evidence: Optional[List[Dict[str, str]]] = None,
+    evidence: list[dict[str, str]] | None = None,
     model: str = "gpt-4o",
     belief_mode: str = "boolean",
     n_samples: int = 5,
@@ -1227,8 +1217,7 @@ def get_belief(
     n_retries=3,
     weight: float = 1.0,
 ):
-    """
-    Get belief distribution for a hypothesis with optional evidence.
+    """Get belief distribution for a hypothesis with optional evidence.
 
     Args:
         hypothesis: The hypothesis to evaluate
@@ -1327,8 +1316,7 @@ def calculate_prior_and_posterior_beliefs(
     prior=None,
     evidence_weight=1.0,
 ):
-    """
-    Calculate prior and posterior belief distributions for a hypothesis.
+    """Calculate prior and posterior belief distributions for a hypothesis.
 
     Args:
         node: MCTSNode instance containing node information and messages or a dictionary with node data
@@ -1343,7 +1331,6 @@ def calculate_prior_and_posterior_beliefs(
         prior: Optional pre-computed prior distribution to use for posterior calculation
         evidence_weight: Weight to apply to the evidence when calculating the posterior belief
     """
-
     # MODEL_CTXT_LIMITS = {
     #     "o4-mini": 200_000,
     #     "gpt-4o": 128_000,

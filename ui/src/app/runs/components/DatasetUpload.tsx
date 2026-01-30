@@ -23,7 +23,7 @@ import prettyBytes from 'pretty-bytes';
 import prettyMs from 'pretty-ms';
 
 import { FileUploadState, UploadStatus } from '@/runs/hooks/useRunSetup';
-import { getFriendlyMimeType } from '@/utils/mimeType';
+import { getFriendlyMimeType, getMimeType } from '@/utils/mimeType';
 
 export interface Dataset {
     filename: string;
@@ -170,7 +170,7 @@ export default function DatasetUpload({
             {fileUploads.length > 0 && (
                 <FilesContainer>
                     {fileUploads.map((upload, index) => {
-                        const fileType = upload.file.type || 'Unknown';
+                        const fileType = upload.file.type || getMimeType(upload.file.name);
                         const friendlyType = getFriendlyMimeType(fileType);
 
                         return (

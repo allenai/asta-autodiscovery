@@ -11,6 +11,7 @@ const columns: GridColDef[] = [
         field: 'id',
         headerName: 'ID',
         width: 130,
+        align: 'center',
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="90%" />;
@@ -27,13 +28,14 @@ const columns: GridColDef[] = [
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="100%" />;
             }
-            return params.value;
+            return <HypothesisCell>{params.value}</HypothesisCell>;
         },
     },
     {
         field: 'surprisal',
         headerName: 'Surprisal',
         width: 150,
+        align: 'center',
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="70%" />;
@@ -56,6 +58,7 @@ const columns: GridColDef[] = [
         field: 'prior',
         headerName: 'Belief Before',
         width: 150,
+        align: 'center',
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -73,6 +76,7 @@ const columns: GridColDef[] = [
         field: 'posterior',
         headerName: 'Belief After',
         width: 150,
+        align: 'center',
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -90,6 +94,7 @@ const columns: GridColDef[] = [
         field: 'direction',
         headerName: 'Direction',
         width: 120,
+        align: 'center',
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="60%" />;
@@ -191,6 +196,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 pageSizeOptions={[5, 10, 25, 50]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
+                getRowHeight={() => 'auto'}
             />
         </Paper>
     );
@@ -237,3 +243,9 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
 const StyledSkeleton = styled(Skeleton)(({ theme }) => ({
     backgroundColor: theme.color['cream-10'].rgba.toString(),
 }));
+
+const HypothesisCell = styled(Box)`
+    lineHeight: 1.4,
+    whiteSpace: 'normal',
+    wordWrap: 'break-word',
+`;

@@ -80,10 +80,14 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
             )}
 
             {(experiment.priorBelief || experiment.posteriorBelief) && (
-                <BeliefDistributionPlot
+                <Box>
+                    <SectionHeader>Belief Shift</SectionHeader>
+                    <BeliefDistributionPlot
                     prior={experiment.priorBelief}
                     posterior={experiment.posteriorBelief}
                 />
+                </Box>
+                
             )}
 
             {experiment.experimentPlan && (

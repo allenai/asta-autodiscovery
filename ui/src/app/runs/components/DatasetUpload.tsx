@@ -282,7 +282,7 @@ export default function DatasetUpload({
                                         sx={{ mt: 1 }}
                                         placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,
-2. "final_choice_new" - "parcipants final choice in the treatment condition"
+2. "final_choice_new" - “participants final choice in the treatment condition”
 3. Each row in this file represents a time-series'
                                     />
                                 </FileDescription>

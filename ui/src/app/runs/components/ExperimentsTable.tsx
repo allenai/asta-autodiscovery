@@ -112,17 +112,6 @@ interface ExperimentsTableProps {
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const { experiments, lastError, selectExperiment, hasJobCompleted } = useRunExperiments();
 
-    // Create a map for O(1) lookups when clicking rows
-    const experimentsMap = useMemo(() => {
-        return experiments.reduce(
-            (acc, exp) => {
-                acc[exp.experimentId] = exp;
-                return acc;
-            },
-            {} as Record<string, Experiment>
-        );
-    }, [experiments]);
-
     const createSkeletonRows = useCallback(() => {
         const pendingCount = runStats?.pendingExperiments ?? 0;
         if (!hasJobCompleted && pendingCount > 0) {
@@ -178,7 +167,10 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         if (params.row.isSkeleton) {
             return;
         }
-        selectExperiment(experimentsMap[params.id]);
+        const exp = experiments.find((exp) => exp.idInRun === params.id);
+        if (exp) {
+            selectExperiment(exp);
+        }
     };
 
     return (

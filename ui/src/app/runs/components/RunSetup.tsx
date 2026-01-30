@@ -118,7 +118,10 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         multiline
                         rows={3}
                         value={settings.datasetsDescription}
-                        onChange={(e) => updateSettings('datasetsDescription', e.target.value)}
+                        onChange={(e) => {
+                            updateSettings('datasetsDescription', e.target.value);
+                            debouncedSaveMetadata();
+                        }}
                         placeholder="e.g., Global migratory bird tracking logs (GPS, species, weather) from 2018–2024. Note: 2020 data is sparse for European routes due to regional sensor downtime."
                         disabled={isFormDisabled}
                         required

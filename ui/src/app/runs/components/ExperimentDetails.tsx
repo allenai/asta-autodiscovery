@@ -8,6 +8,7 @@ import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/E
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
+import { BeliefDistributionPlot } from '@/runs/components/BeliefDistributionPlot';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
@@ -75,6 +76,16 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                         {getSurprisalDirection(experiment.surprise)}{' '}
                         <strong>({experiment.surprise.toFixed(3)})</strong>
                     </BeliefChip>
+                </Box>
+            )}
+
+            {(experiment.priorBelief || experiment.posteriorBelief) && (
+                <Box>
+                    <SectionHeader>Belief Shift</SectionHeader>
+                    <BeliefDistributionPlot
+                        prior={experiment.priorBelief}
+                        posterior={experiment.posteriorBelief}
+                    />
                 </Box>
             )}
 

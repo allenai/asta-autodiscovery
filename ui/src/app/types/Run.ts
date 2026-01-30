@@ -47,6 +47,19 @@ export type RunDetails = {
     statusCheckedAt: string | null;
 };
 
+export type BeliefDistribution = {
+    _type?: string | null;
+    prior_params?: number[] | null;
+    n?: number | null;
+    definitely_true?: number | null;
+    maybe_true?: number | null;
+    uncertain?: number | null;
+    maybe_false?: number | null;
+    definitely_false?: number | null;
+    _empirical_mean?: number | null;
+    mean?: number | null;
+};
+
 export type Experiment = {
     experimentId: string;
     parentId: string | null;
@@ -58,6 +71,8 @@ export type Experiment = {
     surprise: number | null;
     prior: number | null;
     posterior: number | null;
+    priorBelief: BeliefDistribution | null;
+    posteriorBelief: BeliefDistribution | null;
     runtimeMs: number | null;
     hypothesis: string | null;
     analysis: string | null;
@@ -146,6 +161,8 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         surprise: experimentFromApi.surprise,
         prior: experimentFromApi.prior,
         posterior: experimentFromApi.posterior,
+        priorBelief: experimentFromApi.prior_belief ?? null,
+        posteriorBelief: experimentFromApi.posterior_belief ?? null,
         runtimeMs: experimentFromApi.runtime_ms,
         hypothesis: experimentFromApi.hypothesis,
         analysis: experimentFromApi.analysis,

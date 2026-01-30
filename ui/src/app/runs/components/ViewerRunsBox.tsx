@@ -127,7 +127,7 @@ export const ViewerRunsBox = () => {
             )}
             {isViewerRunsLoading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                    <CircularProgress />
+                    <CircularProgress sx={(theme) => ({ color: theme.color['green-100'].hex })} />
                 </Box>
             )}
         </>
@@ -154,7 +154,7 @@ const StatusHeader = styled('div')(({ theme }) => ({
 const StatusLabel = styled(Typography)(({ theme }) => ({
     color: '#FAF2E9',
     fontFeatureSettings: "'liga' off, 'clig' off",
-    fontFamily: '"PP Telegraf"',
+    fontFamily: '"PP Telegraf", Manrope, sans-serif',
     fontSize: '18px',
     fontStyle: 'normal',
     fontWeight: 700,
@@ -204,6 +204,7 @@ const Wrapper = styled(Box)(({ theme }) => ({
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Headline = styled(Typography)(({ theme }) => ({
     color: '#0FCB8C',
+    fontFamily: '"PP Telegraf", Manrope, sans-serif',
     fontSize: 24,
     fontStyle: 'normal',
     fontWeight: 700,

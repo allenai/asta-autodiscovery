@@ -24,7 +24,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--vision_model",
             type=str,
-            default="gemini-3-flash-preview",
+            default="gemini-3-pro-preview",
             help="Model to use for image analysis during code execution.",
         )
         self.add_argument(

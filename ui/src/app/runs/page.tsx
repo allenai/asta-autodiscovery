@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, CircularProgress, Alert, styled } from '@mui/material';
+import { Box, CircularProgress, styled } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { IntroBox } from '@/runs/components/IntroBox';
@@ -11,7 +11,7 @@ import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
  * Main /runs page - shows welcome message when no run is selected
  */
 export default function RunsPage() {
-    const { isAuthenticated, isLoading } = useAuth0();
+    const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
 
     if (isLoading) {
         return (
@@ -29,9 +29,11 @@ export default function RunsPage() {
 
     if (!isAuthenticated) {
         return (
-            <Box sx={{ p: 3 }}>
-                <Alert severity="warning">Please log in to create and manage runs.</Alert>
-            </Box>
+            <Layout>
+                <Section>
+                    <IntroBox showLogin onLoginClick={loginWithRedirect} />
+                </Section>
+            </Layout>
         );
     }
 

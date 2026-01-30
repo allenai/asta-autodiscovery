@@ -98,6 +98,7 @@ class ExperimentNode:
             "experiment_plan": self.experiment_plan,
             "review": self.review,
             "code": self.code,
+            "code_output": self.code_output,
         }
 
     def __repr__(self) -> str:

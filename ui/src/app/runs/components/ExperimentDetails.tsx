@@ -257,11 +257,7 @@ function RichOutputsSection({
                         }
                         return (
                             <RichOutputCard key={`rich-output-${idx}`}>
-                                <Typography variant="caption" sx={{ mb: 0.5 }}>
-                                    Figure {idx + 1}
-                                </Typography>
-                                <RichOutputImageButton
-                                    type="button"
+                                <RichOutputClickableArea
                                     onClick={() =>
                                         setActiveImage({
                                             index: idx,
@@ -269,23 +265,63 @@ function RichOutputsSection({
                                             analysis: plotAnalyses[idx] ?? null,
                                         })
                                     }>
+                                    <RichOutputTitle
+                                        variant="caption"
+                                        className="rich-output-title">
+                                        Figure {idx + 1}
+                                    </RichOutputTitle>
                                     <RichOutputImage
                                         src={preview.src}
                                         alt={`Figure ${idx + 1}`}
                                         loading="lazy"
                                     />
-                                </RichOutputImageButton>
+                                </RichOutputClickableArea>
                             </RichOutputCard>
                         );
                     })}
                 </RichOutputsGrid>
             )}
-            <Dialog open={Boolean(activeImage)} onClose={() => setActiveImage(null)} fullScreen>
+            <Dialog
+                open={Boolean(activeImage)}
+                onClose={() => setActiveImage(null)}
+                maxWidth={false}
+                PaperProps={{
+                    sx: {
+                        width: 'calc(100vw - 120px)',
+                        height: 'calc(100vh - 120px)',
+                        maxWidth: 'calc(100vw - 120px)',
+                        maxHeight: 'calc(100vh - 120px)',
+                        borderRadius: '24px',
+                    },
+                }}
+                slotProps={{
+                    backdrop: {
+                        sx: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        },
+                    },
+                }}>
                 <FullscreenHeader>
-                    <Typography variant="h6">
+                    <Typography
+                        variant="h6"
+                        sx={(theme) => ({
+                            fontWeight: 'bold',
+                            fontSize: '18px',
+                            color: theme.color['green-40'].hex,
+                        })}>
                         {activeImage ? `Figure ${activeImage.index + 1}` : ''}
                     </Typography>
-                    <IconButton onClick={() => setActiveImage(null)} aria-label="close">
+                    <IconButton
+                        onClick={() => setActiveImage(null)}
+                        aria-label="close"
+                        sx={(theme) => ({
+                            color: theme.color['cream-100'].hex,
+                            cursor: 'pointer',
+                            transition: 'color 250ms ease-out',
+                            '&:hover': {
+                                color: theme.color['green-100'].hex,
+                            },
+                        })}>
                         <CloseIcon />
                     </IconButton>
                 </FullscreenHeader>
@@ -353,22 +389,26 @@ const RichOutputCard = styled(Box)`
     background-color: ${({ theme }) => theme.color['dark-teal-100'].hex};
     border: 1px solid ${({ theme }) => theme.color['cream-4'].rgba.toString()};
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
-    padding: ${({ theme }) => theme.spacing(1.5)};
 `;
 
-const RichOutputImageButton = styled('button')`
-    background: transparent;
-    border: none;
+const RichOutputClickableArea = styled('div')`
     cursor: pointer;
-    display: block;
-    padding: 0;
-    width: 100%;
+
+    &:hover .rich-output-title {
+        color: ${({ theme }) => theme.color['green-100'].hex};
+    }
 `;
+
+const RichOutputTitle = styled(Typography)`
+    display: block;
+    margin-bottom: 8px;
+    transition: color 250ms ease-out;
+` as typeof Typography & { className?: string };
 
 const RichOutputImage = styled('img')`
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     display: block;
-    max-height: 240px;
+    max-width: 100%;
     object-fit: contain;
     width: 100%;
 `;
@@ -379,7 +419,8 @@ const FullscreenHeader = styled(Box)`
     color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
     justify-content: space-between;
-    padding: ${({ theme }) => theme.spacing(2)};
+    padding: 12px 24px;
+    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
 `;
 
 const FullscreenBody = styled(Box)`

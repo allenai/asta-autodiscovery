@@ -14,6 +14,9 @@ class RunDetailsModel(BaseModel):
     status_checked_at: str | None = Field(
         None, description="Timestamp when the status was last checked"
     )
+    finished_at: str | None = Field(
+        None, description="Timestamp when the run finished (terminal status)"
+    )
 
 
 class RunStatsModel(BaseModel):

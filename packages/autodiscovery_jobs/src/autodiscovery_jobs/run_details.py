@@ -1,19 +1,14 @@
 """Service for managing run_details.json files in GCS.
 
-This module provides functions for creating, reading, and updating run details
-stored in GCS. Each run has a run_details.json file that tracks execution state.
-
-Schema:
-    {
-        "execution_id": str | None,      # Cloud Run execution ID
-        "created_at": str,                # ISO timestamp when run was created
-        "status": str,                    # CREATED, PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED
-        "status_checked_at": str | None,  # ISO timestamp of last status check
-        "completed_at": str | None,       # ISO timestamp when job completed (SUCCEEDED/FAILED/CANCELLED)
-    }
+This module provides a RunDetails data class and functions for creating,
+reading, and updating run details stored in GCS. Each run has a run_details.json
+file that tracks execution state.
 """
 
+from __future__ import annotations
+
 import json
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,6 +19,66 @@ from .config import JobConfig
 
 # Terminal statuses that indicate job completion
 TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED"}
+
+
+@dataclass
+class RunDetails:
+    """Data class representing run details stored in GCS.
+
+    Attributes:
+        execution_id: Cloud Run execution ID
+        created_at: ISO timestamp when run was created
+        status: CREATED, PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED
+        status_checked_at: ISO timestamp of last status check
+        finished_at_raw: ISO timestamp when job finished (terminal status)
+    """
+
+    execution_id: str | None = None
+    created_at: str = ""
+    status: str = "CREATED"
+    status_checked_at: str | None = None
+    finished_at_raw: str | None = field(default=None, metadata={"json_key": "finished_at"})
+
+    @property
+    def finished_at(self) -> datetime | None:
+        """Get the finish timestamp as a datetime object."""
+        if self.finished_at_raw:
+            return datetime.fromisoformat(self.finished_at_raw)
+        return None
+
+    @property
+    def is_finished(self) -> bool:
+        """Check if the run has finished (terminal status)."""
+        return self.status in TERMINAL_STATUSES
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "execution_id": self.execution_id,
+            "created_at": self.created_at,
+            "status": self.status,
+            "status_checked_at": self.status_checked_at,
+            "finished_at": self.finished_at_raw,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RunDetails:
+        """Create from dictionary (e.g., from JSON)."""
+        return cls(
+            execution_id=data.get("execution_id"),
+            created_at=data.get("created_at", ""),
+            status=data.get("status", "CREATED"),
+            status_checked_at=data.get("status_checked_at"),
+            finished_at_raw=data.get("finished_at"),
+        )
+
+    @classmethod
+    def create_new(cls) -> RunDetails:
+        """Create a new RunDetails with current timestamp."""
+        return cls(
+            created_at=datetime.now(UTC).isoformat(),
+            status="CREATED",
+        )
 
 
 def get_run_details_path(userid: str, runid: str) -> str:
@@ -43,7 +98,7 @@ def create_run_details(
     userid: str,
     runid: str,
     config: JobConfig | None = None,
-) -> dict[str, Any]:
+) -> RunDetails:
     """Create initial run_details.json file.
 
     Args:
@@ -52,23 +107,17 @@ def create_run_details(
         config: Job configuration (uses default if None)
 
     Returns:
-        The created run details dictionary
+        The created RunDetails object
     """
     config = config or JobConfig.from_env()
     client = storage.Client(project=config.project_id)
     bucket = client.bucket(config.bucket)
 
-    run_details = {
-        "execution_id": None,
-        "created_at": datetime.now(UTC).isoformat(),
-        "status": "CREATED",
-        "status_checked_at": None,
-        "completed_at": None,
-    }
+    run_details = RunDetails.create_new()
 
     blob_path = get_run_details_path(userid, runid)
     blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(run_details, indent=2))
+    blob.upload_from_string(json.dumps(run_details.to_dict(), indent=2))
 
     return run_details
 
@@ -77,7 +126,7 @@ def get_run_details(
     userid: str,
     runid: str,
     config: JobConfig | None = None,
-) -> dict[str, Any] | None:
+) -> RunDetails | None:
     """Get run details from GCS.
 
     Args:
@@ -86,7 +135,7 @@ def get_run_details(
         config: Job configuration (uses default if None)
 
     Returns:
-        Run details dictionary, or None if not found
+        RunDetails object, or None if not found
     """
     config = config or JobConfig.from_env()
     client = storage.Client(project=config.project_id)
@@ -97,11 +146,10 @@ def get_run_details(
 
     try:
         content = blob.download_as_text()
-        return json.loads(content)
+        data = json.loads(content)
+        return RunDetails.from_dict(data)
     except Exception:
-        pass
-
-    return None
+        return None
 
 
 def update_run_details(
@@ -109,10 +157,10 @@ def update_run_details(
     runid: str,
     updates: dict[str, Any],
     config: JobConfig | None = None,
-) -> dict[str, Any]:
+) -> RunDetails:
     """Update run details in GCS.
 
-    Automatically sets completed_at when status changes to a terminal status.
+    Automatically sets finished_at when status changes to a terminal status.
 
     Args:
         userid: User identifier
@@ -121,7 +169,7 @@ def update_run_details(
         config: Job configuration (uses default if None)
 
     Returns:
-        Updated run details dictionary
+        Updated RunDetails object
     """
     config = config or JobConfig.from_env()
     client = storage.Client(project=config.project_id)
@@ -130,62 +178,89 @@ def update_run_details(
     # Get existing details
     run_details = get_run_details(userid, runid, config)
     if not run_details:
-        run_details = {
-            "execution_id": None,
-            "created_at": datetime.now(UTC).isoformat(),
-            "status": "CREATED",
-            "status_checked_at": None,
-            "completed_at": None,
-        }
+        run_details = RunDetails.create_new()
+
+    run_details_dict = run_details.to_dict()
 
     # Check if this update transitions to a terminal status
-    old_status = run_details.get("status")
+    old_status = run_details.status
     new_status = updates.get("status")
     if (
         new_status
         and new_status in TERMINAL_STATUSES
         and old_status not in TERMINAL_STATUSES
-        and not run_details.get("completed_at")
+        and not run_details.finished_at_raw
     ):
-        updates["completed_at"] = datetime.now(UTC).isoformat()
+        updates["finished_at"] = datetime.now(UTC).isoformat()
 
     # Update fields
-    run_details.update(updates)
+    run_details_dict.update(updates)
 
     # Save back to GCS
     blob_path = get_run_details_path(userid, runid)
     blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(run_details, indent=2))
+    blob.upload_from_string(json.dumps(run_details_dict, indent=2))
 
-    return run_details
-
-
-def is_completed(run_details: dict[str, Any] | None) -> bool:
-    """Check if a run has completed (terminal status).
-
-    Args:
-        run_details: Run details dictionary
-
-    Returns:
-        True if the run has a terminal status
-    """
-    if not run_details:
-        return False
-    return run_details.get("status") in TERMINAL_STATUSES
+    return RunDetails.from_dict(run_details_dict)
 
 
-def get_completed_at(run_details: dict[str, Any] | None) -> datetime | None:
-    """Get the completion timestamp from run details.
+def refresh_run_status(
+    userid: str,
+    runid: str,
+    config: JobConfig | None = None,
+) -> RunDetails | None:
+    """Get run details, refreshing status from Cloud Run if not yet finished.
+
+    This function:
+    1. Fetches run details from GCS
+    2. If the run is already finished (terminal status), returns as-is
+    3. If not finished and has an execution_id, queries Cloud Run for current status
+    4. Updates and persists the new status if changed
+
+    Use this instead of get_run_details when you need the most up-to-date status.
 
     Args:
-        run_details: Run details dictionary
+        userid: User identifier
+        runid: Run identifier
+        config: Job configuration (uses default if None)
 
     Returns:
-        Completion datetime, or None if not completed or not recorded
+        RunDetails object with refreshed status, or None if not found
     """
+    from .cloudrun import get_job_status
+
+    config = config or JobConfig.from_env()
+
+    # Get current run details
+    run_details = get_run_details(userid, runid, config)
     if not run_details:
         return None
-    completed_at = run_details.get("completed_at")
-    if completed_at:
-        return datetime.fromisoformat(completed_at)
-    return None
+
+    # If already finished, no need to query Cloud Run
+    if run_details.is_finished:
+        return run_details
+
+    # If no execution_id, can't query Cloud Run
+    if not run_details.execution_id:
+        return run_details
+
+    # Query Cloud Run for current status
+    try:
+        status_response = get_job_status(run_details.execution_id, config)
+        phase = status_response.get("phase", status_response.get("status", "UNKNOWN"))
+
+        # Update run details with new status
+        run_details = update_run_details(
+            userid,
+            runid,
+            {
+                "status": phase,
+                "status_checked_at": datetime.now(UTC).isoformat(),
+            },
+            config,
+        )
+    except Exception:
+        # If we can't reach Cloud Run, return what we have
+        pass
+
+    return run_details

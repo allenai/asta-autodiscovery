@@ -84,8 +84,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
             <SectionHeader>
                 <SectionHeaderTitle>Create a new discovery session</SectionHeaderTitle>
-                Define your context and upload source files. AutoDiscovery will use your data to generate hypotheses, run experiments to statistically refute or
-                accept them and reveal surprising insights.
+                Define your context and upload source files. AutoDiscovery will use your data to
+                generate hypotheses, run experiments to statistically refute or accept them and
+                reveal surprising insights.
             </SectionHeader>
 
             <ConfigurationBox>

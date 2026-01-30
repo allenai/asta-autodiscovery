@@ -6,10 +6,10 @@ export const IntroBox = () => {
             <Title>AutoDiscovery</Title>
             <Subtitle>Uncover surprising insights hidden in your data.</Subtitle>
             <Description>
-                AutoDiscovery uses <strong>Bayesian surprise</strong> (a measure of how much new experimental
-                evidence shifts our beliefs) to autonomously explore your datasets. It identifies
-                discoveries that genuinely change what we know, challenging assumptions to inspire
-                entirely new lines of inquiry.
+                AutoDiscovery uses <strong>Bayesian surprise</strong> (a measure of how much new
+                experimental evidence shifts our beliefs) to autonomously explore your datasets. It
+                identifies discoveries that genuinely change what we know, challenging assumptions
+                to inspire entirely new lines of inquiry.
             </Description>
         </Wrapper>
     );

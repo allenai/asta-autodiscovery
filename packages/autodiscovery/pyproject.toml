@@ -11,6 +11,7 @@ dependencies = [
     "matplotlib==3.10",
     "IPython>=9.9.0",
     "ag2[openai, gemini]==0.10",
+    "google-cloud-aiplatform",
     "scikit-learn",
     "scipy",
     "statsmodels",

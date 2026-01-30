@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List, Dict
+from typing import Any, Dict, List
 import concurrent.futures
 
 import numpy as np
@@ -9,15 +9,15 @@ from pydantic import ValidationError
 from pydantic import BaseModel
 from openai import OpenAI
 
-VERTEX_OPENAI_BASE_URL_ENV = "VERTEX_OPENAI_BASE_URL"
-VERTEX_ACCESS_TOKEN_ENV = "VERTEX_ACCESS_TOKEN"
-VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
-VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
+from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
+from autodiscovery.vertex_client import OpenAICredentialsRefresher
 
 
 def is_gemini_model(model: str) -> bool:
     """Check if the model is a Gemini model."""
-    return model.startswith("gemini")
+    if not model:
+        return False
+    return model.split("/")[-1].startswith("gemini")
 
 
 def is_reasoning_model(model: str) -> bool:
@@ -48,39 +48,6 @@ def max_n_for_model(model: str) -> int | None:
     return None
 
 
-def get_vertex_openai_base_url() -> str:
-    """Return the Vertex AI OpenAI-compatible base URL.
-
-    Returns:
-        The Vertex AI OpenAI-compatible base URL.
-
-    Raises:
-        ValueError: If required project or location settings are missing.
-    """
-    # Reference: https://github.com/GoogleCloudPlatform/generative-ai/blob/main/gemini/chat-completions/intro_chat_completions_api.ipynb
-    explicit_base_url = os.getenv(VERTEX_OPENAI_BASE_URL_ENV)
-    if explicit_base_url:
-        return explicit_base_url
-
-    project_id = os.getenv(VERTEX_PROJECT_ENV_VAR)
-    location = os.getenv(VERTEX_LOCATION_ENV_VAR)
-
-    if not project_id or not location:
-        raise ValueError(
-            "Vertex AI configuration is required for Gemini models. Set "
-            f"{VERTEX_OPENAI_BASE_URL_ENV} or both a project ID "
-            f"({VERTEX_PROJECT_ENV_VAR}) and location "
-            f"({VERTEX_LOCATION_ENV_VAR})."
-        )
-
-    api_host = (
-        "aiplatform.googleapis.com"
-        if location == "global"
-        else f"{location}-aiplatform.googleapis.com"
-    )
-    return f"https://{api_host}/v1/projects/{project_id}/locations/{location}/endpoints/openapi"
-
-
 def get_vertex_access_token() -> str:
     """Return the Vertex AI access token from environment variables.
 
@@ -90,6 +57,7 @@ def get_vertex_access_token() -> str:
     Raises:
         ValueError: If no access token is configured.
     """
+    # Static env tokens bypass ADC refresh. Prefer ADC for long-running jobs.
     token = os.getenv(VERTEX_ACCESS_TOKEN_ENV) or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
     if token:
         return token
@@ -114,11 +82,12 @@ def get_vertex_access_token() -> str:
     )
 
 
-def get_openai_client_for_model(model: str, api_key: str | None = None) -> OpenAI:
+def get_openai_client_for_model(model: str, api_key: str | None = None) -> Any:
     """Create an OpenAI-compatible client for the given model."""
     if is_gemini_model(model):
-        api_key = api_key or get_vertex_access_token()
-        return OpenAI(api_key=api_key, base_url=get_vertex_openai_base_url())
+        return OpenAICredentialsRefresher(
+            api_key=api_key, base_url=get_vertex_openai_base_url()
+        )
     return OpenAI(api_key=api_key) if api_key else OpenAI()
 
 
@@ -129,7 +98,7 @@ def query_llm(
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,
-    client: OpenAI = None,
+    client: Any = None,
     debug_requests: bool = False,
 ):
     if client is None:

@@ -156,7 +156,7 @@ def replay_autodiscovery(
     blob_infos = discover_files(source_path, project_id)
 
     if verbose:
-        print(f"Replay AutoDiscovery Run")
+        print("Replay AutoDiscovery Run")
         print(f"  Source: {source_path}")
         print(f"  Target: {target_path}")
         print(f"  Files: {len(blob_infos)}")

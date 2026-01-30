@@ -5,18 +5,17 @@ from autodiscovery.utils import fetch_from_s3
 
 
 def load_blade_metadata(info_path: str) -> dict:
-    with open(info_path, "r") as file:
+    with open(info_path) as file:
         return json.load(file)
 
 
 def load_info_metadata(info_path: str) -> dict:
-    with open(info_path, "r") as file:
+    with open(info_path) as file:
         return json.load(file)
 
 
 def get_blade_description(info_path: str) -> str:
-    """
-    Generate a human-readable description of the dataset based on its metadata.
+    """Generate a human-readable description of the dataset based on its metadata.
 
     Args:
         info_path: Path to info.json file
@@ -56,13 +55,12 @@ def get_blade_description(info_path: str) -> str:
 
 
 def load_ai2_metadata(info_path: str) -> dict:
-    with open(info_path, "r") as file:
+    with open(info_path) as file:
         return json.load(file)
 
 
 def get_ai2_description(ai2_metadata_path: str) -> str:
-    """
-    Generate a human-readable description of the AI2 dataset based on its metadata.
+    """Generate a human-readable description of the AI2 dataset based on its metadata.
 
     Args:
         ai2_metadata_path: Path to the AI2-style metadata JSON file
@@ -97,7 +95,7 @@ def get_ai2_description(ai2_metadata_path: str) -> str:
 
 
 def load_dataset_metadata(dataset_metadata_path: str, dataset_metadata_key: str = None) -> dict:
-    with open(dataset_metadata_path, "r") as file:
+    with open(dataset_metadata_path) as file:
         dataset_metadata = json.load(file)
     if dataset_metadata_key is not None:
         dataset_metadata = dataset_metadata[dataset_metadata_key]
@@ -105,8 +103,7 @@ def load_dataset_metadata(dataset_metadata_path: str, dataset_metadata_key: str 
 
 
 def get_dataset_description(dataset_metadata_path: str) -> str:
-    """
-    Generate a human-readable description of the dataset based on its metadata.
+    """Generate a human-readable description of the dataset based on its metadata.
 
     Args:
         dataset_metadata_path: Path to the dataset metadata JSON file
@@ -114,7 +111,6 @@ def get_dataset_description(dataset_metadata_path: str) -> str:
     Returns:
         str: Formatted description of the dataset
     """
-
     metadata = load_dataset_metadata(dataset_metadata_path)
     description = []
 
@@ -140,7 +136,7 @@ def get_datasets_fpaths(dataset_metadata: str, is_blade=False) -> (list, str):
         # Download the metadata and get the local path
         _dataset_metadata = fetch_from_s3([dataset_metadata])[0]
     # Read the json, loop through "datasets" key, then extract dataset path from "name" key
-    with open(_dataset_metadata, "r") as file:
+    with open(_dataset_metadata) as file:
         obj = json.load(file)
     # Get the dataset paths
     datasets = []

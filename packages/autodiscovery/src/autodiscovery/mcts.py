@@ -1,22 +1,20 @@
 import copy
-import os
-from typing import Optional
-import random
 import json
-from datetime import datetime
+import os
+import random
 
 import numpy as np
 
 from autodiscovery.mcts_utils import (
-    get_query_from_experiment,
+    get_context_string,
     get_experiment_from_query,
     get_node_level_idx,
-    get_context_string,
+    get_query_from_experiment,
 )
 from autodiscovery.utils import try_loading_dict
 
 
-class MCTSNode(object):
+class MCTSNode:
     _creation_counter = 0
 
     def __init__(
@@ -83,12 +81,12 @@ class MCTSNode(object):
         self.self_value = 0.0  # Value of this node only (not aggregated from children)
 
         # Belief attributes
-        self.surprising: Optional[bool] = None
+        self.surprising: bool | None = None
         self.prior = None
         self.posterior = None
-        self.belief_change: Optional[float] = None  # Change in belief from prior to posterior
-        self.normalized_surprisal: Optional[float] = None
-        self.kl_divergence: Optional[float] = None
+        self.belief_change: float | None = None  # Change in belief from prior to posterior
+        self.normalized_surprisal: float | None = None
+        self.kl_divergence: float | None = None
 
     def init_from_dict(self, data):
         """Initialize node attributes from a dictionary."""
@@ -148,8 +146,7 @@ class MCTSNode(object):
         self.kl_divergence = data.get("kl_divergence", self.kl_divergence)
 
     def get_next_experiment(self, experiment_generator=None, n_retry=3):
-        """
-        Returns the next untried experiment. If none left and generating experiments is allowed, generates more using
+        """Returns the next untried experiment. If none left and generating experiments is allowed, generates more using
         the experiment generator agent.
         """
         new_experiment, new_query = None, None
@@ -301,7 +298,7 @@ class MCTSNode(object):
         )
         return context_str
 
-    def get_path_context(self, k: Optional[int] = None, skip_root=True) -> None | list:
+    def get_path_context(self, k: int | None = None, skip_root=True) -> None | list:
         """Returns messages from the node to the root
 
         Args:
@@ -362,8 +359,7 @@ def default_mcts_selection(exploration_weight):
 
 
 def progressive_widening(k, alpha, exploration_weight=1.0):
-    """
-    Create a progressive widening selection function.
+    """Create a progressive widening selection function.
 
     Args:
         k: Progressive widening constant.
@@ -401,8 +397,7 @@ def progressive_widening(k, alpha, exploration_weight=1.0):
 
 
 def progressive_widening_all(k, alpha, exploration_weight=1.0):
-    """
-    Create a progressive widening selection function with an alternative implementation that selects the node
+    """Create a progressive widening selection function with an alternative implementation that selects the node
     which has the highest UCB1 value from the entire set of nodes.
 
     Args:
@@ -439,8 +434,7 @@ def progressive_widening_all(k, alpha, exploration_weight=1.0):
 
 
 def ucb1_recursive(exploration_weight=1.0):
-    """
-    Create a UCB1 traversal selection function.
+    """Create a UCB1 traversal selection function.
 
     Args:
         exploration_weight: Exploration weight for UCB1 selection method.
@@ -472,8 +466,7 @@ def ucb1_recursive(exploration_weight=1.0):
 
 
 def beam_search(branching_factor, beam_width, log_dirname=None):
-    """
-    Create a beam search selection function.
+    """Create a beam search selection function.
 
     Args:
         branching_factor: Maximum number of children per node

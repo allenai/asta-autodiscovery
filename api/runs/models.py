@@ -1,4 +1,5 @@
 from typing import Any
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -70,7 +71,7 @@ class ExperimentModel(BaseModel):
     )
 
     @model_validator(mode="after")
-    def set_id_in_run(self) -> "ExperimentModel":
+    def set_id_in_run(self) -> ExperimentModel:
         if self.id_in_run is None:
             self.id_in_run = self.creation_idx - 1
         return self
@@ -97,7 +98,7 @@ class RunArgsModel(BaseModel):
     n_warmstart: int | None = Field(None, description="Number of warmstart experiments")
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> "RunArgsModel":
+    def from_dict(data: dict[str, Any]) -> RunArgsModel:
         """Create RunArgsModel from a dictionary"""
         return RunArgsModel(
             n_experiments=data.get("n_experiments"),
@@ -122,7 +123,7 @@ class MetadataModel(BaseModel):
     )
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> "MetadataModel":
+    def from_dict(data: dict[str, Any]) -> MetadataModel:
         """Create MetadataModel from a dictionary"""
         datasets_data = data.get("datasets", [])
         datasets = [

@@ -2,10 +2,9 @@ import os
 import sys
 import types
 
-import pytest
-
-from autodiscovery.utils import get_openai_client_for_model, is_gemini_model
 import autodiscovery.vertex_client as vertex_client
+import pytest
+from autodiscovery.utils import get_openai_client_for_model, is_gemini_model
 
 
 class DummyOpenAI:

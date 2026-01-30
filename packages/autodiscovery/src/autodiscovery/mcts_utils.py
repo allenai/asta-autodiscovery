@@ -1,10 +1,10 @@
 import json
 import os
-import regex as re
 from collections import defaultdict
-from typing import List, Dict, Literal
 from glob import glob
+from typing import Literal
 
+import regex as re
 from autogen import GroupChat, GroupChatManager
 
 from autodiscovery.deduplication import dedupe
@@ -289,9 +289,9 @@ def save_mcts_node(node, log_dirname, to_root=False, root_id="node_1_0"):
         save_mcts_node(node.parent, log_dirname, to_root=to_root, root_id=root_id)
 
 
-def get_nodes(in_fpath_or_json: str | List[Dict[str, any]]) -> List[Dict[str, any]] | None:
-    """
-    Load MCTS nodes from a file, directory, or a list of dictionaries without creating class objects.
+def get_nodes(in_fpath_or_json: str | list[dict[str, any]]) -> list[dict[str, any]] | None:
+    """Load MCTS nodes from a file, directory, or a list of dictionaries without creating class objects.
+
     Args:
         in_fpath_or_json: Path to the MCTS nodes JSON file, a directory containing MCTS node files, or a list of MCTS nodes as dictionaries.
 
@@ -306,11 +306,11 @@ def get_nodes(in_fpath_or_json: str | List[Dict[str, any]]) -> List[Dict[str, an
             mcts_nodes = []
             filenames = glob(os.path.join(in_fpath_or_json, "mcts_node_*.json"))
             for filename in filenames:
-                with open(filename, "r") as f:
+                with open(filename) as f:
                     obj = json.load(f)
                     mcts_nodes.append(obj)
         else:
-            with open(in_fpath_or_json, "r") as f:
+            with open(in_fpath_or_json) as f:
                 mcts_nodes = json.load(f)
     return mcts_nodes
 

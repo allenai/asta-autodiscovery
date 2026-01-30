@@ -1,38 +1,36 @@
+import json
 import math
 import os
-import json
+import shutil
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from time import time
 
 from autodiscovery.agents import get_agents
+from autodiscovery.args import ArgParser
+from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
+from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
+from autodiscovery.logger import TreeLogger
 from autodiscovery.mcts import (
     MCTSNode,
-    default_mcts_selection,
     beam_search,
+    default_mcts_selection,
     progressive_widening,
     progressive_widening_all,
     ucb1_recursive,
 )
-from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
-from autodiscovery.logger import TreeLogger
-
-from autodiscovery.beliefs import BeliefTrueFalseCat, calculate_prior_and_posterior_beliefs
-from datetime import datetime
-import shutil
-
-from autodiscovery.args import ArgParser
 from autodiscovery.mcts_utils import (
-    load_mcts_from_json,
-    save_nodes,
-    get_msgs_from_latest_query,
-    setup_group_chat,
-    print_node_info,
-    get_self_value,
     get_context_string,
-    select_nodes,
+    get_msgs_from_latest_query,
+    get_self_value,
+    load_mcts_from_json,
+    print_node_info,
     save_mcts_node,
+    save_nodes,
+    select_nodes,
+    setup_group_chat,
 )
 
 
@@ -206,7 +204,7 @@ def compute_and_store_reward(
         TEMP_LOG[-1]["offline_kl_divergence"] = _kl_divergence
         TEMP_LOG[-1]["current_surprisals"] = all_surprisals.copy()
 
-        print(f"\n\n======================= SURPRISAL-CONDITION BELIEFS =======================\n")
+        print("\n\n======================= SURPRISAL-CONDITION BELIEFS =======================\n")
         print(
             json.dumps(
                 {
@@ -277,8 +275,7 @@ def run_mcts(
     batch_size=1,
     n_threads=1,
 ):
-    """
-    Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
+    """Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
 
     Args:
         root: Root MCTSNode to continue from.
@@ -380,7 +377,7 @@ def run_mcts(
     # Load warmstart experiments if provided
     _warmstart_experiments = None
     if warmstart_experiments is not None:
-        with open(warmstart_experiments, "r") as f:
+        with open(warmstart_experiments) as f:
             _warmstart_experiments = json.load(f)
 
     # TEMPORARY LOGGING

@@ -1,4 +1,4 @@
-name: Build and Push Maintenance Image
+name: Build Maintenance Image
 
 on:
   push:

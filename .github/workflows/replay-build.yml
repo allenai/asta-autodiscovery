@@ -1,4 +1,4 @@
-name: Build and Push Replay Image
+name: Build Replay Image
 
 on:
   push:

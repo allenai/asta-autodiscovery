@@ -1,6 +1,7 @@
 'use client';
 
-import { Box, CircularProgress, styled } from '@mui/material';
+import { Box, CircularProgress, styled, Typography } from '@mui/material';
+import Image from 'next/image';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { IntroBox } from '@/runs/components/IntroBox';
@@ -32,6 +33,29 @@ export default function RunsPage() {
             <Layout>
                 <Section>
                     <IntroBox showLogin onLoginClick={loginWithRedirect} />
+                    <Attribution>
+                        AutoDiscovery is developed by{' '}
+                        <Ai2LogoWrapper>
+                            <Image
+                                src="/ai2-logo.svg"
+                                alt="Ai2"
+                                width={32}
+                                height={20}
+                                style={{ display: 'inline-block', verticalAlign: 'middle' }}
+                            />
+                        </Ai2LogoWrapper>{' '}
+                        and is an{' '}
+                        <AstaLabsLogoWrapper>
+                            <Image
+                                src="/astalabs-logo.svg"
+                                alt="AstaLabs"
+                                width={70}
+                                height={20}
+                                style={{ display: 'inline-block', transform: 'translateY(2px)' }}
+                            />
+                        </AstaLabsLogoWrapper>{' '}
+                        experiment.
+                    </Attribution>
                 </Section>
             </Layout>
         );
@@ -63,3 +87,26 @@ const Layout = styled(Box)(({ theme }) => ({
 const Section = styled(Box)(({ theme }) => ({
     padding: theme.spacing(3),
 }));
+
+const Attribution = styled(Typography)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    opacity: 0.8,
+    fontFamily: 'Manrope',
+    fontSize: '0.875rem',
+    textAlign: 'left',
+    marginTop: theme.spacing(1),
+}));
+
+const Ai2LogoWrapper = styled('span')({
+    display: 'inline-block',
+    verticalAlign: 'middle',
+    marginLeft: '4px',
+    marginRight: '4px',
+});
+
+const AstaLabsLogoWrapper = styled('span')({
+    display: 'inline-block',
+    verticalAlign: 'middle',
+    marginLeft: '4px',
+    marginRight: '4px',
+});

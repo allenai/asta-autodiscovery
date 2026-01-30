@@ -221,8 +221,17 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         color: theme.color['cream-100'].hex,
     },
 
-    '.MuiDataGrid-row:hover, .MuiDataGrid-row.Mui-hovered': {
+    '.MuiDataGrid-cell': {
+        paddingTop: theme.spacing(1),
+        paddingBottom: theme.spacing(1),
+    },
+
+    '.MuiDataGrid-row:nth-of-type(even)': {
         backgroundColor: theme.color['cream-4'].rgba.toString(),
+    },
+
+    '.MuiDataGrid-row:hover, .MuiDataGrid-row.Mui-hovered': {
+        backgroundColor: theme.color['cream-10'].rgba.toString(),
         cursor: 'pointer',
     },
 

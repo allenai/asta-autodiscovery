@@ -101,7 +101,7 @@ const MainContent = styled('div')`
 `;
 
 const Logo = styled('a')`
-    padding: ${({ theme }) => theme.spacing(2, 2, 0, 2)};
+    padding: ${({ theme }) => theme.spacing(2)};
 
     svg {
         width: 100%;

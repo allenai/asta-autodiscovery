@@ -22,7 +22,7 @@ export default function RunsPage() {
                     alignItems: 'center',
                     minHeight: '100%',
                 }}>
-                <CircularProgress />
+                <CircularProgress sx={(theme) => ({ color: theme.color['green-100'].hex })} />
             </Box>
         );
     }
@@ -53,7 +53,6 @@ export default function RunsPage() {
 const Layout = styled(Box)(({ theme }) => ({
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(4),
     padding: theme.spacing(4),
     maxWidth: '900px',
     margin: '0 auto',

@@ -46,12 +46,12 @@ const TosWrapper = styled(Box)(({ theme }) => ({
 
     display: 'flex',
     flexWrap: 'wrap',
-    gap: theme.spacing(1.5),
+    gap: '2px 12px',
     padding: theme.spacing(2),
 
     a: {
         color: theme.color['cream-100'].hex,
-        fontSize: '0.875rem',
+        fontSize: '14px',
 
         '&:hover': {
             color: theme.color['cream-60'].rgba.toString(),

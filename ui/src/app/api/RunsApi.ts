@@ -83,6 +83,8 @@ export interface ExperimentFromApi {
     surprise: number | null;
     prior: number | null;
     posterior: number | null;
+    prior_belief?: Record<string, any> | null;
+    posterior_belief?: Record<string, any> | null;
     runtime_ms: number | null;
     hypothesis: string | null;
     analysis: string | null;

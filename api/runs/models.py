@@ -55,6 +55,12 @@ class ExperimentModel(BaseModel):
     )
     prior: float | None = Field(None, description="Prior probability of the experiment")
     posterior: float | None = Field(None, description="Posterior probability of the experiment")
+    prior_belief: dict[str, Any] | None = Field(
+        None, description="Full prior belief payload for the experiment"
+    )
+    posterior_belief: dict[str, Any] | None = Field(
+        None, description="Full posterior belief payload for the experiment"
+    )
     runtime_ms: float | None = Field(None, description="Runtime of the experiment in milliseconds")
     hypothesis: str | None = Field(None, description="Hypothesis associated with the experiment")
     analysis: str | None = Field(None, description="Analysis details of the experiment")

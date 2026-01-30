@@ -19,7 +19,7 @@ export interface ViewerCreditsState {
     updateViewerCredits: () => Promise<void>;
 }
 
-export const REFRESH_INTERVAL_MS = 10000; // 10 seconds
+export const REFRESH_INTERVAL_MS = 60000; // 60 seconds
 
 export const DEFAULT_STATE: ViewerCreditsState = {
     credits: null,
@@ -54,12 +54,13 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
         try {
             const { data } = await userApi.getViewerCredits();
             setCredits(data.credits);
-            setLastError(null);
+            if (lastError) {
+                setLastError(null);
+            }
         } catch (error: any) {
             setLastError(error.message);
         }
-    }, [isAuthenticated]);
-
+    }, [isAuthenticated, lastError]);
     useEffect(() => {
         if (!isAuthenticated) {
             return;

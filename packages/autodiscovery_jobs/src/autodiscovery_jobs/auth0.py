@@ -4,19 +4,21 @@ This module provides functions to query Auth0 for user information,
 specifically to retrieve user email addresses by user ID.
 
 Required environment variables:
-    AUTH0_DOMAIN: Auth0 tenant domain (e.g., "auth.example.com")
+    AUTH0_MGMT_DOMAIN: Auth0 tenant domain for Management API
+                       (e.g., "YOUR_TENANT.us.auth0.com")
     AUTH0_MGMT_CLIENT_ID: Management API client ID
     AUTH0_MGMT_CLIENT_SECRET: Management API client secret
 
 The client credentials must have the `read:users` scope.
 """
 
+import json
 import os
 from functools import lru_cache
 from typing import Any
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from urllib.parse import urlencode
-import json
+from urllib.request import Request, urlopen
 
 
 class Auth0Error(Exception):
@@ -46,7 +48,7 @@ def _get_management_token() -> str:
     Raises:
         Auth0Error: If token acquisition fails
     """
-    domain = _get_env_or_raise("AUTH0_DOMAIN")
+    domain = _get_env_or_raise("AUTH0_MGMT_DOMAIN")
     client_id = _get_env_or_raise("AUTH0_MGMT_CLIENT_ID")
     client_secret = _get_env_or_raise("AUTH0_MGMT_CLIENT_SECRET")
 
@@ -66,6 +68,16 @@ def _get_management_token() -> str:
         with urlopen(req, timeout=30) as response:
             result = json.loads(response.read().decode("utf-8"))
             return result["access_token"]
+    except HTTPError as e:
+        # Read response body for more details
+        body = ""
+        try:
+            body = e.read().decode("utf-8")
+        except Exception:
+            pass
+        raise Auth0Error(
+            f"Failed to get Auth0 management token: {e.code} {e.reason} - {body}"
+        )
     except Exception as e:
         raise Auth0Error(f"Failed to get Auth0 management token: {e}")
 
@@ -82,7 +94,7 @@ def get_user(userid: str) -> dict[str, Any]:
     Raises:
         Auth0Error: If user lookup fails
     """
-    domain = _get_env_or_raise("AUTH0_DOMAIN")
+    domain = _get_env_or_raise("AUTH0_MGMT_DOMAIN")
     token = _get_management_token()
 
     # URL encode the user ID (contains special characters like |)

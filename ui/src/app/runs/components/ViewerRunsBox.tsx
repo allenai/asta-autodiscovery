@@ -112,13 +112,13 @@ export const ViewerRunsBox = () => {
                                     </StatusLabel>
                                 </StatusHeader>
                                 {isExpanded && (
-                                    <>
+                                    <RunsList>
                                         {runs.map((run) => (
                                             <RunItem key={run.id}>
                                                 <RunSummary run={run} />
                                             </RunItem>
                                         ))}
-                                    </>
+                                    </RunsList>
                                 )}
                             </StatusGroup>
                         );
@@ -135,7 +135,13 @@ export const ViewerRunsBox = () => {
 };
 
 const StatusGroup = styled('div')(({ theme }) => ({
-    marginBottom: theme.spacing(4),
+    marginBottom: theme.spacing(2),
+    '&:last-child': {
+        marginBottom: 0,
+    },
+    '&:last-child > div:last-child': {
+        paddingBottom: 0,
+    },
 }));
 
 const StatusHeader = styled('div')(({ theme }) => ({
@@ -146,20 +152,30 @@ const StatusHeader = styled('div')(({ theme }) => ({
 }));
 
 const StatusLabel = styled(Typography)(({ theme }) => ({
-    color: theme.color['cream-100'].hex,
-    fontSize: 16,
+    color: '#FAF2E9',
+    fontFeatureSettings: "'liga' off, 'clig' off",
+    fontFamily: '"PP Telegraf"',
+    fontSize: '18px',
     fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
+    cursor: 'pointer',
+    transition: 'color 250ms ease-out',
+    '&:hover': {
+        color: theme.color['green-100'].hex,
+    },
     '&.is-collapsed': {
         color: theme.color['green-20'].hex,
+    },
+    '&.is-collapsed:hover': {
+        color: theme.color['green-100'].hex,
     },
 }));
 
 const ToggleButton = styled(Button)(({ theme }) => ({
     background: theme.color['teal-100'].hex,
     border: 'none',
-    color: theme.color['cream-100'].hex,
+    color: theme.color['green-100'].hex,
     cursor: 'pointer',
     width: '20px',
     height: '20px',
@@ -194,6 +210,10 @@ const Headline = styled(Typography)(({ theme }) => ({
     lineHeight: '115%',
 }));
 
+const RunsList = styled('div')(({ theme }) => ({
+    paddingBottom: theme.spacing(2),
+}));
+
 const RunItem = styled('div')(({ theme }) => ({
-    marginTop: theme.spacing(2),
+    marginTop: theme.spacing(1),
 }));

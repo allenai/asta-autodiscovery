@@ -1,5 +1,5 @@
 test:
-  uv run pytest -m "not modal"
+  uv run pytest -m "not modal and not adc"
 
 test-modal:
   uv run pytest -m "modal"

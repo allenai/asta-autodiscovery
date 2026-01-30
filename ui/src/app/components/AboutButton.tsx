@@ -3,7 +3,11 @@ import Link from 'next/link';
 
 export const AboutButton = () => {
     return (
-        <Link href="https://allenai.org/asta" passHref target="_blank" rel="noopener noreferrer">
+        <Link
+            href="https://arxiv.org/pdf/2507.00310"
+            passHref
+            target="_blank"
+            rel="noopener noreferrer">
             <StyledButton variant="outlined">About AutoDiscovery</StyledButton>
         </Link>
     );

@@ -19,7 +19,7 @@ export const ExamplesRunsBox = () => {
             )}
             {isExampleRunsLoading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                    <CircularProgress />
+                    <CircularProgress sx={(theme) => ({ color: theme.color['green-100'].hex })} />
                 </Box>
             )}
         </>
@@ -38,6 +38,7 @@ const Wrapper = styled(Box)(({ theme }) => ({
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Headline = styled(Typography)(({ theme }) => ({
     color: '#0FCB8C',
+    fontFamily: '"PP Telegraf", Manrope, sans-serif',
     fontSize: 24,
     fontStyle: 'normal',
     fontWeight: 700,

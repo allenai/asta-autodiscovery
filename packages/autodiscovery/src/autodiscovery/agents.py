@@ -106,7 +106,6 @@ class ModalSandboxExecutor(CodeExecutor):
             if is_gemini_model(self.vision_model)
             else self.vision_model,
             messages=messages,
-            max_tokens=1000,
         )
 
         return response.choices[0].message.content

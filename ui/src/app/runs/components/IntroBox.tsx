@@ -38,7 +38,7 @@ const Title = styled(Typography)(({ theme }) => ({
 const Subtitle = styled(Typography)(() => ({
     color: '#FAF2E9',
     fontFeatureSettings: "'liga' off, 'clig' off",
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope, sans-serif',
     fontSize: '24px',
     fontStyle: 'normal',
     fontWeight: 400,

@@ -228,18 +228,17 @@ function RunStatusContent({
                             </RunHeaderSubtitle>
 
                             {!!run.stats?.pendingExperiments && (
-                                <>
-                                    <Typography variant="caption">
-                                        AutoDiscovery is running. New findings will populate the
-                                        table below automatically. You can click on any hypothesis
-                                        to review the details while the run continues.
-                                    </Typography>
-                                    <br />
-                                    <Typography variant="caption">
-                                        Feel free to close this tab. We will email you when the full
-                                        analysis is complete.
-                                    </Typography>
-                                </>
+                            <>
+                                <Typography variant="caption">
+                                    AutoDiscovery is running. New findings will populate the table
+                                    below automatically. You can click on any hypothesis to review
+                                    the details while the run continues.
+                                </Typography>
+                                <br />
+                                <Typography variant="caption">
+                                    Feel free to navigate away; your results will be here when the analysis is complete.
+                                </Typography>
+                            </>
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>

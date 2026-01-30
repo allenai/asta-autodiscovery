@@ -84,8 +84,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
             <SectionHeader>
                 <SectionHeaderTitle>Create a new discovery session</SectionHeaderTitle>
-                Define your context and upload source files. AutoDiscovery will use your data
-                appropriately to generate hypotheses, run experiments to statistically refute or
+                Define your context and upload source files. AutoDiscovery will use your data to generate hypotheses, run experiments to statistically refute or
                 accept them and reveal surprising insights.
             </SectionHeader>
 
@@ -118,11 +117,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         multiline
                         rows={3}
                         value={settings.datasetsDescription}
-                        onChange={(e) => {
-                            updateSettings('datasetsDescription', e.target.value);
-                            debouncedSaveMetadata();
-                        }}
-                        placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023"
+                        onChange={(e) => updateSettings('datasetsDescription', e.target.value)}
+                        placeholder="e.g., Global migratory bird tracking logs (GPS, species, weather) from 2018–2024. Note: 2020 data is sparse for European routes due to regional sensor downtime."
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.datasetsDescription}

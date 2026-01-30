@@ -77,6 +77,7 @@ export interface ExperimentFromApi {
     parent_id: string | null;
     child_ids: string[] | null;
     creation_idx: number;
+    id_in_run: number;
     status: string;
     is_surprising: boolean;
     surprise: number | null;

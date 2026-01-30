@@ -51,7 +51,6 @@ const Title = styled(Typography)(({ theme }) => ({
     color: theme.color['green-100'].hex,
     fontFamily: '"PP Telegraf", Manrope, sans-serif',
     fontSize: '2.5rem',
-    fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
     marginBottom: '4px',
@@ -59,10 +58,8 @@ const Title = styled(Typography)(({ theme }) => ({
 
 const Subtitle = styled(Typography)(() => ({
     color: '#FAF2E9',
-    fontFeatureSettings: "'liga' off, 'clig' off",
     fontFamily: 'Manrope',
     fontSize: '1.5rem',
-    fontStyle: 'normal',
     fontWeight: 400,
     lineHeight: '1.5rem',
 }));
@@ -72,7 +69,6 @@ const Description = styled(Typography)(({ theme }) => ({
     marginTop: theme.spacing(2),
     fontFamily: 'Manrope',
     fontSize: '1.125rem',
-    fontStyle: 'normal',
     fontWeight: 400,
     lineHeight: '150%',
 }));
@@ -81,7 +77,6 @@ const LoginHeading = styled(Typography)(({ theme }) => ({
     color: '#9FEAD1',
     fontFamily: '"PP Telegraf", Manrope, sans-serif',
     fontSize: '1.5rem',
-    fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
     marginTop: theme.spacing(4),
@@ -92,7 +87,6 @@ const LoginDescription = styled(Typography)(({ theme }) => ({
     color: theme.color['cream-100'].hex,
     fontFamily: 'Manrope',
     fontSize: '1rem',
-    fontStyle: 'normal',
     fontWeight: 400,
     lineHeight: '150%',
     marginBottom: theme.spacing(3),
@@ -104,7 +98,6 @@ const LoginButton = styled(Button)(({ theme }) => ({
     padding: theme.spacing(1.5, 3),
     fontFamily: 'Manrope',
     fontSize: '1rem',
-    fontStyle: 'normal',
     fontWeight: 500,
     lineHeight: '100%',
     textTransform: 'none',

@@ -236,8 +236,8 @@ function RunStatusContent({
                                     </Typography>
                                     <br />
                                     <Typography variant="caption">
-                                        Feel free to close this tab. We will email you when the full
-                                        analysis is complete.
+                                        Feel free to navigate away; your results will be here when
+                                        the analysis is complete.
                                     </Typography>
                                 </>
                             )}

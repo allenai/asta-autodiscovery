@@ -83,11 +83,10 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                 <Box>
                     <SectionHeader>Belief Shift</SectionHeader>
                     <BeliefDistributionPlot
-                    prior={experiment.priorBelief}
-                    posterior={experiment.posteriorBelief}
-                />
+                        prior={experiment.priorBelief}
+                        posterior={experiment.posteriorBelief}
+                    />
                 </Box>
-                
             )}
 
             {experiment.experimentPlan && (

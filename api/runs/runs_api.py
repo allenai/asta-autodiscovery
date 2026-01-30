@@ -19,20 +19,20 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
-    MetadataModel,
-    GetRunMetadataRequestModel,
-    GetRunMetadataResponseModel,
-    RunDetailsModel,
-    RunModel,
     ExperimentModel,
-    GetExperimentStatusResponseModel,
-    GetRunExperimentsResponseModel,
-    GetViewerRunsRequestModel,
-    GetViewerRunsResponseModel,
-    RunStatsModel,
-    RunArgsModel,
     GenerateUploadUrlRequestModel,
     GenerateUploadUrlResponseModel,
+    GetExperimentStatusResponseModel,
+    GetRunExperimentsResponseModel,
+    GetRunMetadataRequestModel,
+    GetRunMetadataResponseModel,
+    GetViewerRunsRequestModel,
+    GetViewerRunsResponseModel,
+    MetadataModel,
+    RunArgsModel,
+    RunDetailsModel,
+    RunModel,
+    RunStatsModel,
 )
 
 # Import autodiscovery_jobs when available
@@ -198,7 +198,9 @@ def create() -> Blueprint:
 
         return run_details
 
-    def _get_run_detail_with_updated_status(run_details: dict, userid: str, runid: str) -> tuple[dict, dict] | None:
+    def _get_run_detail_with_updated_status(
+        run_details: dict, userid: str, runid: str
+    ) -> tuple[dict, dict] | None:
         """Update run details with the job status from Cloud Run.
 
         Args:
@@ -229,7 +231,7 @@ def create() -> Blueprint:
                 },
             )
             return run_details, status_response
-             
+
         return run_details, None
 
     @api.route("/health")
@@ -304,7 +306,12 @@ def create() -> Blueprint:
         userid_param = request.args.get("userid")
         if userid_param:
             if not allow_public or userid_param not in PUBLIC_USERS:
-                return None, (jsonify({"error": f"Access denied. Cannot query runs for userid: {userid_param}"}), 403)
+                return None, (
+                    jsonify(
+                        {"error": f"Access denied. Cannot query runs for userid: {userid_param}"}
+                    ),
+                    403,
+                )
             return userid_param, None
 
         userid = request.user.get("sub")
@@ -443,11 +450,13 @@ def create() -> Blueprint:
 
             # Get the latest run status
             try:
-                [updated_run_details, _] = _get_run_detail_with_updated_status(run_details, userid, runid)
+                [updated_run_details, _] = _get_run_detail_with_updated_status(
+                    run_details, userid, runid
+                )
             except Exception as e:
                 current_app.logger.error(f"Failed to update run status for {runid}: {e}")
                 updated_run_details = run_details
-                
+
             # Get job stats
             try:
                 job_stats = get_job_stats(userid=userid, jobid=runid, config=manager.config)
@@ -905,7 +914,9 @@ def create() -> Blueprint:
             if not run_details:
                 return jsonify({"error": "Run details not found"}), 404
 
-            [updated_run_details, status_response] = _get_run_detail_with_updated_status(run_details, userid, runid)
+            [updated_run_details, status_response] = _get_run_detail_with_updated_status(
+                run_details, userid, runid
+            )
 
             if status_response:
                 return jsonify(

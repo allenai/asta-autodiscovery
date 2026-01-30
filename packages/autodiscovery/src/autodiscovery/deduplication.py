@@ -2,10 +2,11 @@ import argparse
 import copy
 import json
 import random
+
 import numpy as np
 from openai import OpenAI
-from scipy.cluster.hierarchy import linkage
 from pydantic import BaseModel, Field
+from scipy.cluster.hierarchy import linkage
 from tqdm import tqdm
 
 from autodiscovery.utils import query_llm
@@ -134,12 +135,13 @@ def get_hypotheses(in_nodes_list):
 
 
 def get_embedding(texts, model="text-embedding-3-large", batch_size=128, client=None, n_attempts=1):
-    """
-    Compute embeddings for a list of texts using the OpenAI Embeddings API.
+    """Compute embeddings for a list of texts using the OpenAI Embeddings API.
+
     Args:
         texts (list): A list of text strings to be embedded.
         model (str, optional): The identifier for the embedding model to use.
         batch_size (int, optional): The number of texts to process in one API call.
+
     Returns:
         numpy.ndarray: An array of embeddings for the input texts.
     """

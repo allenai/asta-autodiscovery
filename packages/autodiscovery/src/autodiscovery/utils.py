@@ -1,16 +1,15 @@
-import os
-import json
-from typing import Any, Dict, List
 import concurrent.futures
+import json
+import os
+from typing import Any
 
-import numpy as np
 import boto3
-from pydantic import ValidationError
-from pydantic import BaseModel
+import numpy as np
 from openai import OpenAI
+from pydantic import BaseModel, ValidationError
 
-from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
+from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
 
 
 def is_gemini_model(model: str) -> bool:
@@ -85,14 +84,12 @@ def get_vertex_access_token() -> str:
 def get_openai_client_for_model(model: str, api_key: str | None = None) -> Any:
     """Create an OpenAI-compatible client for the given model."""
     if is_gemini_model(model):
-        return OpenAICredentialsRefresher(
-            api_key=api_key, base_url=get_vertex_openai_base_url()
-        )
+        return OpenAICredentialsRefresher(api_key=api_key, base_url=get_vertex_openai_base_url())
     return OpenAI(api_key=api_key) if api_key else OpenAI()
 
 
 def query_llm(
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     n_samples: int,
     model: str = "gpt-4o",
     temperature: float | None = None,
@@ -207,8 +204,7 @@ def try_loading_dict(_dict_str):
 
 
 def fuse_gaussians(means, stds, weight=1.0):
-    """
-    Fuse n independent Gaussian beliefs N(mu_i, sigma_i^2)
+    """Fuse n independent Gaussian beliefs N(mu_i, sigma_i^2)
     into a single Gaussian via product of Gaussians.
 
     Parameters
@@ -220,7 +216,7 @@ def fuse_gaussians(means, stds, weight=1.0):
     weight : float, optional
         A weight to apply to the precision of each Gaussian. Default is 1.0.
 
-    Returns
+    Returns:
     -------
     mu_star : float
         The fused mean μ_*.
@@ -246,9 +242,8 @@ def fuse_gaussians(means, stds, weight=1.0):
     return mu_star, sigma_star
 
 
-def fetch_from_s3(links: List[str], download_dir="_s3") -> List[str]:
-    """
-    Download data from S3 URLs
+def fetch_from_s3(links: list[str], download_dir="_s3") -> list[str]:
+    """Download data from S3 URLs
     Attributes:
         links (List[str]): List of S3 URLs to download
         download_dir (str): Directory to save downloaded files

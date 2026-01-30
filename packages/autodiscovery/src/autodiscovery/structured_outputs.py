@@ -1,11 +1,11 @@
+
+from typing import Self
+
 from pydantic import BaseModel, model_validator
-from typing import Optional
-from typing_extensions import Self
 
 
 class Relationship(BaseModel):
-    """
-    Represents a relationship between two variables in a hypothesis.
+    """Represents a relationship between two variables in a hypothesis.
 
     Attributes:
         explanatory (str): The independent/explanatory variable in the relationship
@@ -19,8 +19,7 @@ class Relationship(BaseModel):
 
 
 class HypothesisDimensions(BaseModel):
-    """
-    Structured representation of the key dimensions of a hypothesis.
+    """Structured representation of the key dimensions of a hypothesis.
 
     Attributes:
         contexts (list[str]): List of boundary conditions and assumptions under which the hypothesis holds
@@ -34,8 +33,7 @@ class HypothesisDimensions(BaseModel):
 
 
 class Hypothesis(BaseModel):
-    """
-    A declarative sentence about the state of the world whose truth value may be inferred from the given dataset(s) using an experiment.
+    """A declarative sentence about the state of the world whose truth value may be inferred from the given dataset(s) using an experiment.
 
     Attributes:
         hypothesis (str): The hypothesis statement
@@ -47,8 +45,7 @@ class Hypothesis(BaseModel):
 
 
 class ExperimentPlan(BaseModel):
-    """
-    Represents the experiment plan with a title, objective, steps, and deliverables.
+    """Represents the experiment plan with a title, objective, steps, and deliverables.
 
     Attributes:
         objective (str): The main goal or objective of the experiment
@@ -62,8 +59,8 @@ class ExperimentPlan(BaseModel):
 
 
 class Experiment(BaseModel):
-    """
-    Represents an experiment with a hypothesis and corresponding experiment plan.
+    """Represents an experiment with a hypothesis and corresponding experiment plan.
+
     Attributes:
         hypothesis (str): A natural-language hypothesis representing an assertion about the world
         experiment_plan (ExperimentPlan): The structured experiment plan to verify the hypothesis
@@ -74,8 +71,8 @@ class Experiment(BaseModel):
 
 
 class ExperimentHypothesis(BaseModel):
-    """
-    Represents an experiment with an experiment plan and a hypothesis.
+    """Represents an experiment with an experiment plan and a hypothesis.
+
     Attributes:
         experiment_plan (ExperimentPlan): A structured experiment plan to verify a hypothesis
         hypothesis (str): A natural-language hypothesis representing an assertion about the world that can be
@@ -87,8 +84,7 @@ class ExperimentHypothesis(BaseModel):
 
 
 class ExperimentList(BaseModel):
-    """
-    A collection of experiments.
+    """A collection of experiments.
 
     Attributes:
         experiments (list[Experiment]): List of Experiment objects
@@ -98,8 +94,7 @@ class ExperimentList(BaseModel):
 
 
 class ExperimentHypothesisList(BaseModel):
-    """
-    A collection of experiment hypotheses.
+    """A collection of experiment hypotheses.
 
     Attributes:
         experiments (list[ExperimentHypothesis]): List of ExperimentHypothesis objects
@@ -109,8 +104,7 @@ class ExperimentHypothesisList(BaseModel):
 
 
 class ExperimentCode(BaseModel):
-    """
-    Contains the code implementation for an experiment.
+    """Contains the code implementation for an experiment.
 
     Attributes:
         code (str): The actual code to be executed for the experiment
@@ -120,8 +114,7 @@ class ExperimentCode(BaseModel):
 
 
 class ProgramCritique(BaseModel):
-    """
-    Feedback on experiment code implementation.
+    """Feedback on experiment code implementation.
 
     Attributes:
         fixes (list[str]): List of suggested fixes or improvements for the code
@@ -131,8 +124,7 @@ class ProgramCritique(BaseModel):
 
 
 class ExperimentAnalyst(BaseModel):
-    """
-    Analysis of experiment results.
+    """Analysis of experiment results.
 
     Attributes:
         analysis (Optional[str]): Detailed analysis of the experiment outcomes
@@ -150,8 +142,7 @@ class ExperimentAnalyst(BaseModel):
 
 
 class ExperimentReviewer(BaseModel):
-    """
-    Review of an experiment's execution and results.
+    """Review of an experiment's execution and results.
 
     Attributes:
         feedback (str | None): Required feedback when experiment fails, optional otherwise
@@ -172,8 +163,7 @@ class ExperimentReviewer(BaseModel):
 
 
 class ImageAnalysis(BaseModel):
-    """
-    Structured representation of plot axes and related analysis information.
+    """Structured representation of plot axes and related analysis information.
 
     Attributes:
         title (str): The title of the plot

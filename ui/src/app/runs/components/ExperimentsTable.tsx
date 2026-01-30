@@ -2,7 +2,7 @@ import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { useCallback, useMemo } from 'react';
 
-import { Experiment, RunStats } from '@/types/Run';
+import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
@@ -10,8 +10,8 @@ const columns: GridColDef[] = [
     {
         field: 'id',
         headerName: 'ID',
-        width: 130,
-        align: 'center',
+        align: 'right',
+        width: 25,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="90%" />;
@@ -34,8 +34,7 @@ const columns: GridColDef[] = [
     {
         field: 'surprisal',
         headerName: 'Surprisal',
-        width: 150,
-        align: 'center',
+        width: 90,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="70%" />;
@@ -48,6 +47,7 @@ const columns: GridColDef[] = [
                             ? theme.color['warning-orange-100'].hex
                             : theme.color['cream-100'].hex,
                         fontWeight: isSurprising ? 700 : 'normal',
+                        textAlign: 'right',
                     })}>
                     {params.value?.toFixed(3) ?? 'N/A'}
                 </Box>
@@ -57,8 +57,8 @@ const columns: GridColDef[] = [
     {
         field: 'prior',
         headerName: 'Belief Before',
-        width: 150,
         align: 'center',
+        width: 120,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -75,8 +75,8 @@ const columns: GridColDef[] = [
     {
         field: 'posterior',
         headerName: 'Belief After',
-        width: 150,
         align: 'center',
+        width: 120,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -237,7 +237,7 @@ const StyledSkeleton = styled(Skeleton)(({ theme }) => ({
 }));
 
 const HypothesisCell = styled(Box)`
-    lineHeight: 1.4,
-    whiteSpace: 'normal',
-    wordWrap: 'break-word',
+    lineheight: 1.4;
+    whitespace: 'normal';
+    wordwrap: 'break-word';
 `;

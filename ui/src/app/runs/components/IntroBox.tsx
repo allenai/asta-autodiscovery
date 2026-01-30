@@ -3,7 +3,8 @@ import { Box, Typography, styled } from '@mui/material';
 export const IntroBox = () => {
     return (
         <Wrapper>
-            <Title>Uncover surprising insights hidden in your data.</Title>
+            <Title>AutoDiscovery</Title>
+            <Subtitle>Uncover surprising insights hidden in your data.</Subtitle>
             <Description>
                 AutoDiscovery uses Bayesian surprise (a measure of how much new experimental
                 evidence shifts our beliefs) to autonomously explore your datasets. It identifies
@@ -27,9 +28,21 @@ const Wrapper = styled(Box)(({ theme }) => ({
 
 const Title = styled(Typography)(({ theme }) => ({
     color: theme.color['green-100'].hex,
-    fontSize: '2.5rem',
+    fontFamily: '"PP Telegraf"',
+    fontSize: '40px',
+    fontWeight: 700,
     lineHeight: 1,
-    fontWeight: 'bold',
+    marginBottom: '4px',
+}));
+
+const Subtitle = styled(Typography)(() => ({
+    color: '#FAF2E9',
+    fontFeatureSettings: "'liga' off, 'clig' off",
+    fontFamily: 'Manrope',
+    fontSize: '24px',
+    fontStyle: 'normal',
+    fontWeight: 400,
+    lineHeight: '24px',
 }));
 
 const Description = styled(Typography)(({ theme }) => ({

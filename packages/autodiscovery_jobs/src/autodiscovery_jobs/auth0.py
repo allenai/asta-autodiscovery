@@ -4,8 +4,6 @@ This module provides functions to query Auth0 for user information,
 specifically to retrieve user email addresses by user ID.
 
 Required environment variables:
-    AUTH0_MGMT_DOMAIN: Auth0 tenant domain for Management API
-                       (e.g., "YOUR_TENANT.us.auth0.com")
     AUTH0_MGMT_CLIENT_ID: Management API client ID
     AUTH0_MGMT_CLIENT_SECRET: Management API client secret
 
@@ -19,6 +17,9 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+
+AUTH0_MGMT_DOMAIN = "YOUR_TENANT.us.auth0.com"
 
 
 class Auth0Error(Exception):
@@ -48,16 +49,15 @@ def _get_management_token() -> str:
     Raises:
         Auth0Error: If token acquisition fails
     """
-    domain = _get_env_or_raise("AUTH0_MGMT_DOMAIN")
     client_id = _get_env_or_raise("AUTH0_MGMT_CLIENT_ID")
     client_secret = _get_env_or_raise("AUTH0_MGMT_CLIENT_SECRET")
 
-    token_url = f"https://{domain}/oauth/token"
+    token_url = f"https://{AUTH0_MGMT_DOMAIN}/oauth/token"
     payload = {
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret,
-        "audience": f"https://{domain}/api/v2/",
+        "audience": f"https://{AUTH0_MGMT_DOMAIN}/api/v2/",
     }
 
     try:
@@ -94,14 +94,13 @@ def get_user(userid: str) -> dict[str, Any]:
     Raises:
         Auth0Error: If user lookup fails
     """
-    domain = _get_env_or_raise("AUTH0_MGMT_DOMAIN")
     token = _get_management_token()
 
     # URL encode the user ID (contains special characters like |)
     from urllib.parse import quote
     encoded_userid = quote(userid, safe="")
 
-    user_url = f"https://{domain}/api/v2/users/{encoded_userid}"
+    user_url = f"https://{AUTH0_MGMT_DOMAIN}/api/v2/users/{encoded_userid}"
 
     try:
         req = Request(user_url, method="GET")

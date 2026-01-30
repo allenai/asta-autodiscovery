@@ -201,9 +201,7 @@ function RunStatusContent({
                         <ExperimentGraph />
                     </Background>
                 )}
-                <TablePanel
-                    $isExpanded={isTableExpanded}
-                    key={`${isTableExpanded ? 'expanded' : 'collapsed'} ${selectedExperiment?.experimentId ?? ''}`}>
+                <TablePanel $isExpanded={isTableExpanded} $hasDetails={!!selectedExperiment}>
                     <RunHeader>
                         <Box>
                             <RunHeaderName>{run.name}</RunHeaderName>
@@ -346,9 +344,11 @@ const Background = styled('div')`
     }
 `;
 
-const TablePanel = styled('div')<{ $isExpanded: boolean }>`
-    flex: 0 1 auto;
-    width: ${({ $isExpanded }) => ($isExpanded ? '100%' : '400px')};
+const TablePanel = styled('div')<{ $isExpanded: boolean; $hasDetails: boolean }>`
+    flex: 1 1 auto;
+    min-width: 0;
+    width: ${({ $isExpanded, $hasDetails }) =>
+        $isExpanded ? ($hasDetails ? 'auto' : '100%') : '400px'};
     background-color: #163638f3;
     border-radius: ${({ theme }) => theme.shape.borderRadius}px;
     display: flex;

@@ -27,7 +27,11 @@ plugins:
       handlers:
         python:
           paths:
-            - src
+            - packages/code_execution/src
+            - packages/agents/src
+            - packages/autodiscovery/src
+            - packages/autodiscovery_modal/src
+            - packages/autodiscovery_jobs/src
 
 nav:
   - Home: index.md

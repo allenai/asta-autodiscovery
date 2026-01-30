@@ -207,12 +207,6 @@ export function RichOutputsSection({
                                 src={activeImage.src}
                                 alt={`Figure ${activeImage.index + 1}`}
                             />
-                            {activeImage.analysis && (
-                                <FullscreenAnalysis>
-                                    <SectionHeader>Plot Analysis</SectionHeader>
-                                    <AnalysisText>{activeImage.analysis}</AnalysisText>
-                                </FullscreenAnalysis>
-                            )}
                         </FullscreenBody>
                     )}
                 </DialogContent>
@@ -284,17 +278,4 @@ const FullscreenImage = styled('img')`
     max-height: 70vh;
     object-fit: contain;
     width: 100%;
-`;
-
-const FullscreenAnalysis = styled(Box)`
-    background-color: ${({ theme }) => theme.color['dark-teal-100'].hex};
-    border-radius: ${({ theme }) => theme.shape.borderRadius}px;
-    padding: ${({ theme }) => theme.spacing(2)};
-`;
-
-const AnalysisText = styled('pre')`
-    font-family: inherit;
-    font-size: 0.9rem;
-    margin: ${({ theme }) => theme.spacing(1, 0, 0, 0)};
-    white-space: pre-wrap;
 `;

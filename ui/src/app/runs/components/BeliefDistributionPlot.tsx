@@ -273,7 +273,7 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
             posteriorLabel,
             {
                 x: 0,
-                y: -0.16,
+                y: -0.14,
                 xref: 'x',
                 yref: 'paper',
                 text: 'Likely False',
@@ -283,7 +283,7 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
             },
             {
                 x: 1,
-                y: -0.16,
+                y: -0.14,
                 xref: 'x',
                 yref: 'paper',
                 text: 'Likely True',
@@ -294,7 +294,7 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
             priorMean !== null && posteriorMean !== null
                 ? {
                       x: (priorMean + posteriorMean) / 2,
-                      y: -0.36,
+                      y: -0.28,
                       xref: 'x',
                       yref: 'paper',
                       text: 'Surprisal',
@@ -310,10 +310,10 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
             margin: {
-                t: isCompact ? 40 : 48,
-                r: isCompact ? 36 : 56,
-                b: isCompact ? 84 : 92,
-                l: isCompact ? 36 : 56,
+                t: isCompact ? 20 : 24,
+                r: isCompact ? 44 : 66,
+                b: isCompact ? 64 : 72,
+                l: isCompact ? 44 : 66,
             },
             showlegend: false,
             hovermode: false,

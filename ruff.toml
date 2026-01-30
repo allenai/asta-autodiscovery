@@ -2,7 +2,7 @@ target-version = "py314"
 line-length = 100
 
 [lint]
-select = ["D", "E", "F", "UP", "B", "SIM", "I", "W", "Q", "ASYNC", "T20"]
+select = ["D", "E", "F", "UP", "B", "SIM", "I", "W", "Q", "ASYNC", "T20", "FA"]
 
 [lint.pydocstyle]
 convention = "google"

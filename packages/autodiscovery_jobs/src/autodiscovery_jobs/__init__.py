@@ -53,12 +53,12 @@ from .manager import JobManager
 
 # Run details management
 from .run_details import (
+    RunDetails,
     TERMINAL_STATUSES,
     create_run_details,
-    get_completed_at,
     get_run_details,
     get_run_details_path,
-    is_completed,
+    refresh_run_status,
     update_run_details,
 )
 
@@ -116,14 +116,14 @@ __all__ = [
     "get_job_status",
     "cancel_job",
     "get_job_logs",
-    # Run details functions
+    # Run details
+    "RunDetails",
     "TERMINAL_STATUSES",
     "get_run_details_path",
     "create_run_details",
     "get_run_details",
+    "refresh_run_status",
     "update_run_details",
-    "is_completed",
-    "get_completed_at",
     # Email state functions
     "get_email_state_path",
     "get_email_state",

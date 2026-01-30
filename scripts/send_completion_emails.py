@@ -18,11 +18,9 @@ from autodiscovery_jobs import (
     Auth0Error,
     JobConfig,
     JobManager,
-    get_completed_at,
-    get_run_details,
     get_user_email,
-    is_completed,
     record_email_sent,
+    refresh_run_status,
     send_email,
     was_email_sent,
 )
@@ -62,7 +60,7 @@ def build_email_body_text(
     runid: str,
     status: str,
     run_name: str | None,
-    completed_at: datetime | None,
+    finished_at: datetime | None,
     execution_id: str | None,
 ) -> str:
     """Build plain text email body.
@@ -72,14 +70,14 @@ def build_email_body_text(
         runid: Run identifier
         status: Run status
         run_name: Optional run name
-        completed_at: Completion timestamp
+        finished_at: Finish timestamp
         execution_id: Cloud Run execution ID
 
     Returns:
         Plain text email body
     """
     name_display = run_name or runid
-    completed_str = completed_at.strftime("%Y-%m-%d %H:%M:%S UTC") if completed_at else "Unknown"
+    finished_str = finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown"
 
     if status == "SUCCEEDED":
         status_message = "Your AutoDiscovery run has completed successfully."
@@ -99,7 +97,7 @@ def build_email_body_text(
 Run Details:
   Name: {name_display}
   Status: {status}
-  Completed: {completed_str}
+  Finished: {finished_str}
   Run ID: {runid}
 
 View your results: {run_url}
@@ -116,7 +114,7 @@ def build_email_body_html(
     runid: str,
     status: str,
     run_name: str | None,
-    completed_at: datetime | None,
+    finished_at: datetime | None,
     execution_id: str | None,
 ) -> str:
     """Build HTML email body.
@@ -126,14 +124,14 @@ def build_email_body_html(
         runid: Run identifier
         status: Run status
         run_name: Optional run name
-        completed_at: Completion timestamp
+        finished_at: Finish timestamp
         execution_id: Cloud Run execution ID
 
     Returns:
         HTML email body
     """
     name_display = run_name or runid
-    completed_str = completed_at.strftime("%Y-%m-%d %H:%M:%S UTC") if completed_at else "Unknown"
+    finished_str = finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown"
 
     if status == "SUCCEEDED":
         status_message = "Your AutoDiscovery run has completed successfully."
@@ -178,7 +176,7 @@ def build_email_body_html(
                 <dt>Status</dt>
                 <dd>{status}</dd>
                 <dt>Completed</dt>
-                <dd>{completed_str}</dd>
+                <dd>{finished_str}</dd>
                 <dt>Run ID</dt>
                 <dd>{runid}</dd>
             </dl>
@@ -259,24 +257,23 @@ def send_completion_emails(
 
         for runid in job_ids:
             try:
-                # Get run details
-                run_details = get_run_details(userid, runid, config)
+                # Get run details with refreshed status from Cloud Run
+                run_details = refresh_run_status(userid, runid, config)
                 if not run_details:
                     continue
 
-                # Check if run is completed
-                if not is_completed(run_details):
+                # Check if run is finished (status was refreshed above)
+                if not run_details.is_finished:
                     continue
 
-                # Check completion time
-                completed_at = get_completed_at(run_details)
-                if not completed_at:
-                    # Run is completed but no timestamp - might be old
+                # Check finish time
+                if not run_details.finished_at:
+                    # Run is finished but no timestamp - might be old
                     # Skip to avoid sending emails for ancient runs
-                    logger.debug(f"Skipping {userid}/{runid}: completed but no timestamp")
+                    logger.debug(f"Skipping {userid}/{runid}: finished but no timestamp")
                     continue
 
-                if completed_at < cutoff_time:
+                if run_details.finished_at < cutoff_time:
                     # Too old, skip
                     continue
 
@@ -299,16 +296,16 @@ def send_completion_emails(
 
                 # Get run metadata for name
                 run_name = get_run_name(manager, userid, runid)
-                status = run_details.get("status", "UNKNOWN")
-                execution_id = run_details.get("execution_id")
+                status = run_details.status
+                execution_id = run_details.execution_id
 
                 # Build email content
                 subject = build_email_subject(status, run_name)
                 body_text = build_email_body_text(
-                    userid, runid, status, run_name, completed_at, execution_id
+                    userid, runid, status, run_name, run_details.finished_at, execution_id
                 )
                 body_html = build_email_body_html(
-                    userid, runid, status, run_name, completed_at, execution_id
+                    userid, runid, status, run_name, run_details.finished_at, execution_id
                 )
 
                 if dry_run:

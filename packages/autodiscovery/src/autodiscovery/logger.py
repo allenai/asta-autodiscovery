@@ -1,5 +1,5 @@
-import os
 import json
+import os
 
 
 class TreeLogger:
@@ -50,7 +50,7 @@ class TreeLogger:
         filename = os.path.join(self.log_dir, f"node_{level}_{node_idx}.json")
 
         messages = None
-        with open(filename, "r") as f:
+        with open(filename) as f:
             if as_json:
                 messages = json.load(f)
             else:

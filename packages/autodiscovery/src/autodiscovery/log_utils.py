@@ -1,12 +1,12 @@
-import os
 import json
+import os
 import re
+
 from beliefs import evaluate_hypothesis_distribution
 
 
 def load_node_logs(directory, level=None, node_idx=None):
-    """
-    Loads and parses log files in a directory that match the format
+    """Loads and parses log files in a directory that match the format
     'node_level_index.json', saving the contents in a dictionary.
 
     Args:
@@ -32,7 +32,7 @@ def load_node_logs(directory, level=None, node_idx=None):
                     continue
                 filepath = os.path.join(directory, filename)
                 try:
-                    with open(filepath, "r") as f:
+                    with open(filepath) as f:
                         log_content = json.load(f)  # Read the entire log file
                         result[(file_level, file_index)] = extract_node_messages(log_content)
                 except OSError as e:
@@ -47,8 +47,7 @@ def load_node_logs(directory, level=None, node_idx=None):
 
 
 def extract_node_messages(json_data):
-    """
-    Extracts messages starting from the last occurrence of
+    """Extracts messages starting from the last occurrence of
     a message with role 'user_proxy'.
 
     Args:
@@ -72,8 +71,7 @@ def extract_node_messages(json_data):
 
 
 def extract_hypotheses_from_logs(messages):
-    """
-    Extracts hypotheses from a list of messages.
+    """Extracts hypotheses from a list of messages.
 
     Args:
         messages (list): A list of message dictionaries
@@ -137,7 +135,7 @@ def save_belief_distribution(
     belief_log_filename = os.path.join(log_dirname, f"belief_{level}_{node_idx}.json")
 
     try:
-        with open(belief_log_filename, "r") as f:
+        with open(belief_log_filename) as f:
             records = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         records = []
@@ -167,7 +165,7 @@ def load_parent_hypotheses(log_dirname, level, parent_node_idx, context_type="br
         return []
 
     try:
-        with open(parent_log_filename, "r") as f:
+        with open(parent_log_filename) as f:
             records = json.load(f)
     except json.JSONDecodeError:
         return []
@@ -264,7 +262,7 @@ def load_all_hypotheses(log_dirname):
 
             filepath = os.path.join(log_dirname, filename)
             try:
-                with open(filepath, "r") as f:
+                with open(filepath) as f:
                     records = json.load(f)
             except (json.JSONDecodeError, OSError):
                 continue

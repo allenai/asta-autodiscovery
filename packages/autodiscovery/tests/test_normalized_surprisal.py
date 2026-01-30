@@ -1,7 +1,6 @@
 """Tests for normalized surprisal theoretical maximum calculations."""
 
 import numpy as np
-
 from autodiscovery.run import _theoretical_max_boolean_cat
 
 

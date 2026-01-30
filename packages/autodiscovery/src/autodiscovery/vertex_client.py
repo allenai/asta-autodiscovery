@@ -27,9 +27,7 @@ class _VertexADCRefresherBase:
         self._base_url = normalized_base_url or get_vertex_openai_base_url()
         self._client = OpenAI(api_key="PLACEHOLDER", base_url=self._base_url, **kwargs)
         self._static_token = (
-            api_key
-            or os.getenv(VERTEX_ACCESS_TOKEN_ENV)
-            or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
+            api_key or os.getenv(VERTEX_ACCESS_TOKEN_ENV) or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
         )
         self._creds = None
         self._request = None
@@ -43,7 +41,9 @@ class _VertexADCRefresherBase:
             import google.auth
             import google.auth.transport.requests
         except Exception as exc:
-            raise RuntimeError("google-auth is required to refresh Vertex ADC credentials.") from exc
+            raise RuntimeError(
+                "google-auth is required to refresh Vertex ADC credentials."
+            ) from exc
 
         self._creds, _ = google.auth.default(
             scopes=["https://www.googleapis.com/auth/cloud-platform"]

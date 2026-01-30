@@ -39,7 +39,10 @@ class ExperimentModel(BaseModel):
     creation_idx: int = Field(
         ..., description="Index representing the creation order of the experiment"
     )
-    id_in_run: int | None = Field(None, description="Unique identifier for the experiment relative to the run, based on its order")
+    id_in_run: int | None = Field(
+        None,
+        description="Unique identifier for the experiment relative to the run, based on its order",
+    )
     status: str = Field(..., description="Current status of the experiment")
     is_surprising: bool | None = Field(
         ..., description="Flag indicating if the experiment is surprising"
@@ -66,8 +69,8 @@ class ExperimentModel(BaseModel):
         None, description="Rich output bundles generated during code execution"
     )
 
-    @model_validator(mode='after')
-    def set_id_in_run(self) -> 'ExperimentModel':
+    @model_validator(mode="after")
+    def set_id_in_run(self) -> "ExperimentModel":
         if self.id_in_run is None:
             self.id_in_run = self.creation_idx - 1
         return self

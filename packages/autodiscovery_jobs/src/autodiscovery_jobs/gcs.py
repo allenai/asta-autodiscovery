@@ -10,6 +10,10 @@ from google.cloud import storage
 from .config import JobConfig
 from .exceptions import GCSError, JobAlreadyExistsError, JobNotFoundError
 
+# Root node filename - excluded from experiment counts and lists
+# This is the initialization node that doesn't represent a real experiment
+ROOT_NODE_FILENAME = "mcts_node_1_0.json"
+
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
     """Parse GCS path into bucket and prefix.
@@ -588,7 +592,7 @@ def count_experiment_results(userid: str, jobid: str, config: JobConfig | None =
         count = 0
         for blob in blobs:
             filename = blob.name.split("/")[-1]
-            if pattern.match(filename) and filename != "mcts_node_1_0.json":
+            if pattern.match(filename) and filename != ROOT_NODE_FILENAME:
                 count += 1
         return count
     except Exception as e:
@@ -676,7 +680,7 @@ def list_experiment_files(userid: str, jobid: str, config: JobConfig | None = No
         filenames = []
         for blob in blobs:
             filename = blob.name.split("/")[-1]
-            if pattern.match(filename):
+            if pattern.match(filename) and filename != ROOT_NODE_FILENAME:
                 filenames.append(filename)
         return sorted(filenames)
     except Exception as e:

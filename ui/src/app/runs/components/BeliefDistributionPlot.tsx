@@ -23,8 +23,8 @@ const SCORE_PER_CATEGORY = {
 } as const;
 
 // Normalizes missing/invalid values to 0 so partial data doesn't crash the plot.
-const safeNumber = (value: number | null | undefined) =>
-    Number.isFinite(value) ? (value as number) : 0;
+const safeNumber = (value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : 0;
 
 // Converts a categorical belief payload into beta parameters by distributing each
 // category count across alpha/beta according to its score weight.
@@ -37,9 +37,11 @@ const toBetaParams = (belief: BeliefDistribution | null) => {
     let alpha = safeNumber(priorParams[0]);
     let beta = safeNumber(priorParams[1]);
 
-    (Object.entries(SCORE_PER_CATEGORY) as Array<
+    const scoreEntries = Object.entries(SCORE_PER_CATEGORY) as Array<
         [keyof typeof SCORE_PER_CATEGORY, number]
-    >).forEach(([key, score]) => {
+    >;
+
+    scoreEntries.forEach(([key, score]) => {
         const count = safeNumber(belief[key as keyof BeliefDistribution]);
         alpha += count * score;
         beta += count * (1 - score);
@@ -107,10 +109,12 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
             return null;
         }
 
-        const priorMean =
-            priorParams ? priorParams.alpha / (priorParams.alpha + priorParams.beta) : null;
-        const posteriorMean =
-            posteriorParams ? posteriorParams.alpha / (posteriorParams.alpha + posteriorParams.beta) : null;
+        const priorMean = priorParams
+            ? priorParams.alpha / (priorParams.alpha + priorParams.beta)
+            : null;
+        const posteriorMean = posteriorParams
+            ? posteriorParams.alpha / (posteriorParams.alpha + posteriorParams.beta)
+            : null;
 
         // Build only the traces that exist so missing belief payloads still render.
         const traces = [
@@ -123,7 +127,8 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
         ].filter(Boolean) as ReturnType<typeof toTrace>[];
 
         // Use theme-driven colors to keep axes readable against dark backgrounds.
-        const axisColor = theme.color['cream-40']?.rgba?.toString?.() ?? theme.color['cream-100'].hex;
+        const axisColor =
+            theme.color['cream-40']?.rgba?.toString?.() ?? theme.color['cream-100'].hex;
         const gridColor = theme.color['cream-10']?.rgba?.toString?.() ?? 'rgba(255,255,255,0.08)';
 
         const verticalGridLines = Array.from({ length: 9 }, (_, idx) => ({
@@ -200,7 +205,8 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
                   ]
                 : [];
 
-        const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+        const clamp = (value: number, min: number, max: number) =>
+            Math.max(min, Math.min(max, value));
         const meanOffset = 0.02;
         // Place labels on opposite sides based on mean ordering to reduce collisions,
         // and stagger vertically when means are close to keep both readable.
@@ -356,8 +362,8 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
 
         // Lazy-load Plotly to keep the main bundle smaller and avoid SSR issues.
         const renderPlot = async () => {
-            const module = await import('plotly.js-dist-min');
-            plotly = (module as any).default ?? module;
+            const plotlyModule = await import('plotly.js-dist-min');
+            plotly = (plotlyModule as any).default ?? plotlyModule;
             await plotly.react(node, plotPayload.traces, plotPayload.layout, plotPayload.config);
         };
 

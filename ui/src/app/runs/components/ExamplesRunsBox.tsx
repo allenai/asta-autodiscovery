@@ -46,4 +46,7 @@ const Headline = styled(Typography)(({ theme }) => ({
 
 const RunItem = styled('div')(({ theme }) => ({
     marginBottom: theme.spacing(2),
+    '&:last-child': {
+        marginBottom: 0,
+    },
 }));

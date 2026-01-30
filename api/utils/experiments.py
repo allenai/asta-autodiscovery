@@ -63,8 +63,8 @@ class ExperimentNode:
             self.status = "FAILED"
 
         # Metrics
-        self.prior: float | None = node_data.get("prior", {}).get("mean")
-        self.posterior: float | None = node_data.get("posterior", {}).get("mean")
+        self.prior: float | None = (node_data.get("prior") or {}).get("mean")
+        self.posterior: float | None = (node_data.get("posterior") or {}).get("mean")
         self.surprise: float | None = node_data.get("normalized_surprisal")
         self.is_surprising: bool | None = node_data.get("surprising")
 

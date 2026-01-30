@@ -43,12 +43,12 @@ export const CreateRunButton = () => {
     return (
         <>
             <StyledButton
-                variant="contained"
+                variant="outlined"
                 fullWidth
                 startIcon={isCreating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />}
                 onClick={handleCreateRun}
                 disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'New exploration'}
+                {isCreating ? 'Creating...' : 'New discovery session'}
             </StyledButton>
             {error && (
                 <Typography variant="body2" color="error" sx={{ mt: 1 }}>
@@ -60,11 +60,18 @@ export const CreateRunButton = () => {
 };
 
 const StyledButton = styled(Button)`
-    background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-    color: ${({ theme }) => theme.color['cream-100'].hex};
+    &.MuiButton-root {
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+        padding: ${({ theme }) => theme.spacing(0, 2)};
+        height: 40px;
+    }
 
-    &:hover {
-        background-color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    &.MuiButton-outlined {
+        border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+
+        &:hover {
+            border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+        }
     }
 `;
 

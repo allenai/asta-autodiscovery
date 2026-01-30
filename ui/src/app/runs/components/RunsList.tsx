@@ -41,11 +41,13 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                 display: 'flex',
                 flexDirection: 'column',
             }}>
+            <StyledDivider />
+
             <Box sx={{ p: 2 }}>
                 <CreateRunButton />
             </Box>
 
-            <Divider />
+            <SectionTitle>Your Sessions</SectionTitle>
 
             {isViewerRunsLoading ? (
                 <SkeletonWrapper>
@@ -93,6 +95,18 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
         </Box>
     );
 }
+
+const StyledDivider = styled(Divider)`
+    border-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+`;
+
+const SectionTitle = styled(Typography)`
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    font-family: 'PP Telegraf', Manrope, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: ${({ theme }) => theme.spacing(2, 2, 1, 2)};
+`;
 
 const RunItemButton = styled(ListItemButton)`
     color: ${({ theme }) => theme.color['cream-100'].hex};

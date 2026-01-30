@@ -28,7 +28,7 @@ const Wrapper = styled(Box)(({ theme }) => ({
 
 const Title = styled(Typography)(({ theme }) => ({
     color: theme.color['green-100'].hex,
-    fontFamily: '"PP Telegraf"',
+    fontFamily: '"PP Telegraf", Manrope, sans-serif',
     fontSize: '40px',
     fontWeight: 700,
     lineHeight: 1,

@@ -53,12 +53,13 @@ export default function CreditsChip() {
                             <strong>Exchange Rate:</strong> 1 Credit = 1 Experiment.
                         </li>
                         <li>
-                            <strong>Budget Protection:</strong> Discovery sessions are capped at 500 credits
-                            to prevent accidental overspending. We recommend 50-100 experiments per
-                            session.
+                            <strong>Budget Protection:</strong> Discovery sessions are capped at 500
+                            credits to prevent accidental overspending. We recommend 50-100
+                            experiments per session.
                         </li>
                         <li>
-                            <strong>Expiration:</strong> Credits are valid until <strong>Feb 28, 2026</strong>.
+                            <strong>Expiration:</strong> Credits are valid until{' '}
+                            <strong>Feb 28, 2026</strong>.
                         </li>
                     </ul>
 

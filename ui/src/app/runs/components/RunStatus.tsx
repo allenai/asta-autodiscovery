@@ -309,7 +309,6 @@ function RunStatusContent({
                 open={isParametersModalOpen}
                 onClose={() => setIsParametersModalOpen(false)}
                 metadata={run.metadata}
-                args={run.args}
             />
         </Container>
     );

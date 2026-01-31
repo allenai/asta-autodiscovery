@@ -8,11 +8,11 @@ import { getRunFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 
 export const MCTS_SELECTION = {
-    UCB1: { value: 'ucb1', label: 'UCB1' },
-    BEAM_SEARCH: { value: 'beam_search', label: 'Beam Search' },
-    PW: { value: 'pw', label: 'Progressive Widening' },
-    PW_ALL: { value: 'pw_all', label: 'Progressive Widening All' },
     UCB1_RECURSIVE: { value: 'ucb1_recursive', label: 'UCB1 Recursive' },
+    PROGRESSIVE_WIDENING: {
+        value: 'pw',
+        label: 'MCTS with Progressive Widening',
+    },
 };
 
 export type Dataset = {

@@ -53,7 +53,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         isSaving,
         updateSettings,
         debouncedSaveMetadata,
-        debouncedSaveJobArgs,
         handleFileSelect,
         handleFileDescriptionChange,
         handleRemoveFileUpload,
@@ -239,7 +238,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.explorationWeight}
                             onChange={(e) => {
                                 updateSettings('explorationWeight', parseFloat(e.target.value));
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             disabled={isFormDisabled}
                         />
@@ -257,7 +256,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.mctsSelection}
                             onChange={(e) => {
                                 updateSettings('mctsSelection', e.target.value);
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}>
                             {Object.values(MCTS_SELECTION).map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
@@ -286,7 +285,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.surprisalWidth ?? 0}
                             onChange={(_, value) => {
                                 updateSettings('surprisalWidth', value as number);
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             min={0}
                             max={1}
@@ -310,7 +309,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.evidenceWeight}
                             onChange={(e) => {
                                 updateSettings('evidenceWeight', parseFloat(e.target.value));
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             disabled={isFormDisabled}
                         />
@@ -330,7 +329,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.warmstartExperiments}
                             onChange={(e) => {
                                 updateSettings('warmstartExperiments', e.target.value);
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             disabled={isFormDisabled}
                             placeholder="Path to json file"
@@ -351,7 +350,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.nWarmstart}
                             onChange={(e) => {
                                 updateSettings('nWarmstart', parseInt(e.target.value));
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             disabled={isFormDisabled}
                         />

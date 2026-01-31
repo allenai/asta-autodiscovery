@@ -123,23 +123,23 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             setIsLoading(true);
             try {
                 const { data } = await api.getRun(runid);
-                const { metadata, args } = getRunFromApi(data);
+                const { metadata } = getRunFromApi(data);
 
-                if (metadata || args) {
+                if (metadata) {
                     setSettings((prev) => ({
                         ...prev,
-                        name: metadata?.name || '',
-                        datasetsDescription: metadata?.description || '',
-                        domain: metadata?.domain || '',
-                        intent: metadata?.intent || '',
-                        nExperiments: args?.nExperiments || prev.nExperiments,
-                        explorationWeight: args?.explorationWeight || prev.explorationWeight,
-                        mctsSelection: args?.mctsSelection || prev.mctsSelection,
-                        surprisalWidth: args?.surprisalWidth || prev.surprisalWidth,
-                        evidenceWeight: args?.evidenceWeight || prev.evidenceWeight,
+                        name: metadata.name || '',
+                        datasetsDescription: metadata.description || '',
+                        domain: metadata.domain || '',
+                        intent: metadata.intent || '',
+                        nExperiments: metadata.nExperiments ?? prev.nExperiments,
+                        explorationWeight: metadata.explorationWeight ?? prev.explorationWeight,
+                        mctsSelection: metadata.mctsSelection ?? prev.mctsSelection,
+                        surprisalWidth: metadata.surprisalWidth ?? prev.surprisalWidth,
+                        evidenceWeight: metadata.evidenceWeight ?? prev.evidenceWeight,
                         warmstartExperiments:
-                            args?.warmstartExperiments || prev.warmstartExperiments,
-                        nWarmstart: args?.nWarmstart || prev.nWarmstart,
+                            metadata.warmstartExperiments ?? prev.warmstartExperiments,
+                        nWarmstart: metadata.nWarmstart ?? prev.nWarmstart,
                     }));
 
                     // Populate fileUploads from saved datasets
@@ -269,11 +269,20 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             // Build metadata from current settings (via ref to get latest)
             const currentSettings = settingsRef.current;
             const metadata = {
+                // Descriptive metadata
                 name: currentSettings.name.trim(),
                 description: currentSettings.datasetsDescription.trim(),
                 domain: currentSettings.domain.trim(),
                 intent: currentSettings.intent.trim(),
                 datasets,
+                // Job configuration parameters
+                n_experiments: currentSettings.nExperiments,
+                exploration_weight: currentSettings.explorationWeight,
+                mcts_selection: currentSettings.mctsSelection,
+                surprisal_width: currentSettings.surprisalWidth,
+                evidence_weight: currentSettings.evidenceWeight,
+                warmstart_experiments: currentSettings.warmstartExperiments,
+                n_warmstart: currentSettings.nWarmstart,
             };
 
             await api.saveMetadata(runid, metadata);
@@ -487,6 +496,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             const currentFileUploads = fileUploadsRef.current;
 
             const metadata = {
+                // Descriptive metadata
                 name: currentSettings.name.trim(),
                 description: currentSettings.datasetsDescription.trim(),
                 domain: currentSettings.domain.trim(),
@@ -497,6 +507,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                     content_type: upload.file.type || 'application/octet-stream',
                     file_size_bytes: upload.file.size,
                 })),
+                // Job configuration parameters
+                n_experiments: currentSettings.nExperiments,
+                exploration_weight: currentSettings.explorationWeight,
+                mcts_selection: currentSettings.mctsSelection,
+                surprisal_width: currentSettings.surprisalWidth,
+                evidence_weight: currentSettings.evidenceWeight,
+                warmstart_experiments: currentSettings.warmstartExperiments,
+                n_warmstart: currentSettings.nWarmstart,
             };
 
             await api.saveMetadata(runid, metadata);
@@ -515,51 +533,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         }
     }, [api, runid]);
 
-    const saveJobArgs = useCallback(
-        async (overrides?: Partial<Settings>) => {
-            const saveStartTime = Date.now();
-            setIsSaving(true);
-
-            try {
-                // Use ref to get latest state
-                const currentSettings = settingsRef.current;
-                const effectiveSettings = { ...currentSettings, ...overrides };
-                const jobArgs = {
-                    n_experiments: effectiveSettings.nExperiments,
-                    exploration_weight: effectiveSettings.explorationWeight,
-                    mcts_selection: effectiveSettings.mctsSelection,
-                    surprisal_width: effectiveSettings.surprisalWidth,
-                    evidence_weight: effectiveSettings.evidenceWeight,
-                    warmstart_experiments: effectiveSettings.warmstartExperiments,
-                    n_warmstart: effectiveSettings.nWarmstart,
-                };
-                await api.saveJobArgs(runid, jobArgs);
-            } finally {
-                // Ensure indicator shows for at least 1000ms
-                const elapsed = Date.now() - saveStartTime;
-                const remainingTime = Math.max(0, 1000 - elapsed);
-
-                if (savingTimeoutRef.current) {
-                    clearTimeout(savingTimeoutRef.current);
-                }
-
-                savingTimeoutRef.current = setTimeout(() => {
-                    setIsSaving(false);
-                }, remainingTime);
-            }
-        },
-        [api, runid]
-    );
-
     // Create debounced versions of save functions
     const debouncedSaveMetadata = useMemo(
         () => debounce(() => saveMetadata(), debounceSaveMs),
         [saveMetadata, debounceSaveMs]
-    );
-
-    const debouncedSaveJobArgs = useMemo(
-        () => debounce(() => saveJobArgs(), debounceSaveMs),
-        [saveJobArgs, debounceSaveMs]
     );
 
     const debouncedSaveDatasetMetadata = useMemo(
@@ -571,13 +548,12 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     useEffect(() => {
         return () => {
             debouncedSaveMetadata.cancel();
-            debouncedSaveJobArgs.cancel();
             debouncedSaveDatasetMetadata.cancel();
             if (savingTimeoutRef.current) {
                 clearTimeout(savingTimeoutRef.current);
             }
         };
-    }, [debouncedSaveMetadata, debouncedSaveJobArgs, debouncedSaveDatasetMetadata]);
+    }, [debouncedSaveMetadata, debouncedSaveDatasetMetadata]);
 
     const handleExperimentsChange = (value: string) => {
         if (value === '') {
@@ -598,7 +574,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             }));
         } else {
             updateSettings('nExperiments', num);
-            saveJobArgs({ nExperiments: num });
+            debouncedSaveMetadata();
             setFormError(null);
         }
     };
@@ -639,7 +615,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         // Flush any pending debounced saves
         debouncedSaveMetadata.flush();
-        debouncedSaveJobArgs.flush();
         debouncedSaveDatasetMetadata.flush();
 
         if (isFormInvalid()) {
@@ -666,17 +641,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 return;
             }
 
-            // Save metadata
+            // Save metadata (includes all job configuration)
             await saveMetadata();
 
             // Update the run name in the sidebar list
             updateViewerRun({ id: runid, name: settings.name.trim() });
 
-            // Submit run
-            await api.submitRun(runid, {
-                n_experiments: settings.nExperiments,
-                intent: settings.intent,
-            });
+            // Submit run - backend reads configuration from metadata
+            await api.submitRun(runid);
 
             // Notify parent of success
             onSubmitSuccess();
@@ -712,11 +684,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         // Setters
         updateSettings,
         saveMetadata,
-        saveJobArgs,
 
         // Debounced save functions
         debouncedSaveMetadata,
-        debouncedSaveJobArgs,
         debouncedSaveDatasetMetadata,
 
         // Handlers

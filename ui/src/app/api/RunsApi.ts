@@ -27,9 +27,7 @@ export interface RunMetadataFromApi {
         content_type: string | null;
         file_size_bytes: number | null;
     }[];
-}
-
-export interface RunArgsFromApi {
+    // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
     mcts_selection: string | null;
@@ -50,7 +48,6 @@ export interface RunFromApi {
     run_stats?: RunStatsFromApi;
     execution_status?: Record<string, unknown>;
     run_metadata?: RunMetadataFromApi;
-    run_args?: RunArgsFromApi;
 }
 
 export interface UploadDatasetResponseBody {
@@ -121,6 +118,14 @@ export interface MetadataFromApi {
     domain: string | null;
     intent: string | null;
     datasets: MetadataDatasetFromApi[];
+    // Job configuration parameters
+    n_experiments: number | null;
+    exploration_weight: number | null;
+    mcts_selection: string | null;
+    surprisal_width: number | null;
+    evidence_weight: number | null;
+    warmstart_experiments: string | null;
+    n_warmstart: number | null;
 }
 
 export interface GetRunMetadataResponseBody {
@@ -245,14 +250,6 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async saveJobArgs(runId: string, args: Record<string, unknown>) {
-        return this.request<{ path: string; message: string }>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/args`,
-            method: 'POST',
-            body: { args },
-        });
-    }
-
     async uploadDataset(runId: string, file: File) {
         const formData = new FormData();
         formData.append('file', file);
@@ -287,11 +284,11 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async submitRun(runId: string, config: Record<string, unknown>) {
+    async submitRun(runId: string) {
         return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/submit`,
             method: 'POST',
-            body: { runid: runId, ...config },
+            body: { runid: runId },
         });
     }
 }

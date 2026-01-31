@@ -17,6 +17,7 @@
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@fontsource/lato": "^5.0.18",
+    "@fontsource/manrope": "^5.2.8",
     "@mui/icons-material": "^5.15.11",
     "@mui/lab": "^5.0.0-alpha.166",
     "@mui/material": "^5.15.6",

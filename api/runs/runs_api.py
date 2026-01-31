@@ -29,7 +29,6 @@ from runs.models import (
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
     MetadataModel,
-    RunArgsModel,
     RunDetailsModel,
     RunModel,
     RunStatsModel,
@@ -389,7 +388,6 @@ def create() -> Blueprint:
                 if run_metadata_model
                 else f"Description for Run {run_id}",
                 path=None,
-                run_args=None,
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
@@ -468,13 +466,6 @@ def create() -> Blueprint:
                 current_app.logger.error(f"Failed to get metadata for {runid}: {e}")
                 metadata_dict = None
 
-            # Get args
-            try:
-                args_dict = manager.get_job_args(userid, runid)
-            except Exception as e:
-                current_app.logger.error(f"Failed to get job args for {runid}: {e}")
-                args_dict = None
-
             # Build RunModel
             run_details_model = RunDetailsModel(
                 execution_id=updated_run_details.get("execution_id"),
@@ -489,7 +480,6 @@ def create() -> Blueprint:
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
-            run_args_model = RunArgsModel.from_dict(args_dict) if args_dict else None
             run_model = RunModel(
                 runid=runid,
                 userid=userid,
@@ -500,7 +490,6 @@ def create() -> Blueprint:
                 run_stats=run_stats_model,
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
-                run_args=run_args_model,
                 execution_status={},
             )
 
@@ -709,44 +698,6 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to save metadata: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/args", methods=["POST"])
-    @requires_enrollment
-    def save_job_args(runid: str):
-        """Save or update job arguments for a run.
-
-        Args:
-            runid: Run identifier from URL path
-
-        Expects JSON body with:
-        - args: Job arguments object
-
-        Returns:
-            JSON response with upload confirmation.
-
-        Raises:
-            BadRequest: If request body is missing or invalid.
-        """
-        userid = request.user.get("sub")
-        if not userid:
-            return jsonify({"error": "User ID not found in token"}), 401
-
-        data = request.json
-        if not data:
-            raise BadRequest("No request body")
-
-        args = data.get("args")
-
-        if not args:
-            raise BadRequest("args is required")
-
-        try:
-            manager = get_job_manager()
-            path = manager.upload_job_args(userid, runid, args)
-            return jsonify({"path": path, "message": "Job args saved successfully"})
-        except Exception as e:
-            current_app.logger.error(f"Failed to save job args: {e}")
-            return jsonify({"error": str(e)}), 500
-
     @api.route("<runid>/metadata", methods=["GET"])
     @requires_enrollment
     def get_run_metadata(runid: str):
@@ -787,10 +738,8 @@ def create() -> Blueprint:
 
         Expects JSON body with:
         - runid: Run identifier
-        - n_experiments: Number of experiments
-        - model: Model name (optional, uses args.py default when omitted)
-        - belief_model: Belief model (optional)
-        - Additional optional parameters
+
+        Job configuration is read from the run's metadata.json file.
 
         Returns:
             JSON response with execution ID.
@@ -810,16 +759,18 @@ def create() -> Blueprint:
         if not runid:
             raise BadRequest("runid is required")
 
-        # Extract run parameters
-        n_experiments = data.get("n_experiments")
-        model = data.get("model")
-        belief_model = data.get("belief_model")
-
         try:
             manager = get_job_manager()
 
+            # Read job configuration from metadata
+            metadata = manager.get_metadata(userid, runid)
+            if not metadata:
+                raise BadRequest("Run metadata not found. Please save run configuration first.")
+
+            intent = metadata.get("intent", "")
+            n_experiments = metadata.get("n_experiments")
+
             # Check if this is a simulated run (replay mode)
-            intent = data.get("intent", "")
             is_simulated = SIMULATE_RUN_TRIGGER in intent
 
             if is_simulated:
@@ -837,26 +788,35 @@ def create() -> Blueprint:
                 )
             else:
                 if n_experiments is None:
-                    raise BadRequest("Number of Experiments is required")
+                    raise BadRequest("Number of Experiments is required in metadata")
 
                 # Validate sufficient credits before submission
                 check_sufficient_credits(
                     n_experiments=n_experiments, userid=userid, config=manager.config
                 )
 
-                # Pass all additional parameters to run_job
-                execution_id = manager.run_job(
-                    userid,
-                    runid,
-                    # Remap UI parameters to equivalent AutoDiscovery name
-                    user_query=intent,
-                    **{
-                        k: v
-                        for k, v in data.items()
-                        # Exclude parameters that are meaningless to AutoDiscovery job
-                        if k not in ["runid", "intent"]
-                    },
-                )
+                # Build job parameters from metadata
+                job_params = {
+                    "n_experiments": n_experiments,
+                    "user_query": intent,
+                }
+
+                # Add optional parameters if present in metadata
+                # Filter out None and empty strings, but allow 0 and other valid values
+                optional_params = [
+                    "exploration_weight",
+                    "mcts_selection",
+                    "surprisal_width",
+                    "evidence_weight",
+                    "warmstart_experiments",
+                    "n_warmstart",
+                ]
+                for param in optional_params:
+                    value = metadata.get(param)
+                    if value is not None and value != "":
+                        job_params[param] = value
+
+                execution_id = manager.run_job(userid, runid, **job_params)
 
             # Update run_details.json with execution_id and status
             _update_run_details(

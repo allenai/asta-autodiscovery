@@ -13,22 +13,21 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import prettyBytes from 'pretty-bytes';
 
-import { Metadata, RunArgs } from '@/types/Run';
+import { Metadata } from '@/types/Run';
 import { MCTS_SELECTION } from '@/runs/hooks/useRunSetup';
 
 interface RunParametersModalProps {
     open: boolean;
     onClose: () => void;
     metadata: Metadata | null | undefined;
-    args: RunArgs | null | undefined;
 }
 
 /**
  * Modal displaying run parameters in read-only format.
  * Shows metadata (name, description, datasets, domain, intent) and
- * run arguments (experiments, exploration weight, etc.)
+ * run arguments (experiments, exploration weight, etc.) - all from metadata.
  */
-export function RunParametersModal({ open, onClose, metadata, args }: RunParametersModalProps) {
+export function RunParametersModal({ open, onClose, metadata }: RunParametersModalProps) {
     const getMctsSelectionLabel = (value: string | null) => {
         if (!value) return 'Not set';
         const option = Object.values(MCTS_SELECTION).find((opt) => opt.value === value);
@@ -141,45 +140,45 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
                     <FieldRow>
                         <FieldLabel>Experiment Budget</FieldLabel>
                         <FieldValue>
-                            {args?.nExperiments != null
-                                ? `${args.nExperiments} experiments`
+                            {metadata?.nExperiments != null
+                                ? `${metadata.nExperiments} experiments`
                                 : 'Not set'}
                         </FieldValue>
                     </FieldRow>
 
                     <FieldRow>
                         <FieldLabel>Exploration weight</FieldLabel>
-                        <FieldValue>{args?.explorationWeight ?? 'Default'}</FieldValue>
+                        <FieldValue>{metadata?.explorationWeight ?? 'Default'}</FieldValue>
                     </FieldRow>
 
                     <FieldRow>
                         <FieldLabel>Search strategy</FieldLabel>
                         <FieldValue>
-                            {getMctsSelectionLabel(args?.mctsSelection ?? null)}
+                            {getMctsSelectionLabel(metadata?.mctsSelection ?? null)}
                         </FieldValue>
                     </FieldRow>
 
                     <FieldRow>
                         <FieldLabel>Surprise threshold</FieldLabel>
-                        <FieldValue>{args?.surprisalWidth ?? 'Default'}</FieldValue>
+                        <FieldValue>{metadata?.surprisalWidth ?? 'Default'}</FieldValue>
                     </FieldRow>
 
                     <FieldRow>
                         <FieldLabel>Evidence weight</FieldLabel>
-                        <FieldValue>{args?.evidenceWeight ?? 'Default'}</FieldValue>
+                        <FieldValue>{metadata?.evidenceWeight ?? 'Default'}</FieldValue>
                     </FieldRow>
 
-                    {args?.warmstartExperiments && (
+                    {metadata?.warmstartExperiments && (
                         <FieldRow>
                             <FieldLabel>Warmstart experiments</FieldLabel>
-                            <FieldValue>{args.warmstartExperiments}</FieldValue>
+                            <FieldValue>{metadata.warmstartExperiments}</FieldValue>
                         </FieldRow>
                     )}
 
-                    {args?.nWarmstart != null && (
+                    {metadata?.nWarmstart != null && (
                         <FieldRow>
                             <FieldLabel>Warmstart count</FieldLabel>
-                            <FieldValue>{args.nWarmstart}</FieldValue>
+                            <FieldValue>{metadata.nWarmstart}</FieldValue>
                         </FieldRow>
                     )}
                 </Section>

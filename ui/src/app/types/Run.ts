@@ -1,10 +1,4 @@
-import {
-    ExperimentFromApi,
-    MetadataFromApi,
-    RunArgsFromApi,
-    RunDetailsFromApi,
-    RunFromApi,
-} from '@/api/RunsApi';
+import { ExperimentFromApi, MetadataFromApi, RunDetailsFromApi, RunFromApi } from '@/api/RunsApi';
 
 // Maps to values from _get_execution_phase() in cloudrun.py
 export enum RunStatus {
@@ -30,7 +24,6 @@ export type Run = {
     stats: RunStats | null;
     executionStatus?: Record<string, unknown> | null;
     metadata?: Metadata | null;
-    args?: RunArgs | null;
 };
 
 export type RunStats = {
@@ -98,16 +91,14 @@ export type Metadata = {
     datasets: MetadataDataset[];
     domain?: string;
     intent?: string;
-};
-
-export type RunArgs = {
-    nExperiments: number | null;
-    explorationWeight: number | null;
-    mctsSelection: string | null;
-    surprisalWidth: number | null;
-    evidenceWeight: number | null;
-    warmstartExperiments: string | null;
-    nWarmstart: number | null;
+    // Job configuration parameters
+    nExperiments?: number | null;
+    explorationWeight?: number | null;
+    mctsSelection?: string | null;
+    surprisalWidth?: number | null;
+    evidenceWeight?: number | null;
+    warmstartExperiments?: string | null;
+    nWarmstart?: number | null;
 };
 
 export const getRunFromApi = (runFromApi: RunFromApi): Run => {
@@ -121,7 +112,6 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         stats: getRunStatsFromApi(runFromApi.run_stats),
         executionStatus: runFromApi.execution_status || null,
         metadata: getMetadataFromApi(runFromApi.run_metadata) || null,
-        args: getRunArgsFromApi(runFromApi.run_args) || null,
     };
 };
 
@@ -194,21 +184,13 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         domain: metadataFromApi.domain || undefined,
         intent: metadataFromApi.intent || undefined,
         datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
-    };
-};
-
-export const getRunArgsFromApi = (argsFromApi?: RunArgsFromApi): RunArgs | null => {
-    if (!argsFromApi) {
-        return null;
-    }
-
-    return {
-        nExperiments: argsFromApi.n_experiments,
-        explorationWeight: argsFromApi.exploration_weight,
-        mctsSelection: argsFromApi.mcts_selection,
-        surprisalWidth: argsFromApi.surprisal_width,
-        evidenceWeight: argsFromApi.evidence_weight,
-        warmstartExperiments: argsFromApi.warmstart_experiments,
-        nWarmstart: argsFromApi.n_warmstart,
+        // Job configuration parameters
+        nExperiments: metadataFromApi.n_experiments,
+        explorationWeight: metadataFromApi.exploration_weight,
+        mctsSelection: metadataFromApi.mcts_selection,
+        surprisalWidth: metadataFromApi.surprisal_width,
+        evidenceWeight: metadataFromApi.evidence_weight,
+        warmstartExperiments: metadataFromApi.warmstart_experiments,
+        nWarmstart: metadataFromApi.n_warmstart,
     };
 };

@@ -249,9 +249,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <StyledFormLabel>Search strategy</StyledFormLabel>
                         <HelperText>
                             Determines how the system navigates through nested hypotheses during
-                            exploration. UCB1_recursive (default) efficiently balances breadth and
-                            depth. Beam search focuses on top candidates at each level. Progressive
-                            widening gradually expands the search space as more experiments run.
+                            exploration. UCB1 Recursive (default) efficiently balances breadth and
+                            depth. MCTS with Progressive Widening gradually expands the search
+                            space as more experiments run.
                         </HelperText>
                         <Select
                             value={settings.mctsSelection}

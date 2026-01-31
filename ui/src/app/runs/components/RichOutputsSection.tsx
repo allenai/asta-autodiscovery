@@ -180,6 +180,7 @@ export function RichOutputsSection({
                     <Typography
                         variant="h6"
                         sx={(theme) => ({
+                            fontFamily: '"PP Telegraf", Manrope, sans-serif',
                             fontWeight: 'bold',
                             fontSize: '18px',
                             color: theme.color['green-40'].hex,

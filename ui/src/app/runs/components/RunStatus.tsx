@@ -407,6 +407,10 @@ const RunToolbarButtons = styled('div')`
 const ParametersButton = styled(Button)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
     color: ${({ theme }) => theme.color['cream-100'].hex};
+
+    &:hover {
+        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
 `;
 
 const RunHeader = styled('div')`

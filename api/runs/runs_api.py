@@ -56,9 +56,6 @@ SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 # Max size of files that can be uploaded
 UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB
 
-# Allowed file extensions for uploads
-UPLOAD_ALLOWED_EXTENSIONS = {".csv", ".json", ".txt", ".tsv"}
-
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 
@@ -640,11 +637,6 @@ def create() -> Blueprint:
                 return jsonify({"error": "Invalid file size."}), 400
             if req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
                 return jsonify({"error": "File too large."}), 413
-
-            # Validate file extension
-            file_ext = Path(req.filename).suffix.lower()
-            if file_ext not in UPLOAD_ALLOWED_EXTENSIONS:
-                return jsonify({"error": f"File type not allowed: {file_ext}"}), 400
 
             manager = get_job_manager()
 

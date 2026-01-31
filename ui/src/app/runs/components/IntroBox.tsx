@@ -24,10 +24,7 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
                         Your datasets and discoveries are kept private and secure. Signing in
                         ensures that only you can access your research.
                     </LoginDescription>
-                    <LoginButton
-                        onClick={onLoginClick}
-                        variant="contained"
-                        endIcon={<LoginIcon />}>
+                    <LoginButton onClick={onLoginClick} variant="contained" endIcon={<LoginIcon />}>
                         Sign in to get started
                     </LoginButton>
                 </>

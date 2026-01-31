@@ -250,8 +250,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <HelperText>
                             Determines how the system navigates through nested hypotheses during
                             exploration. UCB1 Recursive (default) efficiently balances breadth and
-                            depth. MCTS with Progressive Widening gradually expands the search
-                            space as more experiments run.
+                            depth. MCTS with Progressive Widening gradually expands the search space
+                            as more experiments run.
                         </HelperText>
                         <Select
                             value={settings.mctsSelection}

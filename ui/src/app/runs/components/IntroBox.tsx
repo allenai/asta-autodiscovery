@@ -1,5 +1,5 @@
 import { Box, Typography, styled, Button } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import LoginIcon from '@mui/icons-material/Login';
 
 interface IntroBoxProps {
     showLogin?: boolean;
@@ -24,10 +24,7 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
                         Your datasets and discoveries are kept private and secure. Signing in
                         ensures that only you can access your research.
                     </LoginDescription>
-                    <LoginButton
-                        onClick={onLoginClick}
-                        variant="contained"
-                        endIcon={<ArrowForwardIcon />}>
+                    <LoginButton onClick={onLoginClick} variant="contained" endIcon={<LoginIcon />}>
                         Sign in to get started
                     </LoginButton>
                 </>

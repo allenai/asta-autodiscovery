@@ -314,47 +314,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             disabled={isFormDisabled}
                         />
                     </FormControl>
-
-                    <FormControl fullWidth>
-                        <StyledFormLabel>
-                            Warmstart Experiments <OptionalText>(Optional)</OptionalText>
-                        </StyledFormLabel>
-                        <HelperText>
-                            Initial experiments to run before autonomous exploration begins. These
-                            "seed" the system with baseline findings that inform subsequent
-                            hypothesis generation. Useful for testing known relationships or
-                            establishing a starting point for discovery.
-                        </HelperText>
-                        <TextField
-                            value={settings.warmstartExperiments}
-                            onChange={(e) => {
-                                updateSettings('warmstartExperiments', e.target.value);
-                                debouncedSaveMetadata();
-                            }}
-                            disabled={isFormDisabled}
-                            placeholder="Path to json file"
-                        />
-                    </FormControl>
-
-                    <FormControl fullWidth>
-                        <StyledFormLabel>
-                            Number of warmstarts <OptionalText>(Optional)</OptionalText>
-                        </StyledFormLabel>
-                        <HelperText>
-                            How many initial experiments to run before autonomous exploration
-                            begins. These provide the system with baseline findings to inform its
-                            hypothesis generation.
-                        </HelperText>
-                        <TextField
-                            type="number"
-                            value={settings.nWarmstart}
-                            onChange={(e) => {
-                                updateSettings('nWarmstart', parseInt(e.target.value));
-                                debouncedSaveMetadata();
-                            }}
-                            disabled={isFormDisabled}
-                        />
-                    </FormControl>
                 </StyledAccordian>
             </ConfigurationBox>
 

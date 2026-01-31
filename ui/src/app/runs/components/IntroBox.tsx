@@ -1,5 +1,5 @@
 import { Box, Typography, styled, Button } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import LoginIcon from '@mui/icons-material/Login';
 
 interface IntroBoxProps {
     showLogin?: boolean;
@@ -27,7 +27,7 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
                     <LoginButton
                         onClick={onLoginClick}
                         variant="contained"
-                        endIcon={<ArrowForwardIcon />}>
+                        endIcon={<LoginIcon />}>
                         Sign in to get started
                     </LoginButton>
                 </>

@@ -325,7 +325,7 @@ const PanelLayout = styled('div')`
     display: flex;
     gap: ${({ theme }) => theme.spacing(2)};
     height: 100%;
-    padding: ${({ theme }) => theme.spacing(2)};
+    padding: 0 ${({ theme }) => theme.spacing(2)} ${({ theme }) => theme.spacing(2)};
     justify-content: space-between;
     position: relative;
 
@@ -350,10 +350,11 @@ const TablePanel = styled('div')<{ $isExpanded: boolean; $hasDetails: boolean }>
     width: ${({ $isExpanded, $hasDetails }) =>
         $isExpanded ? ($hasDetails ? 'auto' : '100%') : '400px'};
     background-color: #163638f3;
-    border-radius: ${({ theme }) => theme.shape.borderRadius}px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     gap: ${({ theme }) => theme.spacing(2)};
+    overflow: auto;
     z-index: 2;
 
     @container run-status (width < 1000px) {
@@ -368,8 +369,7 @@ const DetailsPanel = styled('div')`
     flex: 0 1 auto;
     max-width: 500px;
     background-color: #163638f3;
-    border-radius: ${({ theme }) => theme.shape.borderRadius}px;
-    padding: ${({ theme }) => theme.spacing(3)};
+    border-radius: 12px;
     position: relative;
     overflow-y: scroll;
     z-index: 2;
@@ -421,11 +421,14 @@ const RunHeader = styled('div')`
     padding: ${({ theme }) => theme.spacing(3)};
 `;
 
-const RunHeaderName = styled('div')`
+const RunHeaderName = styled('h1')`
     color: ${({ theme }) => theme.color['green-100'].hex};
-    flex: 1 1 auto;
-    font-size: 1.25rem;
+    font-family: 'PP Telegraf', Manrope, sans-serif;
     font-weight: 700;
+    font-size: 20px;
+    line-height: 24px;
+    margin: 0;
+    flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

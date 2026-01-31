@@ -167,20 +167,6 @@ export function RunParametersModal({ open, onClose, metadata }: RunParametersMod
                         <FieldLabel>Evidence weight</FieldLabel>
                         <FieldValue>{metadata?.evidenceWeight ?? 'Default'}</FieldValue>
                     </FieldRow>
-
-                    {metadata?.warmstartExperiments && (
-                        <FieldRow>
-                            <FieldLabel>Warmstart experiments</FieldLabel>
-                            <FieldValue>{metadata.warmstartExperiments}</FieldValue>
-                        </FieldRow>
-                    )}
-
-                    {metadata?.nWarmstart != null && (
-                        <FieldRow>
-                            <FieldLabel>Warmstart count</FieldLabel>
-                            <FieldValue>{metadata.nWarmstart}</FieldValue>
-                        </FieldRow>
-                    )}
                 </Section>
             </StyledDialogContent>
         </Dialog>

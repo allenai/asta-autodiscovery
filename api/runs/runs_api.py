@@ -802,6 +802,7 @@ def create() -> Blueprint:
                 }
 
                 # Add optional parameters if present in metadata
+                # Filter out None and empty strings, but allow 0 and other valid values
                 optional_params = [
                     "exploration_weight",
                     "mcts_selection",
@@ -811,8 +812,9 @@ def create() -> Blueprint:
                     "n_warmstart",
                 ]
                 for param in optional_params:
-                    if metadata.get(param) is not None:
-                        job_params[param] = metadata[param]
+                    value = metadata.get(param)
+                    if value is not None and value != "":
+                        job_params[param] = value
 
                 execution_id = manager.run_job(userid, runid, **job_params)
 

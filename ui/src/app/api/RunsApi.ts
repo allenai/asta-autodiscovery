@@ -291,6 +291,13 @@ export class RunsApi extends BaseApi {
             body: { runid: runId },
         });
     }
+
+    async deleteRun(runId: string) {
+        return this.request<{ message: string }>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}`,
+            method: 'DELETE',
+        });
+    }
 }
 const api = new RunsApi();
 export const getRunsApi = () => api;

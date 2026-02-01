@@ -20,6 +20,7 @@ export interface RunsState {
     updateViewerRuns: () => Promise<void>;
     addViewerRun: (run: Run) => void;
     updateViewerRun: (run: Partial<Run> & { id: string }) => void;
+    removeViewerRun: (runId: string) => void;
     exampleRuns: Run[] | null;
     isExampleRunsLoading?: boolean;
     updateExampleRuns: () => Promise<void>;
@@ -32,6 +33,7 @@ export const DEFAULT_STATE: RunsState = {
     updateViewerRuns: async () => {},
     addViewerRun: () => {},
     updateViewerRun: () => {},
+    removeViewerRun: () => {},
     exampleRuns: null,
     updateExampleRuns: async () => {},
     isExampleRunsLoading: false,
@@ -78,6 +80,13 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
         });
     }, []);
 
+    const removeViewerRun = useCallback((runId: string) => {
+        setViewerRuns((prevRuns) => {
+            if (!prevRuns) return prevRuns;
+            return prevRuns.filter((run) => run.id !== runId);
+        });
+    }, []);
+
     const updateViewerRuns = useCallback(async () => {
         setIsViewerRunsLoading(true);
         try {
@@ -121,6 +130,7 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
             isExampleRunsLoading,
             addViewerRun,
             updateViewerRun,
+            removeViewerRun,
             updateViewerRuns,
             updateExampleRuns,
         }),
@@ -132,6 +142,7 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
             isExampleRunsLoading,
             addViewerRun,
             updateViewerRun,
+            removeViewerRun,
             updateViewerRuns,
             updateExampleRuns,
         ]

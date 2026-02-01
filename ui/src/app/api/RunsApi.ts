@@ -39,10 +39,10 @@ export interface RunMetadataFromApi {
 
 export interface RunFromApi {
     runid: string;
+    status: string;
+    name: string;
     userid: string;
     path?: string;
-    status: string;
-    name?: string;
     description?: string;
     run_details?: RunDetailsFromApi;
     run_stats?: RunStatsFromApi;

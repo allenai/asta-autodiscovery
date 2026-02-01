@@ -105,7 +105,7 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
     return {
         id: runFromApi.runid,
         userid: runFromApi.userid,
-        name: runFromApi.name || `Run ${runFromApi.runid}`,
+        name: runFromApi.name,
         description: runFromApi.description || '',
         path: runFromApi.path || '',
         details: getRunDetailsFromApi(runFromApi.run_details),

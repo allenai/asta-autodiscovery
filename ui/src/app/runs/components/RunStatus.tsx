@@ -269,7 +269,7 @@ function RunStatusContent({
                                     variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}>
-                                    Exploration Parameters
+                                    Session Configuration
                                 </ParametersButton>
                                 {canStop && (
                                     <StopButton

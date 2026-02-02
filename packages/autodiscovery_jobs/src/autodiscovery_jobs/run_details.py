@@ -31,6 +31,7 @@ class RunDetails:
         status: CREATED, PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED
         status_checked_at: ISO timestamp of last status check
         finished_at_raw: ISO timestamp when job finished (terminal status)
+        origin_url: Base URL where the run was submitted from (e.g., https://asta.allenai.org)
     """
 
     execution_id: str | None = None
@@ -38,6 +39,7 @@ class RunDetails:
     status: str = "CREATED"
     status_checked_at: str | None = None
     finished_at_raw: str | None = field(default=None, metadata={"json_key": "finished_at"})
+    origin_url: str | None = None
 
     @property
     def finished_at(self) -> datetime | None:
@@ -59,6 +61,7 @@ class RunDetails:
             "status": self.status,
             "status_checked_at": self.status_checked_at,
             "finished_at": self.finished_at_raw,
+            "origin_url": self.origin_url,
         }
 
     @classmethod
@@ -70,6 +73,7 @@ class RunDetails:
             status=data.get("status", "CREATED"),
             status_checked_at=data.get("status_checked_at"),
             finished_at_raw=data.get("finished_at"),
+            origin_url=data.get("origin_url"),
         )
 
     @classmethod

@@ -62,6 +62,8 @@ def build_email_body_text(
     run_name: str | None,
     finished_at: datetime | None,
     execution_id: str | None,
+    origin_url: str | None = None,
+    metadata: dict | None = None,
 ) -> str:
     """Build plain text email body.
 
@@ -72,6 +74,8 @@ def build_email_body_text(
         run_name: Optional run name
         finished_at: Finish timestamp
         execution_id: Cloud Run execution ID
+        origin_url: Base URL where run was submitted (for results link)
+        metadata: Run metadata for additional context
 
     Returns:
         Plain text email body
@@ -88,8 +92,18 @@ def build_email_body_text(
     else:
         status_message = "Your AutoDiscovery run has finished."
 
-    # Build the run URL
-    run_url = f"https://asta.allenai.org/runs/{runid}"
+    # Build the run URL using origin or default
+    base_url = origin_url or "https://asta.allenai.org"
+    run_url = f"{base_url}/runs/{runid}"
+
+    # Build metadata section
+    metadata = metadata or {}
+    description = metadata.get("description", "")
+    domain = metadata.get("domain", "")
+    intent = metadata.get("intent", "")
+    n_experiments = metadata.get("n_experiments", "")
+    datasets = metadata.get("datasets", [])
+    dataset_names = ", ".join(d.get("name", "") for d in datasets) if datasets else ""
 
     body = f"""
 {status_message}
@@ -98,15 +112,27 @@ Run Details:
   Name: {name_display}
   Status: {status}
   Finished: {finished_str}
-  Run ID: {runid}
+"""
 
+    if description:
+        body += f"  Description: {description}\n"
+    if domain:
+        body += f"  Domain: {domain}\n"
+    if intent:
+        body += f"  Intent: {intent}\n"
+    if dataset_names:
+        body += f"  Datasets: {dataset_names}\n"
+    if n_experiments:
+        body += f"  Experiments: {n_experiments}\n"
+
+    body += f"""
 View your results: {run_url}
 
 ---
 This is an automated message from AutoDiscovery (ASTA).
-""".strip()
+"""
 
-    return body
+    return body.strip()
 
 
 def build_email_body_html(
@@ -116,6 +142,8 @@ def build_email_body_html(
     run_name: str | None,
     finished_at: datetime | None,
     execution_id: str | None,
+    origin_url: str | None = None,
+    metadata: dict | None = None,
 ) -> str:
     """Build HTML email body.
 
@@ -126,6 +154,8 @@ def build_email_body_html(
         run_name: Optional run name
         finished_at: Finish timestamp
         execution_id: Cloud Run execution ID
+        origin_url: Base URL where run was submitted (for results link)
+        metadata: Run metadata for additional context
 
     Returns:
         HTML email body
@@ -146,7 +176,41 @@ def build_email_body_html(
         status_message = "Your AutoDiscovery run has finished."
         status_color = "#17a2b8"
 
-    run_url = f"https://asta.allenai.org/runs/{runid}"
+    # Build the run URL using origin or default
+    base_url = origin_url or "https://asta.allenai.org"
+    run_url = f"{base_url}/runs/{runid}"
+
+    # Extract metadata fields
+    metadata = metadata or {}
+    description = metadata.get("description", "")
+    domain = metadata.get("domain", "")
+    intent = metadata.get("intent", "")
+    n_experiments = metadata.get("n_experiments", "")
+    datasets = metadata.get("datasets", [])
+    dataset_names = ", ".join(d.get("name", "") for d in datasets) if datasets else ""
+
+    # Build optional metadata rows
+    metadata_rows = ""
+    if description:
+        metadata_rows += f"""
+                <dt>Description</dt>
+                <dd>{description}</dd>"""
+    if domain:
+        metadata_rows += f"""
+                <dt>Domain</dt>
+                <dd>{domain}</dd>"""
+    if intent:
+        metadata_rows += f"""
+                <dt>Intent</dt>
+                <dd>{intent}</dd>"""
+    if dataset_names:
+        metadata_rows += f"""
+                <dt>Datasets</dt>
+                <dd>{dataset_names}</dd>"""
+    if n_experiments:
+        metadata_rows += f"""
+                <dt>Experiments</dt>
+                <dd>{n_experiments}</dd>"""
 
     html = f"""
 <!DOCTYPE html>
@@ -176,9 +240,7 @@ def build_email_body_html(
                 <dt>Status</dt>
                 <dd>{status}</dd>
                 <dt>Completed</dt>
-                <dd>{finished_str}</dd>
-                <dt>Run ID</dt>
-                <dd>{runid}</dd>
+                <dd>{finished_str}</dd>{metadata_rows}
             </dl>
         </div>
 
@@ -195,8 +257,8 @@ def build_email_body_html(
     return html
 
 
-def get_run_name(manager: JobManager, userid: str, runid: str) -> str | None:
-    """Get run name from metadata.
+def get_run_metadata(manager: JobManager, userid: str, runid: str) -> dict | None:
+    """Get run metadata.
 
     Args:
         manager: JobManager instance
@@ -204,11 +266,10 @@ def get_run_name(manager: JobManager, userid: str, runid: str) -> str | None:
         runid: Run identifier
 
     Returns:
-        Run name or None if not found
+        Metadata dict or None if not found
     """
     try:
-        metadata = manager.get_metadata(userid, runid)
-        return metadata.get("name")
+        return manager.get_metadata(userid, runid)
     except Exception:
         return None
 
@@ -294,18 +355,22 @@ def send_completion_emails(
                     errors += 1
                     continue
 
-                # Get run metadata for name
-                run_name = get_run_name(manager, userid, runid)
+                # Get run metadata
+                metadata = get_run_metadata(manager, userid, runid)
+                run_name = metadata.get("name") if metadata else None
                 status = run_details.status
                 execution_id = run_details.execution_id
+                origin_url = run_details.origin_url
 
                 # Build email content
                 subject = build_email_subject(status, run_name)
                 body_text = build_email_body_text(
-                    userid, runid, status, run_name, run_details.finished_at, execution_id
+                    userid, runid, status, run_name, run_details.finished_at, execution_id,
+                    origin_url=origin_url, metadata=metadata,
                 )
                 body_html = build_email_body_html(
-                    userid, runid, status, run_name, run_details.finished_at, execution_id
+                    userid, runid, status, run_name, run_details.finished_at, execution_id,
+                    origin_url=origin_url, metadata=metadata,
                 )
 
                 if dry_run:

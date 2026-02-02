@@ -21,7 +21,7 @@ from autodiscovery_jobs import (
     Auth0Error,
     JobConfig,
     JobManager,
-    get_user_email,
+    get_user,
     record_email_sent,
     refresh_run_status,
     send_email,
@@ -40,37 +40,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def build_email_subject(status: str, run_name: str | None) -> str:
-    """Build email subject line based on run status.
-
-    Args:
-        status: Run status (SUCCEEDED, FAILED, CANCELLED)
-        run_name: Optional run name
-
-    Returns:
-        Email subject line
-    """
-    name_part = f'"{run_name}"' if run_name else "Your run"
-
-    if status == "SUCCEEDED":
-        return f"AutoDiscovery: {name_part} completed successfully"
-    elif status == "FAILED":
-        return f"AutoDiscovery: {name_part} failed"
-    elif status == "CANCELLED":
-        return f"AutoDiscovery: {name_part} was cancelled"
-    else:
-        return f"AutoDiscovery: {name_part} finished"
-
-
+SUBJECT_VERBS = {"SUCCEEDED": "completed successfully", "FAILED": "failed", "CANCELLED": "was cancelled"}
 STATUS_MESSAGES = {
     "SUCCEEDED": ("Your AutoDiscovery run has completed successfully.", "#28a745"),
     "FAILED": ("Your AutoDiscovery run has failed.", "#dc3545"),
     "CANCELLED": ("Your AutoDiscovery run was cancelled.", "#6c757d"),
 }
-DEFAULT_STATUS_MESSAGE = ("Your AutoDiscovery run has finished.", "#17a2b8")
 
 
-def build_email_context(
+def build_email_subject(status: str, run_name: str | None) -> str:
+    """Build email subject line based on run status."""
+    name_part = f'"{run_name}"' if run_name else "Your run"
+    return f"AutoDiscovery: {name_part} {SUBJECT_VERBS.get(status, 'finished')}"
+
+
+def build_email_body(
     runid: str,
     status: str,
     run_name: str | None,
@@ -78,27 +62,16 @@ def build_email_context(
     finished_at: datetime | None,
     origin_url: str | None = None,
     metadata: dict | None = None,
-) -> dict:
-    """Build template context for email rendering.
-
-    Args:
-        runid: Run identifier
-        status: Run status
-        run_name: Optional run name
-        started_at: ISO timestamp when run started
-        finished_at: Finish timestamp
-        origin_url: Base URL where run was submitted (for results link)
-        metadata: Run metadata for additional context
-
-    Returns:
-        Dictionary of template variables
-    """
-    status_message, status_color = STATUS_MESSAGES.get(status, DEFAULT_STATUS_MESSAGE)
+) -> str:
+    """Build email body using Jinja2 template."""
+    status_message, status_color = STATUS_MESSAGES.get(
+        status, ("Your AutoDiscovery run has finished.", "#17a2b8")
+    )
     base_url = origin_url or "https://asta.allenai.org"
     metadata = metadata or {}
     datasets = metadata.get("datasets", [])
 
-    return {
+    context = {
         "name": run_name or runid,
         "status": status,
         "status_message": status_message,
@@ -112,19 +85,6 @@ def build_email_context(
         "n_experiments": metadata.get("n_experiments", ""),
         "datasets": ", ".join(d.get("name", "") for d in datasets) if datasets else "",
     }
-
-
-def build_email_body(
-    runid: str,
-    status: str,
-    run_name: str | None,
-    started_at: str | None,
-    finished_at: datetime | None,
-    origin_url: str | None = None,
-    metadata: dict | None = None,
-) -> str:
-    """Build email body using Jinja2 template."""
-    context = build_email_context(runid, status, run_name, started_at, finished_at, origin_url, metadata)
     template = jinja_env.get_template("completion_email.html")
     return template.render(**context).strip()
 
@@ -200,7 +160,7 @@ def send_completion_emails(
 
                 # Get user email from Auth0
                 try:
-                    recipient_email = get_user_email(userid)
+                    recipient_email = get_user(userid).get("email")
                     if not recipient_email:
                         logger.warning(f"No email found for user {userid}")
                         errors += 1

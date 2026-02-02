@@ -74,7 +74,6 @@ from .email_state import (
 from .auth0 import (
     Auth0Error,
     get_user,
-    get_user_email,
 )
 
 # Email sending
@@ -131,7 +130,6 @@ __all__ = [
     "was_email_sent",
     # Auth0 functions
     "get_user",
-    "get_user_email",
     # Email functions
     "send_email",
     "DEFAULT_SENDER_EMAIL",

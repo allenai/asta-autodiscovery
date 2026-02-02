@@ -55,7 +55,7 @@ export default function CreditsChip() {
                         <li>
                             <strong>Budget Protection:</strong> Discovery sessions are capped at 500
                             credits to prevent accidental overspending. We recommend starting with a
-                            smaller budget ({'<'}10) to learn how the system works. Once you're
+                            small budget ({'<'}10) to learn how the system works. Once you're
                             familiar with the output, you can confidently scale up to 50–100
                             experiments per session.
                         </li>

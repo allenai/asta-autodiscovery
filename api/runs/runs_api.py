@@ -234,11 +234,11 @@ def create() -> Blueprint:
                 finished_at=run_details.finished_at_raw if run_details else None,
             )
             run_stats_model = RunStatsModel(
-                requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
-                completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
-                pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
+                requested_experiments=job_stats.num_experiments_requested,
+                completed_experiments=job_stats.num_experiments_completed,
+                pending_experiments=job_stats.num_experiments_pending,
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
-            )
+            ) if job_stats else None
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
             return RunModel(
                 runid=run_id,
@@ -332,11 +332,11 @@ def create() -> Blueprint:
                 finished_at=run_details.finished_at_raw if run_details else None,
             )
             run_stats_model = RunStatsModel(
-                requested_experiments=job_stats.num_experiments_requested if job_stats else 0,
-                completed_experiments=job_stats.num_experiments_completed if job_stats else 0,
-                pending_experiments=job_stats.num_experiments_pending if job_stats else 0,
+                requested_experiments=job_stats.num_experiments_requested,
+                completed_experiments=job_stats.num_experiments_completed,
+                pending_experiments=job_stats.num_experiments_pending,
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
-            )
+            ) if job_stats else None
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
             run_model = RunModel(
                 runid=runid,

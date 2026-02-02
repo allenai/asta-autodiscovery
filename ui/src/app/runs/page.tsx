@@ -7,6 +7,7 @@ import { useAuth0 } from '@/contexts/Auth0Context';
 import { IntroBox } from '@/runs/components/IntroBox';
 import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
 import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
+import { ToS } from '@/components/ToS';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
@@ -30,34 +31,43 @@ export default function RunsPage() {
 
     if (!isAuthenticated) {
         return (
-            <Layout>
+            <LoggedOutLayout>
                 <Section>
                     <IntroBox showLogin onLoginClick={loginWithRedirect} />
                     <Attribution>
                         AutoDiscovery is developed by{' '}
-                        <Ai2LogoWrapper>
+                        <Ai2LogoWrapper
+                            href="https://allenai.org"
+                            target="_blank"
+                            rel="noopener noreferrer">
                             <Image
                                 src="/ai2-logo.svg"
                                 alt="Ai2"
-                                width={32}
-                                height={20}
-                                style={{ display: 'inline-block', verticalAlign: 'middle' }}
+                                width={50}
+                                height={16}
+                                style={{ display: 'block' }}
                             />
                         </Ai2LogoWrapper>{' '}
                         and is an{' '}
-                        <AstaLabsLogoWrapper>
+                        <AstaLabsLogoWrapper
+                            href="https://asta.example.com"
+                            target="_blank"
+                            rel="noopener noreferrer">
                             <Image
                                 src="/astalabs-logo.svg"
                                 alt="AstaLabs"
-                                width={70}
-                                height={20}
-                                style={{ display: 'inline-block', transform: 'translateY(2px)' }}
+                                width={120.004}
+                                height={17}
+                                style={{ display: 'block', transform: 'translateY(-2px)' }}
                             />
                         </AstaLabsLogoWrapper>{' '}
                         experiment.
                     </Attribution>
                 </Section>
-            </Layout>
+                <FooterWrapper>
+                    <ToS />
+                </FooterWrapper>
+            </LoggedOutLayout>
         );
     }
 
@@ -84,9 +94,25 @@ const Layout = styled(Box)(({ theme }) => ({
     margin: '0 auto',
 }));
 
+const LoggedOutLayout = styled(Box)(({ theme }) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: '100vh',
+    padding: theme.spacing(4),
+    maxWidth: '900px',
+    margin: '0 auto',
+}));
+
 const Section = styled(Box)(({ theme }) => ({
     padding: theme.spacing(3),
 }));
+
+const FooterWrapper = styled(Box)({
+    '& > div': {
+        borderTop: 'none',
+    },
+});
 
 const Attribution = styled(Typography)(({ theme }) => ({
     color: theme.color['cream-100'].hex,
@@ -95,18 +121,21 @@ const Attribution = styled(Typography)(({ theme }) => ({
     fontSize: '0.875rem',
     textAlign: 'left',
     marginTop: theme.spacing(1),
+    lineHeight: '1.5',
 }));
 
-const Ai2LogoWrapper = styled('span')({
+const Ai2LogoWrapper = styled('a')({
     display: 'inline-block',
     verticalAlign: 'middle',
-    marginLeft: '4px',
-    marginRight: '4px',
+    lineHeight: 0,
+    margin: '0 4px',
+    textDecoration: 'none',
 });
 
-const AstaLabsLogoWrapper = styled('span')({
+const AstaLabsLogoWrapper = styled('a')({
     display: 'inline-block',
     verticalAlign: 'middle',
-    marginLeft: '4px',
-    marginRight: '4px',
+    lineHeight: 0,
+    margin: '0 4px',
+    textDecoration: 'none',
 });

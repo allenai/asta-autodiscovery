@@ -8,6 +8,7 @@ import { IconAutoDSLogo } from '@/icons/Logo';
 import Header from '@/components/Header';
 import { RunsContextProvider } from '@/contexts/RunsContext';
 import { ToS } from '@/components/ToS';
+import { useAuth0 } from '@/contexts/Auth0Context';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -15,6 +16,7 @@ import { ToS } from '@/components/ToS';
 export default function RunsLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
+    const { isAuthenticated } = useAuth0();
 
     // Extract runId from pathname if we're on a run detail page
     const runIdMatch = pathname.match(/^\/runs\/([^/]+)/);
@@ -27,28 +29,30 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     return (
         <RunsContextProvider>
             <Wrapper>
-                <Layout>
+                <Layout $showSidebar={isAuthenticated}>
                     {/* Sidebar - RunsList */}
-                    <Sidebar>
-                        <Logo href="/runs">
-                            <IconAutoDSLogo />
-                        </Logo>
-                        <ScrollArea>
-                            <ScrollContainer>
-                                <ScrollContent>
-                                    <RunsList
-                                        selectedRunId={selectedRunId}
-                                        onSelectRun={handleSelectRun}
-                                    />
-                                </ScrollContent>
-                            </ScrollContainer>
-                        </ScrollArea>
-                        <ToS />
-                    </Sidebar>
+                    {isAuthenticated && (
+                        <Sidebar>
+                            <Logo href="/runs">
+                                <IconAutoDSLogo />
+                            </Logo>
+                            <ScrollArea>
+                                <ScrollContainer>
+                                    <ScrollContent>
+                                        <RunsList
+                                            selectedRunId={selectedRunId}
+                                            onSelectRun={handleSelectRun}
+                                        />
+                                    </ScrollContent>
+                                </ScrollContainer>
+                            </ScrollArea>
+                            <ToS />
+                        </Sidebar>
+                    )}
 
                     {/* Main content */}
                     <MainContent>
-                        <Header />
+                        {isAuthenticated && <Header />}
                         <ScrollArea>
                             <ScrollContainer>
                                 <ScrollContent>{children}</ScrollContent>
@@ -67,20 +71,22 @@ const Wrapper = styled(Box)`
     inset: 0;
 `;
 
-const Layout = styled('div')`
+const Layout = styled('div')<{ $showSidebar: boolean }>`
     display: grid;
     height: 100%;
-    grid-template-columns: 1fr 5fr;
-    grid-template-areas: 'sidebar main-content';
+    grid-template-columns: ${({ $showSidebar }) => ($showSidebar ? '1fr 5fr' : '1fr')};
+    grid-template-areas: ${({ $showSidebar }) =>
+        $showSidebar ? "'sidebar main-content'" : "'main-content'"};
 
     @media (max-width: 900px) {
         grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
-        grid-template-areas: 'sidebar' 'main-content';
+        grid-template-rows: ${({ $showSidebar }) => ($showSidebar ? 'auto 1fr' : '1fr')};
+        grid-template-areas: ${({ $showSidebar }) =>
+            $showSidebar ? "'sidebar' 'main-content'" : "'main-content'"};
     }
 
     @media (min-width: 1600px) {
-        grid-template-columns: 266px 1fr;
+        grid-template-columns: ${({ $showSidebar }) => ($showSidebar ? '266px 1fr' : '1fr')};
     }
 `;
 

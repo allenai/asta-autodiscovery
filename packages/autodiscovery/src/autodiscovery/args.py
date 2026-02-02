@@ -109,9 +109,9 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--dataset_metadata_type",
             type=str,
-            choices=["dbench", "blade"],
-            default="dbench",
-            help="Type of dataset metadata format (dbench, blade, or ai2)",
+            choices=["asta", "dbench", "blade", "ai2"],
+            default="asta",
+            help="Type of dataset metadata format (asta, dbench, blade, or ai2)",
         )
         self.add_argument(
             "--work_dir", type=str, required=True, help="Working directory for agents"

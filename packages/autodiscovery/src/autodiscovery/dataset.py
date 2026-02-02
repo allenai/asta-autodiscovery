@@ -129,6 +129,34 @@ def get_dataset_description(dataset_metadata_path: str) -> str:
     return "\n".join(description)
 
 
+def get_asta_description(dataset_metadata_path: str) -> str:
+    """Generate a human-readable description of the dataset based on its metadata.
+
+    Args:
+        dataset_metadata_path: Path to the dataset metadata JSON file
+
+    Returns:
+        str: Formatted description of the dataset
+    """
+    metadata = load_dataset_metadata(dataset_metadata_path)
+    description = []
+
+    # Add header
+    description.append("##### DATASET DESCRIPTION #####")
+    description.append(metadata.get("description", ""))
+    # Add dataset info
+    description.append("\n### DATASETS: ###\n")
+    for dataset in metadata["datasets"]:
+        description.append(f"Dataset Name: {dataset['name']}")
+        description.append(f"Dataset Description: {dataset['description']}")
+        if "columns" in dataset and "raw" in dataset["columns"]:
+            description.append("\n### COLUMNS: ###")
+            for col in dataset["columns"]["raw"]:
+                description.append(f"\n{col['name']}:")
+                description.append(f"  {col['description']}")
+    return "\n".join(description)
+
+
 def get_datasets_fpaths(dataset_metadata: str, is_blade=False) -> (list, str):
     is_s3 = dataset_metadata.startswith("s3")
     _dataset_metadata = dataset_metadata
@@ -158,7 +186,7 @@ def get_datasets_fpaths(dataset_metadata: str, is_blade=False) -> (list, str):
 
 
 def get_load_dataset_experiment(
-    dataset_paths, dataset_metadata, run_eda=False, dataset_metadata_type="dbench"
+    dataset_paths, dataset_metadata, run_eda=False, dataset_metadata_type="asta"
 ):
     # Set up the initial experiment to load the dataset
     load_dataset_objective = "Load the dataset and generate summary statistics. "
@@ -170,6 +198,14 @@ def get_load_dataset_experiment(
     if dataset_metadata_type == "blade":
         load_dataset_objective += (
             f"Here is the dataset metadata:\n\n{get_blade_description(dataset_metadata)}"
+        )
+    elif dataset_metadata_type == "ai2":
+        load_dataset_objective += (
+            f"Here is the dataset metadata:\n\n{get_ai2_description(dataset_metadata)}"
+        )
+    elif dataset_metadata_type == "asta":
+        load_dataset_objective += (
+            f"Here is the dataset metadata:\n\n{get_asta_description(dataset_metadata)}"
         )
     else:  # DiscoveryBench-style
         load_dataset_objective += (

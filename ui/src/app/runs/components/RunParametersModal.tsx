@@ -255,4 +255,5 @@ const DatasetDescription = styled(Typography)`
     font-size: 0.85rem;
     color: ${({ theme }) => theme.color['cream-80'].hex};
     margin-top: ${({ theme }) => theme.spacing(0.5)};
+    white-space: pre-wrap;
 `;

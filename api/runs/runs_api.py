@@ -243,7 +243,7 @@ def create() -> Blueprint:
             return RunModel(
                 runid=run_id,
                 userid=req.userid,
-                status=run_details.get("status", "UNKNOWN"),
+                status=run_details.status if run_details else "UNKNOWN",
                 name=run_metadata_model.name if run_metadata_model else "Untitled draft",
                 description=run_metadata_model.description
                 if run_metadata_model

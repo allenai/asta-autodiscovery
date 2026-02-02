@@ -39,9 +39,9 @@ export default function RunsPage() {
                             <Image
                                 src="/ai2-logo.svg"
                                 alt="Ai2"
-                                width={32}
-                                height={20}
-                                style={{ display: 'inline-block', verticalAlign: 'middle' }}
+                                width={50}
+                                height={16}
+                                style={{ display: 'block' }}
                             />
                         </Ai2LogoWrapper>{' '}
                         and is an{' '}
@@ -49,9 +49,9 @@ export default function RunsPage() {
                             <Image
                                 src="/astalabs-logo.svg"
                                 alt="AstaLabs"
-                                width={70}
-                                height={20}
-                                style={{ display: 'inline-block', transform: 'translateY(2px)' }}
+                                width={120.004}
+                                height={17}
+                                style={{ display: 'block', transform: 'translateY(-2px)' }}
                             />
                         </AstaLabsLogoWrapper>{' '}
                         experiment.
@@ -95,18 +95,19 @@ const Attribution = styled(Typography)(({ theme }) => ({
     fontSize: '0.875rem',
     textAlign: 'left',
     marginTop: theme.spacing(1),
+    lineHeight: '1.5',
 }));
 
 const Ai2LogoWrapper = styled('span')({
     display: 'inline-block',
     verticalAlign: 'middle',
-    marginLeft: '4px',
-    marginRight: '4px',
+    lineHeight: 0,
+    margin: '0 4px',
 });
 
 const AstaLabsLogoWrapper = styled('span')({
     display: 'inline-block',
     verticalAlign: 'middle',
-    marginLeft: '4px',
-    marginRight: '4px',
+    lineHeight: 0,
+    margin: '0 4px',
 });

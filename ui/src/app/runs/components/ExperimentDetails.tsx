@@ -22,7 +22,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
     return (
         <DetailsWrapper spacing={0}>
             <TitleWrapper>
-                <ExperimentName>{experiment.experimentId}</ExperimentName>
+                <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
             </TitleWrapper>
             <ContentWrapper spacing={2}>
                 <Box>

@@ -54,7 +54,9 @@ export default function CreditsChip() {
                         </li>
                         <li>
                             <strong>Budget Protection:</strong> Discovery sessions are capped at 500
-                            credits to prevent accidental overspending. We recommend 50-100
+                            credits to prevent accidental overspending. We recommend starting with a
+                            small budget ({'<'}10) to learn how the system works. Once you're
+                            familiar with the output, you can confidently scale up to 50–100
                             experiments per session.
                         </li>
                         <li>
@@ -68,7 +70,7 @@ export default function CreditsChip() {
                         The credits are a one-time fixed allocation to support public access for
                         scientific and education purposes and cannot be reloaded once consumed. If
                         you are interested in discussing potential research collaborations to
-                        further scientific research, please{' '}
+                        further scientific discovery, please{' '}
                         <StyledLink
                             href="https://allenai.org/contact"
                             target="_blank"

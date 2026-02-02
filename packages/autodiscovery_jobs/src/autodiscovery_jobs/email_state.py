@@ -11,8 +11,7 @@ Schema:
         "execution_id": str | None,     # Cloud Run execution ID at time of email
         "status": str | None,           # Job status at time of email (SUCCEEDED/FAILED)
         "subject": str | None,          # Email subject line
-        "body_text": str | None,        # Plain text email body
-        "body_html": str | None,        # HTML email body (optional)
+        "body_html": str | None,        # HTML email body
     }
 
 Note: Recipient email is intentionally NOT stored for privacy.
@@ -77,8 +76,7 @@ def record_email_sent(
     execution_id: str | None,
     status: str,
     subject: str,
-    body_text: str,
-    body_html: str | None = None,
+    body_html: str,
     config: JobConfig | None = None,
 ) -> dict[str, Any]:
     """Record that an email was sent for a run.
@@ -89,8 +87,7 @@ def record_email_sent(
         execution_id: Cloud Run execution ID
         status: Job status (SUCCEEDED/FAILED/CANCELLED)
         subject: Email subject line
-        body_text: Plain text email body
-        body_html: HTML email body (optional)
+        body_html: HTML email body
         config: Job configuration (uses default if None)
 
     Returns:
@@ -106,7 +103,6 @@ def record_email_sent(
         "execution_id": execution_id,
         "status": status,
         "subject": subject,
-        "body_text": body_text,
         "body_html": body_html,
     }
 

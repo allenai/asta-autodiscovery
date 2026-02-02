@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .status { color: {{ status_color }}; font-weight: bold; }
+        .details { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .details dt { font-weight: bold; }
+        .details dd { margin-left: 0; margin-bottom: 10px; }
+        .footer { color: #6c757d; font-size: 12px; margin-top: 30px; border-top: 1px solid #dee2e6; padding-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>AutoDiscovery Run Complete</h2>
+        <p class="status">{{ status_message }}</p>
+
+        <a href="{{ run_url }}" style="display: inline-block; background: #007bff; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 15px 0;">View Results</a>
+
+        <div class="details">
+            <dl>
+                <dt>Run Name</dt>
+                <dd>{{ name }}</dd>
+                <dt>Status</dt>
+                <dd>{{ status }}</dd>
+                <dt>Started</dt>
+                <dd>{{ started_at }}</dd>
+                <dt>Completed</dt>
+                <dd>{{ finished_at }}</dd>
+                {%- if description %}
+                <dt>Description</dt>
+                <dd>{{ description }}</dd>
+                {%- endif %}
+                {%- if domain %}
+                <dt>Domain</dt>
+                <dd>{{ domain }}</dd>
+                {%- endif %}
+                {%- if intent %}
+                <dt>Intent</dt>
+                <dd>{{ intent }}</dd>
+                {%- endif %}
+                {%- if datasets %}
+                <dt>Datasets</dt>
+                <dd>{{ datasets }}</dd>
+                {%- endif %}
+                {%- if n_experiments %}
+                <dt>Experiments</dt>
+                <dd>{{ n_experiments }}</dd>
+                {%- endif %}
+            </dl>
+        </div>
+
+        <div class="footer">
+            This is an automated message from AutoDiscovery (ASTA).
+        </div>
+    </div>
+</body>
+</html>

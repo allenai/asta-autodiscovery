@@ -4,7 +4,6 @@ This module provides authenticated endpoints for users to create and manage
 their own autodiscovery experiment runs.
 """
 
-import json
 import os
 import tempfile
 import uuid
@@ -12,7 +11,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
-from google.cloud import storage
 from utils.auth import requires_enrollment
 from utils.credits import InsufficientCreditsError, check_sufficient_credits, get_job_stats
 from utils.experiments import ExperimentTree
@@ -44,6 +42,13 @@ try:
         JobNotFoundError,
     )
     from autodiscovery_jobs.gcs import read_rich_outputs
+    from autodiscovery_jobs.run_details import (
+        RunDetails,
+        create_run_details,
+        get_run_details,
+        refresh_run_status,
+        update_run_details,
+    )
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -85,151 +90,6 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
-    def _get_run_details_path(userid: str, runid: str) -> str:
-        """Get the GCS path for run_details.json.
-
-        Args:
-            userid: User identifier
-            runid: Run identifier
-
-        Returns:
-            Blob path for run_details.json
-        """
-        return f"users/{userid}/jobs/{runid}/run_details.json"
-
-    def _create_run_details(userid: str, runid: str) -> dict:
-        """Create initial run_details.json file.
-
-        Args:
-            userid: User identifier
-            runid: Run identifier
-
-        Returns:
-            Run details dictionary
-        """
-        if not JOBS_AVAILABLE:
-            raise RuntimeError("autodiscovery_jobs package not available")
-
-        config = JobConfig.from_env()
-        client = storage.Client(project=config.project_id)
-        bucket = client.bucket(config.bucket)
-
-        run_details = {
-            "execution_id": None,
-            "created_at": datetime.now(UTC).isoformat(),
-            "status": "CREATED",
-            "status_checked_at": None,
-        }
-
-        blob_path = _get_run_details_path(userid, runid)
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(json.dumps(run_details, indent=2))
-
-        return run_details
-
-    def _get_run_details(userid: str, runid: str) -> dict | None:
-        """Get run details from GCS.
-
-        Args:
-            userid: User identifier
-            runid: Run identifier
-
-        Returns:
-            Run details dictionary or None if not found
-        """
-        if not JOBS_AVAILABLE:
-            raise RuntimeError("autodiscovery_jobs package not available")
-
-        config = JobConfig.from_env()
-        client = storage.Client(project=config.project_id)
-        bucket = client.bucket(config.bucket)
-
-        blob_path = _get_run_details_path(userid, runid)
-        blob = bucket.blob(blob_path)
-
-        try:
-            if blob.exists():
-                content = blob.download_as_text()
-                return json.loads(content)
-        except Exception as e:
-            current_app.logger.error(f"Failed to get run details: {e}")
-
-        return None
-
-    def _update_run_details(userid: str, runid: str, updates: dict) -> dict:
-        """Update run details in GCS.
-
-        Args:
-            userid: User identifier
-            runid: Run identifier
-            updates: Dictionary of fields to update
-
-        Returns:
-            Updated run details dictionary
-        """
-        if not JOBS_AVAILABLE:
-            raise RuntimeError("autodiscovery_jobs package not available")
-
-        config = JobConfig.from_env()
-        client = storage.Client(project=config.project_id)
-        bucket = client.bucket(config.bucket)
-
-        # Get existing details
-        run_details = _get_run_details(userid, runid)
-        if not run_details:
-            run_details = {
-                "execution_id": None,
-                "created_at": datetime.now(UTC).isoformat(),
-                "status": "CREATED",
-                "status_checked_at": None,
-            }
-
-        # Update fields
-        run_details.update(updates)
-
-        # Save back to GCS
-        blob_path = _get_run_details_path(userid, runid)
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(json.dumps(run_details, indent=2))
-
-        return run_details
-
-    def _get_run_detail_with_updated_status(
-        run_details: dict, userid: str, runid: str
-    ) -> tuple[dict, dict] | None:
-        """Update run details with the job status from Cloud Run.
-
-        Args:
-            run_details: Current run details dictionary
-            userid: User ID
-            runid: Run ID
-
-        Returns:
-            Tuple of updated run details with status and the status response itself
-        """
-        manager = get_job_manager()
-        if run_details.get("execution_id"):
-            execution_id = run_details["execution_id"]
-
-            # Get status from Cloud Run
-            status_response = manager.get_job_status(execution_id)
-
-            # Extract phase from execution status (e.g., "RUNNING", "SUCCEEDED", "FAILED")
-            phase = status_response.get("phase", status_response.get("status", "unknown"))
-
-            # Update run_details with new status
-            run_details = _update_run_details(
-                userid,
-                runid,
-                {
-                    "status": phase,
-                    "status_checked_at": datetime.now(UTC).isoformat(),
-                },
-            )
-            return run_details, status_response
-
-        return run_details, None
-
     @api.route("/health")
     def health():
         """Health check endpoint.
@@ -269,14 +129,14 @@ def create() -> Blueprint:
             path = manager.create_job(userid, runid)
 
             # Create run_details.json
-            run_details = _create_run_details(userid, runid)
+            run_details = create_run_details(userid, runid)
 
             return jsonify(
                 {
                     "runid": runid,
                     "path": path,
                     "message": "Run created successfully",
-                    "run_details": run_details,
+                    "run_details": run_details.to_dict(),
                 }
             )
         except JobAlreadyExistsError as e:
@@ -349,10 +209,10 @@ def create() -> Blueprint:
         def _build_run_model(run_id: str) -> RunModel | None:
             # Parallelize I/O-heavy GCS calls to reduce tail latency.
             try:
-                run_details = _get_run_details(req.userid, run_id) or {}
+                run_details = get_run_details(req.userid, run_id)
             except Exception as e:
                 app_logger.error(f"Failed to get run details for {run_id}: {e}")
-                run_details = {}
+                run_details = None
             try:
                 job_stats = get_job_stats(
                     userid=req.userid, jobid=run_id, config=job_manager.config
@@ -367,10 +227,11 @@ def create() -> Blueprint:
                 metadata_dict = None
 
             run_details_model = RunDetailsModel(
-                execution_id=run_details.get("execution_id"),
-                created_at=run_details.get("created_at", ""),
-                status=run_details.get("status", "UNKNOWN"),
-                status_checked_at=run_details.get("status_checked_at"),
+                execution_id=run_details.execution_id if run_details else None,
+                created_at=run_details.created_at if run_details else "",
+                status=run_details.status if run_details else "UNKNOWN",
+                status_checked_at=run_details.status_checked_at if run_details else None,
+                finished_at=run_details.finished_at_raw if run_details else None,
             )
             run_stats_model = RunStatsModel(
                 requested_experiments=job_stats.num_experiments_requested,
@@ -382,7 +243,7 @@ def create() -> Blueprint:
             return RunModel(
                 runid=run_id,
                 userid=req.userid,
-                status=run_details.get("status", "UNKNOWN"),
+                status=run_details.status if run_details else "UNKNOWN",
                 name=run_metadata_model.name if run_metadata_model else "Untitled draft",
                 description=run_metadata_model.description
                 if run_metadata_model
@@ -439,18 +300,14 @@ def create() -> Blueprint:
             if not exists:
                 return jsonify({"error": "Run not found"}), 404
 
-            # Get run details
-            run_details = _get_run_details(userid, runid) or {}
+            # Get run details with refreshed status from Cloud Run
             path = manager.get_job_path(userid, runid)
 
-            # Get the latest run status
             try:
-                [updated_run_details, _] = _get_run_detail_with_updated_status(
-                    run_details, userid, runid
-                )
+                run_details = refresh_run_status(userid, runid)
             except Exception as e:
-                current_app.logger.error(f"Failed to update run status for {runid}: {e}")
-                updated_run_details = run_details
+                current_app.logger.error(f"Failed to refresh run status for {runid}: {e}")
+                run_details = get_run_details(userid, runid)
 
             # Get job stats
             try:
@@ -468,10 +325,11 @@ def create() -> Blueprint:
 
             # Build RunModel
             run_details_model = RunDetailsModel(
-                execution_id=updated_run_details.get("execution_id"),
-                created_at=updated_run_details.get("created_at", ""),
-                status=updated_run_details.get("status", "UNKNOWN"),
-                status_checked_at=updated_run_details.get("status_checked_at"),
+                execution_id=run_details.execution_id if run_details else None,
+                created_at=run_details.created_at if run_details else "",
+                status=run_details.status if run_details else "UNKNOWN",
+                status_checked_at=run_details.status_checked_at if run_details else None,
+                finished_at=run_details.finished_at_raw if run_details else None,
             )
             run_stats_model = RunStatsModel(
                 requested_experiments=job_stats.num_experiments_requested,
@@ -483,7 +341,7 @@ def create() -> Blueprint:
             run_model = RunModel(
                 runid=runid,
                 userid=userid,
-                status=updated_run_details.get("status", "UNKNOWN"),
+                status=run_details.status if run_details else "UNKNOWN",
                 name=run_metadata_model.name if run_metadata_model else f"Run {runid}",
                 description=run_metadata_model.description if run_metadata_model else None,
                 path=path,
@@ -818,14 +676,18 @@ def create() -> Blueprint:
 
                 execution_id = manager.run_job(userid, runid, **job_params)
 
+            # Capture origin URL for email links (e.g., localhost vs production)
+            origin_url = request.headers.get("Origin")
+
             # Update run_details.json with execution_id and status
-            _update_run_details(
+            update_run_details(
                 userid,
                 runid,
                 {
                     "execution_id": execution_id,
                     "status": "RUNNING",
                     "status_checked_at": datetime.now(UTC).isoformat(),
+                    "origin_url": origin_url,
                 },
             )
 
@@ -861,31 +723,26 @@ def create() -> Blueprint:
             return error
 
         try:
-            # Get run details
-            run_details = _get_run_details(userid, runid)
+            # Get run details with refreshed status
+            run_details = refresh_run_status(userid, runid)
             if not run_details:
                 return jsonify({"error": "Run details not found"}), 404
 
-            [updated_run_details, status_response] = _get_run_detail_with_updated_status(
-                run_details, userid, runid
-            )
+            response = {
+                "runid": runid,
+                "run_details": run_details.to_dict(),
+            }
 
-            if status_response:
-                return jsonify(
-                    {
-                        "runid": runid,
-                        "run_details": updated_run_details,
-                        "execution_status": status_response,
-                    }
-                )
-            else:
-                # Run hasn't been submitted yet
-                return jsonify(
-                    {
-                        "runid": runid,
-                        "run_details": run_details,
-                    }
-                )
+            # If run has an execution_id, also fetch detailed Cloud Run status
+            if run_details.execution_id:
+                manager = get_job_manager()
+                try:
+                    execution_status = manager.get_job_status(run_details.execution_id)
+                    response["execution_status"] = execution_status
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to get execution status: {e}")
+
+            return jsonify(response)
         except Exception as e:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
@@ -910,8 +767,8 @@ def create() -> Blueprint:
 
         # Get job status to determine if polling can stop
         job_manager = get_job_manager()
-        run_details = _get_run_details(userid, runid) or {}
-        has_job_completed = run_details.get("status") in ["SUCCEEDED", "FAILED", "CANCELLED"]
+        run_details = get_run_details(userid, runid)
+        has_job_completed = run_details.is_finished if run_details else False
 
         # Load experiment tree and convert to models
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
@@ -989,19 +846,18 @@ def create() -> Blueprint:
             manager = get_job_manager()
 
             # Get run details
-            run_details = _get_run_details(userid, runid)
+            run_details = get_run_details(userid, runid)
             if not run_details:
                 return jsonify({"error": "Run details not found"}), 404
 
-            execution_id = run_details.get("execution_id")
-            if not execution_id:
+            if not run_details.execution_id:
                 return jsonify({"error": "Run has not been submitted yet"}), 400
 
             # Cancel the job
-            manager.cancel_job(execution_id)
+            manager.cancel_job(run_details.execution_id)
 
             # Update run_details
-            _update_run_details(
+            update_run_details(
                 userid,
                 runid,
                 {

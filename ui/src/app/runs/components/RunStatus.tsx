@@ -191,7 +191,12 @@ function RunStatusContent({
     experimentsLabel,
     lastUpdated,
 }: RunStatusContentProps) {
-    const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
+    const {
+        experiments,
+        selectedExperiment,
+        selectExperiment,
+        isLoading: isLoadingExperiments,
+    } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     // const [isTableExpanded, setIsTableExpanded] = useState(false);
     const isTableExpanded = true;
@@ -258,13 +263,13 @@ function RunStatusContent({
                             {run.stats && (
                                 <ExperimentCount>
                                     <HourglassTopOutlinedIcon />
-                                    {run.stats.requestedExperiments ? (
+                                    {isLoadingExperiments ? (
+                                        'Loading experiments...'
+                                    ) : (
                                         <>
                                             {experiments.length}/{run.stats.requestedExperiments}{' '}
                                             {experimentsLabel}
                                         </>
-                                    ) : (
-                                        'Loading experiments...'
                                     )}
                                 </ExperimentCount>
                             )}
@@ -273,7 +278,7 @@ function RunStatusContent({
                                     variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}>
-                                    Exploration Parameters
+                                    Session Configuration
                                 </ParametersButton>
                                 {canStop && (
                                     <StopButton

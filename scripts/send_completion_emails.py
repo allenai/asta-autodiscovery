@@ -129,23 +129,6 @@ def build_email_body(
     return template.render(**context).strip()
 
 
-def get_run_metadata(manager: JobManager, userid: str, runid: str) -> dict | None:
-    """Get run metadata.
-
-    Args:
-        manager: JobManager instance
-        userid: User identifier
-        runid: Run identifier
-
-    Returns:
-        Metadata dict or None if not found
-    """
-    try:
-        return manager.get_metadata(userid, runid)
-    except Exception:
-        return None
-
-
 def send_completion_emails(
     config: JobConfig,
     max_age_hours: int = 24,
@@ -228,7 +211,7 @@ def send_completion_emails(
                     continue
 
                 # Get run metadata
-                metadata = get_run_metadata(manager, userid, runid)
+                metadata = manager.get_metadata(userid, runid)
                 run_name = metadata.get("name") if metadata else None
                 status = run_details.status
                 execution_id = run_details.execution_id

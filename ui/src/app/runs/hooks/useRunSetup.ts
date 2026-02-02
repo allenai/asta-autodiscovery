@@ -4,7 +4,7 @@ import debounce from 'lodash.debounce';
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useRuns } from '@/contexts/RunsContext';
 import { getRunsApi } from '@/api/RunsApi';
-import { getRunFromApi } from '@/types/Run';
+import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 
 export const MCTS_SELECTION = {
@@ -644,11 +644,15 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             // Save metadata (includes all job configuration)
             await saveMetadata();
 
-            // Update the run name in the sidebar list
-            updateViewerRun({ id: runid, name: settings.name.trim() });
-
             // Submit run - backend reads configuration from metadata
-            await api.submitRun(runid);
+            const response = await api.submitRun(runid);
+
+            // Update run in context with new details so it moves from Drafts to Sessions
+            updateViewerRun({
+                id: runid,
+                name: settings.name.trim(),
+                details: getRunDetailsFromApi(response.data.run_details),
+            });
 
             // Notify parent of success
             onSubmitSuccess();

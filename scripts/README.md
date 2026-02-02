@@ -1,6 +1,54 @@
-# Maintenance Scripts
+# Scripts
 
-This directory contains maintenance scripts that run as scheduled Cloud Run Jobs.
+This directory contains scripts that run as scheduled Cloud Run Jobs.
+
+## send_completion_emails.py
+
+Sends email notifications when AutoDiscovery runs complete. Tracks sent emails in GCS to avoid duplicates.
+
+**Features:**
+- Scans for runs completed within the last 24 hours (configurable)
+- Looks up user emails from Auth0
+- Uses GCS-based distributed lock to prevent concurrent executions
+- Supports dry-run mode for testing
+
+### Local Usage
+
+```bash
+# Dry run (no emails sent)
+uv run python scripts/send_completion_emails.py --dry-run
+
+# Test with specific user
+uv run python scripts/send_completion_emails.py --userid "google-oauth2|123" --dry-run
+```
+
+### Cloud Run Job Setup
+
+```bash
+gcloud run jobs create autodiscovery-send-emails \
+  --image gcr.io/example-legacy-project/autodiscovery-scripts \
+  --region us-west1 \
+  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
+  --set-env-vars "AUTH0_MGMT_CLIENT_ID=<client-id>,AUTH0_MGMT_CLIENT_SECRET=<client-secret>" \
+  --command "uv" \
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
+```
+
+### Schedule (every 15 minutes)
+
+```bash
+gcloud scheduler jobs create http autodiscovery-send-emails-schedule \
+  --location us-west1 \
+  --schedule "*/15 * * * *" \
+  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails:run" \
+  --http-method POST \
+  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
+  --oauth-service-account-scope "https://www.googleapis.com/auth/cloud-platform"
+```
+
+The `--acquire-lock` flag uses a GCS-based lock so overlapping scheduled runs exit cleanly.
+
+---
 
 ## cleanup_old_datasets.py
 
@@ -12,24 +60,20 @@ Deletes user-uploaded dataset files older than 7 days from GCS to comply with da
 
 ### Local Usage
 
-**Test with dry run:**
 ```bash
+# Dry run
 uv run python scripts/cleanup_old_datasets.py --dry-run
-```
 
-**Run cleanup:**
-```bash
+# Run cleanup
 uv run python scripts/cleanup_old_datasets.py
-```
 
-**Custom age:**
-```bash
+# Custom age
 uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 ```
 
 ## Docker Image
 
-All maintenance scripts are packaged into a single container image: `gcr.io/example-legacy-project/autodiscovery-maintenance`
+All maintenance scripts are packaged into a single container image: `gcr.io/example-legacy-project/autodiscovery-scripts`
 
 ### Automated Builds
 
@@ -42,8 +86,8 @@ See `.github/workflows/maintenance-build.yml`
 ### Manual Build (if needed)
 
 ```bash
-docker build --platform linux/amd64 -t gcr.io/example-legacy-project/autodiscovery-maintenance -f scripts/Dockerfile .
-docker push gcr.io/example-legacy-project/autodiscovery-maintenance
+docker build --platform linux/amd64 -t gcr.io/example-legacy-project/autodiscovery-scripts -f scripts/Dockerfile .
+docker push gcr.io/example-legacy-project/autodiscovery-scripts
 ```
 
 Note: `--platform linux/amd64` is required for Cloud Run compatibility (especially when building on Apple Silicon).
@@ -59,7 +103,7 @@ export CLOUDSDK_CORE_PROJECT=example-legacy-project
 
 ```bash
 gcloud run jobs create autodiscovery-dataset-cleanup \
-  --image gcr.io/example-legacy-project/autodiscovery-maintenance \
+  --image gcr.io/example-legacy-project/autodiscovery-scripts \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --command "uv" \
@@ -87,7 +131,7 @@ The GitHub Action automatically pushes new images when changes merge to main. To
 
 ```bash
 gcloud run jobs update autodiscovery-dataset-cleanup \
-  --image gcr.io/example-legacy-project/autodiscovery-maintenance \
+  --image gcr.io/example-legacy-project/autodiscovery-scripts \
   --region us-west1
 ```
 

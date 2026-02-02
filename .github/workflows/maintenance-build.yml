@@ -1,4 +1,4 @@
-name: Build Maintenance Image
+name: Build Scripts Image
 
 on:
   push:
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  IMAGE_NAME: gcr.io/example-legacy-project/autodiscovery-maintenance
+  IMAGE_NAME: gcr.io/example-legacy-project/autodiscovery-scripts
 
 jobs:
   build-and-push:

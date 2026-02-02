@@ -178,8 +178,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     <HelperText>
                         Set the maximum number of experiments to generate (
                         <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
-                        your first session, we recommend starting with a smaller budget (50–100
-                        experiments) to learn how the system works.
+                        your first session, we recommend starting with a small budget ({'<'}10
+                        experiments) to learn how the system works. Once you're familiar with the
+                        output, you can confidently scale up to 50–100 experiments per session.
                     </HelperText>
                     <TextField
                         type="number"
@@ -220,7 +221,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                                 updateSettings('intent', e.target.value);
                                 debouncedSaveMetadata();
                             }}
-                            placeholder="e.g., Focus on relationships between demographic factors and outcomes"
+                            placeholder="e.g., Focus on how weather patterns impact migration timing and route efficiency"
                             disabled={isFormDisabled}
                         />
                     </FormControl>
@@ -299,10 +300,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <StyledFormLabel>Evidence Weight</StyledFormLabel>
                         <HelperText>
                             Controls how much the system trusts experimental results when updating
-                            its beliefs. Higher values (e.g., 0.8-1.0) mean the system relies
-                            heavily on observed data. Lower values (e.g., 0.3-0.5) mean it updates
-                            its beliefs more cautiously, giving more weight to its initial
-                            assumptions.
+                            its beliefs. Higher values (e.g., 2-5) mean the system relies heavily on
+                            observed data. Lower values (e.g., 0.5-1) mean it updates its beliefs
+                            more cautiously, giving more weight to its initial assumptions.
                         </HelperText>
                         <TextField
                             type="number"

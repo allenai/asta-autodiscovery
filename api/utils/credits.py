@@ -27,7 +27,7 @@ from typing import Any, NamedTuple
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import (
     count_experiment_results,
-    get_job_args,
+    get_metadata,
     list_user_jobs,
 )
 
@@ -118,20 +118,20 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
 
     Returns:
         JobStats object containing job arguments and experiment counts,
-        or None if args.json is missing or invalid.
+        or None if metadata is missing or invalid.
     """
     config = config or JobConfig()
 
-    args = get_job_args(userid, jobid, config)
-    if args is None:
+    metadata = get_metadata(userid, jobid, config)
+    if metadata is None:
         return None
 
     completed = count_experiment_results(userid, jobid, config)
-    requested = args.get("n_experiments", 0)
+    requested = metadata.get("n_experiments", 0)
     pending = max(0, requested - completed)
 
     job_stats = JobStats(
-        job_args=args,
+        job_args=metadata,
         num_experiments_requested=requested,
         num_experiments_completed=completed,
         num_experiments_pending=pending,

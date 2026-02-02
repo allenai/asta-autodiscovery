@@ -23,7 +23,7 @@ import prettyBytes from 'pretty-bytes';
 import prettyMs from 'pretty-ms';
 
 import { FileUploadState, UploadStatus } from '@/runs/hooks/useRunSetup';
-import { getFriendlyMimeType } from '@/utils/mimeType';
+import { getFriendlyMimeType, getMimeType } from '@/utils/mimeType';
 
 export interface Dataset {
     filename: string;
@@ -122,13 +122,7 @@ export default function DatasetUpload({
 
         const files = e.dataTransfer.files;
         if (files && files.length > 0) {
-            // Check file type
-            const validTypes = ['.csv', '.json', '.txt', '.tsv'];
-            const validFiles = Array.from(files).filter((file) => {
-                const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-                return validTypes.includes(fileExtension);
-            });
-            onFileSelect(validFiles);
+            onFileSelect(Array.from(files));
         }
     };
 
@@ -176,7 +170,7 @@ export default function DatasetUpload({
             {fileUploads.length > 0 && (
                 <FilesContainer>
                     {fileUploads.map((upload, index) => {
-                        const fileType = upload.file.type || 'Unknown';
+                        const fileType = upload.file.type || getMimeType(upload.file.name);
                         const friendlyType = getFriendlyMimeType(fileType);
 
                         return (
@@ -282,7 +276,7 @@ export default function DatasetUpload({
                                         sx={{ mt: 1 }}
                                         placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,
-2. "final_choice_new" - "parcipants final choice in the treatment condition"
+2. "final_choice_new" - “participants final choice in the treatment condition”
 3. Each row in this file represents a time-series'
                                     />
                                 </FileDescription>

@@ -63,8 +63,10 @@ class ExperimentNode:
             self.status = "FAILED"
 
         # Metrics
-        self.prior: float | None = (node_data.get("prior") or {}).get("mean")
-        self.posterior: float | None = (node_data.get("posterior") or {}).get("mean")
+        self.prior_belief: dict[str, Any] | None = node_data.get("prior")
+        self.posterior_belief: dict[str, Any] | None = node_data.get("posterior")
+        self.prior: float | None = (self.prior_belief or {}).get("mean")
+        self.posterior: float | None = (self.posterior_belief or {}).get("mean")
         self.surprise: float | None = node_data.get("normalized_surprisal")
         self.is_surprising: bool | None = node_data.get("surprising")
 
@@ -92,6 +94,8 @@ class ExperimentNode:
             "surprise": self.surprise,
             "prior": self.prior,
             "posterior": self.posterior,
+            "prior_belief": self.prior_belief,
+            "posterior_belief": self.posterior_belief,
             "runtime_ms": self.runtime_ms,
             "hypothesis": self.hypothesis,
             "analysis": self.analysis,

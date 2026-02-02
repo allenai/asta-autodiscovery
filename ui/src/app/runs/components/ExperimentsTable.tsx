@@ -189,6 +189,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
                 getRowHeight={() => 'auto'}
+                rowSelection={false}
             />
         </Paper>
     );

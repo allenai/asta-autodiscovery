@@ -53,7 +53,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         isSaving,
         updateSettings,
         debouncedSaveMetadata,
-        debouncedSaveJobArgs,
         handleFileSelect,
         handleFileDescriptionChange,
         handleRemoveFileUpload,
@@ -84,9 +83,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
             <SectionHeader>
                 <SectionHeaderTitle>Create a new discovery session</SectionHeaderTitle>
-                Define your context and upload source files. AutoDiscovery will use your data
-                appropriately to generate hypotheses, run experiments to statistically refute or
-                accept them and reveal surprising insights.
+                Define your context and upload source files. AutoDiscovery will use your data to
+                generate hypotheses, run experiments to statistically refute or accept them and
+                reveal surprising insights.
             </SectionHeader>
 
             <ConfigurationBox>
@@ -122,7 +121,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             updateSettings('datasetsDescription', e.target.value);
                             debouncedSaveMetadata();
                         }}
-                        placeholder="e.g., Customer purchase history with demographics, product categories, and timestamp data from 2020-2023"
+                        placeholder="e.g., Global migratory bird tracking logs (GPS, species, weather) from 2018–2024. Note: 2020 data is sparse for European routes due to regional sensor downtime."
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.datasetsDescription}
@@ -239,7 +238,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.explorationWeight}
                             onChange={(e) => {
                                 updateSettings('explorationWeight', parseFloat(e.target.value));
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             disabled={isFormDisabled}
                         />
@@ -249,15 +248,15 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <StyledFormLabel>Search strategy</StyledFormLabel>
                         <HelperText>
                             Determines how the system navigates through nested hypotheses during
-                            exploration. UCB1_recursive (default) efficiently balances breadth and
-                            depth. Beam search focuses on top candidates at each level. Progressive
-                            widening gradually expands the search space as more experiments run.
+                            exploration. UCB1 Recursive (default) efficiently balances breadth and
+                            depth. MCTS with Progressive Widening gradually expands the search space
+                            as more experiments run.
                         </HelperText>
                         <Select
                             value={settings.mctsSelection}
                             onChange={(e) => {
                                 updateSettings('mctsSelection', e.target.value);
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}>
                             {Object.values(MCTS_SELECTION).map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
@@ -286,7 +285,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.surprisalWidth ?? 0}
                             onChange={(_, value) => {
                                 updateSettings('surprisalWidth', value as number);
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             min={0}
                             max={1}
@@ -310,48 +309,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             value={settings.evidenceWeight}
                             onChange={(e) => {
                                 updateSettings('evidenceWeight', parseFloat(e.target.value));
-                                debouncedSaveJobArgs();
-                            }}
-                            disabled={isFormDisabled}
-                        />
-                    </FormControl>
-
-                    <FormControl fullWidth>
-                        <StyledFormLabel>
-                            Warmstart Experiments <OptionalText>(Optional)</OptionalText>
-                        </StyledFormLabel>
-                        <HelperText>
-                            Initial experiments to run before autonomous exploration begins. These
-                            "seed" the system with baseline findings that inform subsequent
-                            hypothesis generation. Useful for testing known relationships or
-                            establishing a starting point for discovery.
-                        </HelperText>
-                        <TextField
-                            value={settings.warmstartExperiments}
-                            onChange={(e) => {
-                                updateSettings('warmstartExperiments', e.target.value);
-                                debouncedSaveJobArgs();
-                            }}
-                            disabled={isFormDisabled}
-                            placeholder="Path to json file"
-                        />
-                    </FormControl>
-
-                    <FormControl fullWidth>
-                        <StyledFormLabel>
-                            Number of warmstarts <OptionalText>(Optional)</OptionalText>
-                        </StyledFormLabel>
-                        <HelperText>
-                            How many initial experiments to run before autonomous exploration
-                            begins. These provide the system with baseline findings to inform its
-                            hypothesis generation.
-                        </HelperText>
-                        <TextField
-                            type="number"
-                            value={settings.nWarmstart}
-                            onChange={(e) => {
-                                updateSettings('nWarmstart', parseInt(e.target.value));
-                                debouncedSaveJobArgs();
+                                debouncedSaveMetadata();
                             }}
                             disabled={isFormDisabled}
                         />

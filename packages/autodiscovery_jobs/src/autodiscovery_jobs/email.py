@@ -20,18 +20,16 @@ DEFAULT_SENDER_EMAIL = "no-reply@asta.allenai.org"
 def send_email(
     recipient_email: str,
     subject: str,
-    body_text: str,
-    body_html: str | None = None,
+    body_html: str,
     sender_email: str = DEFAULT_SENDER_EMAIL,
     smtp_server: str = DEFAULT_SMTP_SERVER,
 ) -> None:
-    """Send an email via SMTP.
+    """Send an HTML email via SMTP.
 
     Args:
         recipient_email: Recipient email address
         subject: Email subject line
-        body_text: Plain text email body
-        body_html: HTML email body (optional)
+        body_html: HTML email body
         sender_email: Sender email address
         smtp_server: SMTP server hostname
 
@@ -43,10 +41,7 @@ def send_email(
     msg["From"] = sender_email
     msg["To"] = recipient_email
 
-    # Attach plain text and HTML versions
-    msg.attach(MIMEText(body_text, "plain"))
-    if body_html:
-        msg.attach(MIMEText(body_html, "html"))
+    msg.attach(MIMEText(body_html, "html"))
 
     with smtplib.SMTP(smtp_server) as conn:
         conn.starttls()  # Upgrade connection to secure

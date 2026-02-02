@@ -13,6 +13,9 @@ import argparse
 import logging
 import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
 
 from autodiscovery_jobs import (
     Auth0Error,
@@ -24,6 +27,10 @@ from autodiscovery_jobs import (
     send_email,
     was_email_sent,
 )
+
+# Set up Jinja2 environment for email templates
+TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
+jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=False)
 
 # Configure logging
 logging.basicConfig(
@@ -55,213 +62,71 @@ def build_email_subject(status: str, run_name: str | None) -> str:
         return f"AutoDiscovery: {name_part} finished"
 
 
-def build_email_body_text(
-    userid: str,
+STATUS_MESSAGES = {
+    "SUCCEEDED": ("Your AutoDiscovery run has completed successfully.", "#28a745"),
+    "FAILED": ("Your AutoDiscovery run has failed.", "#dc3545"),
+    "CANCELLED": ("Your AutoDiscovery run was cancelled.", "#6c757d"),
+}
+DEFAULT_STATUS_MESSAGE = ("Your AutoDiscovery run has finished.", "#17a2b8")
+
+
+def build_email_context(
     runid: str,
     status: str,
     run_name: str | None,
     started_at: str | None,
     finished_at: datetime | None,
-    execution_id: str | None,
     origin_url: str | None = None,
     metadata: dict | None = None,
-) -> str:
-    """Build plain text email body.
+) -> dict:
+    """Build template context for email rendering.
 
     Args:
-        userid: User identifier
         runid: Run identifier
         status: Run status
         run_name: Optional run name
         started_at: ISO timestamp when run started
         finished_at: Finish timestamp
-        execution_id: Cloud Run execution ID
         origin_url: Base URL where run was submitted (for results link)
         metadata: Run metadata for additional context
 
     Returns:
-        Plain text email body
+        Dictionary of template variables
     """
-    name_display = run_name or runid
-    started_str = datetime.fromisoformat(started_at).strftime("%Y-%m-%d %H:%M:%S UTC") if started_at else "Unknown"
-    finished_str = finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown"
-
-    if status == "SUCCEEDED":
-        status_message = "Your AutoDiscovery run has completed successfully."
-    elif status == "FAILED":
-        status_message = "Your AutoDiscovery run has failed."
-    elif status == "CANCELLED":
-        status_message = "Your AutoDiscovery run was cancelled."
-    else:
-        status_message = "Your AutoDiscovery run has finished."
-
-    # Build the run URL using origin or default
+    status_message, status_color = STATUS_MESSAGES.get(status, DEFAULT_STATUS_MESSAGE)
     base_url = origin_url or "https://asta.allenai.org"
-    run_url = f"{base_url}/runs/{runid}"
-
-    # Build metadata section
     metadata = metadata or {}
-    description = metadata.get("description", "")
-    domain = metadata.get("domain", "")
-    intent = metadata.get("intent", "")
-    n_experiments = metadata.get("n_experiments", "")
     datasets = metadata.get("datasets", [])
-    dataset_names = ", ".join(d.get("name", "") for d in datasets) if datasets else ""
 
-    body = f"""
-{status_message}
-
-View your results: {run_url}
-
-Run Details:
-  Name: {name_display}
-  Status: {status}
-  Started: {started_str}
-  Finished: {finished_str}
-"""
-
-    if description:
-        body += f"  Description: {description}\n"
-    if domain:
-        body += f"  Domain: {domain}\n"
-    if intent:
-        body += f"  Intent: {intent}\n"
-    if dataset_names:
-        body += f"  Datasets: {dataset_names}\n"
-    if n_experiments:
-        body += f"  Experiments: {n_experiments}\n"
-
-    body += """
----
-This is an automated message from AutoDiscovery (ASTA).
-"""
-
-    return body.strip()
+    return {
+        "name": run_name or runid,
+        "status": status,
+        "status_message": status_message,
+        "status_color": status_color,
+        "run_url": f"{base_url}/runs/{runid}",
+        "started_at": datetime.fromisoformat(started_at).strftime("%Y-%m-%d %H:%M:%S UTC") if started_at else "Unknown",
+        "finished_at": finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown",
+        "description": metadata.get("description", ""),
+        "domain": metadata.get("domain", ""),
+        "intent": metadata.get("intent", ""),
+        "n_experiments": metadata.get("n_experiments", ""),
+        "datasets": ", ".join(d.get("name", "") for d in datasets) if datasets else "",
+    }
 
 
-def build_email_body_html(
-    userid: str,
+def build_email_body(
     runid: str,
     status: str,
     run_name: str | None,
     started_at: str | None,
     finished_at: datetime | None,
-    execution_id: str | None,
     origin_url: str | None = None,
     metadata: dict | None = None,
 ) -> str:
-    """Build HTML email body.
-
-    Args:
-        userid: User identifier
-        runid: Run identifier
-        status: Run status
-        run_name: Optional run name
-        started_at: ISO timestamp when run started
-        finished_at: Finish timestamp
-        execution_id: Cloud Run execution ID
-        origin_url: Base URL where run was submitted (for results link)
-        metadata: Run metadata for additional context
-
-    Returns:
-        HTML email body
-    """
-    name_display = run_name or runid
-    started_str = datetime.fromisoformat(started_at).strftime("%Y-%m-%d %H:%M:%S UTC") if started_at else "Unknown"
-    finished_str = finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown"
-
-    if status == "SUCCEEDED":
-        status_message = "Your AutoDiscovery run has completed successfully."
-        status_color = "#28a745"
-    elif status == "FAILED":
-        status_message = "Your AutoDiscovery run has failed."
-        status_color = "#dc3545"
-    elif status == "CANCELLED":
-        status_message = "Your AutoDiscovery run was cancelled."
-        status_color = "#6c757d"
-    else:
-        status_message = "Your AutoDiscovery run has finished."
-        status_color = "#17a2b8"
-
-    # Build the run URL using origin or default
-    base_url = origin_url or "https://asta.allenai.org"
-    run_url = f"{base_url}/runs/{runid}"
-
-    # Extract metadata fields
-    metadata = metadata or {}
-    description = metadata.get("description", "")
-    domain = metadata.get("domain", "")
-    intent = metadata.get("intent", "")
-    n_experiments = metadata.get("n_experiments", "")
-    datasets = metadata.get("datasets", [])
-    dataset_names = ", ".join(d.get("name", "") for d in datasets) if datasets else ""
-
-    # Build optional metadata rows
-    metadata_rows = ""
-    if description:
-        metadata_rows += f"""
-                <dt>Description</dt>
-                <dd>{description}</dd>"""
-    if domain:
-        metadata_rows += f"""
-                <dt>Domain</dt>
-                <dd>{domain}</dd>"""
-    if intent:
-        metadata_rows += f"""
-                <dt>Intent</dt>
-                <dd>{intent}</dd>"""
-    if dataset_names:
-        metadata_rows += f"""
-                <dt>Datasets</dt>
-                <dd>{dataset_names}</dd>"""
-    if n_experiments:
-        metadata_rows += f"""
-                <dt>Experiments</dt>
-                <dd>{n_experiments}</dd>"""
-
-    html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .status {{ color: {status_color}; font-weight: bold; }}
-        .details {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-        .details dt {{ font-weight: bold; }}
-        .details dd {{ margin-left: 0; margin-bottom: 10px; }}
-        .footer {{ color: #6c757d; font-size: 12px; margin-top: 30px; border-top: 1px solid #dee2e6; padding-top: 15px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>AutoDiscovery Run Complete</h2>
-        <p class="status">{status_message}</p>
-
-        <a href="{run_url}" style="display: inline-block; background: #007bff; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 15px 0;">View Results</a>
-
-        <div class="details">
-            <dl>
-                <dt>Run Name</dt>
-                <dd>{name_display}</dd>
-                <dt>Status</dt>
-                <dd>{status}</dd>
-                <dt>Started</dt>
-                <dd>{started_str}</dd>
-                <dt>Completed</dt>
-                <dd>{finished_str}</dd>{metadata_rows}
-            </dl>
-        </div>
-
-        <div class="footer">
-            This is an automated message from AutoDiscovery (ASTA).
-        </div>
-    </div>
-</body>
-</html>
-""".strip()
-
-    return html
+    """Build email body using Jinja2 template."""
+    context = build_email_context(runid, status, run_name, started_at, finished_at, origin_url, metadata)
+    template = jinja_env.get_template("completion_email.html")
+    return template.render(**context).strip()
 
 
 def get_run_metadata(manager: JobManager, userid: str, runid: str) -> dict | None:
@@ -372,12 +237,8 @@ def send_completion_emails(
 
                 # Build email content
                 subject = build_email_subject(status, run_name)
-                body_text = build_email_body_text(
-                    userid, runid, status, run_name, started_at, run_details.finished_at, execution_id,
-                    origin_url=origin_url, metadata=metadata,
-                )
-                body_html = build_email_body_html(
-                    userid, runid, status, run_name, started_at, run_details.finished_at, execution_id,
+                body_html = build_email_body(
+                    runid, status, run_name, started_at, run_details.finished_at,
                     origin_url=origin_url, metadata=metadata,
                 )
 
@@ -390,7 +251,6 @@ def send_completion_emails(
                         send_email(
                             recipient_email=recipient_email,
                             subject=subject,
-                            body_text=body_text,
                             body_html=body_html,
                         )
 
@@ -401,7 +261,6 @@ def send_completion_emails(
                             execution_id=execution_id,
                             status=status,
                             subject=subject,
-                            body_text=body_text,
                             body_html=body_html,
                             config=config,
                         )

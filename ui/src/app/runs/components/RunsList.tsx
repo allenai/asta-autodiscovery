@@ -242,7 +242,7 @@ const StyledDivider = styled(Divider)`
 `;
 
 const SectionTitle = styled(Typography)`
-    color: ${({ theme }) => theme.color['cream-100'].hex};
+    color: ${({ theme }) => theme.color['green-100'].hex};
     font-family: 'PP Telegraf', Manrope, sans-serif;
     font-size: 14px;
     font-weight: 700;

@@ -33,6 +33,7 @@ export const AttributionDialog = ({ isOpen, onClose }: AttributionDialogProps) =
                 <li>Find papers: Gemini</li>
                 <li>Generate a report: Claude Sonnet</li>
                 <li>Analyze data: GPT</li>
+                <li>AstaLabs AutoDiscovery: Gemini</li>
             </BulletList>
             <Typography variant="body1" sx={{ mb: 2 }}>
                 OpenAI&apos;s{' '}

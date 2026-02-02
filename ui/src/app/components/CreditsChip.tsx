@@ -45,20 +45,21 @@ export default function CreditsChip() {
                 <PopoverContent>
                     <PopoverHeading>How experiment credits work</PopoverHeading>
                     <PopoverParagraph>
-                        To support your research, we are providing a one-time grant of 1,000
-                        credits.
+                        To support your research, we are providing a one-time grant of{' '}
+                        <strong>1,000 credits.</strong>
                     </PopoverParagraph>
                     <ul>
                         <li>
-                            <b>Exchange Rate:</b> 1 Credit = 1 Experiment.
+                            <strong>Exchange Rate:</strong> 1 Credit = 1 Experiment.
                         </li>
                         <li>
-                            <b>Budget Protection:</b> Discovery sessions are capped at 500 credits
-                            to prevent accidental overspending. We recommend 50-100 experiments per
-                            session.
+                            <strong>Budget Protection:</strong> Discovery sessions are capped at 500
+                            credits to prevent accidental overspending. We recommend 50-100
+                            experiments per session.
                         </li>
                         <li>
-                            <b>Expiration:</b> Credits are valid until <b>Feb 28, 2026</b>.
+                            <strong>Expiration:</strong> Credits are valid until{' '}
+                            <strong>Feb 28, 2026</strong>.
                         </li>
                     </ul>
 

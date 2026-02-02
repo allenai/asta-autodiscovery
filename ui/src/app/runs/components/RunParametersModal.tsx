@@ -13,22 +13,21 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import prettyBytes from 'pretty-bytes';
 
-import { Metadata, RunArgs } from '@/types/Run';
+import { Metadata } from '@/types/Run';
 import { MCTS_SELECTION } from '@/runs/hooks/useRunSetup';
 
 interface RunParametersModalProps {
     open: boolean;
     onClose: () => void;
     metadata: Metadata | null | undefined;
-    args: RunArgs | null | undefined;
 }
 
 /**
  * Modal displaying run parameters in read-only format.
  * Shows metadata (name, description, datasets, domain, intent) and
- * run arguments (experiments, exploration weight, etc.)
+ * run arguments (experiments, exploration weight, etc.) - all from metadata.
  */
-export function RunParametersModal({ open, onClose, metadata, args }: RunParametersModalProps) {
+export function RunParametersModal({ open, onClose, metadata }: RunParametersModalProps) {
     const getMctsSelectionLabel = (value: string | null) => {
         if (!value) return 'Not set';
         const option = Object.values(MCTS_SELECTION).find((opt) => opt.value === value);
@@ -36,26 +35,53 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth={false}
+            PaperProps={{
+                sx: {
+                    width: '90%',
+                    maxWidth: '600px',
+                    borderRadius: '24px',
+                },
+            }}
+            slotProps={{
+                backdrop: {
+                    sx: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    },
+                },
+            }}>
             <StyledDialogTitle>
-                Run Parameters
-                <IconButton onClick={onClose} size="small">
+                <TitleText>Run Parameters</TitleText>
+                <IconButton
+                    onClick={onClose}
+                    aria-label="close"
+                    sx={(theme) => ({
+                        color: theme.color['cream-100'].hex,
+                        cursor: 'pointer',
+                        transition: 'color 250ms ease-out',
+                        '&:hover': {
+                            color: theme.color['green-100'].hex,
+                        },
+                    })}>
                     <CloseIcon />
                 </IconButton>
             </StyledDialogTitle>
-            <StyledDialogContent dividers>
+            <StyledDialogContent>
                 {/* Metadata Section */}
                 <Section>
-                    <SectionTitle>Session Info</SectionTitle>
+                    <SectionTitle>Session info</SectionTitle>
 
                     <FieldRow>
-                        <FieldLabel>Name</FieldLabel>
+                        <FieldLabel>Discovery session name</FieldLabel>
                         <FieldValue>{metadata?.name || 'Untitled'}</FieldValue>
                     </FieldRow>
 
                     {metadata?.description && (
                         <FieldRow>
-                            <FieldLabel>Dataset Context</FieldLabel>
+                            <FieldLabel>Dataset context</FieldLabel>
                             <FieldValue>{metadata.description}</FieldValue>
                         </FieldRow>
                     )}
@@ -109,52 +135,38 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
 
                 {/* Run Arguments Section */}
                 <Section>
-                    <SectionTitle>Session Settings</SectionTitle>
+                    <SectionTitle>Session settings</SectionTitle>
 
                     <FieldRow>
                         <FieldLabel>Experiment Budget</FieldLabel>
                         <FieldValue>
-                            {args?.nExperiments != null
-                                ? `${args.nExperiments} experiments`
+                            {metadata?.nExperiments != null
+                                ? `${metadata.nExperiments} experiments`
                                 : 'Not set'}
                         </FieldValue>
                     </FieldRow>
 
                     <FieldRow>
-                        <FieldLabel>Exploration Weight</FieldLabel>
-                        <FieldValue>{args?.explorationWeight ?? 'Default'}</FieldValue>
+                        <FieldLabel>Exploration weight</FieldLabel>
+                        <FieldValue>{metadata?.explorationWeight ?? 'Default'}</FieldValue>
                     </FieldRow>
 
                     <FieldRow>
-                        <FieldLabel>Search Strategy</FieldLabel>
+                        <FieldLabel>Search strategy</FieldLabel>
                         <FieldValue>
-                            {getMctsSelectionLabel(args?.mctsSelection ?? null)}
+                            {getMctsSelectionLabel(metadata?.mctsSelection ?? null)}
                         </FieldValue>
                     </FieldRow>
 
                     <FieldRow>
-                        <FieldLabel>Surprise Threshold</FieldLabel>
-                        <FieldValue>{args?.surprisalWidth ?? 'Default'}</FieldValue>
+                        <FieldLabel>Surprise threshold</FieldLabel>
+                        <FieldValue>{metadata?.surprisalWidth ?? 'Default'}</FieldValue>
                     </FieldRow>
 
                     <FieldRow>
-                        <FieldLabel>Evidence Weight</FieldLabel>
-                        <FieldValue>{args?.evidenceWeight ?? 'Default'}</FieldValue>
+                        <FieldLabel>Evidence weight</FieldLabel>
+                        <FieldValue>{metadata?.evidenceWeight ?? 'Default'}</FieldValue>
                     </FieldRow>
-
-                    {args?.warmstartExperiments && (
-                        <FieldRow>
-                            <FieldLabel>Warmstart Experiments</FieldLabel>
-                            <FieldValue>{args.warmstartExperiments}</FieldValue>
-                        </FieldRow>
-                    )}
-
-                    {args?.nWarmstart != null && (
-                        <FieldRow>
-                            <FieldLabel>Warmstart Count</FieldLabel>
-                            <FieldValue>{args.nWarmstart}</FieldValue>
-                        </FieldRow>
-                    )}
                 </Section>
             </StyledDialogContent>
         </Dialog>
@@ -162,16 +174,26 @@ export function RunParametersModal({ open, onClose, metadata, args }: RunParamet
 }
 
 const StyledDialogTitle = styled(DialogTitle)`
-    display: flex;
-    justify-content: space-between;
     align-items: center;
     background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+`;
+
+const TitleText = styled(Typography)`
+    font-family: 'PP Telegraf', Manrope, sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: ${({ theme }) => theme.color['green-40'].hex};
 `;
 
 const StyledDialogContent = styled(DialogContent)`
     background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    padding: ${({ theme }) => theme.spacing(3)} !important;
 `;
 
 const Section = styled(Box)`
@@ -181,8 +203,9 @@ const Section = styled(Box)`
 `;
 
 const SectionTitle = styled(Typography)`
-    font-size: 1rem;
-    font-weight: 600;
+    font-family: 'PP Telegraf', Manrope, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
     color: ${({ theme }) => theme.color['green-100'].hex};
     margin-bottom: ${({ theme }) => theme.spacing(1)};
 `;
@@ -194,11 +217,10 @@ const FieldRow = styled(Box)`
 `;
 
 const FieldLabel = styled(Typography)`
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: ${({ theme }) => theme.color['cream-60'].hex};
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 14px;
+    font-weight: 700;
+    color: rgb(159, 234, 209);
+    text-transform: none;
 `;
 
 const FieldValue = styled(Typography)`

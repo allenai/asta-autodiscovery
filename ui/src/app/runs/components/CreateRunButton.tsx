@@ -64,6 +64,13 @@ const StyledButton = styled(Button)`
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};
         height: 40px;
+        white-space: nowrap;
+        overflow: hidden;
+        justify-content: flex-start;
+
+        & .MuiButton-startIcon {
+            flex-shrink: 0;
+        }
     }
 
     &.MuiButton-outlined {
@@ -72,6 +79,11 @@ const StyledButton = styled(Button)`
         &:hover {
             border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
         }
+    }
+
+    & span.MuiButton-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 `;
 

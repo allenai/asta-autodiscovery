@@ -174,7 +174,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
             </SectionHeader>
             <ConfigurationBox>
                 <FormControl>
-                    <StyledFormLabel>Experiment Budget</StyledFormLabel>
+                    <StyledFormLabel>Experiment budget</StyledFormLabel>
                     <HelperText>
                         Set the maximum number of experiments to generate (
                         <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
@@ -227,7 +227,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </FormControl>
 
                     <FormControl fullWidth>
-                        <StyledFormLabel>Exploration Weight</StyledFormLabel>
+                        <StyledFormLabel>Exploration weight</StyledFormLabel>
                         <HelperText>
                             Controls how the system balances exploring new hypothesis directions
                             versus diving deeper into promising ones. Higher values (e.g., 3-5)
@@ -297,7 +297,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </FormControl>
 
                     <FormControl fullWidth>
-                        <StyledFormLabel>Evidence Weight</StyledFormLabel>
+                        <StyledFormLabel>Evidence weight</StyledFormLabel>
                         <HelperText>
                             Controls how much the system trusts experimental results when updating
                             its beliefs. Higher values (e.g., 2-5) mean the system relies heavily on

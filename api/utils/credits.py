@@ -27,6 +27,7 @@ from typing import Any, NamedTuple
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import (
     count_experiment_results,
+    get_job_args,
     get_metadata,
     list_user_jobs,
 )
@@ -122,12 +123,17 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
     """
     config = config or JobConfig()
 
-    metadata = get_metadata(userid, jobid, config)
+    metadata = get_metadata(userid=userid, jobid=jobid, config=config)
     if metadata is None:
         return None
 
-    completed = count_experiment_results(userid, jobid, config)
-    requested = metadata.get("n_experiments", 0)
+    completed = count_experiment_results(userid=userid, jobid=jobid, config=config)
+    requested = metadata.get("n_experiments", None)
+    if requested is None:
+        # Fallback, from when args.json contained this data
+        # TODO: Remove this hack after public launch, since "real" users will never see this
+        args = get_job_args(userid=userid, jobid=jobid, config=config) or {}
+        requested = args.get("n_experiments", 0)
     pending = max(0, requested - completed)
 
     job_stats = JobStats(
@@ -136,6 +142,9 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
         num_experiments_completed=completed,
         num_experiments_pending=pending,
     )
+
+    if jobid == "353800d1-9e6e-40c1-a241-2169ed1a9b7d":
+        print(f"JobStats: {job_stats}")
     return job_stats
 
 

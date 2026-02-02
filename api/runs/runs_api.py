@@ -264,9 +264,9 @@ def create() -> Blueprint:
                     model for model in executor.map(_build_run_model, sliced_run_ids) if model
                 ]
 
-        # Sort by created_at descending (newest first)
+        # Sort by most recent activity (status_checked_at if available, else created_at)
         run_models.sort(
-            key=lambda r: r.run_details.created_at if r.run_details else "",
+            key=lambda r: r.run_details.status_checked_at or r.run_details.created_at if r.run_details else "",
             reverse=True,
         )
 
@@ -691,7 +691,14 @@ def create() -> Blueprint:
                 },
             )
 
-            return jsonify({"execution_id": execution_id, "message": "Run submitted successfully"})
+            # Get updated run_details to return to frontend
+            run_details = _get_run_details(userid, runid)
+
+            return jsonify({
+                "execution_id": execution_id,
+                "message": "Run submitted successfully",
+                "run_details": run_details,
+            })
 
         except InsufficientCreditsError as e:
             return jsonify(

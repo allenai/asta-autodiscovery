@@ -1,3 +1,4 @@
+# This build is purely for CI. The built images are not pushed anywhere.
 name: "CI: Docker Compose Build"
 
 on:

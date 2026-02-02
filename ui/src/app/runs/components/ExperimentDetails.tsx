@@ -1,6 +1,4 @@
 import { styled, Typography, Box, Stack } from '@mui/material';
-import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
-import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 
 import { Experiment } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
@@ -25,58 +23,29 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                 <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
             </TitleWrapper>
             <ContentWrapper spacing={2}>
-                <Box>
-                    <SectionHeader>Status</SectionHeader>
-                    <Box sx={{ mt: 0.5 }}>
-                        <StatusChip
-                            label={experiment.status}
-                            size="small"
-                            $status={experiment.status}
-                        />
-                    </Box>
-                </Box>
-
-                {experiment.hypothesis && (
+                {experiment.status !== 'SUCCEEDED' && (
                     <Box>
-                        <SectionHeader>Hypothesis</SectionHeader>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {experiment.hypothesis}
-                        </Typography>
-                        <BeliefChip>
-                            <ScienceOutlinedIcon />
-                            Belief before experiment:{' '}
-                            <strong>
-                                {getPriorAndPosteriorLabel(experiment.prior)} (
-                                {experiment.prior?.toFixed(3)})
-                            </strong>
-                        </BeliefChip>
-                    </Box>
-                )}
-
-                {experiment.analysis && (
-                    <Box>
-                        <SectionHeader>Analysis</SectionHeader>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {experiment.analysis}
-                        </Typography>
-                        <BeliefChip>
-                            <ScienceOutlinedIcon />
-                            Belief after experiment:{' '}
-                            <strong>
-                                {getPriorAndPosteriorLabel(experiment.posterior)} (
-                                {experiment.posterior?.toFixed(3)})
-                            </strong>
-                        </BeliefChip>
+                        <SectionHeader>Status</SectionHeader>
+                        <Box sx={{ mt: 0.5 }}>
+                            <StatusChip
+                                label={experiment.status}
+                                size="small"
+                                $status={experiment.status}
+                            />
+                        </Box>
                     </Box>
                 )}
 
                 {experiment.surprise !== null && (
                     <Box>
-                        <SectionHeader>Surprise</SectionHeader>
+                        <SectionHeader>Surprisal</SectionHeader>
                         <BeliefChip>
-                            <LightbulbOutlinedIcon />
                             {getSurprisalDirection(experiment.surprise)}{' '}
-                            <strong>({experiment.surprise.toFixed(3)})</strong>
+                            {experiment.isSurprising ? (
+                                <OrangeText>({experiment.surprise.toFixed(3)})</OrangeText>
+                            ) : (
+                                <strong>({experiment.surprise.toFixed(3)})</strong>
+                            )}
                         </BeliefChip>
                     </Box>
                 )}
@@ -88,6 +57,38 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                             prior={experiment.priorBelief}
                             posterior={experiment.posteriorBelief}
                         />
+                    </Box>
+                )}
+
+                {experiment.hypothesis && (
+                    <Box>
+                        <SectionHeader>Hypothesis</SectionHeader>
+                        <BeliefChip>
+                            Belief before experiment:{' '}
+                            <PinkText>
+                                {getPriorAndPosteriorLabel(experiment.prior)} (
+                                {experiment.prior?.toFixed(3)})
+                            </PinkText>
+                        </BeliefChip>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {experiment.hypothesis}
+                        </Typography>
+                    </Box>
+                )}
+
+                {experiment.analysis && (
+                    <Box>
+                        <SectionHeader>Analysis</SectionHeader>
+                        <BeliefChip>
+                            Belief after experiment:{' '}
+                            <GreenText>
+                                {getPriorAndPosteriorLabel(experiment.posterior)} (
+                                {experiment.posterior?.toFixed(3)})
+                            </GreenText>
+                        </BeliefChip>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {experiment.analysis}
+                        </Typography>
                     </Box>
                 )}
 
@@ -181,19 +182,25 @@ const SectionHeader = styled(Typography)`
 
 const BeliefChip = styled(Box)`
     align-items: center;
-    backgroundcolor: transparent;
-    border: 1px solid ${({ theme }) => theme.color['green-40'].rgba.toString()};
+    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
     border-radius: 40px;
     color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
     gap: ${({ theme }) => theme.spacing(0.5)};
     font-size: 0.875rem;
-    margin-top: ${({ theme }) => theme.spacing(1)};
+    margin: ${({ theme }) => theme.spacing(1)} 0;
     padding: ${({ theme }) => theme.spacing(0.5, 1)};
     width: fit-content;
+`;
 
-    .MuiSvgIcon-root {
-        color: ${({ theme }) => theme.color['green-100'].hex};
-        font-size: 1rem;
-    }
+const PinkText = styled('strong')`
+    color: ${({ theme }) => theme.color['pink-100'].hex};
+`;
+
+const GreenText = styled('strong')`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+`;
+
+const OrangeText = styled('strong')`
+    color: ${({ theme }) => theme.color['warning-orange-100'].hex};
 `;

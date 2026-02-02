@@ -45,8 +45,8 @@ export default function CreditsChip() {
                 <PopoverContent>
                     <PopoverHeading>How experiment credits work</PopoverHeading>
                     <PopoverParagraph>
-                        To support your research, we are providing a one-time grant of{' '}
-                        <strong>1,000 credits.</strong>
+                        To support your research, we are providing up to{' '}
+                        <strong>1,000 credits</strong> per user to run experiments.
                     </PopoverParagraph>
                     <ul>
                         <li>
@@ -65,9 +65,10 @@ export default function CreditsChip() {
 
                     <PopoverSubheading>Can I get more credits?</PopoverSubheading>
                     <PopoverParagraph>
-                        This grant is a fixed allocation and credits cannot be reloaded once
-                        consumed. However, we are actively evaluating future funding or premium
-                        models. If you are interested in discussing potential partnerships, please{' '}
+                        The credits are a one-time fixed allocation to support public access for
+                        scientific and education purposes and cannot be reloaded once consumed. If
+                        you are interested in discussing potential research collaborations to
+                        further scientific research, please{' '}
                         <StyledLink
                             href="https://allenai.org/contact"
                             target="_blank"

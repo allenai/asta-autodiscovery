@@ -60,6 +60,7 @@ def build_email_body_text(
     runid: str,
     status: str,
     run_name: str | None,
+    started_at: str | None,
     finished_at: datetime | None,
     execution_id: str | None,
     origin_url: str | None = None,
@@ -72,6 +73,7 @@ def build_email_body_text(
         runid: Run identifier
         status: Run status
         run_name: Optional run name
+        started_at: ISO timestamp when run started
         finished_at: Finish timestamp
         execution_id: Cloud Run execution ID
         origin_url: Base URL where run was submitted (for results link)
@@ -81,6 +83,7 @@ def build_email_body_text(
         Plain text email body
     """
     name_display = run_name or runid
+    started_str = datetime.fromisoformat(started_at).strftime("%Y-%m-%d %H:%M:%S UTC") if started_at else "Unknown"
     finished_str = finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown"
 
     if status == "SUCCEEDED":
@@ -108,9 +111,12 @@ def build_email_body_text(
     body = f"""
 {status_message}
 
+View your results: {run_url}
+
 Run Details:
   Name: {name_display}
   Status: {status}
+  Started: {started_str}
   Finished: {finished_str}
 """
 
@@ -125,9 +131,7 @@ Run Details:
     if n_experiments:
         body += f"  Experiments: {n_experiments}\n"
 
-    body += f"""
-View your results: {run_url}
-
+    body += """
 ---
 This is an automated message from AutoDiscovery (ASTA).
 """
@@ -140,6 +144,7 @@ def build_email_body_html(
     runid: str,
     status: str,
     run_name: str | None,
+    started_at: str | None,
     finished_at: datetime | None,
     execution_id: str | None,
     origin_url: str | None = None,
@@ -152,6 +157,7 @@ def build_email_body_html(
         runid: Run identifier
         status: Run status
         run_name: Optional run name
+        started_at: ISO timestamp when run started
         finished_at: Finish timestamp
         execution_id: Cloud Run execution ID
         origin_url: Base URL where run was submitted (for results link)
@@ -161,6 +167,7 @@ def build_email_body_html(
         HTML email body
     """
     name_display = run_name or runid
+    started_str = datetime.fromisoformat(started_at).strftime("%Y-%m-%d %H:%M:%S UTC") if started_at else "Unknown"
     finished_str = finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown"
 
     if status == "SUCCEEDED":
@@ -223,8 +230,6 @@ def build_email_body_html(
         .details {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }}
         .details dt {{ font-weight: bold; }}
         .details dd {{ margin-left: 0; margin-bottom: 10px; }}
-        .button {{ display: inline-block; background: #007bff; color: white; padding: 10px 20px;
-                   text-decoration: none; border-radius: 5px; margin-top: 15px; }}
         .footer {{ color: #6c757d; font-size: 12px; margin-top: 30px; border-top: 1px solid #dee2e6; padding-top: 15px; }}
     </style>
 </head>
@@ -233,18 +238,20 @@ def build_email_body_html(
         <h2>AutoDiscovery Run Complete</h2>
         <p class="status">{status_message}</p>
 
+        <a href="{run_url}" style="display: inline-block; background: #007bff; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 15px 0;">View Results</a>
+
         <div class="details">
             <dl>
                 <dt>Run Name</dt>
                 <dd>{name_display}</dd>
                 <dt>Status</dt>
                 <dd>{status}</dd>
+                <dt>Started</dt>
+                <dd>{started_str}</dd>
                 <dt>Completed</dt>
                 <dd>{finished_str}</dd>{metadata_rows}
             </dl>
         </div>
-
-        <a href="{run_url}" class="button">View Results</a>
 
         <div class="footer">
             This is an automated message from AutoDiscovery (ASTA).
@@ -361,15 +368,16 @@ def send_completion_emails(
                 status = run_details.status
                 execution_id = run_details.execution_id
                 origin_url = run_details.origin_url
+                started_at = run_details.created_at
 
                 # Build email content
                 subject = build_email_subject(status, run_name)
                 body_text = build_email_body_text(
-                    userid, runid, status, run_name, run_details.finished_at, execution_id,
+                    userid, runid, status, run_name, started_at, run_details.finished_at, execution_id,
                     origin_url=origin_url, metadata=metadata,
                 )
                 body_html = build_email_body_html(
-                    userid, runid, status, run_name, run_details.finished_at, execution_id,
+                    userid, runid, status, run_name, started_at, run_details.finished_at, execution_id,
                     origin_url=origin_url, metadata=metadata,
                 )
 

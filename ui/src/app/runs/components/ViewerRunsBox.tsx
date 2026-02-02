@@ -1,7 +1,7 @@
 import { Box, Button, CircularProgress, Typography, styled } from '@mui/material';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { useRuns } from '@/contexts/RunsContext';
@@ -66,13 +66,36 @@ export const ViewerRunsBox = () => {
         return orderedBuckets;
     }, [viewerRuns]);
 
-    const [expandedBuckets, setExpandedBuckets] = useState<Record<Bucket, boolean>>(() => ({
-        [Bucket.NOT_STARTED]: true,
+    const [expandedBuckets, setExpandedBuckets] = useState<Record<Bucket, boolean>>({
+        [Bucket.NOT_STARTED]: false,
         [Bucket.RUNNING]: false,
         [Bucket.FINISHED]: false,
         [Bucket.ERROR]: false,
         [Bucket.CANCELLED]: false,
-    }));
+    });
+
+    // Find the first non-empty bucket and expand it
+    useEffect(() => {
+        const bucketOrder = [
+            Bucket.NOT_STARTED,
+            Bucket.RUNNING,
+            Bucket.FINISHED,
+            Bucket.ERROR,
+            Bucket.CANCELLED,
+        ];
+
+        const firstNonEmptyBucket = bucketOrder.find((bucket) => runsByBucket[bucket]?.length > 0);
+
+        if (firstNonEmptyBucket) {
+            setExpandedBuckets({
+                [Bucket.NOT_STARTED]: firstNonEmptyBucket === Bucket.NOT_STARTED,
+                [Bucket.RUNNING]: firstNonEmptyBucket === Bucket.RUNNING,
+                [Bucket.FINISHED]: firstNonEmptyBucket === Bucket.FINISHED,
+                [Bucket.ERROR]: firstNonEmptyBucket === Bucket.ERROR,
+                [Bucket.CANCELLED]: firstNonEmptyBucket === Bucket.CANCELLED,
+            });
+        }
+    }, [runsByBucket]);
 
     const onClickToggleButton = (bucket: Bucket) => {
         setExpandedBuckets((prev) => ({

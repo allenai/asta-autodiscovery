@@ -204,7 +204,15 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 rows={rows}
                 columns={DEFAULT_COLUMNS}
                 loading={!runStats?.pendingExperiments && !experiments.length}
-                initialState={{ pagination: { paginationModel } }}
+                initialState={{
+                    pagination: { paginationModel },
+                    sorting: {
+                        sortModel:
+                            runStats?.completedExperiments === runStats?.requestedExperiments
+                                ? [{ field: 'surprisal', sort: 'desc' }]
+                                : [],
+                    },
+                }}
                 pageSizeOptions={[5, 10, 25, 50]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}

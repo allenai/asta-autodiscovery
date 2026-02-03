@@ -44,7 +44,7 @@ def load_retry_config() -> RetryConfig:
 
 
 def should_retry_llm_error(exc: Exception) -> bool:
-    """Return True when an exception looks like an LLM rate-limit (HTTP 429) error.
+    """Return True when an exception looks retryable (429/timeout/5xx).
 
     Args:
         exc: The exception to inspect.
@@ -52,19 +52,23 @@ def should_retry_llm_error(exc: Exception) -> bool:
     Returns:
         True when the error indicates a rate limit, otherwise False.
     """
-    if _is_google_rate_limit_error(exc):
+    if _is_google_retryable_error(exc):
         return True
-    if _is_openai_rate_limit_error(exc):
+    if _is_openai_retryable_error(exc):
         return True
-    if _is_requests_rate_limit_error(exc):
+    if _is_requests_retryable_error(exc):
         return True
     status_code = getattr(exc, "status_code", None) or getattr(exc, "http_status", None)
-    if status_code == 429:
+    if status_code == 429 or (status_code is not None and status_code >= 500):
         return True
     message = str(exc).lower()
-    return "429" in message and (
+    if "timeout" in message or "timed out" in message:
+        return True
+    if "429" in message and (
         "resource exhausted" in message or "too many requests" in message or "rate limit" in message
-    )
+    ):
+        return True
+    return "5xx" in message or "server error" in message
 
 
 def call_with_backoff(
@@ -195,37 +199,44 @@ def _extract_retry_after_seconds(exc: Exception) -> float | None:
         return None
 
 
-def _is_google_rate_limit_error(exc: Exception) -> bool:
+def _is_google_retryable_error(exc: Exception) -> bool:
     try:
         from google.api_core import exceptions as google_exceptions
     except Exception:
         return False
 
-    rate_limit_errors = tuple(
+    retryable_errors = tuple(
         error
         for error in (
             getattr(google_exceptions, "ResourceExhausted", None),
             getattr(google_exceptions, "TooManyRequests", None),
+            getattr(google_exceptions, "ServiceUnavailable", None),
+            getattr(google_exceptions, "DeadlineExceeded", None),
+            getattr(google_exceptions, "InternalServerError", None),
         )
         if error is not None
     )
-    return isinstance(exc, rate_limit_errors)
+    return isinstance(exc, retryable_errors)
 
 
-def _is_openai_rate_limit_error(exc: Exception) -> bool:
+def _is_openai_retryable_error(exc: Exception) -> bool:
     try:
-        from openai import APIStatusError, RateLimitError
+        from openai import APIStatusError, APITimeoutError, RateLimitError
     except Exception:
         return False
 
     if isinstance(exc, RateLimitError):
         return True
+    if isinstance(exc, APITimeoutError):
+        return True
     if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) == 429:
+        return True
+    if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) in {500, 502, 503, 504}:
         return True
     return False
 
 
-def _is_requests_rate_limit_error(exc: Exception) -> bool:
+def _is_requests_retryable_error(exc: Exception) -> bool:
     try:
         from requests import HTTPError
     except Exception:
@@ -233,5 +244,6 @@ def _is_requests_rate_limit_error(exc: Exception) -> bool:
 
     if isinstance(exc, HTTPError):
         response = getattr(exc, "response", None)
-        return getattr(response, "status_code", None) == 429
+        status = getattr(response, "status_code", None)
+        return status == 429 or (status is not None and status >= 500)
     return False

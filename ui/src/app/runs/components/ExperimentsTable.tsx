@@ -1,6 +1,6 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { useCallback, useMemo } from 'react';
+import { DataGrid, GridColDef, GridRenderCellParams, GridSortModel } from '@mui/x-data-grid';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
@@ -124,6 +124,13 @@ interface ExperimentsTableProps {
 
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const { experiments, lastError, selectExperiment, hasJobCompleted } = useRunExperiments();
+    const [sortModel, setSortModel] = useState<GridSortModel>([]);
+    // Apply default Surprisal sort when the session completes.
+    useEffect(() => {
+        if (hasJobCompleted) {
+            setSortModel([{ field: 'surprisal', sort: 'desc' }]);
+        }
+    }, [hasJobCompleted]);
 
     const createSkeletonRows = useCallback(() => {
         const pendingCount = runStats?.pendingExperiments ?? 0;
@@ -201,6 +208,8 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 pageSizeOptions={[5, 10, 25, 50]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
+                sortModel={sortModel}
+                onSortModelChange={setSortModel}
                 getRowHeight={() => 'auto'}
                 rowSelection={false}
             />

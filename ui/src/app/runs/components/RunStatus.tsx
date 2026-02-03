@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutlined';
 import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
@@ -197,6 +198,7 @@ function RunStatusContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     // const [isTableExpanded, setIsTableExpanded] = useState(false);
     const isTableExpanded = true;
+    const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
     const setIsTableExpanded = (...args: any[]) => {}; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     return (
@@ -302,22 +304,26 @@ function RunStatusContent({
                 </TablePanel>
 
                 {!!selectedExperiment && (
-                    <DetailsPanel>
-                        <>
-                            <DetailsActions>
-                                <LargeScreenAction>
-                                    <DetailsActionButton size="small">
-                                        <OpenInFullOutlinedIcon />
-                                    </DetailsActionButton>
-                                </LargeScreenAction>
+                    <DetailsPanel $isExpanded={isDetailsExpanded}>
+                        <DetailsActions>
+                            <LargeScreenAction>
                                 <DetailsActionButton
-                                    onClick={() => selectExperiment(null)}
+                                    onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
                                     size="small">
-                                    <CloseIcon />
+                                    {isDetailsExpanded ? (
+                                        <CloseFullscreenOutlinedIcon />
+                                    ) : (
+                                        <OpenInFullOutlinedIcon />
+                                    )}
                                 </DetailsActionButton>
-                            </DetailsActions>
-                            <ExperimentDetails experiment={selectedExperiment} />
-                        </>
+                            </LargeScreenAction>
+                            <DetailsActionButton
+                                onClick={() => selectExperiment(null)}
+                                size="small">
+                                <CloseIcon />
+                            </DetailsActionButton>
+                        </DetailsActions>
+                        <ExperimentDetails experiment={selectedExperiment} />
                     </DetailsPanel>
                 )}
             </PanelLayout>
@@ -393,18 +399,21 @@ const TablePanel = styled('div')<{ $isExpanded: boolean; $hasDetails: boolean }>
     }
 `;
 
-const DetailsPanel = styled('div')`
+const DetailsPanel = styled('div')<{ $isExpanded: boolean }>`
     flex: 0 1 auto;
-    max-width: 500px;
+    max-width: ${({ $isExpanded }) => ($isExpanded ? 'initial' : '500px')};
     background-color: #163638f3;
     border-radius: 12px;
-    position: relative;
-    overflow-y: scroll;
+    position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
+    overflow-y: auto;
     z-index: 2;
+    top: 0;
+    bottom: 0;
 
     @container run-status (width < 1000px) {
         flex: 1 1 auto;
         max-width: initial;
+        position: relative;
         width: calc(100cqw - 20px);
         grid-row: 1;
         grid-column: 1;

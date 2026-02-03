@@ -28,11 +28,6 @@ import { useRouter } from 'next/navigation';
 import { useRuns } from '@/contexts/RunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { getRunsApi } from '@/api/RunsApi';
-import { Run, RunStatus } from '@/types/Run';
-
-const isDraftRun = (run: Run): boolean => {
-    return run.details?.status === RunStatus.CREATED && !run.details?.executionId;
-};
 
 interface RunsListProps {
     selectedRunId: string | null;
@@ -53,11 +48,9 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
     const router = useRouter();
     const api = getRunsApi();
 
-    const draftRuns = useMemo(() => viewerRuns?.filter(isDraftRun) ?? [], [viewerRuns]);
-
-    const submittedRuns = useMemo(
+    const sortedRuns = useMemo(
         () =>
-            (viewerRuns?.filter((run) => !isDraftRun(run)) ?? []).sort((a, b) => {
+            [...(viewerRuns ?? [])].sort((a, b) => {
                 const aTime = a.details?.statusCheckedAt || a.details?.createdAt || '';
                 const bTime = b.details?.statusCheckedAt || b.details?.createdAt || '';
                 return bTime.localeCompare(aTime); // descending (newest first)
@@ -128,103 +121,56 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                 </SkeletonWrapper>
             ) : viewerRuns?.length === 0 ? (
                 <Box sx={{ p: 2 }}>
-                    <Typography variant="body2" color="text.secondary" align="center">
+                    <Typography
+                        variant="body2"
+                        align="center"
+                        sx={{ color: (theme) => theme.color['cream-100'].hex }}>
                         No runs yet. Create your first run to get started.
                     </Typography>
                 </Box>
             ) : (
                 <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-                    {draftRuns.length > 0 && (
-                        <>
-                            <SectionTitle>Your Drafts</SectionTitle>
-                            <List disablePadding>
-                                {draftRuns.map((run) => (
-                                    <ListItem key={run.id} disablePadding>
-                                        <Link
-                                            href={`/runs/${run.id}`}
-                                            style={{
-                                                textDecoration: 'none',
-                                                color: 'inherit',
-                                                width: '100%',
-                                            }}>
-                                            <RunItemButton
-                                                selected={selectedRunId === run.id}
-                                                onClick={() => onSelectRun(run.id)}>
-                                                <ListItemText
-                                                    primary={run.name || run.id}
-                                                    primaryTypographyProps={{
-                                                        variant: 'body2',
-                                                        noWrap: true,
-                                                        sx: {
-                                                            fontFamily: 'monospace',
-                                                            fontSize: '0.85rem',
-                                                        },
-                                                    }}
-                                                />
-                                                {deletingRunId === run.id ? (
-                                                    <CircularProgress size={20} sx={{ mx: 1 }} />
-                                                ) : (
-                                                    <MenuButton
-                                                        size="small"
-                                                        onClick={(
-                                                            e: React.MouseEvent<HTMLElement>
-                                                        ) => handleMenuOpen(e, run.id)}>
-                                                        <MoreVertIcon fontSize="small" />
-                                                    </MenuButton>
-                                                )}
-                                            </RunItemButton>
-                                        </Link>
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </>
-                    )}
-
-                    {submittedRuns.length > 0 && (
-                        <>
-                            <SectionTitle>Your Sessions</SectionTitle>
-                            <List disablePadding>
-                                {submittedRuns.map((run) => (
-                                    <ListItem key={run.id} disablePadding>
-                                        <Link
-                                            href={`/runs/${run.id}`}
-                                            style={{
-                                                textDecoration: 'none',
-                                                color: 'inherit',
-                                                width: '100%',
-                                            }}>
-                                            <RunItemButton
-                                                selected={selectedRunId === run.id}
-                                                onClick={() => onSelectRun(run.id)}>
-                                                <ListItemText
-                                                    primary={run.name || run.id}
-                                                    primaryTypographyProps={{
-                                                        variant: 'body2',
-                                                        noWrap: true,
-                                                        sx: {
-                                                            fontFamily: 'monospace',
-                                                            fontSize: '0.85rem',
-                                                        },
-                                                    }}
-                                                />
-                                                {deletingRunId === run.id ? (
-                                                    <CircularProgress size={20} sx={{ mx: 1 }} />
-                                                ) : (
-                                                    <MenuButton
-                                                        size="small"
-                                                        onClick={(
-                                                            e: React.MouseEvent<HTMLElement>
-                                                        ) => handleMenuOpen(e, run.id)}>
-                                                        <MoreVertIcon fontSize="small" />
-                                                    </MenuButton>
-                                                )}
-                                            </RunItemButton>
-                                        </Link>
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </>
-                    )}
+                    <SectionTitle>Your Sessions</SectionTitle>
+                    <List disablePadding>
+                        {sortedRuns.map((run) => (
+                            <ListItem key={run.id} disablePadding>
+                                <Link
+                                    href={`/runs/${run.id}`}
+                                    style={{
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        width: '100%',
+                                    }}>
+                                    <RunItemButton
+                                        selected={selectedRunId === run.id}
+                                        onClick={() => onSelectRun(run.id)}>
+                                        <ListItemText
+                                            primary={run.name || run.id}
+                                            primaryTypographyProps={{
+                                                variant: 'body2',
+                                                noWrap: true,
+                                                sx: {
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '0.85rem',
+                                                },
+                                            }}
+                                        />
+                                        {deletingRunId === run.id ? (
+                                            <CircularProgress size={20} sx={{ mx: 1 }} />
+                                        ) : (
+                                            <MenuButton
+                                                size="small"
+                                                onClick={(e: React.MouseEvent<HTMLElement>) =>
+                                                    handleMenuOpen(e, run.id)
+                                                }>
+                                                <MoreVertIcon fontSize="small" />
+                                            </MenuButton>
+                                        )}
+                                    </RunItemButton>
+                                </Link>
+                            </ListItem>
+                        ))}
+                    </List>
                 </Box>
             )}
 

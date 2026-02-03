@@ -29,10 +29,12 @@ gcloud run jobs create autodiscovery-send-emails \
   --image gcr.io/ai2-aristo/autodiscovery-scripts \
   --region us-west1 \
   --service-account ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com \
-  --set-env-vars "AUTH0_MGMT_CLIENT_ID=<client-id>,AUTH0_MGMT_CLIENT_SECRET=<client-secret>" \
+  --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
   --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--dry-run"
 ```
+
+Note: Remove `--dry-run` from args once validated.
 
 ### Schedule (every 15 minutes)
 
@@ -73,7 +75,7 @@ uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 
 ## Docker Image
 
-All maintenance scripts are packaged into a single container image: `gcr.io/ai2-aristo/autodiscovery-scripts`
+All scripts are packaged into a single container image: `gcr.io/ai2-aristo/autodiscovery-scripts`
 
 ### Automated Builds
 
@@ -138,7 +140,7 @@ gcloud run jobs update autodiscovery-dataset-cleanup \
 ## Required Permissions
 
 **`ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com`** is used for:
-- Running maintenance Cloud Run Jobs (job runtime identity)
+- Running scheduled Cloud Run Jobs (job runtime identity)
 - Pushing images to GCR (via GitHub Actions)
 - Invoking Cloud Run Jobs (via Cloud Scheduler)
 

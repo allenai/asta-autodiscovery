@@ -216,9 +216,12 @@ function RunStatusContent({
                             <RunHeaderSubtitle>
                                 <StyledListItem>
                                     Started{' '}
-                                    {new Date(run.details.createdAt).toLocaleString(undefined, {
-                                        dateStyle: 'short',
-                                        timeStyle: 'short',
+                                    {new Date(run.details.createdAt).toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
                                     })}
                                 </StyledListItem>
                                 <StyledListItem>

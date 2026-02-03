@@ -14,5 +14,6 @@ export const StatusChip = styled(Chip)<{ $status: string }>`
         }
     }};
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    font-weight: normal;
     padding: ${({ theme }) => theme.spacing(1)};
 `;

@@ -30,6 +30,10 @@ import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
 import { useAuth0 } from '@/contexts/Auth0Context';
 
+const toSentenceCase = (str: string): string => {
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
 interface RunStatusProps {
     runid: string;
     onRunCancelled?: () => void;
@@ -229,7 +233,7 @@ function RunStatusContent({
                                 </StyledListItem>
                                 <StyledListItem>
                                     <StatusChip
-                                        label={run.details.status}
+                                        label={toSentenceCase(run.details.status)}
                                         size="small"
                                         $status={run.details.status}
                                     />
@@ -522,7 +526,7 @@ const RunHeaderSubtitle = styled(List)`
     color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
     flex-direction: row;
-    font-weight: 700;
+    font-weight: normal;
     gap: ${({ theme }) => theme.spacing(1)};
     padding: 0;
 `;

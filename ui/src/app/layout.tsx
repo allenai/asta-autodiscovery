@@ -12,8 +12,9 @@ import '@fontsource/lato/700.css';
 import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/700.css';
 
-import ClientProviders from './components/ClientProviders';
-import AuthErrorDialog from './components/AuthErrorDialog';
+import ClientProviders from '@/components/ClientProviders';
+import AuthErrorDialog from '@/components/AuthErrorDialog';
+import HeapAnalytics from '@/components/HeapAnalytics';
 
 export const metadata: Metadata = {
     title: 'AstaLabs AutoDiscovery',
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <body>
                 <AppRouterCacheProvider>
                     <ClientProviders>
+                        <HeapAnalytics />
                         <VarnishApp>
                             <div
                                 style={{

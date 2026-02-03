@@ -12,7 +12,13 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
 from utils.auth import requires_enrollment
-from utils.credits import InsufficientCreditsError, check_sufficient_credits, get_job_stats
+from utils.credits import (
+    ExperimentLimitExceededError,
+    InsufficientCreditsError,
+    InvalidExperimentCountError,
+    check_experiment_limits,
+    get_job_stats,
+)
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
@@ -648,8 +654,8 @@ def create() -> Blueprint:
                 if n_experiments is None:
                     raise BadRequest("Number of Experiments is required in metadata")
 
-                # Validate sufficient credits before submission
-                check_sufficient_credits(
+                # Validate experiment count and sufficient credits before submission
+                check_experiment_limits(
                     n_experiments=n_experiments, userid=userid, config=manager.config
                 )
 
@@ -699,6 +705,16 @@ def create() -> Blueprint:
                 "message": "Run submitted successfully",
                 "run_details": run_details,
             })
+
+        except InvalidExperimentCountError as e:
+            return jsonify(
+                {"error": e.message, "requested": e.requested}
+            ), 400  # Bad Request
+
+        except ExperimentLimitExceededError as e:
+            return jsonify(
+                {"error": e.message, "requested": e.requested, "limit": e.limit}
+            ), 400  # Bad Request
 
         except InsufficientCreditsError as e:
             return jsonify(

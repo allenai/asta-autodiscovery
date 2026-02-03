@@ -12,8 +12,12 @@ Example usage:
 
     # Check credits with exception
     try:
-        check_sufficient_credits(10, userid, config)
+        check_experiment_limits(10, userid, config)
         manager.run_job(...)
+    except InvalidExperimentCountError as e:
+        return jsonify({"error": e.message}), 400
+    except ExperimentLimitExceededError as e:
+        return jsonify({"error": e.message}), 400
     except InsufficientCreditsError as e:
         return jsonify({"error": e.message}), 402
 
@@ -34,6 +38,9 @@ from autodiscovery_jobs.gcs import (
 
 # Credit configuration
 DEFAULT_CREDITS_GRANTED = 1000
+
+# Max number of experiments that can run in a single job
+DEFAULT_EXPERIMENT_LIMIT = 500
 
 
 class JobStats(NamedTuple):
@@ -84,6 +91,40 @@ class InsufficientCreditsError(Exception):
         self.available = available
         self.message = (
             f"Insufficient credits: requested {requested}, but only {available} available"
+        )
+        super().__init__(self.message)
+
+
+class InvalidExperimentCountError(Exception):
+    """Raised when experiment count is invalid (n <= 0).
+
+    Attributes:
+        requested: Number of experiments requested
+        message: Descriptive error message
+    """
+
+    def __init__(self, requested: int):
+        self.requested = requested
+        self.message = (
+            f"Invalid experiment count: {requested}. Must be greater than 0."
+        )
+        super().__init__(self.message)
+
+
+class ExperimentLimitExceededError(Exception):
+    """Raised when experiment count exceeds maximum allowed limit.
+
+    Attributes:
+        requested: Number of experiments requested
+        limit: Maximum experiments allowed
+        message: Descriptive error message
+    """
+
+    def __init__(self, requested: int, limit: int):
+        self.requested = requested
+        self.limit = limit
+        self.message = (
+            f"Experiment limit exceeded: requested {requested}, but maximum allowed is {limit}"
         )
         super().__init__(self.message)
 
@@ -248,14 +289,19 @@ def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | N
     return credits.available >= n_experiments
 
 
-def check_sufficient_credits(
+def check_experiment_limits(
     n_experiments: int, userid: str, config: JobConfig | None = None
 ) -> UserCredits:
-    """Verify user has sufficient credits or raise exception.
+    """Verify experiment count is valid and user has sufficient credits.
+
+    Performs three validation checks in order:
+    1. Validates n_experiments > 0
+    2. Validates n_experiments <= DEFAULT_EXPERIMENT_LIMIT (500)
+    3. Validates user has sufficient available credits
 
     Uses the conservative 'available' metric (granted - used - pending).
     This function is useful in API endpoints where you want to fail fast
-    with a descriptive exception.
+    with specific, descriptive exceptions.
 
     Args:
         n_experiments: Number of experiments to check
@@ -263,18 +309,36 @@ def check_sufficient_credits(
         config: Configuration (uses default if None)
 
     Returns:
-        UserCredits object if check passes
+        UserCredits object if all checks pass
 
     Raises:
+        InvalidExperimentCountError: If n_experiments <= 0
+        ExperimentLimitExceededError: If n_experiments > DEFAULT_EXPERIMENT_LIMIT
         InsufficientCreditsError: If user does not have enough available credits
 
     Example:
         >>> try:
-        ...     credits = check_sufficient_credits(10, "user123")
-        ...     print(f"Check passed, user has {credits.available} available")
+        ...     credits = check_experiment_limits(10, "user123")
+        ...     print(f"All checks passed, user has {credits.available} available")
+        ... except InvalidExperimentCountError as e:
+        ...     print(f"Invalid count: {e.message}")
+        ... except ExperimentLimitExceededError as e:
+        ...     print(f"Limit exceeded: {e.message}")
         ... except InsufficientCreditsError as e:
-        ...     print(f"Error: {e.message}")
+        ...     print(f"No credits: {e.message}")
     """
+    # Validation 1: Check n_experiments > 0
+    if n_experiments <= 0:
+        raise InvalidExperimentCountError(requested=n_experiments)
+
+    # Validation 2: Check n_experiments <= DEFAULT_EXPERIMENT_LIMIT
+    if n_experiments > DEFAULT_EXPERIMENT_LIMIT:
+        raise ExperimentLimitExceededError(
+            requested=n_experiments,
+            limit=DEFAULT_EXPERIMENT_LIMIT
+        )
+
+    # Validation 3: Check sufficient credits (existing logic)
     credits = get_user_credits(userid=userid, config=config)
 
     if credits.available < n_experiments:

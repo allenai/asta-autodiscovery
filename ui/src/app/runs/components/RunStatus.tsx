@@ -13,8 +13,10 @@ import {
 } from '@mui/material';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutlined';
 import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
@@ -196,6 +198,7 @@ function RunStatusContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     // const [isTableExpanded, setIsTableExpanded] = useState(false);
     const isTableExpanded = true;
+    const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
     const setIsTableExpanded = (...args: any[]) => {}; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     return (
@@ -213,9 +216,12 @@ function RunStatusContent({
                             <RunHeaderSubtitle>
                                 <StyledListItem>
                                     Started{' '}
-                                    {new Date(run.details.createdAt).toLocaleString(undefined, {
-                                        dateStyle: 'short',
-                                        timeStyle: 'short',
+                                    {new Date(run.details.createdAt).toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
                                     })}
                                 </StyledListItem>
                                 <StyledListItem>
@@ -247,14 +253,16 @@ function RunStatusContent({
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         {ENABLE_GRAPH_VIZ && (
-                            <RunHeaderExpandButton
-                                onClick={() => setIsTableExpanded(!isTableExpanded)}>
-                                {isTableExpanded ? 'Collapse' : 'Expand'}
-                            </RunHeaderExpandButton>
+                            <LargeScreenAction>
+                                <RunHeaderExpandButton
+                                    onClick={() => setIsTableExpanded(!isTableExpanded)}>
+                                    {isTableExpanded ? 'Collapse' : 'Expand'}
+                                </RunHeaderExpandButton>
+                            </LargeScreenAction>
                         )}
                     </RunHeader>
 
-                    <Box sx={{ padding: 3 }}>
+                    <RunContent>
                         <RunToolbar>
                             {run.stats && (
                                 <ExperimentCount>
@@ -295,17 +303,30 @@ function RunStatusContent({
                         </RunToolbar>
 
                         <ExperimentsTable runStats={run.stats} />
-                    </Box>
+                    </RunContent>
                 </TablePanel>
 
                 {!!selectedExperiment && (
-                    <DetailsPanel>
-                        <>
-                            <CloseDetailButton onClick={() => selectExperiment(null)} size="small">
+                    <DetailsPanel $isExpanded={isDetailsExpanded}>
+                        <DetailsActions>
+                            <LargeScreenAction>
+                                <DetailsActionButton
+                                    onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                                    size="small">
+                                    {isDetailsExpanded ? (
+                                        <CloseFullscreenOutlinedIcon />
+                                    ) : (
+                                        <OpenInFullOutlinedIcon />
+                                    )}
+                                </DetailsActionButton>
+                            </LargeScreenAction>
+                            <DetailsActionButton
+                                onClick={() => selectExperiment(null)}
+                                size="small">
                                 <CloseIcon />
-                            </CloseDetailButton>
-                            <ExperimentDetails experiment={selectedExperiment} />
-                        </>
+                            </DetailsActionButton>
+                        </DetailsActions>
+                        <ExperimentDetails experiment={selectedExperiment} />
                     </DetailsPanel>
                 )}
             </PanelLayout>
@@ -329,12 +350,20 @@ const PanelLayout = styled('div')`
     display: flex;
     gap: ${({ theme }) => theme.spacing(2)};
     height: 100%;
-    padding: 0 ${({ theme }) => theme.spacing(2)} ${({ theme }) => theme.spacing(2)};
+    padding: ${({ theme }) => theme.spacing(0, 2, 2)};
     justify-content: space-between;
     position: relative;
 
     @container run-status (width < 1000px) {
         display: grid;
+    }
+
+    @container run-status (width < 600px) {
+        padding: ${({ theme }) => theme.spacing(0, 1, 1)};
+    }
+
+    @container run-status (width < 425px) {
+        padding: 0;
     }
 `;
 
@@ -367,31 +396,47 @@ const TablePanel = styled('div')<{ $isExpanded: boolean; $hasDetails: boolean }>
         grid-row: 1;
         grid-column: 1;
     }
+
+    @container run-status (width < 600px) {
+        width: 100%;
+    }
 `;
 
-const DetailsPanel = styled('div')`
+const DetailsPanel = styled('div')<{ $isExpanded: boolean }>`
     flex: 0 1 auto;
-    max-width: 500px;
+    max-width: ${({ $isExpanded }) => ($isExpanded ? 'initial' : '500px')};
     background-color: #163638f3;
     border-radius: 12px;
-    position: relative;
-    overflow-y: scroll;
+    position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
+    overflow-y: auto;
     z-index: 2;
+    top: 0;
+    bottom: 0;
 
     @container run-status (width < 1000px) {
         flex: 1 1 auto;
         max-width: initial;
+        position: relative;
         width: calc(100cqw - 20px);
         grid-row: 1;
         grid-column: 1;
     }
+
+    @container run-status (width < 600px) {
+        width: 100%;
+    }
 `;
 
-const CloseDetailButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
+const DetailsActions = styled('div')`
+    display: flex;
+    gap: ${({ theme }) => theme.spacing(1)};
     position: absolute;
     top: ${({ theme }) => theme.spacing(2)};
     right: ${({ theme }) => theme.spacing(2)};
+`;
+
+const DetailsActionButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
 `;
 
 const StopButton = styled(Button)`
@@ -438,9 +483,23 @@ const RunHeaderName = styled('h1')`
     white-space: nowrap;
 `;
 
+const RunContent = styled(Box)`
+    padding: ${({ theme }) => theme.spacing(3)};
+
+    @container run-status (width < 700px) {
+        padding: ${({ theme }) => theme.spacing(1)};
+    }
+
+    @container run-status (width < 500px) {
+        padding: ${({ theme }) => theme.spacing(0.5)};
+    }
+`;
+
 const RunHeaderExpandButton = styled(Button)`
     color: ${({ theme }) => theme.color['green-100'].hex};
+`;
 
+const LargeScreenAction = styled('div')`
     @container run-status (width < 1000px) {
         display: none;
     }

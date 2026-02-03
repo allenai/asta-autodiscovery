@@ -45,29 +45,48 @@ logger = logging.getLogger(__name__)
 
 # Lock configuration
 LOCK_BLOB_PATH = "maintenance/send_emails.lock"
-LOCK_TIMEOUT_MINUTES = 30  # Consider lock stale after this duration
+LOCK_MAX_AGE_HOURS = 2  # Fail if lock older than this (something is wrong)
+
+
+class LockError(Exception):
+    """Raised when lock is held for too long, indicating a problem."""
+
+    pass
 
 
 def acquire_lock(config: JobConfig) -> bool:
-    """Acquire distributed lock via GCS. Returns True if lock acquired."""
+    """Acquire distributed lock via GCS using atomic operations.
+
+    Returns True if lock acquired, False if lock held by another run.
+    Raises LockError if lock is older than LOCK_MAX_AGE_HOURS (indicates a problem).
+    """
+    from google.api_core.exceptions import PreconditionFailed
+
     client = storage.Client(project=config.project_id)
     bucket = client.bucket(config.bucket)
     blob = bucket.blob(LOCK_BLOB_PATH)
 
-    # Check for existing lock
-    if blob.exists():
-        content = json.loads(blob.download_as_text())
-        locked_at = datetime.fromisoformat(content["locked_at"])
-        if datetime.now(UTC) - locked_at < timedelta(minutes=LOCK_TIMEOUT_MINUTES):
-            logger.info(f"Lock held since {locked_at.isoformat()}, skipping run")
-            return False
-        logger.info("Found stale lock, overwriting")
+    lock_data = json.dumps({"locked_at": datetime.now(UTC).isoformat()})
 
-    # Acquire lock
-    lock_data = {"locked_at": datetime.now(UTC).isoformat(), "pid": str(sys.argv)}
-    blob.upload_from_string(json.dumps(lock_data))
-    logger.info("Lock acquired")
-    return True
+    # Try atomic create (fails if lock exists)
+    try:
+        blob.upload_from_string(lock_data, if_generation_match=0)
+        logger.info("Lock acquired")
+        return True
+    except PreconditionFailed:
+        pass  # Lock exists, check age
+
+    # Lock exists - check how old it is
+    blob.reload()
+    content = json.loads(blob.download_as_text())
+    locked_at = datetime.fromisoformat(content["locked_at"])
+    lock_age = datetime.now(UTC) - locked_at
+
+    if lock_age >= timedelta(hours=LOCK_MAX_AGE_HOURS):
+        raise LockError(f"Lock held for {lock_age}, exceeds {LOCK_MAX_AGE_HOURS}h - investigate!")
+
+    logger.info(f"Lock held since {locked_at.isoformat()}, skipping run")
+    return False
 
 
 def release_lock(config: JobConfig) -> None:
@@ -297,9 +316,13 @@ def main():
     # Acquire lock if requested (for scheduled runs)
     lock_acquired = False
     if args.acquire_lock:
-        if not acquire_lock(config):
-            return 0  # Another instance is running, exit cleanly
-        lock_acquired = True
+        try:
+            if not acquire_lock(config):
+                return 0  # Another instance is running, exit cleanly
+            lock_acquired = True
+        except LockError as e:
+            logger.error(f"Lock error: {e}")
+            return 1  # Fail to alert that something is wrong
 
     try:
         logger.info("=" * 60)

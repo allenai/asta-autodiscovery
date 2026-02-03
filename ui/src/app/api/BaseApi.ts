@@ -79,7 +79,7 @@ export class BaseApi {
 
         const resp = await fetch(url, init);
         if (!resp.ok) {
-            let errorMsg: string | null = await resp
+            const errorMsg: string | null = await resp
                 .json()
                 .then((result) => result.error)
                 .catch(() => resp.text())

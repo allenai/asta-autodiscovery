@@ -7,6 +7,7 @@ from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
 from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
 
+from autodiscovery.llm_retry import apply_gemini_client_backoff, call_with_backoff
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -101,11 +102,14 @@ class ModalSandboxExecutor(CodeExecutor):
             },
         ]
 
-        response = client.chat.completions.create(
-            model=normalize_vertex_model_name(self.vision_model)
-            if is_gemini_model(self.vision_model)
-            else self.vision_model,
-            messages=messages,
+        response = call_with_backoff(
+            lambda: client.chat.completions.create(
+                model=normalize_vertex_model_name(self.vision_model)
+                if is_gemini_model(self.vision_model)
+                else self.vision_model,
+                messages=messages,
+            ),
+            label=f"vision_analysis(model={self.vision_model})",
         )
 
         return response.choices[0].message.content
@@ -451,9 +455,10 @@ def get_openai_config(
     is_gemini = is_gemini_model(model_name)
 
     if is_gemini:
+        apply_gemini_client_backoff()
         # Configure Gemini via AG2's native Google/Vertex client.
         project_id = os.getenv("VERTEX_PROJECT_ID")
-        location = os.getenv("VERTEX_LOCATION")
+        location = os.getenv("VERTEX_LOCATION") or "global"
         google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         model = model_name.split("/")[-1]
         config = {

@@ -8,6 +8,7 @@ import numpy as np
 from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 
+from autodiscovery.llm_retry import call_with_backoff
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
 from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
 
@@ -98,6 +99,21 @@ def query_llm(
     client: Any = None,
     debug_requests: bool = False,
 ):
+    """Query an LLM and return parsed responses.
+
+    Args:
+        messages: Chat messages to send to the model.
+        n_samples: Number of samples to request.
+        model: Model name to use.
+        temperature: Sampling temperature.
+        reasoning_effort: Optional reasoning effort for o-series models.
+        response_format: Optional structured output schema.
+        client: Optional pre-configured client instance.
+        debug_requests: Whether to log request batching details.
+
+    Returns:
+        A list of parsed response objects.
+    """
     if client is None:
         client = get_openai_client_for_model(model)
     is_gemini = is_gemini_model(model)
@@ -144,17 +160,23 @@ def query_llm(
         if is_reasoning and reasoning_effort is not None:
             kwargs["reasoning_effort"] = reasoning_effort
 
-        try:
-            if response_format is not None:
-                response = client.beta.chat.completions.parse(
+        def _send_request():
+            try:
+                if response_format is not None:
+                    return client.beta.chat.completions.parse(
+                        **kwargs, response_format=response_format
+                    )
+                return client.chat.completions.create(**kwargs)
+            except ValidationError:
+                # Retry if the response format validation fails
+                return client.beta.chat.completions.parse(
                     **kwargs, response_format=response_format
                 )
-            else:
-                response = client.chat.completions.create(**kwargs)
-        except ValidationError:
-            # Retry if the response format validation fails
-            response = client.beta.chat.completions.parse(**kwargs, response_format=response_format)
-        return response
+
+        return call_with_backoff(
+            _send_request,
+            label=f"query_llm(model={model_name}, n={batch_n})",
+        )
 
     responses = []
     if len(batch_sizes) == 1:

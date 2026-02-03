@@ -254,7 +254,7 @@ function RunStatusContent({
                         )}
                     </RunHeader>
 
-                    <Box sx={{ padding: 3 }}>
+                    <RunContent>
                         <RunToolbar>
                             {run.stats && (
                                 <ExperimentCount>
@@ -295,7 +295,7 @@ function RunStatusContent({
                         </RunToolbar>
 
                         <ExperimentsTable runStats={run.stats} />
-                    </Box>
+                    </RunContent>
                 </TablePanel>
 
                 {!!selectedExperiment && (
@@ -329,12 +329,20 @@ const PanelLayout = styled('div')`
     display: flex;
     gap: ${({ theme }) => theme.spacing(2)};
     height: 100%;
-    padding: 0 ${({ theme }) => theme.spacing(2)} ${({ theme }) => theme.spacing(2)};
+    padding: ${({ theme }) => theme.spacing(0, 2, 2)};
     justify-content: space-between;
     position: relative;
 
     @container run-status (width < 1000px) {
         display: grid;
+    }
+
+    @container run-status (width < 600px) {
+        padding: ${({ theme }) => theme.spacing(0, 1, 1)};
+    }
+
+    @container run-status (width < 425px) {
+        padding: 0;
     }
 `;
 
@@ -367,6 +375,10 @@ const TablePanel = styled('div')<{ $isExpanded: boolean; $hasDetails: boolean }>
         grid-row: 1;
         grid-column: 1;
     }
+
+    @container run-status (width < 600px) {
+        width: 100%;
+    }
 `;
 
 const DetailsPanel = styled('div')`
@@ -384,6 +396,10 @@ const DetailsPanel = styled('div')`
         width: calc(100cqw - 20px);
         grid-row: 1;
         grid-column: 1;
+    }
+
+    @container run-status (width < 600px) {
+        width: 100%;
     }
 `;
 
@@ -443,6 +459,18 @@ const RunHeaderExpandButton = styled(Button)`
 
     @container run-status (width < 1000px) {
         display: none;
+    }
+`;
+
+const RunContent = styled(Box)`
+    padding: ${({ theme }) => theme.spacing(3)};
+
+    @container run-status (width < 700px) {
+        padding: ${({ theme }) => theme.spacing(1)};
+    }
+
+    @container run-status (width < 500px) {
+        padding: ${({ theme }) => theme.spacing(0.5)};
     }
 `;
 

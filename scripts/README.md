@@ -45,7 +45,7 @@ gcloud scheduler jobs create http autodiscovery-send-emails-schedule \
   --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails:run" \
   --http-method POST \
   --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --oauth-service-account-scope "https://www.googleapis.com/auth/cloud-platform"
+  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
 ```
 
 The `--acquire-lock` flag uses a GCS-based lock so overlapping scheduled runs exit cleanly.
@@ -122,7 +122,7 @@ gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule \
   --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup:run" \
   --http-method POST \
   --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --oauth-service-account-scope "https://www.googleapis.com/auth/cloud-platform"
+  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
 ```
 
 This runs daily at 2 AM.

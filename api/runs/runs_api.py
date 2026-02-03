@@ -692,7 +692,7 @@ def create() -> Blueprint:
             )
 
             # Get updated run_details to return to frontend
-            run_details = _get_run_details(userid, runid)
+            run_details = get_run_details(userid, runid)
 
             return jsonify({
                 "execution_id": execution_id,

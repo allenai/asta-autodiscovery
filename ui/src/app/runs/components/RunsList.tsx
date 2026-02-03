@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Alert,
     Box,
@@ -53,8 +53,17 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
     const router = useRouter();
     const api = getRunsApi();
 
-    const draftRuns = viewerRuns?.filter(isDraftRun) ?? [];
-    const submittedRuns = viewerRuns?.filter((run) => !isDraftRun(run)) ?? [];
+    const draftRuns = useMemo(() => viewerRuns?.filter(isDraftRun) ?? [], [viewerRuns]);
+
+    const submittedRuns = useMemo(
+        () =>
+            (viewerRuns?.filter((run) => !isDraftRun(run)) ?? []).sort((a, b) => {
+                const aTime = a.details?.statusCheckedAt || a.details?.createdAt || '';
+                const bTime = b.details?.statusCheckedAt || b.details?.createdAt || '';
+                return bTime.localeCompare(aTime); // descending (newest first)
+            }),
+        [viewerRuns]
+    );
 
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [menuRunId, setMenuRunId] = useState<string | null>(null);

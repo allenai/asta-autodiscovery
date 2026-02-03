@@ -1,17 +1,18 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { useCallback, useMemo } from 'react';
+import { DataGrid, GridColDef, GridRenderCellParams, GridSortModel } from '@mui/x-data-grid';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
-const columns: GridColDef[] = [
+const DEFAULT_COLUMNS: GridColDef[] = [
     {
         field: 'id',
         headerName: 'ID',
         align: 'right',
-        width: 25,
+        width: 45,
+        minWidth: 45,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="90%" />;
@@ -22,19 +23,25 @@ const columns: GridColDef[] = [
     {
         field: 'hypothesis',
         headerName: 'Experiment Hypothesis',
-        width: 200,
-        flex: 1,
+        flex: 3,
+        minWidth: 0,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="100%" />;
             }
-            return <HypothesisCell>{params.value}</HypothesisCell>;
+            return (
+                <HypothesisCell>
+                    <HypothesisText>{params.value}</HypothesisText>
+                </HypothesisCell>
+            );
         },
     },
     {
         field: 'surprisal',
         headerName: 'Surprisal',
-        width: 90,
+        flex: 1,
+        minWidth: 70,
+        maxWidth: 90,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="70%" />;
@@ -58,7 +65,9 @@ const columns: GridColDef[] = [
         field: 'prior',
         headerName: 'Belief Before',
         align: 'center',
-        width: 120,
+        flex: 1,
+        minWidth: 80,
+        maxWidth: 120,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -67,7 +76,7 @@ const columns: GridColDef[] = [
             const label = params.value;
             return (
                 <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
-                    <Box sx={{ cursor: 'pointer' }}>{label}</Box>
+                    <BeliefValue sx={{ cursor: 'pointer' }}>{label}</BeliefValue>
                 </Tooltip>
             );
         },
@@ -76,7 +85,9 @@ const columns: GridColDef[] = [
         field: 'posterior',
         headerName: 'Belief After',
         align: 'center',
-        width: 120,
+        flex: 1,
+        minWidth: 80,
+        maxWidth: 120,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -85,7 +96,7 @@ const columns: GridColDef[] = [
             const label = params.value;
             return (
                 <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
-                    <Box sx={{ cursor: 'pointer' }}>{label}</Box>
+                    <BeliefValue sx={{ cursor: 'pointer' }}>{label}</BeliefValue>
                 </Tooltip>
             );
         },
@@ -93,8 +104,10 @@ const columns: GridColDef[] = [
     {
         field: 'direction',
         headerName: 'Direction',
-        width: 120,
         align: 'center',
+        flex: 1,
+        minWidth: 50,
+        maxWidth: 120,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="60%" />;
@@ -111,6 +124,13 @@ interface ExperimentsTableProps {
 
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const { experiments, lastError, selectExperiment, hasJobCompleted } = useRunExperiments();
+    const [sortModel, setSortModel] = useState<GridSortModel>([]);
+    // Apply default Surprisal sort when the session completes.
+    useEffect(() => {
+        if (hasJobCompleted) {
+            setSortModel([{ field: 'surprisal', sort: 'desc' }]);
+        }
+    }, [hasJobCompleted]);
 
     const createSkeletonRows = useCallback(() => {
         const pendingCount = runStats?.pendingExperiments ?? 0;
@@ -174,7 +194,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     };
 
     return (
-        <Paper sx={{ height: '100%', width: '100%' }}>
+        <Wrapper>
             {lastError && (
                 <Alert severity="error" sx={{ m: 1 }}>
                     {lastError}
@@ -182,20 +202,38 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
             )}
             <StyledDataGrid
                 rows={rows}
-                columns={columns}
+                columns={DEFAULT_COLUMNS}
                 loading={!runStats?.pendingExperiments && !experiments.length}
-                initialState={{ pagination: { paginationModel } }}
+                initialState={{
+                    pagination: { paginationModel },
+                    sorting: {
+                        sortModel:
+                            runStats?.completedExperiments === runStats?.requestedExperiments
+                                ? [{ field: 'surprisal', sort: 'desc' }]
+                                : [],
+                    },
+                }}
                 pageSizeOptions={[5, 10, 25, 50]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
+                sortModel={sortModel}
+                onSortModelChange={setSortModel}
                 getRowHeight={() => 'auto'}
                 rowSelection={false}
             />
-        </Paper>
+        </Wrapper>
     );
 }
 
+const Wrapper = styled(Paper)`
+    background: transparent;
+    container: experiment-table-wrapper / inline-size;
+    height: 100%;
+    width: 100%;
+`;
+
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+    container: 'experiment-table / inline-size',
     color: theme.color['cream-100'].hex,
     backgroundColor: theme.color['extra-dark-teal-100'].hex,
     margin: theme.spacing(0.5, 0, 1, 0),
@@ -211,6 +249,10 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         '.MuiDataGrid-sortButton': {
             backgroundColor: theme.color['cream-4'].rgba.toString(),
         },
+
+        '@container experiment-table (width < 800px)': {
+            fontSize: '.85em',
+        },
     },
 
     '.MuiDataGrid-columnHeaderTitle, .MuiDataGrid-columnHeader svg': {
@@ -225,6 +267,11 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     '.MuiDataGrid-cell': {
         paddingTop: theme.spacing(1),
         paddingBottom: theme.spacing(1),
+
+        '@container experiment-table (width < 800px)': {
+            paddingLeft: theme.spacing(0.5),
+            paddingRight: theme.spacing(0.5),
+        },
     },
 
     '.MuiDataGrid-row:nth-of-type(even)': {
@@ -247,7 +294,29 @@ const StyledSkeleton = styled(Skeleton)(({ theme }) => ({
 }));
 
 const HypothesisCell = styled(Box)`
-    lineheight: 1.4;
-    whitespace: 'normal';
-    wordwrap: 'break-word';
+    container: hypothesis-cell / inline-size;
+`;
+
+const HypothesisText = styled('div')`
+    display: -webkit-box;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: normal;
+    word-wrap: break-word;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+
+    @container hypothesis-cell (width < 150px) {
+        word-break: break-all;
+        -webkit-line-clamp: 4;
+    }
+
+    @container hypothesis-cell (width < 40px) {
+        visibility: hidden;
+        -webkit-line-clamp: 1;
+    }
+`;
+
+const BeliefValue = styled(Box)`
+    word-wrap: break-word;
 `;

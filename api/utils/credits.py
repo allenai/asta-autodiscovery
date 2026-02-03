@@ -142,9 +142,6 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
         num_experiments_completed=completed,
         num_experiments_pending=pending,
     )
-
-    if jobid == "353800d1-9e6e-40c1-a241-2169ed1a9b7d":
-        print(f"JobStats: {job_stats}")
     return job_stats
 
 

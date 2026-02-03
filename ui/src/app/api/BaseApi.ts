@@ -79,8 +79,15 @@ export class BaseApi {
 
         const resp = await fetch(url, init);
         if (!resp.ok) {
+            let errorMsg: string | null = await resp
+                .json()
+                .then((result) => result.error)
+                .catch(() => resp.text())
+                .catch(() => null);
             if (shouldThrowOnServerError) {
-                throw new Error(`Request failed with status ${resp.status}`);
+                throw new Error(
+                    `Request failed with status ${resp.status}${errorMsg ? `: ${errorMsg}` : ''}`
+                );
             }
         }
         const data = await resp.json();

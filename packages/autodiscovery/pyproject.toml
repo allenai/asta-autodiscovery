@@ -17,6 +17,7 @@ dependencies = [
     "statsmodels",
     "h5py",
     "boto3",
+    "tenacity>=9.1.2",
     "autodiscovery-modal",
 ]
 

@@ -23,14 +23,14 @@ def get_vertex_openai_base_url() -> str:
         return explicit_base_url
 
     project_id = os.getenv(VERTEX_PROJECT_ENV_VAR)
-    location = os.getenv(VERTEX_LOCATION_ENV_VAR)
+    location = os.getenv(VERTEX_LOCATION_ENV_VAR) or "global"
 
-    if not project_id or not location:
+    if not project_id:
         raise ValueError(
             "Vertex AI configuration is required for Gemini models. Set "
             f"{VERTEX_OPENAI_BASE_URL_ENV} or both a project ID "
-            f"({VERTEX_PROJECT_ENV_VAR}) and location "
-            f"({VERTEX_LOCATION_ENV_VAR})."
+            f"({VERTEX_PROJECT_ENV_VAR}) and an optional location "
+            f"({VERTEX_LOCATION_ENV_VAR}, defaults to global)."
         )
 
     api_host = (

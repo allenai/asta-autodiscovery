@@ -15,6 +15,7 @@ import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
@@ -247,10 +248,12 @@ function RunStatusContent({
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         {ENABLE_GRAPH_VIZ && (
-                            <RunHeaderExpandButton
-                                onClick={() => setIsTableExpanded(!isTableExpanded)}>
-                                {isTableExpanded ? 'Collapse' : 'Expand'}
-                            </RunHeaderExpandButton>
+                            <LargeScreenAction>
+                                <RunHeaderExpandButton
+                                    onClick={() => setIsTableExpanded(!isTableExpanded)}>
+                                    {isTableExpanded ? 'Collapse' : 'Expand'}
+                                </RunHeaderExpandButton>
+                            </LargeScreenAction>
                         )}
                     </RunHeader>
 
@@ -301,9 +304,18 @@ function RunStatusContent({
                 {!!selectedExperiment && (
                     <DetailsPanel>
                         <>
-                            <CloseDetailButton onClick={() => selectExperiment(null)} size="small">
-                                <CloseIcon />
-                            </CloseDetailButton>
+                            <DetailsActions>
+                                <LargeScreenAction>
+                                    <DetailsActionButton size="small">
+                                        <OpenInFullOutlinedIcon />
+                                    </DetailsActionButton>
+                                </LargeScreenAction>
+                                <DetailsActionButton
+                                    onClick={() => selectExperiment(null)}
+                                    size="small">
+                                    <CloseIcon />
+                                </DetailsActionButton>
+                            </DetailsActions>
                             <ExperimentDetails experiment={selectedExperiment} />
                         </>
                     </DetailsPanel>
@@ -403,11 +415,16 @@ const DetailsPanel = styled('div')`
     }
 `;
 
-const CloseDetailButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
+const DetailsActions = styled('div')`
+    display: flex;
+    gap: ${({ theme }) => theme.spacing(1)};
     position: absolute;
     top: ${({ theme }) => theme.spacing(2)};
     right: ${({ theme }) => theme.spacing(2)};
+`;
+
+const DetailsActionButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
 `;
 
 const StopButton = styled(Button)`
@@ -454,14 +471,6 @@ const RunHeaderName = styled('h1')`
     white-space: nowrap;
 `;
 
-const RunHeaderExpandButton = styled(Button)`
-    color: ${({ theme }) => theme.color['green-100'].hex};
-
-    @container run-status (width < 1000px) {
-        display: none;
-    }
-`;
-
 const RunContent = styled(Box)`
     padding: ${({ theme }) => theme.spacing(3)};
 
@@ -471,6 +480,16 @@ const RunContent = styled(Box)`
 
     @container run-status (width < 500px) {
         padding: ${({ theme }) => theme.spacing(0.5)};
+    }
+`;
+
+const RunHeaderExpandButton = styled(Button)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+`;
+
+const LargeScreenAction = styled('div')`
+    @container run-status (width < 1000px) {
+        display: none;
     }
 `;
 

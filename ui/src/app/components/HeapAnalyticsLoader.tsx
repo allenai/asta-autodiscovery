@@ -18,7 +18,7 @@ declare global {
     }
 }
 
-export default function HeapAnalytics() {
+export default function HeapAnalyticsLoader() {
     const [scriptLoaded, setScriptLoaded] = useState(false);
     const { user } = useAuth0(); // Assuming useAuth is a custom hook to get auth status and session
 

@@ -4,17 +4,21 @@
 This script scans for completed runs and sends email notifications to users.
 It tracks sent emails in email_state.json to avoid duplicates.
 
+Uses a GCS-based lock to prevent concurrent executions when scheduled frequently.
+
 Environment variables required:
     - GCS credentials (for reading/writing job state)
-    - AUTH0_DOMAIN, AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for user email lookup)
+    - AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for user email lookup)
 """
 
 import argparse
+import json
 import logging
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from google.cloud import storage
 from jinja2 import Environment, FileSystemLoader
 
 from autodiscovery_jobs import (
@@ -38,6 +42,63 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Lock configuration
+LOCK_BLOB_PATH = "scripts/send_emails.lock"
+LOCK_MAX_AGE_HOURS = 2  # Fail if lock older than this (something is wrong)
+
+
+class LockError(Exception):
+    """Raised when lock is held for too long, indicating a problem."""
+
+    pass
+
+
+def acquire_lock(config: JobConfig) -> bool:
+    """Acquire distributed lock via GCS using atomic operations.
+
+    Returns True if lock acquired, False if lock held by another run.
+    Raises LockError if lock is older than LOCK_MAX_AGE_HOURS (indicates a problem).
+    """
+    from google.api_core.exceptions import PreconditionFailed
+
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    blob = bucket.blob(LOCK_BLOB_PATH)
+
+    lock_data = json.dumps({"locked_at": datetime.now(UTC).isoformat()})
+
+    # Try atomic create (fails if lock exists)
+    try:
+        blob.upload_from_string(lock_data, if_generation_match=0)
+        logger.info("Lock acquired")
+        return True
+    except PreconditionFailed:
+        pass  # Lock exists, check age
+
+    # Lock exists - check how old it is
+    blob.reload()
+    content = json.loads(blob.download_as_text())
+    locked_at = datetime.fromisoformat(content["locked_at"])
+    lock_age = datetime.now(UTC) - locked_at
+
+    if lock_age >= timedelta(hours=LOCK_MAX_AGE_HOURS):
+        raise LockError(f"Lock held for {lock_age}, exceeds {LOCK_MAX_AGE_HOURS}h - investigate!")
+
+    logger.info(f"Lock held since {locked_at.isoformat()}, skipping run")
+    return False
+
+
+def release_lock(config: JobConfig) -> None:
+    """Release distributed lock."""
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    blob = bucket.blob(LOCK_BLOB_PATH)
+    try:
+        blob.delete()
+        logger.info("Lock released")
+    except Exception:
+        logger.warning("Lock already released or missing")
 
 
 SUBJECT_VERBS = {"SUCCEEDED": "completed successfully", "FAILED": "failed", "CANCELLED": "was cancelled"}
@@ -111,13 +172,14 @@ def send_completion_emails(
 
     logger.info(f"Scanning for runs completed after {cutoff_time.isoformat()}")
 
-    # Get users to scan
+    # Get users to scan (only real Auth0 users have '|' in their ID)
     if userid:
         user_ids = [userid]
         logger.info(f"Scanning single user: {userid}")
     else:
-        user_ids = manager.list_user_ids()
-        logger.info(f"Found {len(user_ids)} users to scan")
+        all_user_ids = manager.list_user_ids()
+        user_ids = [uid for uid in all_user_ids if "|" in uid]
+        logger.info(f"Found {len(user_ids)} users to scan (skipped {len(all_user_ids) - len(user_ids)} non-Auth0 users)")
 
     emails_sent = 0
     already_sent = 0
@@ -243,19 +305,35 @@ def main():
         default=None,
         help="Only scan runs for this specific user ID",
     )
+    parser.add_argument(
+        "--acquire-lock",
+        action="store_true",
+        help="Acquire distributed lock to prevent concurrent runs (use in scheduled jobs)",
+    )
     args = parser.parse_args()
 
     config = JobConfig.from_env()
 
-    logger.info("=" * 60)
-    logger.info("Send Completion Emails Script")
-    logger.info(f"Bucket: {config.bucket}")
-    logger.info(f"Max age: {args.max_age_hours} hours")
-    logger.info(f"Dry run: {args.dry_run}")
-    logger.info(f"User filter: {args.userid or 'all users'}")
-    logger.info("=" * 60)
+    # Acquire lock if requested (for scheduled runs)
+    lock_acquired = False
+    if args.acquire_lock:
+        try:
+            if not acquire_lock(config):
+                return 0  # Another instance is running, exit cleanly
+            lock_acquired = True
+        except LockError as e:
+            logger.error(f"Lock error: {e}")
+            return 1  # Fail to alert that something is wrong
 
     try:
+        logger.info("=" * 60)
+        logger.info("Send Completion Emails Script")
+        logger.info(f"Bucket: {config.bucket}")
+        logger.info(f"Max age: {args.max_age_hours} hours")
+        logger.info(f"Dry run: {args.dry_run}")
+        logger.info(f"User filter: {args.userid or 'all users'}")
+        logger.info("=" * 60)
+
         emails_sent, already_sent, errors = send_completion_emails(
             config,
             args.max_age_hours,
@@ -275,6 +353,10 @@ def main():
     except Exception as e:
         logger.error(f"Script failed: {e}")
         return 1
+
+    finally:
+        if lock_acquired:
+            release_lock(config)
 
 
 if __name__ == "__main__":

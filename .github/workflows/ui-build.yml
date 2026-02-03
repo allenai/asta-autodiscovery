@@ -1,3 +1,4 @@
+# This build is purely for CI. It does not publish any artifacts.
 name: "CI: UI Build"
 
 on:

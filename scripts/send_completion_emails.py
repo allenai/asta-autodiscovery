@@ -44,7 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Lock configuration
-LOCK_BLOB_PATH = "maintenance/send_emails.lock"
+LOCK_BLOB_PATH = "scripts/send_emails.lock"
 LOCK_MAX_AGE_HOURS = 2  # Fail if lock older than this (something is wrong)
 
 
@@ -172,13 +172,14 @@ def send_completion_emails(
 
     logger.info(f"Scanning for runs completed after {cutoff_time.isoformat()}")
 
-    # Get users to scan
+    # Get users to scan (only real Auth0 users have '|' in their ID)
     if userid:
         user_ids = [userid]
         logger.info(f"Scanning single user: {userid}")
     else:
-        user_ids = manager.list_user_ids()
-        logger.info(f"Found {len(user_ids)} users to scan")
+        all_user_ids = manager.list_user_ids()
+        user_ids = [uid for uid in all_user_ids if "|" in uid]
+        logger.info(f"Found {len(user_ids)} users to scan (skipped {len(all_user_ids) - len(user_ids)} non-Auth0 users)")
 
     emails_sent = 0
     already_sent = 0

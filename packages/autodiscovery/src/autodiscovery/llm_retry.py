@@ -91,9 +91,14 @@ def call_with_backoff(
     max_attempts = max_retries + 1
 
     def _wait(retry_state):
-        return wait_random_exponential(
+        base_wait = wait_random_exponential(
             min=config.initial_delay_seconds, max=config.max_delay_seconds
         )(retry_state)
+        exc = retry_state.outcome.exception() if retry_state.outcome else None
+        retry_after = _extract_retry_after_seconds(exc) if exc is not None else None
+        if retry_after is None:
+            return base_wait
+        return max(base_wait, retry_after)
 
     def _before_sleep(retry_state):
         exc = retry_state.outcome.exception() if retry_state.outcome else None
@@ -171,6 +176,23 @@ def _env_float(name: str, default: float) -> float:
     except ValueError:
         return default
     return value if value >= 0 else default
+
+
+def _extract_retry_after_seconds(exc: Exception) -> float | None:
+    retry_after = getattr(exc, "retry_after", None)
+    if isinstance(retry_after, (int, float)) and retry_after >= 0:
+        return float(retry_after)
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if not headers:
+        return None
+    retry_after_header = headers.get("Retry-After")
+    if retry_after_header is None:
+        return None
+    try:
+        return float(retry_after_header)
+    except (TypeError, ValueError):
+        return None
 
 
 def _is_google_rate_limit_error(exc: Exception) -> bool:

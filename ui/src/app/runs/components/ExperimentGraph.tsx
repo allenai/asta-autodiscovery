@@ -232,6 +232,24 @@ export const ExperimentGraph = () => {
         const linksG = graphG.append('g').attr('class', 'links');
         const nodesG = graphG.append('g').attr('class', 'nodes');
 
+        // Get all nodes for later use
+        const nodes = layout.descendants() as ExtendedHierarchyPointNode[];
+
+        // Calculate path from selected experiment to root
+        const selectedPathIds = new Set<string>();
+        if (selectedExperiment) {
+            const selectedNode = nodes.find(
+                (n) => n.data.data.id === selectedExperiment.experimentId
+            );
+            if (selectedNode) {
+                let current: any = selectedNode;
+                while (current) {
+                    selectedPathIds.add(current.data.data.id);
+                    current = current.parent;
+                }
+            }
+        }
+
         // Render links
         const links = layout.links();
         linksG
@@ -242,12 +260,24 @@ export const ExperimentGraph = () => {
             .attr('y1', (d: any) => d.source.yPos ?? 0)
             .attr('x2', (d: any) => d.target.xPos ?? 0)
             .attr('y2', (d: any) => d.target.yPos ?? 0)
-            .attr('stroke', '#334155')
-            .attr('stroke-width', 1.2)
+            .attr('stroke', (d: any) => {
+                const sourceId = d.source.data.data.id;
+                const targetId = d.target.data.data.id;
+                const inSelectedPath =
+                    selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
+                return inSelectedPath ? '#F0529C' : '#334155';
+            })
+            .attr('stroke-width', (d: any) => {
+                const sourceId = d.source.data.data.id;
+                const targetId = d.target.data.data.id;
+                const inSelectedPath =
+                    selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
+                return inSelectedPath ? 2.5 : 1.2;
+            })
             .attr('fill', 'none')
             .style('cursor', 'pointer')
             .on('mouseover', function (_event, d: any) {
-                // Highlight path from target node to root
+                // Highlight path from target node to root (ancestors)
                 const pathIds = new Set<string>();
                 let current = d.target;
                 while (current) {
@@ -255,29 +285,56 @@ export const ExperimentGraph = () => {
                     current = current.parent;
                 }
 
-                // Highlight nodes in path with brighter stroke
+                // Collect all descendant IDs from target node
+                const descendantIds = new Set<string>();
+                const collectDescendants = (node: any) => {
+                    if (node.children) {
+                        node.children.forEach((child: any) => {
+                            descendantIds.add(child.data.data.id);
+                            collectDescendants(child);
+                        });
+                    }
+                };
+                collectDescendants(d.target);
+
+                // Highlight nodes in path and descendants
                 nodesG.selectAll('circle.node').attr('stroke', (n: any) => {
                     const isSelected = n.data.data.id === selectedExperiment?.experimentId;
                     const isInPath = pathIds.has(n.data.data.id);
+                    const isDescendant = descendantIds.has(n.data.data.id);
                     if (isSelected) return '#0FCB8C';
                     if (isInPath && n.data.data.id !== 'node_1_0') return '#F0529C';
+                    if (isDescendant && n.data.data.id !== 'node_1_0') return '#f472b6';
                     return '#0f172a';
                 });
 
-                // Highlight links in path
+                // Highlight links in path and descendants
                 linksG
                     .selectAll('line')
                     .attr('stroke', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
-                        return pathIds.has(sourceId) && pathIds.has(targetId)
-                            ? '#F0529C'
-                            : '#334155';
+                        const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
+                        const bothInDescendants =
+                            descendantIds.has(sourceId) && descendantIds.has(targetId);
+                        const connectsToDescendants =
+                            pathIds.has(sourceId) && descendantIds.has(targetId);
+
+                        if (bothInPath) return '#F0529C';
+                        if (bothInDescendants || connectsToDescendants) return '#f472b6';
+                        return '#334155';
                     })
                     .attr('stroke-width', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
-                        return pathIds.has(sourceId) && pathIds.has(targetId) ? 2.5 : 1.2;
+                        const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
+                        const bothInDescendants =
+                            descendantIds.has(sourceId) && descendantIds.has(targetId);
+                        const connectsToDescendants =
+                            pathIds.has(sourceId) && descendantIds.has(targetId);
+
+                        if (bothInPath) return 2.5;
+                        return 1.2;
                     });
             })
             .on('mouseout', function () {
@@ -292,8 +349,6 @@ export const ExperimentGraph = () => {
             });
 
         // Render nodes
-        const nodes = layout.descendants() as ExtendedHierarchyPointNode[];
-
         // First render yellow rings for surprising nodes
         nodesG
             .selectAll('circle.surprising-ring')
@@ -334,7 +389,7 @@ export const ExperimentGraph = () => {
             .attr('opacity', (d) => (d.data.data.id === 'node_1_0' ? 0.3 : 1))
             .style('cursor', (d) => (d.data.data.id === 'node_1_0' ? 'default' : 'pointer'))
             .on('mouseover', function (_event, d) {
-                // Find path from this node to root
+                // Find path from this node to root (ancestors)
                 const pathIds = new Set<string>();
                 let current: any = d;
                 while (current) {
@@ -342,29 +397,57 @@ export const ExperimentGraph = () => {
                     current = current.parent;
                 }
 
-                // Highlight nodes in path with brighter stroke
+                // Collect all descendant IDs from this node
+                const descendantIds = new Set<string>();
+                const collectDescendants = (node: any) => {
+                    if (node.children) {
+                        node.children.forEach((child: any) => {
+                            descendantIds.add(child.data.data.id);
+                            collectDescendants(child);
+                        });
+                    }
+                };
+                collectDescendants(d);
+
+                // Highlight nodes in path and descendants
                 nodesG.selectAll('circle.node').attr('stroke', (n: any) => {
                     const isSelected = n.data.data.id === selectedExperiment?.experimentId;
                     const isInPath = pathIds.has(n.data.data.id);
+                    const isDescendant = descendantIds.has(n.data.data.id);
                     if (isSelected) return '#0FCB8C';
                     if (isInPath && n.data.data.id !== 'node_1_0') return '#F0529C';
+                    if (isDescendant && n.data.data.id !== 'node_1_0') return '#f472b6';
                     return '#0f172a';
                 });
 
-                // Highlight links in path
+                // Highlight links in path and descendants
                 linksG
                     .selectAll('line')
                     .attr('stroke', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
-                        return pathIds.has(sourceId) && pathIds.has(targetId)
-                            ? '#F0529C'
-                            : '#334155';
+                        const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
+                        const bothInDescendants =
+                            descendantIds.has(sourceId) && descendantIds.has(targetId);
+                        const connectsToDescendants =
+                            pathIds.has(sourceId) && descendantIds.has(targetId);
+
+                        if (bothInPath) return '#F0529C';
+                        if (bothInDescendants || connectsToDescendants) return '#f472b6';
+                        return '#334155';
                     })
                     .attr('stroke-width', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
-                        return pathIds.has(sourceId) && pathIds.has(targetId) ? 2.5 : 1.2;
+                        const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
+                        const bothInDescendants =
+                            descendantIds.has(sourceId) && descendantIds.has(targetId);
+                        const connectsToDescendants =
+                            pathIds.has(sourceId) && descendantIds.has(targetId);
+
+                        if (bothInPath) return 2.5;
+                        if (bothInDescendants || connectsToDescendants) return 1.2;
+                        return 1.2;
                     });
             })
             .on('mouseout', function () {

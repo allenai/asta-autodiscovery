@@ -22,7 +22,7 @@ export default function CreditsChip() {
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
                         ) : credits !== null ? (
-                            <CreditsValue>{credits?.remaining.toLocaleString()}</CreditsValue>
+                            <CreditsValue>{credits?.available.toLocaleString()}</CreditsValue>
                         ) : (
                             <LoadingShimmer />
                         )}
@@ -82,14 +82,14 @@ export default function CreditsChip() {
 
                     {credits !== null ? (
                         <CreditsReport>
-                            <CreditLabel>Credits Used:</CreditLabel>
-                            <CreditValue>{credits.used.toLocaleString()}</CreditValue>
+                            <CreditLabel>Credits Consumed:</CreditLabel>
+                            <CreditValue>{credits.consumed.toLocaleString()}</CreditValue>
 
                             <CreditLabel>Credits Pending:</CreditLabel>
                             <CreditValue>{credits.pending.toLocaleString()}</CreditValue>
 
-                            <CreditLabel>Credits Remaining:</CreditLabel>
-                            <CreditValue>{credits.remaining.toLocaleString()}</CreditValue>
+                            <CreditLabel>Credits Available:</CreditLabel>
+                            <CreditValue>{credits.available.toLocaleString()}</CreditValue>
                         </CreditsReport>
                     ) : (
                         <LoadingShimmer />

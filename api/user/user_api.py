@@ -80,10 +80,9 @@ def create() -> Blueprint:
             {
                 "credits": {
                     "granted": user_credits.granted,
-                    "used": user_credits.used,
+                    "consumed": user_credits.consumed,
                     "pending": user_credits.pending,
                     "available": user_credits.available,
-                    "remaining": user_credits.remaining,
                 }
             }
         ), 200

@@ -44,7 +44,7 @@ interface RunSetupProps {
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
         settings,
-        creditsRemaining,
+        creditsAvailable,
         fileUploads,
         fieldErrors,
         isSubmitting,
@@ -193,7 +193,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         fullWidth
                     />
                     <RemainingCreditsChip
-                        label={`Your credits after this run: ${creditsRemaining - settings.nExperiments}`}
+                        label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
                     />
                 </FormControl>
 

@@ -1,4 +1,5 @@
 import { styled, Typography, Box, Stack } from '@mui/material';
+import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
@@ -70,9 +71,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                                 {experiment.prior?.toFixed(3)})
                             </PinkText>
                         </BeliefChip>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {experiment.hypothesis}
-                        </Typography>
+                        <StyledMarkdown>{experiment.hypothesis}</StyledMarkdown>
                     </Box>
                 )}
 
@@ -86,9 +85,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                                 {experiment.posterior?.toFixed(3)})
                             </GreenText>
                         </BeliefChip>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {experiment.analysis}
-                        </Typography>
+                        <StyledMarkdown>{experiment.analysis}</StyledMarkdown>
                     </Box>
                 )}
 
@@ -96,21 +93,17 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                     <>
                         <Box>
                             <SectionHeader>Experiment Plan</SectionHeader>
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                Objective: {experiment.experimentPlan.objective}
-                            </Typography>
+                            <StyledMarkdown>{`Objective: ${experiment.experimentPlan.objective}`}</StyledMarkdown>
                         </Box>
                         <Box>
                             <SectionHeader>Steps</SectionHeader>
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                {experiment.experimentPlan.steps}
-                            </Typography>
+                            <StyledMarkdown>{experiment.experimentPlan.steps}</StyledMarkdown>
                         </Box>
                         <Box>
                             <SectionHeader>Deliverables</SectionHeader>
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            <StyledMarkdown>
                                 {experiment.experimentPlan.deliverables}
-                            </Typography>
+                            </StyledMarkdown>
                         </Box>
 
                         {experiment.code && (
@@ -143,9 +136,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                 {experiment.review && (
                     <Box>
                         <SectionHeader>Review</SectionHeader>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            Objective: {experiment.review}
-                        </Typography>
+                        <StyledMarkdown>{experiment.review}</StyledMarkdown>
                     </Box>
                 )}
             </ContentWrapper>
@@ -203,4 +194,32 @@ const GreenText = styled('strong')`
 
 const OrangeText = styled('strong')`
     color: ${({ theme }) => theme.color['warning-orange-100'].hex};
+`;
+
+const StyledMarkdown = styled(Markdown)`
+    margin-top: ${({ theme }) => theme.spacing(0.5)};
+
+    &,
+    & * {
+        font-size: 0.875rem !important;
+        margin: 0;
+    }
+
+    & ol,
+    & ul {
+        padding-left: 1.5em;
+        margin: 0.25em 0;
+    }
+
+    & li {
+        margin: 0.125em 0;
+    }
+
+    & p {
+        margin: 0.25em 0;
+    }
+
+    & p:first-of-type {
+        margin-top: 0;
+    }
 `;

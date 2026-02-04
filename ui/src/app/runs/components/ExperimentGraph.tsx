@@ -1,4 +1,5 @@
 import { styled } from '@mui/material';
+import d3 from 'd3';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 

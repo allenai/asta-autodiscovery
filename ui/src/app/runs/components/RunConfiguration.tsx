@@ -171,7 +171,7 @@ export default function RunConfiguration({
                         onChange={(e) => handleExperimentsChange(e.target.value)}
                         inputProps={{
                             min: 1,
-                            max: credits?.remaining ?? 500,
+                            max: credits?.available ?? 500,
                             step: 1,
                         }}
                         fullWidth
@@ -179,7 +179,7 @@ export default function RunConfiguration({
                         error={!!experimentsError}
                         helperText={
                             experimentsError ||
-                            `Enter a number between 1 and ${credits?.remaining ?? 500}`
+                            `Enter a number between 1 and ${credits?.available ?? 500}`
                         }
                     />
 

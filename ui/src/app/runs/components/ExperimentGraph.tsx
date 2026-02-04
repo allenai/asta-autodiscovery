@@ -70,7 +70,9 @@ const buildHierarchy = (experiments: Experiment[]): d3.HierarchyNode<TreeNode> |
     const byId = new Map(experiments.map((e) => [e.experimentId, e]));
 
     // Check if we need to create a fake root node (node_1_0)
-    const needsFakeRoot = experiments.some((e) => e.parentId === 'node_1_0' && !byId.has('node_1_0'));
+    const needsFakeRoot = experiments.some(
+        (e) => e.parentId === 'node_1_0' && !byId.has('node_1_0')
+    );
 
     let root: Experiment | null = null;
     let allExperiments = experiments;
@@ -80,7 +82,9 @@ const buildHierarchy = (experiments: Experiment[]): d3.HierarchyNode<TreeNode> |
         const fakeRoot: Experiment = {
             experimentId: 'node_1_0',
             parentId: null,
-            childIds: experiments.filter((e) => e.parentId === 'node_1_0').map((e) => e.experimentId),
+            childIds: experiments
+                .filter((e) => e.parentId === 'node_1_0')
+                .map((e) => e.experimentId),
             creationIdx: -1,
             idInRun: 0,
             status: 'FAKE_ROOT',
@@ -266,7 +270,9 @@ export const ExperimentGraph = () => {
                     .attr('stroke', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
-                        return pathIds.has(sourceId) && pathIds.has(targetId) ? '#F0529C' : '#334155';
+                        return pathIds.has(sourceId) && pathIds.has(targetId)
+                            ? '#F0529C'
+                            : '#334155';
                     })
                     .attr('stroke-width', (l: any) => {
                         const sourceId = l.source.data.data.id;
@@ -291,10 +297,12 @@ export const ExperimentGraph = () => {
         // First render yellow rings for surprising nodes
         nodesG
             .selectAll('circle.surprising-ring')
-            .data(nodes.filter((d) => {
-                const exp = experiments.find((e) => e.experimentId === d.data.data.id);
-                return exp?.isSurprising === true;
-            }))
+            .data(
+                nodes.filter((d) => {
+                    const exp = experiments.find((e) => e.experimentId === d.data.data.id);
+                    return exp?.isSurprising === true;
+                })
+            )
             .join('circle')
             .attr('class', 'surprising-ring')
             .attr('cx', (d) => d.xPos ?? 0)
@@ -349,7 +357,9 @@ export const ExperimentGraph = () => {
                     .attr('stroke', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
-                        return pathIds.has(sourceId) && pathIds.has(targetId) ? '#F0529C' : '#334155';
+                        return pathIds.has(sourceId) && pathIds.has(targetId)
+                            ? '#F0529C'
+                            : '#334155';
                     })
                     .attr('stroke-width', (l: any) => {
                         const sourceId = l.source.data.data.id;
@@ -487,7 +497,9 @@ export const ExperimentGraph = () => {
                     </Typography>
                 </LegendItem>
                 <LegendItem>
-                    <LegendCircle style={{ backgroundColor: 'transparent', border: '3px solid #fbbf24' }} />
+                    <LegendCircle
+                        style={{ backgroundColor: 'transparent', border: '3px solid #fbbf24' }}
+                    />
                     <Typography variant="caption" sx={{ color: '#faf2e9' }}>
                         Surprising finding
                     </Typography>

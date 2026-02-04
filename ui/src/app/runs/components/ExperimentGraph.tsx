@@ -1,41 +1,16 @@
 import { styled } from '@mui/material';
-import { useCallback, useState } from 'react';
+
+import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 
 export const ExperimentGraph = () => {
-    const [counter, setCounter] = useState(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
 
-    const onClickGraph = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        setCounter((prev) => prev + 1);
-    }, []);
-
-    return (
-        <GraphContainer>
-            <MockGraph key={counter} onClick={onClickGraph} />
-        </GraphContainer>
-    );
+    return <GraphContainer>{/* GRAPH GOES HERE */}</GraphContainer>;
 };
 
 const GraphContainer = styled('div')`
     display: flex;
     height: 100%;
     width: 100%;
-`;
-
-const MockGraph = styled('div')`
-    animation: flash 0.25s ease-in-out;
-    flex: 1 1 auto;
-    background-color: #ccc;
-
-    @keyframes flash {
-        0% {
-            filter: brightness(1);
-        }
-        10% {
-            filter: brightness(2);
-        }
-        100% {
-            filter: brightness(1);
-        }
-    }
 `;

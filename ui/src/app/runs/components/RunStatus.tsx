@@ -41,8 +41,6 @@ interface RunStatusProps {
     userid?: string;
 }
 
-const ENABLE_GRAPH_VIZ = false; // Hide the graph until we are ready to implement
-
 /**
  * Component for displaying the status of a submitted run.
  *
@@ -200,20 +198,16 @@ function RunStatusContent({
         isLoading: isLoadingExperiments,
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
-    // const [isTableExpanded, setIsTableExpanded] = useState(false);
-    const isTableExpanded = true;
+    const [isTableExpanded, setIsTableExpanded] = useState(true);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
-    const setIsTableExpanded = (...args: any[]) => {}; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     return (
         <Container>
             <PanelLayout>
-                {ENABLE_GRAPH_VIZ && (
-                    <Background>
-                        <ExperimentGraph />
-                    </Background>
-                )}
-                <TablePanel $isExpanded={isTableExpanded} $hasDetails={!!selectedExperiment}>
+                <Background>
+                    <ExperimentGraph />
+                </Background>
+                <TablePanel $isExpanded={isTableExpanded}>
                     <RunHeader>
                         <Box>
                             <RunHeaderName>{run.name}</RunHeaderName>
@@ -256,14 +250,16 @@ function RunStatusContent({
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
-                        {ENABLE_GRAPH_VIZ && (
-                            <LargeScreenAction>
-                                <RunHeaderExpandButton
-                                    onClick={() => setIsTableExpanded(!isTableExpanded)}>
-                                    {isTableExpanded ? 'Collapse' : 'Expand'}
-                                </RunHeaderExpandButton>
-                            </LargeScreenAction>
-                        )}
+                        <LargeScreenAction>
+                            <RunHeaderExpandButton
+                                onClick={() => setIsTableExpanded(!isTableExpanded)}>
+                                {isTableExpanded ? (
+                                    <CloseFullscreenOutlinedIcon />
+                                ) : (
+                                    <OpenInFullOutlinedIcon />
+                                )}
+                            </RunHeaderExpandButton>
+                        </LargeScreenAction>
                     </RunHeader>
 
                     <RunContent>
@@ -381,11 +377,10 @@ const Background = styled('div')`
     }
 `;
 
-const TablePanel = styled('div')<{ $isExpanded: boolean; $hasDetails: boolean }>`
-    flex: 1 1 auto;
+const TablePanel = styled('div')<{ $isExpanded: boolean }>`
+    flex: 0 1 auto;
     min-width: 0;
-    width: ${({ $isExpanded, $hasDetails }) =>
-        $isExpanded ? ($hasDetails ? 'auto' : '100%') : '400px'};
+    width: ${({ $isExpanded }) => ($isExpanded ? '100%' : '500px')};
     background-color: #163638f3;
     border-radius: 12px;
     display: flex;

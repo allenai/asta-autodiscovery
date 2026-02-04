@@ -76,15 +76,18 @@ export const ViewerRunsBox = () => {
 
     // Find the first non-empty bucket and expand it
     useEffect(() => {
-        const bucketOrder = [
-            Bucket.NOT_STARTED,
+        // Order buckets by priority for expansion
+        const bucketPriority = [
             Bucket.RUNNING,
+            Bucket.NOT_STARTED,
             Bucket.FINISHED,
             Bucket.ERROR,
             Bucket.CANCELLED,
         ];
 
-        const firstNonEmptyBucket = bucketOrder.find((bucket) => runsByBucket[bucket]?.length > 0);
+        const firstNonEmptyBucket = bucketPriority.find(
+            (bucket) => runsByBucket[bucket]?.length > 0
+        );
 
         if (firstNonEmptyBucket) {
             setExpandedBuckets({

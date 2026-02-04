@@ -84,7 +84,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const { updateViewerRun } = useRuns();
     const api = getRunsApi();
 
-    const creditsRemaining = credits?.remaining ?? 500;
+    const creditsAvailable = credits?.available ?? 0;
 
     // Dataset upload state
     const [fileUploads, setFileUploads] = useState<FileUploadState[]>([]);
@@ -567,10 +567,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         const num = parseInt(value, 10);
 
-        if (isNaN(num) || num < 1 || num > creditsRemaining) {
+        if (isNaN(num) || num < 1 || num > creditsAvailable) {
             setFieldErrors((prev) => ({
                 ...prev,
-                nExperiments: `Must be between 1 and ${creditsRemaining}`,
+                nExperiments: `Must be between 1 and ${creditsAvailable}`,
             }));
         } else {
             updateSettings('nExperiments', num);
@@ -598,8 +598,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         // Validate file descriptions
         const hasValidationErrors = Object.values(errors).length > 0;
 
-        if (settings.nExperiments < 1 || settings.nExperiments > creditsRemaining) {
-            errors.nExperiments = `Number of experiments must be between 1 and ${creditsRemaining}`;
+        if (settings.nExperiments < 1 || settings.nExperiments > creditsAvailable) {
+            errors.nExperiments = `Number of experiments must be between 1 and ${creditsAvailable}`;
         }
 
         if (hasValidationErrors) {
@@ -666,7 +666,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
     return {
         // Computed values
-        creditsRemaining,
+        creditsAvailable,
 
         // Dataset upload state
         fileUploads,

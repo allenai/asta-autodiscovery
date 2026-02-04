@@ -65,17 +65,15 @@ class UserCredits(NamedTuple):
 
     Attributes:
         granted: Total credits granted to user
-        used: Credits already consumed (completed experiments)
+        consumed: Credits already consumed (completed experiments)
         pending: Credits reserved for running experiments
-        available: Credits available for new experiments (granted - used - pending)
-        remaining: Credits not yet consumed (granted - used)
+        available: Credits available for new experiments (granted - consumed - pending)
     """
 
     granted: int
-    used: int
+    consumed: int
     pending: int
     available: int
-    remaining: int
 
 
 class InsufficientCreditsError(Exception):
@@ -190,7 +188,7 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
 def calculate_job_credits(
     userid: str, jobid: str, config: JobConfig | None = None
 ) -> tuple[int, int]:
-    """Calculate used and pending credits for a single job.
+    """Calculate consumed and pending credits for a single job.
 
     This function is migrated from autodiscovery_jobs.gcs module to
     centralize credit logic in the API layer.
@@ -201,19 +199,19 @@ def calculate_job_credits(
         config: Configuration (uses default if None)
 
     Returns:
-        Tuple of (used_credits, pending_credits)
+        Tuple of (consumed_credits, pending_credits)
 
     Example:
-        >>> used, pending = calculate_job_credits("user123", "job456")
-        >>> print(f"Job has used {used} and pending {pending} credits")
+        >>> consumed, pending = calculate_job_credits("user123", "job456")
+        >>> print(f"Job has consumed {consumed} and pending {pending} credits")
     """
     job_stats = get_job_stats(userid=userid, jobid=jobid, config=config)
     if job_stats is None:
         return (0, 0)
 
-    used = job_stats.num_experiments_completed
+    consumed = job_stats.num_experiments_completed
     pending = job_stats.num_experiments_pending
-    return (used, pending)
+    return (consumed, pending)
 
 
 def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredits:
@@ -231,9 +229,9 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
 
     Example:
         >>> credits = get_user_credits("user123")
-        >>> print(f"Available: {credits.available}, Used: {credits.used}")
+        >>> print(f"Available: {credits.available}, Consumed: {credits.consumed}")
     """
-    total_used = 0
+    total_consumed = 0
     total_pending = 0
 
     # Get all jobs for the user
@@ -246,8 +244,8 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
             run_status = run_details.status if run_details is not None else None
             if run_status is None or run_status in ["CREATED"]:
                 continue
-            used, pending = calculate_job_credits(userid=userid, jobid=job_id, config=config)
-            total_used += used
+            consumed, pending = calculate_job_credits(userid=userid, jobid=job_id, config=config)
+            total_consumed += consumed
             if run_status in ["PENDING", "QUEUED", "RUNNING"]:
                 total_pending += pending
         except Exception:
@@ -259,15 +257,13 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
     credits_granted = get_user_credits_granted(userid)
 
     # Calculate derived metrics
-    available = max(0, credits_granted - total_used - total_pending)
-    remaining = max(0, credits_granted - total_used)
+    available = max(0, credits_granted - total_consumed - total_pending)
 
     return UserCredits(
         granted=credits_granted,
-        used=total_used,
+        consumed=total_consumed,
         pending=total_pending,
         available=available,
-        remaining=remaining,
     )
 
 

@@ -16,10 +16,9 @@ export interface GetViewerUserResponseBody {
 
 export interface ViewerCreditsFromApi {
     granted: number; // Total credits granted to the user
-    used: number; // Credits used on completed jobs
+    consumed: number; // Credits consumed on completed jobs
     pending: number; // Credits in started jobs which have yet to complete
     available: number; // Credits available for new jobs, assuming pending jobs are cancelled
-    remaining: number; // Credits available for new jobs, assuming pending jobs are completed
 }
 
 export interface GetViewerCreditsResponseBody {

@@ -198,7 +198,7 @@ function RunStatusContent({
         isLoading: isLoadingExperiments,
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
-    const [isTableExpanded, setIsTableExpanded] = useState(false);
+    const [isTableExpanded, setIsTableExpanded] = useState(true);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
     return (

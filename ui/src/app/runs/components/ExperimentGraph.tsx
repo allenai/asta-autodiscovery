@@ -5,7 +5,7 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 export const ExperimentGraph = () => {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
 
-    return <GraphContainer>GRAPH GOES HERE</GraphContainer>;
+    return <GraphContainer>{/* GRAPH GOES HERE */}</GraphContainer>;
 };
 
 const GraphContainer = styled('div')`

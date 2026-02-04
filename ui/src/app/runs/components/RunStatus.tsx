@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
     Box,
     Button,
@@ -25,6 +25,7 @@ import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
@@ -200,6 +201,36 @@ function RunStatusContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isTableExpanded, setIsTableExpanded] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+
+    // URL synchronization
+    const { setSearchParam, deleteSearchParam } = useURLSearchParams();
+    const expParam = useSearchValue('exp');
+    const hasInitiallySelected = useRef(false);
+
+    // Read from URL: Initial selection when exp param is present
+    useEffect(() => {
+        if (hasInitiallySelected.current || !expParam) return;
+        if (isLoadingExperiments || experiments.length === 0) return;
+
+        const expId = parseInt(expParam, 10);
+        if (!expId || expId <= 0 || isNaN(expId)) return;
+
+        const experimentToSelect = experiments.find((exp) => exp.idInRun === expId);
+        if (experimentToSelect) {
+            selectExperiment(experimentToSelect);
+            hasInitiallySelected.current = true;
+        }
+    }, [expParam, experiments, isLoadingExperiments, selectExperiment]);
+
+    // Write to URL: Update URL when selection changes
+    useEffect(() => {
+        if (selectedExperiment) {
+            setSearchParam('exp', selectedExperiment.idInRun.toString());
+        } else if (hasInitiallySelected.current) {
+            // Only delete if we've previously selected (don't delete on initial load)
+            deleteSearchParam('exp');
+        }
+    }, [selectedExperiment, setSearchParam, deleteSearchParam]);
 
     return (
         <Container>

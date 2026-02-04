@@ -43,10 +43,6 @@ DEFAULT_CREDITS_GRANTED = 1000
 # Max number of experiments that can run in a single job
 DEFAULT_EXPERIMENT_LIMIT = 500
 
-# List of statuses which count towards credit usage
-RUN_STATUS_TO_EXCLUDE_FOR_CREDITS = ["CREATED"]
-RUN_STATUS_TO_EXCLUDE_PENDING = ["CREATED", "PENDING"]
-
 
 class JobStats(NamedTuple):
     """Statistics about a job's experiments.

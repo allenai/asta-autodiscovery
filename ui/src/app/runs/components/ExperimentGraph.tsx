@@ -50,11 +50,17 @@ const surprisalColor = (node: D3TreeNode): string => {
     const delta = postMean - priorMean;
     const intensity = Math.max(0, Math.min(1, Math.abs(node.belief_change ?? delta ?? 0)));
 
-    const hue = delta >= 0 ? 145 : 0; // green for positive, red for negative
-    const saturation = 60 + 30 * intensity;
-    const lightness = 80 - 45 * intensity;
-
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    if (delta >= 0) {
+        // Positive belief change - use green with varying intensity
+        const saturation = 60 + 30 * intensity;
+        const lightness = 80 - 45 * intensity;
+        return `hsl(145, ${saturation}%, ${lightness}%)`; // Green hue (145)
+    } else {
+        // Negative belief change - use red with varying intensity
+        const saturation = 60 + 30 * intensity;
+        const lightness = 80 - 45 * intensity;
+        return `hsl(0, ${saturation}%, ${lightness}%)`; // Red hue (0)
+    }
 };
 
 // Build tree hierarchy from flat experiment array
@@ -114,58 +120,49 @@ const buildHierarchy = (experiments: Experiment[]): d3.HierarchyNode<TreeNode> |
     return d3.hierarchy(toTree(root));
 };
 
-// Adjust angular spacing to prevent node overlaps
-const adjustAngularSpacing = (layout: ExtendedHierarchyPointNode, radius: number) => {
-    const minDist = 48; // minimum pixel distance between nodes
-    const depthBuckets = new Map<number, ExtendedHierarchyPointNode[]>();
+// Assign angular ranges to ensure children stay near parents and edges don't cross
+const assignAngularRanges = (
+    node: ExtendedHierarchyPointNode,
+    minAngle: number,
+    maxAngle: number
+) => {
+    const angleRange = maxAngle - minAngle;
+    const children = node.children as ExtendedHierarchyPointNode[] | undefined;
 
-    // Group nodes by depth level
-    layout.descendants().forEach((d: ExtendedHierarchyPointNode) => {
-        if (!depthBuckets.has(d.depth)) {
-            depthBuckets.set(d.depth, []);
-        }
-        depthBuckets.get(d.depth)!.push(d);
+    if (!children || children.length === 0) {
+        // Leaf node - position at center of range
+        node.angle = (minAngle + maxAngle) / 2;
+        node.xPos = node.y * Math.cos(node.angle);
+        node.yPos = node.y * Math.sin(node.angle);
+        return;
+    }
+
+    // Count total leaves in each child's subtree for proportional allocation
+    const getLeafCount = (n: ExtendedHierarchyPointNode): number => {
+        if (!n.children || n.children.length === 0) return 1;
+        return (n.children as ExtendedHierarchyPointNode[]).reduce(
+            (sum, child) => sum + getLeafCount(child),
+            0
+        );
+    };
+
+    const totalLeaves = children.reduce((sum, child) => sum + getLeafCount(child), 0);
+
+    // Distribute angular range among children proportionally
+    let currentAngle = minAngle;
+    children.forEach((child) => {
+        const childLeaves = getLeafCount(child);
+        const childAngleRange = (childLeaves / totalLeaves) * angleRange;
+        const childMaxAngle = currentAngle + childAngleRange;
+
+        assignAngularRanges(child, currentAngle, childMaxAngle);
+        currentAngle = childMaxAngle;
     });
 
-    // Iteratively adjust angles to enforce minimum spacing
-    depthBuckets.forEach((arr) => {
-        if (arr.length < 2) return;
-
-        const r = Math.max(arr[0]?.y || radius, 1);
-        const maxIter = 12;
-
-        for (let iter = 0; iter < maxIter; iter++) {
-            let moved = false;
-
-            for (let i = 0; i < arr.length; i++) {
-                for (let j = i + 1; j < arr.length; j++) {
-                    const a = arr[i];
-                    const b = arr[j];
-
-                    // Calculate shortest angular difference (wrap-aware)
-                    let diff = (b.angle ?? 0) - (a.angle ?? 0);
-                    diff = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
-
-                    const gapArc = Math.abs(diff) * r;
-                    if (gapArc < minDist) {
-                        const delta = (minDist / r - Math.abs(diff)) / 2;
-                        const sign = diff >= 0 ? 1 : -1;
-                        a.angle = (a.angle ?? 0) - delta * sign;
-                        b.angle = (b.angle ?? 0) + delta * sign;
-                        moved = true;
-                    }
-                }
-            }
-
-            if (!moved) break;
-        }
-
-        // Recalculate Cartesian positions after angle adjustments
-        arr.forEach((d) => {
-            d.xPos = d.y * Math.cos(d.angle ?? 0);
-            d.yPos = d.y * Math.sin(d.angle ?? 0);
-        });
-    });
+    // Position parent at center of its assigned range
+    node.angle = (minAngle + maxAngle) / 2;
+    node.xPos = node.y * Math.cos(node.angle);
+    node.yPos = node.y * Math.sin(node.angle);
 };
 
 export const ExperimentGraph = () => {
@@ -223,15 +220,8 @@ export const ExperimentGraph = () => {
 
         const layout = tree(hierarchy) as ExtendedHierarchyPointNode;
 
-        // Calculate polar coordinates
-        layout.each((d: ExtendedHierarchyPointNode) => {
-            d.angle = d.x - Math.PI / 2;
-            d.xPos = d.y * Math.cos(d.angle);
-            d.yPos = d.y * Math.sin(d.angle);
-        });
-
-        // Adjust angular spacing to prevent overlaps
-        adjustAngularSpacing(layout, radius);
+        // Assign angular ranges to keep children near parents and prevent crossings
+        assignAngularRanges(layout, 0, 2 * Math.PI);
 
         // Create groups for links and nodes
         const graphG = svg.append('g').attr('class', 'tree-group');
@@ -250,21 +240,84 @@ export const ExperimentGraph = () => {
             .attr('y2', (d: any) => d.target.yPos ?? 0)
             .attr('stroke', '#334155')
             .attr('stroke-width', 1.2)
-            .attr('fill', 'none');
+            .attr('fill', 'none')
+            .style('cursor', 'pointer')
+            .on('mouseover', function (_event, d: any) {
+                // Highlight path from target node to root
+                const pathIds = new Set<string>();
+                let current = d.target;
+                while (current) {
+                    pathIds.add(current.data.data.id);
+                    current = current.parent;
+                }
+
+                // Highlight nodes in path with brighter stroke
+                nodesG.selectAll('circle.node').attr('stroke', (n: any) => {
+                    const isSelected = n.data.data.id === selectedExperiment?.experimentId;
+                    const isInPath = pathIds.has(n.data.data.id);
+                    if (isSelected) return '#0FCB8C';
+                    if (isInPath && n.data.data.id !== 'node_1_0') return '#F0529C';
+                    return '#0f172a';
+                });
+
+                // Highlight links in path
+                linksG
+                    .selectAll('line')
+                    .attr('stroke', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        return pathIds.has(sourceId) && pathIds.has(targetId) ? '#F0529C' : '#334155';
+                    })
+                    .attr('stroke-width', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        return pathIds.has(sourceId) && pathIds.has(targetId) ? 2.5 : 1.2;
+                    });
+            })
+            .on('mouseout', function () {
+                // Reset all nodes
+                nodesG.selectAll('circle.node').attr('stroke', (n: any) => {
+                    const isSelected = n.data.data.id === selectedExperiment?.experimentId;
+                    return isSelected ? '#0FCB8C' : '#0f172a';
+                });
+
+                // Reset all links
+                linksG.selectAll('line').attr('stroke', '#334155').attr('stroke-width', 1.2);
+            });
 
         // Render nodes
         const nodes = layout.descendants() as ExtendedHierarchyPointNode[];
+
+        // First render yellow rings for surprising nodes
         nodesG
-            .selectAll('circle')
+            .selectAll('circle.surprising-ring')
+            .data(nodes.filter((d) => {
+                const exp = experiments.find((e) => e.experimentId === d.data.data.id);
+                return exp?.isSurprising === true;
+            }))
+            .join('circle')
+            .attr('class', 'surprising-ring')
+            .attr('cx', (d) => d.xPos ?? 0)
+            .attr('cy', (d) => d.yPos ?? 0)
+            .attr('r', 20)
+            .attr('fill', 'none')
+            .attr('stroke', '#fbbf24')
+            .attr('stroke-width', 3)
+            .attr('opacity', 0.8);
+
+        // Then render the main node circles
+        nodesG
+            .selectAll('circle.node')
             .data(nodes)
             .join('circle')
+            .attr('class', 'node')
             .attr('cx', (d) => d.xPos ?? 0)
             .attr('cy', (d) => d.yPos ?? 0)
             .attr('r', 18)
             .attr('fill', (d) => surprisalColor(d.data.data))
             .attr('stroke', (d) => {
                 const isSelected = d.data.data.id === selectedExperiment?.experimentId;
-                return isSelected ? '#fbbf24' : '#0f172a';
+                return isSelected ? '#0FCB8C' : '#0f172a';
             })
             .attr('stroke-width', (d) => {
                 const isSelected = d.data.data.id === selectedExperiment?.experimentId;
@@ -272,6 +325,48 @@ export const ExperimentGraph = () => {
             })
             .attr('opacity', (d) => (d.data.data.id === 'node_1_0' ? 0.3 : 1))
             .style('cursor', (d) => (d.data.data.id === 'node_1_0' ? 'default' : 'pointer'))
+            .on('mouseover', function (_event, d) {
+                // Find path from this node to root
+                const pathIds = new Set<string>();
+                let current: any = d;
+                while (current) {
+                    pathIds.add(current.data.data.id);
+                    current = current.parent;
+                }
+
+                // Highlight nodes in path with brighter stroke
+                nodesG.selectAll('circle.node').attr('stroke', (n: any) => {
+                    const isSelected = n.data.data.id === selectedExperiment?.experimentId;
+                    const isInPath = pathIds.has(n.data.data.id);
+                    if (isSelected) return '#0FCB8C';
+                    if (isInPath && n.data.data.id !== 'node_1_0') return '#F0529C';
+                    return '#0f172a';
+                });
+
+                // Highlight links in path
+                linksG
+                    .selectAll('line')
+                    .attr('stroke', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        return pathIds.has(sourceId) && pathIds.has(targetId) ? '#F0529C' : '#334155';
+                    })
+                    .attr('stroke-width', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        return pathIds.has(sourceId) && pathIds.has(targetId) ? 2.5 : 1.2;
+                    });
+            })
+            .on('mouseout', function () {
+                // Reset all nodes
+                nodesG.selectAll('circle.node').attr('stroke', (n: any) => {
+                    const isSelected = n.data.data.id === selectedExperiment?.experimentId;
+                    return isSelected ? '#0FCB8C' : '#0f172a';
+                });
+
+                // Reset all links
+                linksG.selectAll('line').attr('stroke', '#334155').attr('stroke-width', 1.2);
+            })
             .on('click', (_event, d) => {
                 // Don't allow clicking the fake root node
                 if (d.data.data.id === 'node_1_0') return;
@@ -389,6 +484,12 @@ export const ExperimentGraph = () => {
                     <LegendCircle style={{ backgroundColor: '#94a3b8' }} />
                     <Typography variant="caption" sx={{ color: '#faf2e9' }}>
                         No belief data
+                    </Typography>
+                </LegendItem>
+                <LegendItem>
+                    <LegendCircle style={{ backgroundColor: 'transparent', border: '3px solid #fbbf24' }} />
+                    <Typography variant="caption" sx={{ color: '#faf2e9' }}>
+                        Surprising finding
                     </Typography>
                 </LegendItem>
             </LegendOverlay>

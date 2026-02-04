@@ -49,7 +49,7 @@ export const DEFAULT_REFRESH_INTERVAL_MS = 15000; // 15 seconds
 const RunExperimentsContext = createContext<RunExperimentsState>(DEFAULT_STATE);
 export default RunExperimentsContext;
 
-export const useRunExperiments = () => {
+export const useRunExperiments = (): RunExperimentsState => {
     const context = useContext(RunExperimentsContext);
     if (!context) {
         throw new Error('useRunExperiments must be used within a RunExperimentsProvider');

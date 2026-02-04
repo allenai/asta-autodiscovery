@@ -333,10 +333,6 @@ export const ExperimentGraph = () => {
                         const inSelectedPath =
                             selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
                         const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
-                        const bothInDescendants =
-                            descendantIds.has(sourceId) && descendantIds.has(targetId);
-                        const connectsToDescendants =
-                            pathIds.has(sourceId) && descendantIds.has(targetId);
 
                         if (inSelectedPath) return 2.5;
                         if (bothInPath) return 2.5;

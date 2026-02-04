@@ -35,6 +35,7 @@ from autodiscovery_jobs.gcs import (
     get_metadata,
     list_user_jobs,
 )
+from autodiscovery_jobs.run_details import get_run_details
 
 # Credit configuration
 DEFAULT_CREDITS_GRANTED = 1000
@@ -241,9 +242,14 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
     # Aggregate credits across all jobs
     for job_id in job_ids:
         try:
+            run_details = get_run_details(userid=userid, runid=job_id, config=config)
+            run_status = run_details.status if run_details is not None else None
+            if run_status is None or run_status in ["CREATED"]:
+                continue
             used, pending = calculate_job_credits(userid=userid, jobid=job_id, config=config)
             total_used += used
-            total_pending += pending
+            if run_status in ["PENDING", "QUEUED", "RUNNING"]:
+                total_pending += pending
         except Exception:
             # Continue processing other jobs if one fails
             # This matches the error handling in user_api.py line 100

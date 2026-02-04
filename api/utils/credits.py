@@ -248,6 +248,7 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
         try:
             run_details = get_run_details(userid=userid, runid=job_id, config=config)
             run_status = run_details.status if run_details is not None else None
+            print(f"Run ID: {job_id}, Status: {run_status}")
             if run_status is None or run_status in ["CREATED"]:
                 continue
             used, pending = calculate_job_credits(userid=userid, jobid=job_id, config=config)

@@ -265,7 +265,7 @@ export const ExperimentGraph = () => {
                 const targetId = d.target.data.data.id;
                 const inSelectedPath =
                     selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
-                return inSelectedPath ? '#F0529C' : '#334155';
+                return inSelectedPath ? '#0FCB8C' : '#334155';
             })
             .attr('stroke-width', (d: any) => {
                 const sourceId = d.source.data.data.id;
@@ -314,12 +314,15 @@ export const ExperimentGraph = () => {
                     .attr('stroke', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
                         const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
                         const bothInDescendants =
                             descendantIds.has(sourceId) && descendantIds.has(targetId);
                         const connectsToDescendants =
                             pathIds.has(sourceId) && descendantIds.has(targetId);
 
+                        if (inSelectedPath) return '#0FCB8C';
                         if (bothInPath) return '#F0529C';
                         if (bothInDescendants || connectsToDescendants) return '#f472b6';
                         return '#334155';
@@ -327,12 +330,15 @@ export const ExperimentGraph = () => {
                     .attr('stroke-width', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
                         const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
                         const bothInDescendants =
                             descendantIds.has(sourceId) && descendantIds.has(targetId);
                         const connectsToDescendants =
                             pathIds.has(sourceId) && descendantIds.has(targetId);
 
+                        if (inSelectedPath) return 2.5;
                         if (bothInPath) return 2.5;
                         return 1.2;
                     });
@@ -344,8 +350,23 @@ export const ExperimentGraph = () => {
                     return isSelected ? '#0FCB8C' : '#0f172a';
                 });
 
-                // Reset all links
-                linksG.selectAll('line').attr('stroke', '#334155').attr('stroke-width', 1.2);
+                // Reset all links (preserving selected path highlighting)
+                linksG
+                    .selectAll('line')
+                    .attr('stroke', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
+                        return inSelectedPath ? '#0FCB8C' : '#334155';
+                    })
+                    .attr('stroke-width', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
+                        return inSelectedPath ? 2.5 : 1.2;
+                    });
             });
 
         // Render nodes
@@ -426,12 +447,15 @@ export const ExperimentGraph = () => {
                     .attr('stroke', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
                         const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
                         const bothInDescendants =
                             descendantIds.has(sourceId) && descendantIds.has(targetId);
                         const connectsToDescendants =
                             pathIds.has(sourceId) && descendantIds.has(targetId);
 
+                        if (inSelectedPath) return '#0FCB8C';
                         if (bothInPath) return '#F0529C';
                         if (bothInDescendants || connectsToDescendants) return '#f472b6';
                         return '#334155';
@@ -439,12 +463,15 @@ export const ExperimentGraph = () => {
                     .attr('stroke-width', (l: any) => {
                         const sourceId = l.source.data.data.id;
                         const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
                         const bothInPath = pathIds.has(sourceId) && pathIds.has(targetId);
                         const bothInDescendants =
                             descendantIds.has(sourceId) && descendantIds.has(targetId);
                         const connectsToDescendants =
                             pathIds.has(sourceId) && descendantIds.has(targetId);
 
+                        if (inSelectedPath) return 2.5;
                         if (bothInPath) return 2.5;
                         if (bothInDescendants || connectsToDescendants) return 1.2;
                         return 1.2;
@@ -457,8 +484,23 @@ export const ExperimentGraph = () => {
                     return isSelected ? '#0FCB8C' : '#0f172a';
                 });
 
-                // Reset all links
-                linksG.selectAll('line').attr('stroke', '#334155').attr('stroke-width', 1.2);
+                // Reset all links (preserving selected path highlighting)
+                linksG
+                    .selectAll('line')
+                    .attr('stroke', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
+                        return inSelectedPath ? '#0FCB8C' : '#334155';
+                    })
+                    .attr('stroke-width', (l: any) => {
+                        const sourceId = l.source.data.data.id;
+                        const targetId = l.target.data.data.id;
+                        const inSelectedPath =
+                            selectedPathIds.has(sourceId) && selectedPathIds.has(targetId);
+                        return inSelectedPath ? 2.5 : 1.2;
+                    });
             })
             .on('click', (_event, d) => {
                 // Don't allow clicking the fake root node

@@ -3,6 +3,7 @@
 import { Box, Alert } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import RunStatus from '@/runs/components/RunStatus';
 
@@ -33,5 +34,9 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
         );
     }
 
-    return <RunStatus runid={runid} userid={userid} />;
+    return (
+        <URLSearchParamsProvider>
+            <RunStatus runid={runid} userid={userid} />
+        </URLSearchParamsProvider>
+    );
 }

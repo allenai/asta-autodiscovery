@@ -46,6 +46,7 @@ from .gcs import (
     list_user_ids,
     list_user_jobs,
     parse_gcs_path,
+    soft_delete_job,
     upload_dataset,
     upload_metadata,
 )
@@ -105,6 +106,7 @@ __all__ = [
     "job_exists",
     "create_job_directory",
     "delete_job_directory",
+    "soft_delete_job",
     "upload_dataset",
     "expire_datasets",
     "upload_metadata",

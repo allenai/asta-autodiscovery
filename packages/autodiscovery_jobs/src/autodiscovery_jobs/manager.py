@@ -5,6 +5,7 @@ from typing import Any
 
 from . import cloudrun, gcs
 from .config import JobConfig
+from .run_details import get_run_details
 
 
 class JobManager:
@@ -96,6 +97,55 @@ class JobManager:
             jobid: Job identifier
         """
         gcs.delete_job_directory(userid, jobid, self.config)
+
+    def soft_delete_job(self, userid: str, jobid: str) -> dict[str, Any]:
+        """Soft delete a job by stopping execution and removing user data.
+
+        This performs a soft delete that:
+        1. Cancels the Cloud Run execution if job is RUNNING
+        2. Marks the job as DELETED in run_details.json
+        3. Removes user-uploaded files from data/ directory
+        4. Preserves metadata.json, run_details.json, and all output/ files
+
+        This operation is idempotent and can be safely called multiple times.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+
+        Returns:
+            Dictionary with deletion details including:
+            - deleted_files: List of deleted file paths
+            - preserved_files: Count of preserved files
+            - status: "DELETED"
+            - deleted_at: ISO timestamp
+            - cancelled_execution: Boolean indicating if job was cancelled
+
+        Raises:
+            JobNotFoundError: If job doesn't exist
+            GCSError: If soft delete fails
+        """
+        # Get current run details
+        run_details = get_run_details(userid, jobid, self.config)
+        cancelled_execution = False
+
+        # Cancel execution if job is RUNNING
+        if run_details and run_details.status == "RUNNING" and run_details.execution_id:
+            try:
+                cloudrun.cancel_execution(
+                    execution_id=run_details.execution_id,
+                    config=self.config
+                )
+                cancelled_execution = True
+            except Exception:
+                # Continue with soft delete even if cancellation fails
+                pass
+
+        # Perform soft delete
+        result = gcs.soft_delete_job(userid, jobid, self.config)
+        result["cancelled_execution"] = cancelled_execution
+
+        return result
 
     def get_job_path(self, userid: str, jobid: str) -> str:
         """Get GCS path for a job.

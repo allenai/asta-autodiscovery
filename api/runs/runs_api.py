@@ -181,6 +181,21 @@ def create() -> Blueprint:
             return None, (jsonify({"error": "User ID not found in token"}), 401)
         return userid, None
 
+    def _check_run_not_deleted(userid: str, runid: str) -> tuple[None, None] | tuple[dict, int]:
+        """Check if a run is deleted and return 404 error if so.
+
+        Returns:
+            Tuple of (None, None) if run is not deleted, or (error_response, status_code) if deleted.
+        """
+        try:
+            run_details = get_run_details(userid, runid)
+            if run_details and run_details.status == "DELETED":
+                return jsonify({"error": "Run has been deleted"}), 404
+        except Exception:
+            # If we can't get run details, let the endpoint handle it
+            pass
+        return None, None
+
     @api.route("/list", methods=["GET"])
     @requires_enrollment
     def list_runs():
@@ -219,6 +234,11 @@ def create() -> Blueprint:
             except Exception as e:
                 app_logger.error(f"Failed to get run details for {run_id}: {e}")
                 run_details = None
+
+            # Skip DELETED runs from the list
+            if run_details and run_details.status == "DELETED":
+                return None
+
             try:
                 job_stats = get_job_stats(
                     userid=req.userid, jobid=run_id, config=job_manager.config
@@ -366,13 +386,21 @@ def create() -> Blueprint:
     @api.route("/<runid>", methods=["DELETE"])
     @requires_enrollment
     def delete_run(runid: str):
-        """Delete a run and all its contents.
+        """Soft delete a run - removes user data but preserves results.
+
+        This endpoint performs a soft delete that:
+        - Cancels the Cloud Run execution if job is running
+        - Marks the run as DELETED in run_details.json
+        - Deletes user-uploaded files in data/ directory (except .placeholder)
+        - Preserves metadata.json, run_details.json, and all output/ files
+
+        This operation is idempotent - calling it multiple times is safe.
 
         Args:
             runid: Run identifier.
 
         Returns:
-            JSON response confirming deletion.
+            JSON response with deletion details including count of deleted/preserved files.
         """
         userid = request.user.get("sub")
         if not userid:
@@ -380,8 +408,17 @@ def create() -> Blueprint:
 
         try:
             manager = get_job_manager()
-            manager.delete_job(userid, runid)
-            return jsonify({"message": "Run deleted successfully"})
+            result = manager.soft_delete_job(userid, runid)
+
+            return jsonify({
+                "message": "Run deleted successfully",
+                "deleted_files_count": len(result["deleted_files"]),
+                "preserved_files_count": result["preserved_files"],
+                "status": result["status"],
+                "deleted_at": result["deleted_at"],
+                "cancelled_execution": result.get("cancelled_execution", False)
+            })
+
         except JobNotFoundError as e:
             return jsonify({"error": str(e)}), 404
         except Exception as e:
@@ -576,6 +613,13 @@ def create() -> Blueprint:
         userid, error = _get_userid_for_read()
         if error:
             return error
+        if not userid:
+            return jsonify({"error": "User ID not found"}), 401
+
+        # Check if run is deleted
+        error_response, status_code = _check_run_not_deleted(userid, runid)
+        if error_response:
+            return error_response, status_code
 
         req = GetRunMetadataRequestModel(
             runid=runid,
@@ -786,6 +830,14 @@ def create() -> Blueprint:
         userid, error = _get_userid_for_read()
         if error:
             return error
+        if not userid:
+            return jsonify({"error": "User ID not found"}), 401
+
+        # Check if run is deleted
+        error_response, status_code = _check_run_not_deleted(userid, runid)
+        if error_response:
+            return error_response, status_code
+
         after_experiment_id = request.args.get("after_experiment_id", None)
 
         # Get job status to determine if polling can stop
@@ -817,6 +869,13 @@ def create() -> Blueprint:
         userid, error = _get_userid_for_read()
         if error:
             return error
+        if not userid:
+            return jsonify({"error": "User ID not found"}), 401
+
+        # Check if run is deleted
+        error_response, status_code = _check_run_not_deleted(userid, runid)
+        if error_response:
+            return error_response, status_code
 
         job_manager = get_job_manager()
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)

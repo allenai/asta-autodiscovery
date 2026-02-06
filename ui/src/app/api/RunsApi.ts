@@ -143,16 +143,13 @@ export class RunsApi extends BaseApi {
 
     async listRuns({ userid, limit }: { userid?: string; limit?: number } = {}) {
         const effectiveUserid = userid ?? (await this.getUserId());
-        if (!effectiveUserid) {
-            throw new Error('User ID not found. Please log in.');
-        }
 
         const query: Record<string, string> = {};
         if (limit) {
             query.limit = limit.toString();
         }
         return this.request<GetViewerRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/list`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/list`,
             method: 'GET',
             query,
         });
@@ -160,12 +157,9 @@ export class RunsApi extends BaseApi {
 
     async getRunMetadata({ userid, runid }: { userid?: string; runid: string }) {
         const effectiveUserid = userid ?? (await this.getUserId());
-        if (!effectiveUserid) {
-            throw new Error('User ID not found. Please log in.');
-        }
 
         return this.request<GetRunMetadataResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/metadata`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
         });
     }
@@ -180,9 +174,6 @@ export class RunsApi extends BaseApi {
         afterExperimentId?: string;
     }) {
         const effectiveUserid = userid ?? (await this.getUserId());
-        if (!effectiveUserid) {
-            throw new Error('User ID not found. Please log in.');
-        }
 
         const query: Record<string, string> = {};
         if (afterExperimentId) {
@@ -190,7 +181,7 @@ export class RunsApi extends BaseApi {
         }
 
         return this.request<GetRunExperimentsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments`,
             method: 'GET',
             query,
         });
@@ -206,12 +197,9 @@ export class RunsApi extends BaseApi {
         experimentId: string;
     }) {
         const effectiveUserid = userid ?? (await this.getUserId());
-        if (!effectiveUserid) {
-            throw new Error('User ID not found. Please log in.');
-        }
 
         return this.request<GetRunExperimentDetailsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,
             method: 'GET',
@@ -220,24 +208,18 @@ export class RunsApi extends BaseApi {
 
     async getRun({ userid, runId }: { userid?: string; runId: string }) {
         const effectiveUserid = userid ?? (await this.getUserId());
-        if (!effectiveUserid) {
-            throw new Error('User ID not found. Please log in.');
-        }
 
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runId)}`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}`,
             method: 'GET',
         });
     }
 
     async getRunStatus({ userid, runId }: { userid?: string; runId: string }) {
         const effectiveUserid = userid ?? (await this.getUserId());
-        if (!effectiveUserid) {
-            throw new Error('User ID not found. Please log in.');
-        }
 
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runId)}/status`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}/status`,
             method: 'GET',
         });
     }

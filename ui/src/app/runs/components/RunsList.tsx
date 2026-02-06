@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { useRuns } from '@/contexts/RunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { getRunsApi } from '@/api/RunsApi';
+import { mkDeleteRunBtnAttrs, mkRunListItemAttrs } from '@/analytics/run';
 
 interface RunsListProps {
     selectedRunId: string | null;
@@ -133,7 +134,10 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                     <SectionTitle>Your Sessions</SectionTitle>
                     <List disablePadding>
                         {sortedRuns.map((run) => (
-                            <ListItem key={run.id} disablePadding>
+                            <ListItem
+                                key={run.id}
+                                disablePadding
+                                {...mkRunListItemAttrs({ runId: run.id })}>
                                 <Link
                                     href={`/runs/${run.id}`}
                                     style={{
@@ -175,7 +179,9 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
             )}
 
             <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
-                <MenuItem onClick={handleDelete}>
+                <MenuItem
+                    onClick={handleDelete}
+                    {...(menuRunId && mkDeleteRunBtnAttrs({ runId: menuRunId }))}>
                     <ListItemIcon>
                         <DeleteIcon fontSize="small" />
                     </ListItemIcon>

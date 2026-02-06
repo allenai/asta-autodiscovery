@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
+import { mkExperimentRowAttrs } from '@/analytics/runDetails';
 
 const DEFAULT_COLUMNS: GridColDef[] = [
     {
@@ -220,6 +221,9 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 onSortModelChange={setSortModel}
                 getRowHeight={() => 'auto'}
                 rowSelection={false}
+                slotProps={{
+                    row: mkExperimentRowAttrs(),
+                }}
             />
         </Wrapper>
     );

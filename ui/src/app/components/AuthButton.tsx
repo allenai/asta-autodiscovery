@@ -5,6 +5,7 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { mkLoginBtnTrackAttrs, mkLogoutBtnTrackAttrs } from '@/analytics/run';
 
 export default function AuthButton() {
     const { isAuthenticated, isLoading, loginWithRedirect, logout } = useAuth0();
@@ -21,7 +22,8 @@ export default function AuthButton() {
         <StyledButton
             onClick={isAuthenticated ? handleLogout : loginWithRedirect}
             variant="outlined"
-            endIcon={isAuthenticated ? <LogoutOutlinedIcon /> : <LoginOutlinedIcon />}>
+            endIcon={isAuthenticated ? <LogoutOutlinedIcon /> : <LoginOutlinedIcon />}
+            {...(isAuthenticated ? mkLogoutBtnTrackAttrs() : mkLoginBtnTrackAttrs())}>
             {isAuthenticated ? 'Logout' : 'Login'}
         </StyledButton>
     );

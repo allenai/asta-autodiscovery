@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import { RunsContextProvider } from '@/contexts/RunsContext';
 import { ToS } from '@/components/ToS';
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { mkLogoTrackAttrs } from '@/analytics/run';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -33,7 +34,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                     {/* Sidebar - RunsList */}
                     {isAuthenticated && (
                         <Sidebar>
-                            <Logo href="/runs">
+                            <Logo href="/runs" {...mkLogoTrackAttrs()}>
                                 <IconAutoDSLogo />
                             </Logo>
                             <ScrollArea>

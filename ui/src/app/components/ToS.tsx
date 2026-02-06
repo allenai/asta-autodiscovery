@@ -3,6 +3,13 @@ import { useState } from 'react';
 
 import { DisclaimerDialog } from './DisclaimerDialog';
 import { AttributionDialog } from './AttributionDialog';
+import {
+    mkAttributionBtnTrackAttrs,
+    mkDisclaimerBtnTrackAttrs,
+    mkPrivacyLinkTrackAttrs,
+    mkResponsibleUseLinkTrackAttrs,
+    mkTosLinkTrackAttrs,
+} from '@/analytics/run';
 
 export const ToS = () => {
     const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
@@ -11,21 +18,31 @@ export const ToS = () => {
     return (
         <>
             <TosWrapper>
-                <Link onClick={() => setIsDisclaimerOpen(true)}>Disclaimer</Link>
-                <Link onClick={() => setIsAttributionOpen(true)}>Attribution</Link>
+                <Link onClick={() => setIsDisclaimerOpen(true)} {...mkDisclaimerBtnTrackAttrs()}>
+                    Disclaimer
+                </Link>
+                <Link onClick={() => setIsAttributionOpen(true)} {...mkAttributionBtnTrackAttrs()}>
+                    Attribution
+                </Link>
                 <Link
                     href="https://allenai.org/privacy-policy"
                     target="_blank"
-                    rel="noopener noreferrer">
+                    rel="noopener noreferrer"
+                    {...mkPrivacyLinkTrackAttrs()}>
                     Privacy Policy
                 </Link>
-                <Link href="https://allenai.org/terms" target="_blank" rel="noopener noreferrer">
+                <Link
+                    href="https://allenai.org/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    {...mkTosLinkTrackAttrs()}>
                     Terms of Use
                 </Link>
                 <Link
                     href="https://allenai.org/responsible-use"
                     target="_blank"
-                    rel="noopener noreferrer">
+                    rel="noopener noreferrer"
+                    {...mkResponsibleUseLinkTrackAttrs()}>
                     Responsible Use
                 </Link>
             </TosWrapper>

@@ -141,97 +141,86 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async listRuns(options?: { userid?: string }) {
+    async listRuns({ userid, limit }: { userid?: string; limit?: number } = {}) {
+        const effectiveUserid = userid ?? (await this.getUserId());
+
         const query: Record<string, string> = {};
-        if (options?.userid) {
-            query.userid = options.userid;
+        if (limit) {
+            query.limit = limit.toString();
         }
         return this.request<GetViewerRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/list`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/list`,
             method: 'GET',
             query,
         });
     }
 
-    async getRunMetadata(runid: string, options?: { userid?: string }) {
-        const query: Record<string, string> = {};
-        if (options?.userid) {
-            query.userid = options.userid;
-        }
+    async getRunMetadata({ userid, runid }: { userid?: string; runid: string }) {
+        const effectiveUserid = userid ?? (await this.getUserId());
+
         return this.request<GetRunMetadataResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/metadata`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
-            query,
         });
     }
 
     async getRunExperiments({
+        userid,
         runid,
         afterExperimentId,
-        userid,
     }: {
+        userid?: string;
         runid: string;
         afterExperimentId?: string;
-        userid?: string;
     }) {
+        const effectiveUserid = userid ?? (await this.getUserId());
+
         const query: Record<string, string> = {};
         if (afterExperimentId) {
             query.after_experiment_id = afterExperimentId;
         }
-        if (userid) {
-            query.userid = userid;
-        }
 
         return this.request<GetRunExperimentsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/experiments`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments`,
             method: 'GET',
             query,
         });
     }
 
     async getRunExperimentDetails({
+        userid,
         runid,
         experimentId,
-        userid,
     }: {
+        userid?: string;
         runid: string;
         experimentId: string;
-        userid?: string;
     }) {
-        const query: Record<string, string> = {};
-        if (userid) {
-            query.userid = userid;
-        }
+        const effectiveUserid = userid ?? (await this.getUserId());
+
         return this.request<GetRunExperimentDetailsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,
             method: 'GET',
-            query,
         });
     }
 
-    async getRun(runId: string, options?: { userid?: string }) {
-        const query: Record<string, string> = {};
-        if (options?.userid) {
-            query.userid = options.userid;
-        }
+    async getRun({ userid, runId }: { userid?: string; runId: string }) {
+        const effectiveUserid = userid ?? (await this.getUserId());
+
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${runId}`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}`,
             method: 'GET',
-            query,
         });
     }
 
-    async getRunStatus(runId: string, options?: { userid?: string }) {
-        const query: Record<string, string> = {};
-        if (options?.userid) {
-            query.userid = options.userid;
-        }
+    async getRunStatus({ userid, runId }: { userid?: string; runId: string }) {
+        const effectiveUserid = userid ?? (await this.getUserId());
+
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${runId}/status`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}/status`,
             method: 'GET',
-            query,
         });
     }
 

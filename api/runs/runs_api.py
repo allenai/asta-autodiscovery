@@ -164,30 +164,13 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    def _get_userid_for_read(allow_public: bool = True) -> tuple[str | None, tuple | None]:
-        """Get the user ID to use for read operations.
-
-        Checks for a 'userid' query parameter. If provided and the user is in PUBLIC_USERS,
-        returns that user ID. Otherwise, returns the authenticated user's ID.
-
-        Args:
-            allow_public: Whether to allow public user access (default True)
+    def _get_userid_for_read() -> tuple[str | None, tuple | None]:
+        """Get the authenticated user's ID from JWT token.
 
         Returns:
             Tuple of (userid, error_response). If error_response is not None,
             it should be returned directly from the endpoint.
         """
-        userid_param = request.args.get("userid")
-        if userid_param:
-            if not allow_public or userid_param not in PUBLIC_USERS:
-                return None, (
-                    jsonify(
-                        {"error": f"Access denied. Cannot query runs for userid: {userid_param}"}
-                    ),
-                    403,
-                )
-            return userid_param, None
-
         userid = request.user.get("sub")
         if not userid:
             return None, (jsonify({"error": "User ID not found in token"}), 401)
@@ -208,22 +191,27 @@ def create() -> Blueprint:
             pass
         return None, None
 
-    @api.route("/list", methods=["GET"])
+    @api.route("/<userid>/list", methods=["GET"])
     @requires_enrollment
-    def list_runs():
-        """List runs for a user.
+    def list_runs(userid: str):
+        """List runs for a specific user.
+
+        Args:
+            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
 
         Query Parameters:
-            userid: Optional user ID to query. If not provided, uses the authenticated user.
-                  Only users in PUBLIC_USERS can be queried by others.
             limit: Maximum number of runs to return (default: 1000)
 
         Returns:
             JSON response containing run metadata, details, and stats.
         """
-        userid, error = _get_userid_for_read()
+        token_userid, error = _get_userid_for_read()
         if error:
             return error
+
+        # Validate access: either viewing own data or viewing public user
+        if userid != token_userid and userid not in PUBLIC_USERS:
+            return jsonify({"error": "User cannot view other user's data"}), 403
 
         req = GetViewerRunsRequestModel(
             limit=int(request.args.get("limit", 1000)),
@@ -313,23 +301,25 @@ def create() -> Blueprint:
         )
         return jsonify(resp.model_dump()), 200
 
-    @api.route("/<runid>")
+    @api.route("/<userid>/<runid>")
     @requires_enrollment
-    def get_run(runid: str):
+    def get_run(userid: str, runid: str):
         """Get details for a specific run.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
             runid: Run identifier.
-
-        Query Parameters:
-            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
 
         Returns:
             JSON response with run details as RunModel.
         """
-        userid, error = _get_userid_for_read()
+        token_userid, error = _get_userid_for_read()
         if error:
             return error
+
+        # Validate access: either viewing own data or viewing public user
+        if userid != token_userid and userid not in PUBLIC_USERS:
+            return jsonify({"error": "User cannot view other user's data"}), 403
 
         req = GetRunRequestModel(runid=runid, userid=userid)
 
@@ -628,22 +618,22 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to save metadata: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("<runid>/metadata", methods=["GET"])
+    @api.route("<userid>/<runid>/metadata", methods=["GET"])
     @requires_enrollment
-    def get_run_metadata(runid: str):
+    def get_run_metadata(userid: str, runid: str):
         """Fetch metadata for a specific run.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
             runid: Run identifier
-
-        Query Parameters:
-            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
-        userid, error = _get_userid_for_read()
+        token_userid, error = _get_userid_for_read()
         if error:
             return error
-        if not userid:
-            return jsonify({"error": "User ID not found"}), 401
+
+        # Validate access: either viewing own data or viewing public user
+        if userid != token_userid and userid not in PUBLIC_USERS:
+            return jsonify({"error": "User cannot view other user's data"}), 403
 
         # Check if run is deleted
         error_response, status_code = _check_run_not_deleted(userid, runid)
@@ -803,27 +793,27 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/status")
+    @api.route("/<userid>/<runid>/status")
     @requires_enrollment
-    def get_run_status(runid: str):
+    def get_run_status(userid: str, runid: str):
         """Get the current status of a run.
 
         Checks the Cloud Run execution status and updates run_details.json.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
             runid: Run identifier
-
-        Query Parameters:
-            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
 
         Returns:
             JSON response with run status details
         """
-        userid, error = _get_userid_for_read()
+        token_userid, error = _get_userid_for_read()
         if error:
             return error
-        if not userid:
-            return jsonify({"error": "User ID not found"}), 401
+
+        # Validate access: either viewing own data or viewing public user
+        if userid != token_userid and userid not in PUBLIC_USERS:
+            return jsonify({"error": "User cannot view other user's data"}), 403
 
         req = GetRunStatusRequestModel(runid=runid, userid=userid)
 
@@ -853,24 +843,26 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/experiments", methods=["GET"])
+    @api.route("/<userid>/<runid>/experiments", methods=["GET"])
     @requires_enrollment
-    def get_run_experiments(runid: str):
+    def get_run_experiments(userid: str, runid: str):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
             runid: Run identifier
 
         Query Parameters:
             after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
-            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
         """
-        userid, error = _get_userid_for_read()
+        token_userid, error = _get_userid_for_read()
         if error:
             return error
-        if not userid:
-            return jsonify({"error": "User ID not found"}), 401
+
+        # Validate access: either viewing own data or viewing public user
+        if userid != token_userid and userid not in PUBLIC_USERS:
+            return jsonify({"error": "User cannot view other user's data"}), 403
 
         # Check if run is deleted
         error_response, status_code = _check_run_not_deleted(userid, runid)
@@ -897,19 +889,23 @@ def create() -> Blueprint:
         )
         return jsonify(resp.model_dump()), 200
 
-    @api.route("/<runid>/experiments/<experiment_id>", methods=["GET"])
+    @api.route("/<userid>/<runid>/experiments/<experiment_id>", methods=["GET"])
     @requires_enrollment
-    def get_run_experiment_details(runid: str, experiment_id: str):
+    def get_run_experiment_details(userid: str, runid: str, experiment_id: str):
         """Fetch details about a specific experiment within a run.
 
-        Query Parameters:
-            userid: Optional user ID to query. Only users in PUBLIC_USERS can be queried by others.
+        Args:
+            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
+            runid: Run identifier
+            experiment_id: Experiment identifier
         """
-        userid, error = _get_userid_for_read()
+        token_userid, error = _get_userid_for_read()
         if error:
             return error
-        if not userid:
-            return jsonify({"error": "User ID not found"}), 401
+
+        # Validate access: either viewing own data or viewing public user
+        if userid != token_userid and userid not in PUBLIC_USERS:
+            return jsonify({"error": "User cannot view other user's data"}), 403
 
         # Check if run is deleted
         error_response, status_code = _check_run_not_deleted(userid, runid)

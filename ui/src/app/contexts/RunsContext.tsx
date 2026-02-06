@@ -90,6 +90,7 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     const updateViewerRuns = useCallback(async () => {
         setIsViewerRunsLoading(true);
         try {
+            // No userid needed - API will use authenticated user
             const { data } = await runsApi.listRuns();
             const runs = data.runs.map((runData) => getRunFromApi(runData));
             setViewerRuns(runs);

@@ -42,7 +42,8 @@ export default function RunPage({ params }: RunPageProps) {
             setError(null);
 
             try {
-                const response = await api.getRun(runId);
+                // No userid needed - API will use authenticated user
+                const response = await api.getRun({ runId });
                 const run = getRunFromApi(response.data);
 
                 // Check if run has been submitted

@@ -29,7 +29,6 @@ import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsCo
 import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
-import { useAuth0 } from '@/contexts/Auth0Context';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -53,7 +52,6 @@ interface RunStatusProps {
  */
 export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusProps) {
     const api = getRunsApi();
-    const { user: authUser } = useAuth0();
 
     const [run, setRun] = useState<Run | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +65,8 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
         setError(null);
 
         try {
-            const response = await api.getRun(runid, { userid });
+            // Pass userid (can be undefined for authenticated user's own runs)
+            const response = await api.getRun({ userid, runId: runid });
             const run = getRunFromApi(response.data);
 
             setRun(run);
@@ -131,8 +130,8 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
         }
     };
 
-    // Run is read-only if it belongs to a different user
-    const isReadOnly = run ? run.userid !== authUser?.sub : false;
+    // Run is read-only if viewing another user's run (userid prop is provided)
+    const isReadOnly = !!userid;
     const canStop = !isReadOnly && run?.details?.status === 'RUNNING';
     const experimentsLabel = run?.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments';
 

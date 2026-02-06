@@ -59,7 +59,7 @@ export const useRunExperiments = (): RunExperimentsState => {
 
 export type RunExperimentsProps = PropsWithChildren<{
     runid: string | null;
-    /** Optional user ID for viewing public runs (e.g., "samples") */
+    /** Optional user ID for viewing public runs (e.g., "samples"). Defaults to authenticated user. */
     userid?: string;
     autoStart?: boolean;
     refreshIntervalMs?: number;
@@ -117,9 +117,9 @@ export const RunExperimentsProvider = ({
 
             runsApi
                 .getRunExperimentDetails({
+                    userid,
                     runid,
                     experimentId: experiment.experimentId,
-                    userid,
                 })
                 .then(({ data }) => {
                     if (selectedExperimentRequestId.current !== requestId) {
@@ -184,9 +184,9 @@ export const RunExperimentsProvider = ({
             try {
                 setIsLoading(true);
                 const { data } = await runsApi.getRunExperiments({
+                    userid,
                     runid,
                     afterExperimentId: afterExperimentId.current ?? undefined,
-                    userid,
                 });
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
                 if (newExperiments.length > 0) {

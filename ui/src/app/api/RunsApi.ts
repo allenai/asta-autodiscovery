@@ -28,6 +28,8 @@ export interface RunMetadataFromApi {
         content_type: string | null;
         file_size_bytes: number | null;
     }[];
+    // Sharing
+    is_shared?: boolean | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -120,6 +122,8 @@ export interface MetadataFromApi {
     domain: string | null;
     intent: string | null;
     datasets: MetadataDatasetFromApi[];
+    // Sharing
+    is_shared?: boolean | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -287,6 +291,14 @@ export class RunsApi extends BaseApi {
         return this.request<{ message: string }>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}`,
             method: 'DELETE',
+        });
+    }
+
+    async shareRun(runId: string, isShared: boolean) {
+        return this.request<{ is_shared: boolean; message: string }>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/share`,
+            method: 'POST',
+            body: { is_shared: isShared },
         });
     }
 }

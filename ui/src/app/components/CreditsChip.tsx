@@ -5,6 +5,7 @@ import { Chip, Popover, styled } from '@mui/material';
 import Link from 'next/link';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
+import { mkCreditsBtnTrackAttrs } from '@/analytics/run';
 
 export default function CreditsChip() {
     const { credits, lastError } = useViewerCredits();
@@ -29,6 +30,7 @@ export default function CreditsChip() {
                     </span>
                 }
                 onClick={() => setIsOpen(!isOpen)}
+                {...mkCreditsBtnTrackAttrs()}
             />
             <Popover
                 open={isOpen}

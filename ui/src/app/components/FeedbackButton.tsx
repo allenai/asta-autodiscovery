@@ -1,13 +1,16 @@
 import { Button, styled } from '@mui/material';
 import Link from 'next/link';
 
+import { mkFeedbackBtnTrackAttrs } from '@/analytics/run';
+
 export const FeedbackButton = () => {
     return (
         <Link
             href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
             passHref
             target="_blank"
-            rel="noopener noreferrer">
+            rel="noopener noreferrer"
+            {...mkFeedbackBtnTrackAttrs()}>
             <StyledButton variant="outlined">Feedback</StyledButton>
         </Link>
     );

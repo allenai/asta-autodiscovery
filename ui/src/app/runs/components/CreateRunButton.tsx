@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getRunFromApi } from '@/types/Run';
 import { useRuns } from '@/contexts/RunsContext';
 import { getRunsApi } from '@/api/RunsApi';
+import { mkCreateNewRunBtnAttrs } from '@/analytics/run';
 
 export const CreateRunButton = () => {
     const router = useRouter();
@@ -47,7 +48,8 @@ export const CreateRunButton = () => {
                 fullWidth
                 startIcon={isCreating ? <CircularProgress size={16} /> : <StyledAddBoxIcon />}
                 onClick={handleCreateRun}
-                disabled={isCreating}>
+                disabled={isCreating}
+                {...mkCreateNewRunBtnAttrs()}>
                 {isCreating ? 'Creating...' : 'New discovery session'}
             </StyledButton>
             {error && (

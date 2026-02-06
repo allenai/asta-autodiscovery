@@ -29,6 +29,10 @@ import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsCo
 import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
+import {
+    mkCloseExperimentDetailsPanelAttrs,
+    mkSessionConfigBtnAttrs,
+} from '@/analytics/runDetails';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -311,7 +315,8 @@ function RunStatusContent({
                                 <ParametersButton
                                     variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}
-                                    onClick={() => setIsParametersModalOpen(true)}>
+                                    onClick={() => setIsParametersModalOpen(true)}
+                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
                                 </ParametersButton>
                                 {canStop && (
@@ -352,7 +357,8 @@ function RunStatusContent({
                             </LargeScreenAction>
                             <DetailsActionButton
                                 onClick={() => selectExperiment(null)}
-                                size="small">
+                                size="small"
+                                {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />
                             </DetailsActionButton>
                         </DetailsActions>

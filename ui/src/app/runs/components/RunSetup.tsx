@@ -24,6 +24,7 @@ import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFil
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
 import DatasetUpload from '@/runs/components/DatasetUpload';
+import { mkExpandAdvancedSettingsTrackAttrs, mkSubmitRunBtnTrackAttrs } from '@/analytics/runSetup';
 
 const DEBOUNCE_SAVE_MS = 3000;
 
@@ -201,7 +202,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     <AccordionSummary
                         expandIcon={<ExpandMoreIcon />}
                         aria-controls="panel1-content"
-                        id="panel1-header">
+                        id="panel1-header"
+                        {...mkExpandAdvancedSettingsTrackAttrs({ runId: runid })}>
                         <Typography component="span">Advanced settings</Typography>
                     </AccordionSummary>
 
@@ -334,7 +336,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     )
                 }
                 onClick={handleSubmit}
-                disabled={isFormDisabled || Object.keys(fieldErrors).length > 0}>
+                disabled={isFormDisabled || Object.keys(fieldErrors).length > 0}
+                {...mkSubmitRunBtnTrackAttrs({ runId: runid })}>
                 {isSubmitting ? 'Starting...' : 'Start Run'}
             </SubmitButton>
 

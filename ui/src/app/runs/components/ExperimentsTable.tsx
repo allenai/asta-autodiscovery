@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
-import { mkExperimentRowAttrs } from '@/analytics/runDetails';
+import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
+import { track } from '@/analytics/track';
 
 const DEFAULT_COLUMNS: GridColDef[] = [
     {
@@ -133,6 +134,20 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         }
     }, [hasJobCompleted]);
 
+    const handleSortModelChange = useCallback((newSortModel: GridSortModel) => {
+        setSortModel(newSortModel);
+        // Track sorting event
+        if (newSortModel.length > 0) {
+            const { field, sort } = newSortModel[0];
+            if (sort) {
+                track(sortColumnEventName, {
+                    columnName: field,
+                    direction: sort,
+                });
+            }
+        }
+    }, []);
+
     const createSkeletonRows = useCallback(() => {
         const pendingCount = runStats?.pendingExperiments ?? 0;
         if (!hasJobCompleted && pendingCount > 0) {
@@ -218,7 +233,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
                 sortModel={sortModel}
-                onSortModelChange={setSortModel}
+                onSortModelChange={handleSortModelChange}
                 getRowHeight={() => 'auto'}
                 rowSelection={false}
                 slotProps={{

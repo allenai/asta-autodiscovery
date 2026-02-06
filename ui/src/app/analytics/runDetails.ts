@@ -13,3 +13,6 @@ export const mkSessionConfigBtnAttrs = (props: { runId: string }) =>
 // Close experiments details panel
 export const mkCloseExperimentDetailsPanelAttrs = (props: { runId: string }) =>
     mkTrackAttrs(`${RUN_DETAILS}__close_experiment_details_panel`, props);
+
+// Sort column event name
+export const sortColumnEventName = `${RUN_DETAILS}__sort_column` as const;

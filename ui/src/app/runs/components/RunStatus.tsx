@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import {
     Box,
     Button,
@@ -20,6 +20,7 @@ import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Run, getRunFromApi } from '@/types/Run';
@@ -192,6 +193,7 @@ function RunStatusContent({
     handleStop,
     experimentsLabel,
 }: RunStatusContentProps) {
+    const runsApi = getRunsApi();
     const {
         experiments,
         selectedExperiment,
@@ -201,12 +203,40 @@ function RunStatusContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isTableExpanded, setIsTableExpanded] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+    const [isSharedState, setIsSharedState] = useState(run.metadata?.isShared ?? false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
     const expParam = useSearchValue('exp');
     const hasInitiallySelected = useRef(false);
+
+    const onShareClick = useCallback(
+        async (event: React.MouseEvent<HTMLButtonElement>) => {
+            event.preventDefault();
+            const newIsShared = !isSharedState;
+            setIsSharedState(newIsShared);
+
+            const shareUrl = `${window.location.origin}/runs/${run.id}/share`;
+            const sharePromise = navigator.clipboard.writeText(shareUrl);
+
+            const apiPromise = runsApi.shareRun({
+                runId: run.id,
+                isShared: newIsShared,
+            });
+
+            // TODO: Show UI with URL
+
+            try {
+                await Promise.all([sharePromise, apiPromise]);
+            } catch (err) {
+                // TODO: Report error in a toast notification
+                console.error('Error sharing run:', err);
+                setIsSharedState(!newIsShared); // Revert view
+            }
+        },
+        [isSharedState, run.id]
+    );
 
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
@@ -318,6 +348,12 @@ function RunStatusContent({
                                 </ExperimentCount>
                             )}
                             <RunToolbarButtons>
+                                <ParametersButton
+                                    variant="outlined"
+                                    startIcon={<ShareOutlinedIcon />}
+                                    onClick={onShareClick}>
+                                    {isSharedState ? 'Unshare Run' : 'Share Run'}
+                                </ParametersButton>
                                 <ParametersButton
                                     variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}

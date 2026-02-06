@@ -139,6 +139,11 @@ export interface GetRunMetadataResponseBody {
     metadata: MetadataFromApi;
 }
 
+export interface ShareRunResponseBody {
+    runid: string;
+    is_shared: boolean;
+}
+
 export class RunsApi extends BaseApi {
     async createRun() {
         return this.request<RunResponseBody>({
@@ -294,8 +299,8 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async shareRun(runId: string, isShared: boolean) {
-        return this.request<{ is_shared: boolean; message: string }>({
+    async shareRun({ runId, isShared }: { runId: string; isShared: boolean }) {
+        return this.request<ShareRunResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/share`,
             method: 'POST',
             body: { is_shared: isShared },

@@ -5,6 +5,24 @@ const DEFAULT_HEADERS = {
 } as const;
 
 export class BaseApi {
+    /**
+     * Get the current authenticated user's ID from Auth0.
+     * Returns null if not authenticated or if user data is not available.
+     */
+    protected getUserId = async (): Promise<string | null> => {
+        if (!auth0Client) {
+            return null;
+        }
+
+        try {
+            const user = await auth0Client.getUser();
+            return user?.sub ?? null;
+        } catch (error) {
+            console.error('Error getting user ID:', error);
+            return null;
+        }
+    };
+
     protected createDefaultHeaders = async (): Promise<{
         'Content-Type': string;
         Authorization?: string;

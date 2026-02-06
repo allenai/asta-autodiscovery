@@ -122,7 +122,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         const fetchRunMetadata = async () => {
             setIsLoading(true);
             try {
-                const { data } = await api.getRun(runid);
+                // No userid needed - API will use authenticated user
+                const { data } = await api.getRun({ runId: runid });
                 const { metadata } = getRunFromApi(data);
 
                 if (metadata) {

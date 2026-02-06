@@ -23,6 +23,11 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    CancelRunRequestModel,
+    CancelRunResponseModel,
+    CreateRunResponseModel,
+    DeleteRunRequestModel,
+    DeleteRunResponseModel,
     ExperimentModel,
     GenerateUploadUrlRequestModel,
     GenerateUploadUrlResponseModel,
@@ -30,12 +35,20 @@ from runs.models import (
     GetRunExperimentsResponseModel,
     GetRunMetadataRequestModel,
     GetRunMetadataResponseModel,
+    GetRunRequestModel,
+    GetRunStatusRequestModel,
+    GetRunStatusResponseModel,
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
     MetadataModel,
     RunDetailsModel,
     RunModel,
     RunStatsModel,
+    SaveMetadataRequestModel,
+    SaveMetadataResponseModel,
+    SubmitRunRequestModel,
+    SubmitRunResponseModel,
+    UploadDatasetResponseModel,
 )
 
 # Import autodiscovery_jobs when available
@@ -137,14 +150,13 @@ def create() -> Blueprint:
             # Create run_details.json
             run_details = create_run_details(userid, runid)
 
-            return jsonify(
-                {
-                    "runid": runid,
-                    "path": path,
-                    "message": "Run created successfully",
-                    "run_details": run_details.to_dict(),
-                }
+            resp = CreateRunResponseModel(
+                runid=runid,
+                path=path,
+                message="Run created successfully",
+                run_details=RunDetailsModel(**run_details.to_dict()),
             )
+            return jsonify(resp.model_dump()), 200
         except JobAlreadyExistsError as e:
             # This should be extremely rare with UUIDs
             return jsonify({"error": str(e)}), 409
@@ -319,34 +331,36 @@ def create() -> Blueprint:
         if error:
             return error
 
+        req = GetRunRequestModel(runid=runid, userid=userid)
+
         try:
             manager = get_job_manager()
-            exists = manager.job_exists(userid, runid)
+            exists = manager.job_exists(req.userid, req.runid)
 
             if not exists:
                 return jsonify({"error": "Run not found"}), 404
 
             # Get run details with refreshed status from Cloud Run
-            path = manager.get_job_path(userid, runid)
+            path = manager.get_job_path(req.userid, req.runid)
 
             try:
-                run_details = refresh_run_status(userid, runid)
+                run_details = refresh_run_status(req.userid, req.runid)
             except Exception as e:
-                current_app.logger.error(f"Failed to refresh run status for {runid}: {e}")
-                run_details = get_run_details(userid, runid)
+                current_app.logger.error(f"Failed to refresh run status for {req.runid}: {e}")
+                run_details = get_run_details(req.userid, req.runid)
 
             # Get job stats
             try:
-                job_stats = get_job_stats(userid=userid, jobid=runid, config=manager.config)
+                job_stats = get_job_stats(userid=req.userid, jobid=req.runid, config=manager.config)
             except Exception as e:
-                current_app.logger.error(f"Failed to get job stats for {runid}: {e}")
+                current_app.logger.error(f"Failed to get job stats for {req.runid}: {e}")
                 job_stats = None
 
             # Get metadata
             try:
-                metadata_dict = manager.get_metadata(userid, runid)
+                metadata_dict = manager.get_metadata(req.userid, req.runid)
             except Exception as e:
-                current_app.logger.error(f"Failed to get metadata for {runid}: {e}")
+                current_app.logger.error(f"Failed to get metadata for {req.runid}: {e}")
                 metadata_dict = None
 
             # Build RunModel
@@ -365,10 +379,10 @@ def create() -> Blueprint:
             ) if job_stats else None
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
             run_model = RunModel(
-                runid=runid,
-                userid=userid,
+                runid=req.runid,
+                userid=req.userid,
                 status=run_details.status if run_details else "UNKNOWN",
-                name=run_metadata_model.name if run_metadata_model else f"Run {runid}",
+                name=run_metadata_model.name if run_metadata_model else f"Run {req.runid}",
                 description=run_metadata_model.description if run_metadata_model else None,
                 path=path,
                 run_stats=run_stats_model,
@@ -406,18 +420,21 @@ def create() -> Blueprint:
         if not userid:
             return jsonify({"error": "User ID not found in token"}), 401
 
+        req = DeleteRunRequestModel(runid=runid, userid=userid)
+
         try:
             manager = get_job_manager()
-            result = manager.soft_delete_job(userid, runid)
+            result = manager.soft_delete_job(req.userid, req.runid)
 
-            return jsonify({
-                "message": "Run deleted successfully",
-                "deleted_files_count": len(result["deleted_files"]),
-                "preserved_files_count": result["preserved_files"],
-                "status": result["status"],
-                "deleted_at": result["deleted_at"],
-                "cancelled_execution": result.get("cancelled_execution", False)
-            })
+            resp = DeleteRunResponseModel(
+                message="Run deleted successfully",
+                deleted_files_count=len(result["deleted_files"]),
+                preserved_files_count=result["preserved_files"],
+                status=result["status"],
+                deleted_at=result["deleted_at"],
+                cancelled_execution=result.get("cancelled_execution", False),
+            )
+            return jsonify(resp.model_dump()), 200
 
         except JobNotFoundError as e:
             return jsonify({"error": str(e)}), 404
@@ -469,13 +486,12 @@ def create() -> Blueprint:
             try:
                 # Upload to GCS with original filename
                 path = manager.upload_dataset(userid, runid, tmp_path, remote_name=file.filename)
-                return jsonify(
-                    {
-                        "path": path,
-                        "filename": file.filename,
-                        "message": "Dataset uploaded successfully",
-                    }
+                resp = UploadDatasetResponseModel(
+                    path=path,
+                    filename=file.filename,
+                    message="Dataset uploaded successfully",
                 )
+                return jsonify(resp.model_dump()), 200
             finally:
                 # Clean up temp file
                 if tmp_path.exists():
@@ -586,15 +602,28 @@ def create() -> Blueprint:
         if not data:
             raise BadRequest("No request body")
 
-        metadata = data.get("metadata")
+        metadata_data = data.get("metadata")
 
-        if not metadata:
+        if not metadata_data:
             raise BadRequest("metadata is required")
 
         try:
+            req = SaveMetadataRequestModel(
+                runid=runid,
+                userid=userid,
+                metadata=MetadataModel.from_dict(metadata_data),
+            )
+        except Exception as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        try:
             manager = get_job_manager()
-            path = manager.upload_metadata(userid, runid, metadata)
-            return jsonify({"path": path, "message": "Metadata saved successfully"})
+            path = manager.upload_metadata(req.userid, req.runid, req.metadata.model_dump())
+            resp = SaveMetadataResponseModel(
+                path=path,
+                message="Metadata saved successfully",
+            )
+            return jsonify(resp.model_dump()), 200
         except Exception as e:
             current_app.logger.error(f"Failed to save metadata: {e}")
             return jsonify({"error": str(e)}), 500
@@ -663,15 +692,17 @@ def create() -> Blueprint:
         if not data:
             raise BadRequest("No request body")
 
-        runid = data.get("runid")
-        if not runid:
+        runid_data = data.get("runid")
+        if not runid_data:
             raise BadRequest("runid is required")
+
+        req = SubmitRunRequestModel(runid=runid_data, userid=userid)
 
         try:
             manager = get_job_manager()
 
             # Read job configuration from metadata
-            metadata = manager.get_metadata(userid, runid)
+            metadata = manager.get_metadata(req.userid, req.runid)
             if not metadata:
                 raise BadRequest("Run metadata not found. Please save run configuration first.")
 
@@ -683,13 +714,13 @@ def create() -> Blueprint:
 
             if is_simulated:
                 # Run replay job instead of actual AutoDiscovery job
-                current_app.logger.info(f"Running replay job for {userid}/{runid}")
+                current_app.logger.info(f"Running replay job for {req.userid}/{req.runid}")
 
                 from utils.dev import run_simulated_job
 
                 execution_id = run_simulated_job(
-                    userid=userid,
-                    jobid=runid,
+                    userid=req.userid,
+                    jobid=req.runid,
                     bucket=manager.config.bucket,
                     project_id=manager.config.project_id,
                     region=manager.config.region,
@@ -700,7 +731,7 @@ def create() -> Blueprint:
 
                 # Validate experiment count and sufficient credits before submission
                 check_experiment_limits(
-                    n_experiments=n_experiments, userid=userid, config=manager.config
+                    n_experiments=n_experiments, userid=req.userid, config=manager.config
                 )
 
                 # Build job parameters from metadata
@@ -724,15 +755,15 @@ def create() -> Blueprint:
                     if value is not None and value != "":
                         job_params[param] = value
 
-                execution_id = manager.run_job(userid, runid, **job_params)
+                execution_id = manager.run_job(req.userid, req.runid, **job_params)
 
             # Capture origin URL for email links (e.g., localhost vs production)
             origin_url = request.headers.get("Origin")
 
             # Update run_details.json with execution_id and status
             update_run_details(
-                userid,
-                runid,
+                req.userid,
+                req.runid,
                 {
                     "execution_id": execution_id,
                     "status": "RUNNING",
@@ -742,13 +773,16 @@ def create() -> Blueprint:
             )
 
             # Get updated run_details to return to frontend
-            run_details = get_run_details(userid, runid)
+            run_details = get_run_details(req.userid, req.runid)
+            if not run_details:
+                return jsonify({"error": "Failed to retrieve run details after submission"}), 500
 
-            return jsonify({
-                "execution_id": execution_id,
-                "message": "Run submitted successfully",
-                "run_details": run_details,
-            })
+            resp = SubmitRunResponseModel(
+                execution_id=execution_id,
+                message="Run submitted successfully",
+                run_details=RunDetailsModel(**run_details.to_dict()),
+            )
+            return jsonify(resp.model_dump()), 200
 
         except InvalidExperimentCountError as e:
             return jsonify(
@@ -788,28 +822,33 @@ def create() -> Blueprint:
         userid, error = _get_userid_for_read()
         if error:
             return error
+        if not userid:
+            return jsonify({"error": "User ID not found"}), 401
+
+        req = GetRunStatusRequestModel(runid=runid, userid=userid)
 
         try:
             # Get run details with refreshed status
-            run_details = refresh_run_status(userid, runid)
+            run_details = refresh_run_status(req.userid, req.runid)
             if not run_details:
                 return jsonify({"error": "Run details not found"}), 404
 
-            response = {
-                "runid": runid,
-                "run_details": run_details.to_dict(),
-            }
+            execution_status = None
 
             # If run has an execution_id, also fetch detailed Cloud Run status
             if run_details.execution_id:
                 manager = get_job_manager()
                 try:
                     execution_status = manager.get_job_status(run_details.execution_id)
-                    response["execution_status"] = execution_status
                 except Exception as e:
                     current_app.logger.warning(f"Failed to get execution status: {e}")
 
-            return jsonify(response)
+            resp = GetRunStatusResponseModel(
+                runid=req.runid,
+                run_details=RunDetailsModel(**run_details.to_dict()),
+                execution_status=execution_status,
+            )
+            return jsonify(resp.model_dump()), 200
         except Exception as e:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
@@ -924,11 +963,13 @@ def create() -> Blueprint:
         if not userid:
             return jsonify({"error": "User ID not found in token"}), 401
 
+        req = CancelRunRequestModel(runid=runid, userid=userid)
+
         try:
             manager = get_job_manager()
 
             # Get run details
-            run_details = get_run_details(userid, runid)
+            run_details = get_run_details(req.userid, req.runid)
             if not run_details:
                 return jsonify({"error": "Run details not found"}), 404
 
@@ -940,15 +981,16 @@ def create() -> Blueprint:
 
             # Update run_details
             update_run_details(
-                userid,
-                runid,
+                req.userid,
+                req.runid,
                 {
                     "status": "CANCELLED",
                     "status_checked_at": datetime.now(UTC).isoformat(),
                 },
             )
 
-            return jsonify({"message": "Run cancelled successfully"})
+            resp = CancelRunResponseModel(message="Run cancelled successfully")
+            return jsonify(resp.model_dump()), 200
 
         except Exception as e:
             current_app.logger.error(f"Failed to cancel run: {e}")

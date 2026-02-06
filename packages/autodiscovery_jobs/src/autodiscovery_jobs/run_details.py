@@ -18,7 +18,7 @@ from .config import JobConfig
 
 
 # Terminal statuses that indicate job completion
-TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED"}
+TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 
 
 @dataclass
@@ -28,7 +28,7 @@ class RunDetails:
     Attributes:
         execution_id: Cloud Run execution ID
         created_at: ISO timestamp when run was created
-        status: CREATED, PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED
+        status: CREATED, PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED, DELETED
         status_checked_at: ISO timestamp of last status check
         finished_at_raw: ISO timestamp when job finished (terminal status)
         origin_url: Base URL where the run was submitted from (e.g., https://asta.allenai.org)

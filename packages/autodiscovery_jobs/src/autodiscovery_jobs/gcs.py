@@ -244,6 +244,87 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
         raise GCSError(f"Failed to delete job directory: {e}")
 
 
+def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
+    """Soft delete a job by removing user data but preserving results and metadata.
+
+    This function:
+    1. Deletes all files in data/ directory except .placeholder files
+    2. Updates run_details.json to mark status as DELETED with timestamp
+    3. Preserves metadata.json, run_details.json, and all output/ files
+
+    This operation is idempotent - can be called multiple times safely.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Dictionary with keys:
+        - deleted_files: List of GCS paths that were deleted
+        - preserved_files: Count of preserved files
+        - status: "DELETED"
+        - deleted_at: ISO timestamp
+
+    Raises:
+        JobNotFoundError: If job doesn't exist
+        GCSError: If deletion or status update fails
+    """
+    from datetime import UTC, datetime
+
+    config = config or JobConfig()
+
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    # Delete all files in data/ directory except .placeholder
+    data_prefix = f"users/{userid}/jobs/{jobid}/data/"
+    deleted_files = []
+
+    try:
+        blobs = bucket.list_blobs(prefix=data_prefix)
+        for blob in blobs:
+            # Skip placeholder files
+            if blob.name.endswith(".placeholder"):
+                continue
+
+            gcs_path = f"gs://{config.bucket}/{blob.name}"
+            deleted_files.append(gcs_path)
+            blob.delete()
+
+        # Count preserved files (metadata.json, run_details.json, output/*)
+        job_prefix = f"users/{userid}/jobs/{jobid}/"
+        all_blobs = bucket.list_blobs(prefix=job_prefix)
+        preserved_count = sum(1 for _ in all_blobs)
+
+        # Update run_details.json to mark as DELETED
+        from .run_details import update_run_details
+
+        deleted_at = datetime.now(UTC).isoformat()
+        update_run_details(
+            userid,
+            jobid,
+            {
+                "status": "DELETED",
+                "status_checked_at": deleted_at,
+            },
+            config,
+        )
+
+        return {
+            "deleted_files": deleted_files,
+            "preserved_files": preserved_count,
+            "status": "DELETED",
+            "deleted_at": deleted_at,
+        }
+
+    except Exception as e:
+        raise GCSError(f"Failed to soft delete job: {e}")
+
+
 def upload_dataset(
     userid: str,
     jobid: str,

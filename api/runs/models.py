@@ -272,3 +272,114 @@ class GenerateUploadUrlResponseModel(BaseModel):
     expires_at_unix: int = Field(
         ..., description="Unix timestamp (seconds since epoch) when the URL expires"
     )
+
+
+class CreateRunResponseModel(BaseModel):
+    """Model for the response when creating a new run"""
+
+    runid: str = Field(..., description="Unique identifier for the newly created run")
+    path: str = Field(..., description="GCS path where the run is stored")
+    message: str = Field(..., description="Success message")
+    run_details: RunDetailsModel = Field(..., description="Initial run details")
+
+
+class GetRunRequestModel(BaseModel):
+    """Model for the request to get a specific run"""
+
+    runid: str = Field(..., description="Identifier of the run to retrieve")
+    userid: str = Field(..., description="User identifier who owns the run or public user")
+
+
+class DeleteRunRequestModel(BaseModel):
+    """Model for the request to delete a run"""
+
+    runid: str = Field(..., description="Identifier of the run to delete")
+    userid: str = Field(..., description="User identifier who owns the run")
+
+
+class DeleteRunResponseModel(BaseModel):
+    """Model for the response when deleting a run"""
+
+    message: str = Field(..., description="Success message")
+    deleted_files_count: int = Field(
+        ..., description="Number of files deleted from data/ directory"
+    )
+    preserved_files_count: int = Field(
+        ..., description="Number of files preserved (metadata, outputs)"
+    )
+    status: str = Field(..., description="Updated status of the run (DELETED)")
+    deleted_at: str = Field(..., description="ISO timestamp when the run was deleted")
+    cancelled_execution: bool = Field(
+        ...,
+        description="Whether the Cloud Run execution was cancelled (true if job was running)",
+    )
+
+
+class UploadDatasetResponseModel(BaseModel):
+    """Model for the response when uploading a dataset"""
+
+    path: str = Field(..., description="GCS path where the dataset was stored")
+    filename: str = Field(..., description="Name of the uploaded file")
+    message: str = Field(..., description="Success message")
+
+
+class SaveMetadataRequestModel(BaseModel):
+    """Model for the request to save or update run metadata"""
+
+    runid: str = Field(..., description="Identifier of the run to save metadata for")
+    userid: str = Field(..., description="User identifier who owns the run")
+    metadata: MetadataModel = Field(..., description="Metadata to save for the run")
+
+
+class SaveMetadataResponseModel(BaseModel):
+    """Model for the response when saving metadata"""
+
+    path: str = Field(..., description="GCS path where the metadata was stored")
+    message: str = Field(..., description="Success message")
+
+
+class SubmitRunRequestModel(BaseModel):
+    """Model for the request to submit a run for execution"""
+
+    runid: str = Field(..., description="Identifier of the run to submit")
+    userid: str = Field(..., description="User identifier who owns the run")
+
+
+class SubmitRunResponseModel(BaseModel):
+    """Model for the response when submitting a run"""
+
+    execution_id: str = Field(..., description="Cloud Run execution identifier")
+    message: str = Field(..., description="Success message")
+    run_details: RunDetailsModel = Field(
+        ..., description="Updated run details including execution_id"
+    )
+
+
+class GetRunStatusRequestModel(BaseModel):
+    """Model for the request to get run status"""
+
+    runid: str = Field(..., description="Identifier of the run to check status for")
+    userid: str = Field(..., description="User identifier who owns the run or public user")
+
+
+class GetRunStatusResponseModel(BaseModel):
+    """Model for the response containing run status"""
+
+    runid: str = Field(..., description="Identifier of the run")
+    run_details: RunDetailsModel = Field(..., description="Detailed run status information")
+    execution_status: dict[str, Any] | None = Field(
+        None, description="Detailed Cloud Run execution status (if execution_id exists)"
+    )
+
+
+class CancelRunRequestModel(BaseModel):
+    """Model for the request to cancel a running job"""
+
+    runid: str = Field(..., description="Identifier of the run to cancel")
+    userid: str = Field(..., description="User identifier who owns the run")
+
+
+class CancelRunResponseModel(BaseModel):
+    """Model for the response when cancelling a run"""
+
+    message: str = Field(..., description="Success message confirming cancellation")

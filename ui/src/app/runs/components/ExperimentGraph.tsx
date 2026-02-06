@@ -45,14 +45,14 @@ const surprisalColor = (node: D3TreeNode): string => {
     const surprisal = node.belief_change;
 
     if (typeof surprisal !== 'number' || surprisal === null) {
-        return '#94a3b8'; // default gray for nodes without surprisal data
+        return '#384849'; // default dark for nodes without surprisal data
     }
 
     // Calculate intensity where 0.7 = full color, using absolute value
     const intensity = Math.max(0, Math.min(1, Math.abs(surprisal) / 0.7));
 
     // Base color (low surprisal)
-    const baseColor = '#94a3b8';
+    const baseColor = '#384849';
 
     // Target color depends on whether node is surprising
     const targetColor = node.isSurprising ? '#FFA31C' : '#FAF2E9';
@@ -585,7 +585,7 @@ export const ExperimentGraph = () => {
                     </Typography>
                 </LegendItem>
                 <LegendItem>
-                    <LegendCircle style={{ backgroundColor: '#94a3b8' }} />
+                    <LegendCircle style={{ backgroundColor: '#5F6A69' }} />
                     <Typography variant="caption" sx={{ color: '#faf2e9' }}>
                         Low/no surprisal
                     </Typography>

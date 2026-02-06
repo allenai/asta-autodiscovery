@@ -1,3 +1,6 @@
+import { isBrowser } from '@/runs/utils/env';
+import { runWithHeap } from './heapAnalytics';
+
 export const ATTR_TRACK_NAME = 'data-track-name' as const;
 export const ATTR_TRACK_PROPS = 'data-track-props' as const;
 
@@ -30,4 +33,16 @@ export function mkTrackAttrs<TTrackName extends TrackName>(
         attrs[ATTR_TRACK_PROPS] = JSON.stringify(props);
     }
     return attrs;
+}
+
+// Generic tracking function that sends events to various analytics services
+export function track(eventName: string, attrs: Record<string, any>): void {
+    const shouldTrack = isBrowser();
+    if (!shouldTrack) {
+        return;
+    }
+
+    runWithHeap((heap) => {
+        heap.track(eventName, attrs);
+    });
 }

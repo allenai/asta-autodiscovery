@@ -94,7 +94,7 @@ export type Metadata = {
     domain?: string;
     intent?: string;
     // Sharing
-    isShared?: boolean | null;
+    isShared: boolean;
     // Job configuration parameters
     nExperiments?: number | null;
     explorationWeight?: number | null;
@@ -190,7 +190,7 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         domain: metadataFromApi.domain || undefined,
         intent: metadataFromApi.intent || undefined,
         datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
-        isShared: metadataFromApi.is_shared ?? null,
+        isShared: !!metadataFromApi.is_shared,
         // Job configuration parameters
         nExperiments: metadataFromApi.n_experiments,
         explorationWeight: metadataFromApi.exploration_weight,

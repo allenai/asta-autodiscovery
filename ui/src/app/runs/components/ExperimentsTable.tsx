@@ -1,5 +1,11 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams, GridRowSelectionModel, GridSortModel } from '@mui/x-data-grid';
+import {
+    DataGrid,
+    GridColDef,
+    GridRenderCellParams,
+    GridRowSelectionModel,
+    GridSortModel,
+} from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
@@ -125,7 +131,8 @@ interface ExperimentsTableProps {
 }
 
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
-    const { experiments, lastError, selectExperiment, selectedExperiment, hasJobCompleted } = useRunExperiments();
+    const { experiments, lastError, selectExperiment, selectedExperiment, hasJobCompleted } =
+        useRunExperiments();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
     // Apply default Surprisal sort when the session completes.
     useEffect(() => {

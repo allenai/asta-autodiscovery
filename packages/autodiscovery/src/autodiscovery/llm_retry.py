@@ -44,7 +44,7 @@ def load_retry_config() -> RetryConfig:
 
 
 def should_retry_llm_error(exc: Exception) -> bool:
-    """Return True when an exception looks retryable (429/timeout/5xx).
+    """Return True when an exception looks retryable (rate/network/server).
 
     Args:
         exc: The exception to inspect.
@@ -58,6 +58,8 @@ def should_retry_llm_error(exc: Exception) -> bool:
         return True
     if _is_requests_retryable_error(exc):
         return True
+    if _is_urllib3_retryable_error(exc):
+        return True
     status_code = getattr(exc, "status_code", None) or getattr(exc, "http_status", None)
     if status_code == 429 or (status_code is not None and status_code >= 500):
         return True
@@ -66,6 +68,13 @@ def should_retry_llm_error(exc: Exception) -> bool:
         return True
     if "429" in message and (
         "resource exhausted" in message or "too many requests" in message or "rate limit" in message
+    ):
+        return True
+    if (
+        "connection aborted" in message
+        or "remote end closed connection" in message
+        or "connection reset" in message
+        or "connection refused" in message
     ):
         return True
     return "5xx" in message or "server error" in message
@@ -238,12 +247,28 @@ def _is_openai_retryable_error(exc: Exception) -> bool:
 
 def _is_requests_retryable_error(exc: Exception) -> bool:
     try:
-        from requests import HTTPError
+        from requests import ConnectionError, HTTPError, Timeout
     except Exception:
         return False
 
+    if isinstance(exc, (ConnectionError, Timeout)):
+        return True
     if isinstance(exc, HTTPError):
         response = getattr(exc, "response", None)
         status = getattr(response, "status_code", None)
         return status == 429 or (status is not None and status >= 500)
     return False
+
+
+def _is_urllib3_retryable_error(exc: Exception) -> bool:
+    try:
+        from urllib3.exceptions import (
+            ConnectTimeoutError,
+            NewConnectionError,
+            ProtocolError,
+            ReadTimeoutError,
+        )
+    except Exception:
+        return False
+
+    return isinstance(exc, (ProtocolError, ReadTimeoutError, ConnectTimeoutError, NewConnectionError))

@@ -4,14 +4,16 @@ import os
 import shutil
 import threading
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from time import time
+import traceback
 
 from autodiscovery.agents import get_agents
 from autodiscovery.args import ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
 from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
+from autodiscovery.future_utils import gather_completed_futures
 from autodiscovery.logger import TreeLogger
 from autodiscovery.mcts import (
     MCTSNode,
@@ -618,14 +620,25 @@ def run_mcts(
 
                 expanded_nodes = []
                 with ThreadPoolExecutor(max_workers=n_threads) as executor:
-                    futures = [
-                        executor.submit(_expand_node_parallel, inbatch_idx, node)
+                    future_labels = {
+                        executor.submit(_expand_node_parallel, inbatch_idx, node): (
+                            f"{node.level}_{node.node_idx}"
+                        )
                         for inbatch_idx, node in enumerate(next_nodes)
-                    ]
-                    for future in as_completed(futures):
-                        result = future.result()
-                        if result is not None:
-                            expanded_nodes.append(result)
+                    }
+
+                    def _on_expand_error(node_id: str, exc: Exception) -> None:
+                        # Keep exploration running when one node expansion fails.
+                        print(
+                            f"[run_mcts] Failed expanding node {node_id}: "
+                            f"{exc.__class__.__name__}: {exc}"
+                        )
+                        traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+                    expanded_nodes = gather_completed_futures(
+                        future_labels,
+                        on_error=_on_expand_error,
+                    )
             else:
                 # Sequential expansion of nodes
                 if base_agent_objs is None:

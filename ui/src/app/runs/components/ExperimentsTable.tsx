@@ -1,5 +1,5 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams, GridSortModel } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams, GridRowSelectionModel, GridSortModel } from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
@@ -125,7 +125,7 @@ interface ExperimentsTableProps {
 }
 
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
-    const { experiments, lastError, selectExperiment, hasJobCompleted } = useRunExperiments();
+    const { experiments, lastError, selectExperiment, selectedExperiment, hasJobCompleted } = useRunExperiments();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
     // Apply default Surprisal sort when the session completes.
     useEffect(() => {
@@ -198,6 +198,20 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
 
     const paginationModel = { page: 0, pageSize: 50 };
 
+    // Set up row selection based on selectedExperiment
+    const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
+        if (selectedExperiment) {
+            return {
+                type: 'include',
+                ids: new Set([selectedExperiment.idInRun]),
+            };
+        }
+        return {
+            type: 'include',
+            ids: new Set(),
+        };
+    }, [selectedExperiment]);
+
     const handleRowClick = (params: any) => {
         // Don't allow clicking on skeleton rows
         if (params.row.isSkeleton) {
@@ -235,7 +249,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 sortModel={sortModel}
                 onSortModelChange={handleSortModelChange}
                 getRowHeight={() => 'auto'}
-                rowSelection={false}
+                rowSelectionModel={rowSelectionModel}
                 slotProps={{
                     row: mkExperimentRowAttrs(),
                 }}
@@ -291,6 +305,10 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
             paddingLeft: theme.spacing(0.5),
             paddingRight: theme.spacing(0.5),
         },
+
+        '&:active, &:focus, &:focus-within': {
+            outline: 'none',
+        },
     },
 
     '.MuiDataGrid-row:nth-of-type(even)': {
@@ -300,6 +318,21 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     '.MuiDataGrid-row:hover, .MuiDataGrid-row.Mui-hovered': {
         backgroundColor: theme.color['cream-10'].rgba.toString(),
         cursor: 'pointer',
+    },
+
+    '.MuiDataGrid-row.Mui-selected': {
+        outline: '2px solid #0FCB8C',
+        outlineOffset: '-2px',
+    },
+
+    '.MuiDataGrid-row.Mui-selected:not(:nth-of-type(even))': {
+        backgroundColor: '#0D2529',
+    },
+
+    '.MuiDataGrid-row.Mui-selected:hover, .MuiDataGrid-row.Mui-selected.Mui-hovered': {
+        backgroundColor: theme.color['cream-10'].rgba.toString(),
+        outline: '2px solid #0FCB8C',
+        outlineOffset: '-2px',
     },
 
     '.MuiTablePagination-root, .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows, .MuiTablePagination-select, .MuiTablePagination-selectIcon':

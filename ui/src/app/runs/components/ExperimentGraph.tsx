@@ -15,6 +15,7 @@ type D3TreeNode = {
     belief_change: number | null;
     prior: BeliefDistribution | null;
     posterior: BeliefDistribution | null;
+    isSurprising: boolean;
 };
 
 type TreeNode = {
@@ -36,31 +37,29 @@ const toD3TreeNode = (exp: Experiment): D3TreeNode => ({
     belief_change: exp.surprise,
     prior: exp.priorBelief,
     posterior: exp.posteriorBelief,
+    isSurprising: exp.isSurprising,
 });
 
-// Calculate node color based on belief change (surprisal)
+// Calculate node color based on surprisal
 const surprisalColor = (node: D3TreeNode): string => {
-    const priorMean = node.prior?.mean ?? node.prior?._empirical_mean;
-    const postMean = node.posterior?.mean ?? node.posterior?._empirical_mean;
+    const surprisal = node.belief_change;
 
-    if (typeof priorMean !== 'number' || typeof postMean !== 'number') {
-        return '#94a3b8'; // default gray for nodes without belief data
+    if (typeof surprisal !== 'number' || surprisal === null) {
+        return '#384849'; // default dark for nodes without surprisal data
     }
 
-    const delta = postMean - priorMean;
-    const intensity = Math.max(0, Math.min(1, Math.abs(node.belief_change ?? delta ?? 0)));
+    // Calculate intensity where 0.7 = full color, using absolute value
+    const intensity = Math.max(0, Math.min(1, Math.abs(surprisal) / 0.7));
 
-    if (delta >= 0) {
-        // Positive belief change - use green with varying intensity
-        const saturation = 60 + 30 * intensity;
-        const lightness = 80 - 45 * intensity;
-        return `hsl(145, ${saturation}%, ${lightness}%)`; // Green hue (145)
-    } else {
-        // Negative belief change - use red with varying intensity
-        const saturation = 60 + 30 * intensity;
-        const lightness = 80 - 45 * intensity;
-        return `hsl(0, ${saturation}%, ${lightness}%)`; // Red hue (0)
-    }
+    // Base color (low surprisal)
+    const baseColor = '#384849';
+
+    // Target color depends on whether node is surprising
+    const targetColor = node.isSurprising ? '#FFA31C' : '#FAF2E9';
+
+    // Interpolate between base and target color
+    const interpolator = d3.interpolateRgb(baseColor, targetColor);
+    return interpolator(intensity);
 };
 
 // Build tree hierarchy from flat experiment array
@@ -366,26 +365,6 @@ export const ExperimentGraph = () => {
             });
 
         // Render nodes
-        // First render yellow rings for surprising nodes
-        nodesG
-            .selectAll('circle.surprising-ring')
-            .data(
-                nodes.filter((d) => {
-                    const exp = experiments.find((e) => e.experimentId === d.data.data.id);
-                    return exp?.isSurprising === true;
-                })
-            )
-            .join('circle')
-            .attr('class', 'surprising-ring')
-            .attr('cx', (d) => d.xPos ?? 0)
-            .attr('cy', (d) => d.yPos ?? 0)
-            .attr('r', 20)
-            .attr('fill', 'none')
-            .attr('stroke', '#fbbf24')
-            .attr('stroke-width', 3)
-            .attr('opacity', 0.8);
-
-        // Then render the main node circles
         nodesG
             .selectAll('circle.node')
             .data(nodes)
@@ -597,32 +576,18 @@ export const ExperimentGraph = () => {
             {/* Color Legend */}
             <LegendOverlay>
                 <Typography variant="caption" fontWeight="bold" sx={{ color: '#faf2e9', mb: 0.5 }}>
-                    Belief Change
+                    Surprisal Intensity
                 </Typography>
                 <LegendItem>
-                    <LegendCircle style={{ backgroundColor: 'hsl(145, 90%, 35%)' }} />
+                    <LegendCircle style={{ backgroundColor: '#FFA31C' }} />
                     <Typography variant="caption" sx={{ color: '#faf2e9' }}>
-                        Increased confidence
+                        High surprisal
                     </Typography>
                 </LegendItem>
                 <LegendItem>
-                    <LegendCircle style={{ backgroundColor: 'hsl(0, 90%, 35%)' }} />
+                    <LegendCircle style={{ backgroundColor: '#5F6A69' }} />
                     <Typography variant="caption" sx={{ color: '#faf2e9' }}>
-                        Decreased confidence
-                    </Typography>
-                </LegendItem>
-                <LegendItem>
-                    <LegendCircle style={{ backgroundColor: '#94a3b8' }} />
-                    <Typography variant="caption" sx={{ color: '#faf2e9' }}>
-                        No belief data
-                    </Typography>
-                </LegendItem>
-                <LegendItem>
-                    <LegendCircle
-                        style={{ backgroundColor: 'transparent', border: '3px solid #fbbf24' }}
-                    />
-                    <Typography variant="caption" sx={{ color: '#faf2e9' }}>
-                        Surprising finding
+                        Low/no surprisal
                     </Typography>
                 </LegendItem>
             </LegendOverlay>

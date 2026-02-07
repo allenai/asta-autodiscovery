@@ -1,4 +1,8 @@
+import http.client
+
 import pytest
+import requests
+from urllib3.exceptions import ProtocolError
 
 from autodiscovery import llm_retry
 
@@ -23,6 +27,18 @@ def test_should_retry_llm_error_status_codes():
 
 def test_should_retry_llm_error_timeout_message():
     assert llm_retry.should_retry_llm_error(Exception("request timed out"))
+
+
+def test_should_retry_llm_error_requests_connection_error():
+    assert llm_retry.should_retry_llm_error(requests.ConnectionError("connection aborted"))
+
+
+def test_should_retry_llm_error_urllib3_protocol_error():
+    protocol_error = ProtocolError(
+        "Connection aborted.",
+        http.client.RemoteDisconnected("Remote end closed connection without response"),
+    )
+    assert llm_retry.should_retry_llm_error(protocol_error)
 
 
 def test_call_with_backoff_retries_on_retryable():
@@ -50,6 +66,20 @@ def test_call_with_backoff_does_not_retry_non_retryable():
     with pytest.raises(ValueError):
         llm_retry.call_with_backoff(call, retry_config=config)
     assert attempts["count"] == 1
+
+
+def test_call_with_backoff_retries_on_connection_error():
+    attempts = {"count": 0}
+
+    def call():
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            raise requests.ConnectionError("connection dropped")
+        return "ok"
+
+    config = llm_retry.RetryConfig(max_retries=3, initial_delay_seconds=0.0, max_delay_seconds=0.0)
+    assert llm_retry.call_with_backoff(call, retry_config=config) == "ok"
+    assert attempts["count"] == 3
 
 
 def test_extract_retry_after_seconds_from_header():

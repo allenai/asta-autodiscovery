@@ -10,6 +10,7 @@ import {
     styled,
     List,
     ListItem,
+    useMediaQuery,
 } from '@mui/material';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
@@ -204,6 +205,7 @@ function RunStatusContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isTableExpanded, setIsTableExpanded] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+    const isTreeVisible = useMediaQuery('(min-width:1000px)');
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
@@ -238,9 +240,11 @@ function RunStatusContent({
     return (
         <Container>
             <PanelLayout>
-                <Background>
-                    <ExperimentGraph />
-                </Background>
+                {isTreeVisible && (
+                    <Background>
+                        <ExperimentGraph />
+                    </Background>
+                )}
                 <TablePanel $isExpanded={isTableExpanded}>
                     <RunHeader>
                         <Box>

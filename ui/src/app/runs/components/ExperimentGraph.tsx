@@ -1,3 +1,41 @@
+/**
+ * ExperimentGraph Component
+ *
+ * This file renders a radial tree visualization representing a DAG (Directed Acyclic Graph)
+ * of experiment nodes. Each node represents a single experiment in a scientific discovery run.
+ *
+ * NODE STRUCTURE:
+ * - Each node is an experiment with a surprisal value (belief_change), measuring how much
+ *   the experiment changed the agent's beliefs about a hypothesis
+ * - Nodes are positioned radially from the root, with parent-child relationships preserved
+ * - A fake root node (node_1_0) may be created if multiple experiments lack a parent
+ *
+ * COLOR CODING:
+ * - Node colors are determined by surprisal intensity and whether the node is marked surprising
+ * - Color interpolation between base color (#384849 dark gray) and target color:
+ *   - Orange (#FFA31C): For nodes marked as surprising (isSurprising = true)
+ *   - Cream (#FAF2E9): For regular nodes with high surprisal
+ * - Intensity calculation: abs(surprisal) / 0.7, clamped to [0, 1]
+ * - Low/no surprisal nodes remain dark gray (#384849)
+ * - D3 interpolateRgb handles the gradient between base and target colors
+ *
+ * INTERACTIONS:
+ * - Click nodes to select and view experiment details
+ * - Hover over nodes/edges to highlight the ancestral path (magenta) and descendants (pink)
+ * - Selected experiments show a green highlight along their path to root
+ * - Zoom controls: +/- buttons for zoom, center button to reset view
+ * - Pan/zoom: Drag to pan, scroll to zoom
+ *
+ * DATA FLOW:
+ * - Experiments come from RunExperimentsContext
+ * - buildHierarchy() converts flat experiment array into D3 tree hierarchy
+ * - assignAngularRanges() positions nodes to prevent edge crossings
+ * - surprisalColor() calculates node colors based on surprisal intensity and isSurprising flag
+ *
+ * All information and logic relevant to rendering the experiment tree is contained in this file.
+ * The component uses D3.js for tree layout, radial positioning, and zoom/pan interactions.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { styled, Typography, IconButton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -201,11 +239,16 @@ export const ExperimentGraph = () => {
             return;
         }
 
+        // Deduplicate experiments by experimentId to prevent duplicate nodes
+        const uniqueExperiments = Array.from(
+            new Map(experiments.map((exp) => [exp.experimentId, exp])).values()
+        );
+
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove();
 
         // Build hierarchy
-        const hierarchy = buildHierarchy(experiments);
+        const hierarchy = buildHierarchy(uniqueExperiments);
         if (!hierarchy) return;
 
         // Configure radial tree layout
@@ -481,7 +524,7 @@ export const ExperimentGraph = () => {
                 // Don't allow clicking the fake root node
                 if (d.data.data.id === 'node_1_0') return;
 
-                const experiment = experiments.find((e) => e.experimentId === d.data.data.id);
+                const experiment = uniqueExperiments.find((e) => e.experimentId === d.data.data.id);
                 if (experiment) {
                     selectExperiment(experiment);
                 }

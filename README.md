@@ -104,6 +104,10 @@ After making and committing those changes, submit a [request to be onboarded](ht
 
 Aftering being onboarded, changes will be automatically deployed as commits are pushed to the `main` branch.
 
+**Environments:**
+- **Development:** `main` branch → https://asta-autodiscovery-dev.allen.ai/
+- **Production:** `env/prod` branch → https://autodiscovery.allen.ai/
+
 You can find more details about your application via [Marina](https://marina.apps.allenai.org).
 
 ## Getting Help

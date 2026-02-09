@@ -17,9 +17,7 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
     local domains =
         util.getHosts(env, config, '.apps.allenai.org') +
         util.getHosts(env, config, '.allen.ai') +
-        if env == 'prod' && 'customDomains' in config then
-            config.customDomains else
-        [];
+        if env in config.customDomains then config.customDomains[env] else [];
 
     local grouped = util.groupHosts(
         domains,

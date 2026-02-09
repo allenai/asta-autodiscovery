@@ -36,6 +36,7 @@ export type RunStats = {
 export type RunDetails = {
     executionId: string | null;
     createdAt: string;
+    finishedAt: string | null;
     status: RunStatus;
     statusCheckedAt: string | null;
 };
@@ -74,6 +75,7 @@ export type Experiment = {
     code: string | null;
     codeOutput: string | null;
     richOutputs: RichOutputBundle[] | null;
+    createdAt?: string | null;
 };
 
 export type RichOutputBundle = Record<string, string>;
@@ -122,6 +124,7 @@ export const getRunDetailsFromApi = (detailsFromApi?: RunDetailsFromApi): RunDet
     return {
         executionId: detailsFromApi.execution_id,
         createdAt: detailsFromApi.created_at,
+        finishedAt: detailsFromApi.finished_at,
         status: detailsFromApi.status as RunStatus,
         statusCheckedAt: detailsFromApi.status_checked_at,
     };
@@ -161,6 +164,7 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         code: experimentFromApi.code,
         codeOutput: experimentFromApi.code_output ?? null,
         richOutputs: experimentFromApi.rich_outputs ?? null,
+        createdAt: experimentFromApi.created_at ?? null,
     };
 };
 

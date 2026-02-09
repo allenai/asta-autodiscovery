@@ -1,4 +1,5 @@
 import copy
+from datetime import UTC, datetime
 import json
 import os
 import random
@@ -33,10 +34,12 @@ class MCTSNode:
         analysis=None,
         review=None,
         creation_idx=None,
+        created_at=None,
     ):
         # Tree attributes
         self.creation_idx = creation_idx if creation_idx is not None else MCTSNode._creation_counter
         MCTSNode._creation_counter += 1  # Used to replay MCTS from log files
+        self.created_at = created_at if created_at is not None else datetime.now(UTC).isoformat()
         self.time_elapsed = None
         self.level = level
         self.node_idx = node_idx
@@ -92,6 +95,7 @@ class MCTSNode:
         """Initialize node attributes from a dictionary."""
         # Tree attributes
         self.creation_idx = data.get("creation_idx", MCTSNode._creation_counter)
+        self.created_at = data.get("created_at", self.created_at)
         self.time_elapsed = data.get("time_elapsed", self.time_elapsed)
         self.id = data.get("id", None)
         if self.id is not None:
@@ -196,6 +200,7 @@ class MCTSNode:
             "success": self.success,
             "parent_id": self.parent_id,
             "creation_idx": self.creation_idx,
+            "created_at": self.created_at,
             "time_elapsed": self.time_elapsed,
             "visits": self.visits,
             "value": self.value,

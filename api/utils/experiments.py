@@ -26,6 +26,7 @@ class ExperimentNode:
         self.parent_id: str | None = node_data.get("parent_id")
         self.creation_idx: int = node_data.get("creation_idx", 0)
         self.filename: str = filename
+        self.created_at: str | None = node_data.get("created_at")  
 
         # Derive level and index from filename if not in data
         # Format: mcts_node_{level}_{index}.json
@@ -78,6 +79,7 @@ class ExperimentNode:
         self.parent: ExperimentNode | None = None
         self.children: list[ExperimentNode] = []
 
+
     def to_dict(self) -> dict[str, Any]:
         """Convert node to ExperimentModel dict for API response.
 
@@ -103,6 +105,7 @@ class ExperimentNode:
             "review": self.review,
             "code": self.code,
             "code_output": self.code_output,
+            "created_at": self.created_at,
         }
 
     def __repr__(self) -> str:

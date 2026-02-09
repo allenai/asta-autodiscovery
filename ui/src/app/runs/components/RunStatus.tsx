@@ -11,6 +11,7 @@ import {
     List,
     ListItem,
     useMediaQuery,
+    Link,
 } from '@mui/material';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
@@ -27,13 +28,13 @@ import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from './ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsContext';
-import { getRelativeTime } from '@/utils/timeUtils';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
 import {
     mkCloseExperimentDetailsPanelAttrs,
     mkSessionConfigBtnAttrs,
 } from '@/analytics/runDetails';
+import { getRunStatusString } from '@/runs/utils/runUtils';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -62,7 +63,6 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
     const [isLoading, setIsLoading] = useState(true);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [, setTick] = useState(0);
 
     const fetchStatus = async () => {
@@ -75,7 +75,6 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
             const run = getRunFromApi(response.data);
 
             setRun(run);
-            setLastUpdated(new Date());
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
@@ -171,7 +170,6 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
                 cancelling={cancelling}
                 handleStop={handleStop}
                 experimentsLabel={experimentsLabel}
-                lastUpdated={lastUpdated}
             />
         </RunExperimentsProvider>
     );
@@ -184,7 +182,6 @@ interface RunStatusContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
-    lastUpdated: Date | null;
 }
 
 function RunStatusContent({
@@ -194,7 +191,6 @@ function RunStatusContent({
     cancelling,
     handleStop,
     experimentsLabel,
-    lastUpdated,
 }: RunStatusContentProps) {
     const {
         experiments,
@@ -237,6 +233,8 @@ function RunStatusContent({
         }
     }, [selectedExperiment, setSearchParam, deleteSearchParam]);
 
+    const isRunning = !!run.stats?.pendingExperiments && run.details.status !== 'FAILED';
+
     return (
         <Container>
             <PanelLayout>
@@ -251,18 +249,9 @@ function RunStatusContent({
                             <RunHeaderName>{run.name}</RunHeaderName>
                             <RunHeaderSubtitle>
                                 <StyledListItem>
-                                    Started{' '}
-                                    {new Date(run.details.createdAt).toLocaleString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                    })}
+                                    {getRunStatusString(run.details, experiments)}
                                 </StyledListItem>
-                                <StyledListItem>
-                                    Last updated {getRelativeTime(lastUpdated)}
-                                </StyledListItem>
+
                                 <StyledListItem>
                                     <StatusChip
                                         label={toSentenceCase(run.details.status)}
@@ -272,7 +261,7 @@ function RunStatusContent({
                                 </StyledListItem>
                             </RunHeaderSubtitle>
 
-                            {!!run.stats?.pendingExperiments && (
+                            {isRunning && (
                                 <>
                                     <Typography variant="caption">
                                         AutoDiscovery is running. New findings will populate the
@@ -285,6 +274,19 @@ function RunStatusContent({
                                         the analysis is complete.
                                     </Typography>
                                 </>
+                            )}
+                            {run.details.status === 'FAILED' && (
+                                <Typography variant="caption">
+                                    AutoDiscovery failed. We weren't able to finish this analysis.
+                                    You might want to try again. If you keep seeing this message,
+                                    please share your feedback with us{' '}
+                                    <Link
+                                        href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
+                                        rel="noopener noreferrer"
+                                        target="_blank">
+                                        via this form.
+                                    </Link>
+                                </Typography>
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>

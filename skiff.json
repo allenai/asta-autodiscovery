@@ -2,5 +2,8 @@
     "appName": "asta-autodiscovery",
     "contact": "jasond",
     "team": "asta",
-    "replicas": { "prod": 2 }
+    "replicas": { "prod": 2 },
+    "customDomains": {
+        "env/prod": ["autodiscovery.allen.ai"]
+    }
 }

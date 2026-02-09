@@ -25,13 +25,13 @@ from autodiscovery_jobs import (
     Auth0Error,
     JobConfig,
     JobManager,
-    count_high_surprisal_experiments,
     get_user,
     record_email_sent,
     refresh_run_status,
     send_email,
     was_email_sent,
 )
+from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
 
 # Set up Jinja2 environment for email templates
 TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
@@ -150,7 +150,24 @@ def count_high_surprisal(
     Returns:
         Tuple of (high_surprisal_count, total_experiments), or None if loading fails
     """
-    return count_high_surprisal_experiments(userid, runid, threshold, config)
+    try:
+        # List all experiment files
+        filenames = list_experiment_files(userid, runid, config)
+        total = len(filenames)
+        high_count = 0
+
+        # Count experiments with high surprisal
+        for filename in filenames:
+            node_data = read_experiment_node(userid, runid, filename, config)
+            if node_data:
+                surprisal = node_data.get("normalized_surprisal")
+                if surprisal is not None and surprisal > threshold:
+                    high_count += 1
+
+        return (high_count, total)
+    except Exception as e:
+        logger.warning(f"Failed to count high surprisal for {userid}/{runid}: {e}")
+        return None
 
 
 def build_email_body(

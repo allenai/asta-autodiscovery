@@ -35,7 +35,6 @@ from .exceptions import (
 
 # Re-export functional APIs for direct use
 from .gcs import (
-    count_high_surprisal_experiments,
     create_job_directory,
     delete_job_directory,
     download_job_results,
@@ -113,7 +112,6 @@ __all__ = [
     "upload_metadata",
     "get_job_results",
     "download_job_results",
-    "count_high_surprisal_experiments",
     # Cloud Run functions
     "run_job",
     "get_job_status",

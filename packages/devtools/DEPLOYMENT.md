@@ -7,11 +7,11 @@ This document describes how to deploy the replay job as a Cloud Run service.
 ```bash
 # Build for linux/amd64 (required for Cloud Run)
 docker build --platform linux/amd64 \
-  -t gcr.io/example-legacy-project/autodiscovery-replay \
+  -t us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay \
   -f packages/devtools/Dockerfile .
 
-# Push to Google Container Registry
-docker push gcr.io/example-legacy-project/autodiscovery-replay
+# Push to Artifact Registry
+docker push us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay
 ```
 
 ## Create Cloud Run Job
@@ -22,7 +22,7 @@ export CLOUDSDK_CORE_PROJECT=example-legacy-project
 
 # Create the Cloud Run job
 gcloud run jobs create autodiscovery-replay \
-  --image gcr.io/example-legacy-project/autodiscovery-replay \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay \
   --region us-west1 \
   --service-account example-gcp-project@example-legacy-project.iam.gserviceaccount.com \
   --max-retries 0 \
@@ -45,7 +45,7 @@ gcloud run jobs execute autodiscovery-replay \
 ```bash
 # Update the image
 gcloud run jobs update autodiscovery-replay \
-  --image gcr.io/example-legacy-project/autodiscovery-replay \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay \
   --region us-west1
 ```
 

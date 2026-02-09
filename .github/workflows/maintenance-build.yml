@@ -17,7 +17,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  IMAGE_NAME: gcr.io/example-legacy-project/autodiscovery-scripts
+  IMAGE_NAME: us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts
 
 jobs:
   build-and-push:
@@ -30,9 +30,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Authenticate to GCR
+      - name: Authenticate to Artifact Registry
         run: |
-          echo '${{ secrets.GCP_SA_KEY }}' | docker login -u _json_key --password-stdin gcr.io
+          echo '${{ secrets.GCP_SA_KEY }}' | docker login -u _json_key --password-stdin https://us-west1-docker.pkg.dev
 
       - name: Build image
         run: |

@@ -5,6 +5,7 @@ const RUNS_URL_PREFIX = '/api/runs';
 export interface RunDetailsFromApi {
     execution_id: string | null;
     created_at: string;
+    finished_at: string | null;
     status: string;
     status_checked_at: string | null;
 }
@@ -90,6 +91,7 @@ export interface ExperimentFromApi {
     code: string | null;
     code_output?: string | null;
     rich_outputs?: Record<string, string>[] | null;
+    created_at?: string | null;
 }
 
 export interface GetRunExperimentsResponseBody {

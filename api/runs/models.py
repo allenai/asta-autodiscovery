@@ -45,6 +45,9 @@ class ExperimentModel(BaseModel):
     creation_idx: int = Field(
         ..., description="Index representing the creation order of the experiment"
     )
+    created_at: str | None = Field(
+        None, description="ISO timestamp when the experiment was created"
+    )
     id_in_run: int | None = Field(
         None,
         description="Unique identifier for the experiment relative to the run, based on its order",

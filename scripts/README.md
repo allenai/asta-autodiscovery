@@ -26,7 +26,7 @@ uv run python scripts/send_completion_emails.py --userid "google-oauth2|123" --d
 
 ```bash
 gcloud run jobs create autodiscovery-send-emails \
-  --image gcr.io/ai2-aristo/autodiscovery-scripts \
+  --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts \
   --region us-west1 \
   --service-account ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com \
   --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
@@ -75,11 +75,11 @@ uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 
 ## Docker Image
 
-All scripts are packaged into a single container image: `gcr.io/ai2-aristo/autodiscovery-scripts`
+All scripts are packaged into a single container image: `us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts`
 
 ### Automated Builds
 
-The image is automatically built and pushed to GCR by GitHub Actions when changes are merged to `main` that affect:
+The image is automatically built and pushed to Artifact Registry by GitHub Actions when changes are merged to `main` that affect:
 - `scripts/**`
 - `packages/autodiscovery_jobs/**`
 
@@ -88,8 +88,8 @@ See `.github/workflows/maintenance-build.yml`
 ### Manual Build (if needed)
 
 ```bash
-docker build --platform linux/amd64 -t gcr.io/ai2-aristo/autodiscovery-scripts -f scripts/Dockerfile .
-docker push gcr.io/ai2-aristo/autodiscovery-scripts
+docker build --platform linux/amd64 -t us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts -f scripts/Dockerfile .
+docker push us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts
 ```
 
 Note: `--platform linux/amd64` is required for Cloud Run compatibility (especially when building on Apple Silicon).
@@ -105,7 +105,7 @@ export CLOUDSDK_CORE_PROJECT=ai2-aristo
 
 ```bash
 gcloud run jobs create autodiscovery-dataset-cleanup \
-  --image gcr.io/ai2-aristo/autodiscovery-scripts \
+  --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts \
   --region us-west1 \
   --service-account ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com \
   --command "uv" \
@@ -133,7 +133,7 @@ The GitHub Action automatically pushes new images when changes merge to main. To
 
 ```bash
 gcloud run jobs update autodiscovery-dataset-cleanup \
-  --image gcr.io/ai2-aristo/autodiscovery-scripts \
+  --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts \
   --region us-west1
 ```
 
@@ -141,10 +141,10 @@ gcloud run jobs update autodiscovery-dataset-cleanup \
 
 **`ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com`** is used for:
 - Running scheduled Cloud Run Jobs (job runtime identity)
-- Pushing images to GCR (via GitHub Actions)
+- Pushing images to Artifact Registry (via GitHub Actions)
 - Invoking Cloud Run Jobs (via Cloud Scheduler)
 
 It needs:
 - `roles/storage.objectAdmin` - for GCS operations (list/delete)
-- `roles/artifactregistry.writer` - for pushing images to Artifact Registry/GCR
+- `roles/artifactregistry.writer` - for pushing images to Artifact Registry
 - `roles/run.invoker` - for Cloud Scheduler to invoke the job

@@ -25,16 +25,13 @@ from autodiscovery_jobs import (
     Auth0Error,
     JobConfig,
     JobManager,
+    count_high_surprisal_experiments,
     get_user,
     record_email_sent,
     refresh_run_status,
     send_email,
     was_email_sent,
 )
-
-# Add parent directory to path to import api.utils
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from api.utils.experiments import ExperimentTree
 
 # Set up Jinja2 environment for email templates
 TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
@@ -153,17 +150,7 @@ def count_high_surprisal(
     Returns:
         Tuple of (high_surprisal_count, total_experiments), or None if loading fails
     """
-    try:
-        tree = ExperimentTree.load(userid, runid, config)
-        nodes = tree.as_list()
-        high_count = sum(
-            1 for node in nodes
-            if node.surprise is not None and node.surprise > threshold
-        )
-        return (high_count, len(nodes))
-    except Exception as e:
-        logger.warning(f"Failed to count high surprisal for {userid}/{runid}: {e}")
-        return None
+    return count_high_surprisal_experiments(userid, runid, threshold, config)
 
 
 def build_email_body(

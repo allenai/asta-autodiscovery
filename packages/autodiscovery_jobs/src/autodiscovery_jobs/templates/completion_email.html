@@ -37,8 +37,13 @@
             {%- if n_experiments %}
             <div class="summary-item"><span class="summary-label">Experiment budget:</span> {{ n_experiments }}</div>
             {%- endif %}
-            {%- if high_surprisal_count is defined and surprisal_width is defined %}
-            <div class="summary-item"><span class="summary-label">Surprisal &gt; {{ surprisal_width }}:</span> {{ high_surprisal_count }}</div>
+            {%- if high_surprisal_count is defined and total_experiments is defined and surprisal_width is defined %}
+            <div class="summary-item">
+                <span class="summary-label">Surprisal &gt; {{ surprisal_width }}:</span>
+                <ul class="dataset-list">
+                    <li>{{ high_surprisal_count }}/{{ total_experiments }} experiment(s)</li>
+                </ul>
+            </div>
             {%- endif %}
             {%- if duration %}
             <div class="summary-item"><span class="summary-label">Duration:</span> {{ duration }}</div>

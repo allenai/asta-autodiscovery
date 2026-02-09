@@ -32,6 +32,10 @@ from autodiscovery_jobs import (
     was_email_sent,
 )
 
+# Add parent directory to path to import api.utils
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from api.utils.experiments import ExperimentTree
+
 # Set up Jinja2 environment for email templates
 TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
 jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=False)
@@ -101,18 +105,63 @@ def release_lock(config: JobConfig) -> None:
         logger.warning("Lock already released or missing")
 
 
-SUBJECT_VERBS = {"SUCCEEDED": "completed successfully", "FAILED": "failed", "CANCELLED": "was cancelled"}
-STATUS_MESSAGES = {
-    "SUCCEEDED": ("Your AutoDiscovery run has completed successfully.", "#28a745"),
-    "FAILED": ("Your AutoDiscovery run has failed.", "#dc3545"),
-    "CANCELLED": ("Your AutoDiscovery run was cancelled.", "#6c757d"),
-}
-
-
 def build_email_subject(status: str, run_name: str | None) -> str:
     """Build email subject line based on run status."""
-    name_part = f'"{run_name}"' if run_name else "Your run"
-    return f"AutoDiscovery: {name_part} {SUBJECT_VERBS.get(status, 'finished')}"
+    if status == "SUCCEEDED":
+        name_part = run_name or "Your Session"
+        return f"[AstaLabs AutoDiscovery] Successful Discovery Session: {name_part}"
+    elif status == "FAILED":
+        name_part = run_name or "Your Session"
+        return f"[AstaLabs AutoDiscovery] Failed Discovery Session: {name_part}"
+    elif status == "CANCELLED":
+        name_part = run_name or "Your Session"
+        return f"[AstaLabs AutoDiscovery] Cancelled Discovery Session: {name_part}"
+    else:
+        name_part = run_name or "Your Session"
+        return f"[AstaLabs AutoDiscovery] Discovery Session Complete: {name_part}"
+
+
+def format_duration(started_at: str | None, finished_at: datetime | None) -> str | None:
+    """Format duration between start and finish times."""
+    if not started_at or not finished_at:
+        return None
+    try:
+        start = datetime.fromisoformat(started_at)
+        delta = finished_at - start
+        total_seconds = int(delta.total_seconds())
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours}h {minutes}m {seconds}s"
+    except Exception:
+        return None
+
+
+def count_high_surprisal(
+    userid: str,
+    runid: str,
+    config: JobConfig,
+    threshold: float,
+) -> int | None:
+    """Count experiments with surprisal above threshold.
+
+    Args:
+        userid: User identifier
+        runid: Run/job identifier
+        config: Job configuration
+        threshold: Surprisal threshold (surprisal_width from run parameters)
+
+    Returns:
+        Count of high surprisal experiments, or None if loading fails
+    """
+    try:
+        tree = ExperimentTree.load(userid, runid, config)
+        return sum(
+            1 for node in tree.as_list()
+            if node.surprise is not None and node.surprise > threshold
+        )
+    except Exception as e:
+        logger.warning(f"Failed to count high surprisal for {userid}/{runid}: {e}")
+        return None
 
 
 def build_email_body(
@@ -123,29 +172,27 @@ def build_email_body(
     finished_at: datetime | None,
     origin_url: str | None = None,
     metadata: dict | None = None,
+    high_surprisal_count: int | None = None,
+    surprisal_width: float | None = None,
 ) -> str:
     """Build email body using Jinja2 template."""
-    status_message, status_color = STATUS_MESSAGES.get(
-        status, ("Your AutoDiscovery run has finished.", "#17a2b8")
-    )
     base_url = origin_url or "https://asta.allenai.org"
     metadata = metadata or {}
     datasets = metadata.get("datasets", [])
+    dataset_names = [d.get("name", "") for d in datasets if d.get("name")]
 
     context = {
         "name": run_name or runid,
-        "status": status,
-        "status_message": status_message,
-        "status_color": status_color,
         "run_url": f"{base_url}/runs/{runid}",
-        "started_at": datetime.fromisoformat(started_at).strftime("%Y-%m-%d %H:%M:%S UTC") if started_at else "Unknown",
-        "finished_at": finished_at.strftime("%Y-%m-%d %H:%M:%S UTC") if finished_at else "Unknown",
         "description": metadata.get("description", ""),
-        "domain": metadata.get("domain", ""),
-        "intent": metadata.get("intent", ""),
+        "dataset_names": dataset_names,
         "n_experiments": metadata.get("n_experiments", ""),
-        "datasets": ", ".join(d.get("name", "") for d in datasets) if datasets else "",
+        "duration": format_duration(started_at, finished_at),
     }
+    if high_surprisal_count is not None and surprisal_width is not None:
+        context["high_surprisal_count"] = high_surprisal_count
+        context["surprisal_width"] = surprisal_width
+
     template = jinja_env.get_template("completion_email.html")
     return template.render(**context).strip()
 
@@ -204,6 +251,10 @@ def send_completion_emails(
                 if not run_details.is_finished:
                     continue
 
+                # Skip soft-deleted runs
+                if run_details.status == "DELETED":
+                    continue
+
                 # Check finish time
                 if not run_details.finished_at:
                     # Run is finished but no timestamp - might be old
@@ -240,11 +291,21 @@ def send_completion_emails(
                 origin_url = run_details.origin_url
                 started_at = run_details.created_at
 
+                # Count high surprisal experiments (only for successful runs)
+                high_surprisal_count = None
+                surprisal_width = None
+                if status == "SUCCEEDED" and metadata:
+                    surprisal_width = metadata.get("surprisal_width")
+                    if surprisal_width is not None:
+                        high_surprisal_count = count_high_surprisal(userid, runid, config, surprisal_width)
+
                 # Build email content
                 subject = build_email_subject(status, run_name)
                 body_html = build_email_body(
                     runid, status, run_name, started_at, run_details.finished_at,
                     origin_url=origin_url, metadata=metadata,
+                    high_surprisal_count=high_surprisal_count,
+                    surprisal_width=surprisal_width,
                 )
 
                 if dry_run:

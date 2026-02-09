@@ -31,10 +31,7 @@ from autodiscovery_jobs import (
     send_email,
     was_email_sent,
 )
-
-# Add parent directory to path to import api.utils
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from api.utils.experiments import ExperimentTree
+from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
 
 # Set up Jinja2 environment for email templates
 TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
@@ -154,13 +151,20 @@ def count_high_surprisal(
         Tuple of (high_surprisal_count, total_experiments), or None if loading fails
     """
     try:
-        tree = ExperimentTree.load(userid, runid, config)
-        nodes = tree.as_list()
-        high_count = sum(
-            1 for node in nodes
-            if node.surprise is not None and node.surprise > threshold
-        )
-        return (high_count, len(nodes))
+        # List all experiment files
+        filenames = list_experiment_files(userid, runid, config)
+        total = len(filenames)
+        high_count = 0
+
+        # Count experiments with high surprisal
+        for filename in filenames:
+            node_data = read_experiment_node(userid, runid, filename, config)
+            if node_data:
+                surprisal = node_data.get("normalized_surprisal")
+                if surprisal is not None and surprisal > threshold:
+                    high_count += 1
+
+        return (high_count, total)
     except Exception as e:
         logger.warning(f"Failed to count high surprisal for {userid}/{runid}: {e}")
         return None

@@ -48,6 +48,8 @@ from runs.models import (
     SaveMetadataResponseModel,
     ShareRunRequestModel,
     ShareRunResponseModel,
+    GetSharedRunOwnerRequestModel,
+    GetSharedRunOwnerResponseModel,
     SubmitRunRequestModel,
     SubmitRunResponseModel,
     UploadDatasetResponseModel,
@@ -967,20 +969,25 @@ def create() -> Blueprint:
         )
         return jsonify(resp.model_dump()), 200
 
-    @api.route("/<runid>/cancel", methods=["POST"])
+    @api.route("/<userid>/<runid>/cancel", methods=["POST"])
     @requires_enrollment
-    def cancel_run(runid: str):
+    def cancel_run(userid: str, runid: str):
         """Cancel a running job.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user.
             runid: Run identifier
 
         Returns:
             JSON response confirming cancellation
         """
-        userid = request.user.get("sub")
-        if not userid:
+        token_userid = request.user.get("sub")
+        if not token_userid:
             return jsonify({"error": "User ID not found in token"}), 401
+
+        # Validate that the requesting user owns the run
+        if userid != token_userid:
+            return jsonify({"error": "User cannot cancel other user's runs"}), 403
 
         req = CancelRunRequestModel(runid=runid, userid=userid)
 
@@ -1015,12 +1022,13 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to cancel run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<runid>/share", methods=["POST"])
+    @api.route("/<userid>/<runid>/share", methods=["POST"])
     @requires_enrollment
-    def share_run(runid: str):
+    def share_run(userid: str, runid: str):
         """Share or unshare a run. Only the run owner can toggle sharing.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user.
             runid: Run identifier
 
         Request body:
@@ -1029,9 +1037,13 @@ def create() -> Blueprint:
         Returns:
             JSON response with updated sharing status.
         """
-        userid = request.user.get("sub")
-        if not userid:
+        token_userid = request.user.get("sub")
+        if not token_userid:
             return jsonify({"error": "User ID not found in token"}), 401
+
+        # Validate that the requesting user owns the run
+        if userid != token_userid:
+            return jsonify({"error": "User cannot share other user's runs"}), 403
 
         data = request.get_json()
         if not data or "is_shared" not in data:
@@ -1067,5 +1079,46 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to share run: {e}")
             return jsonify({"error": str(e)}), 500
+
+    @api.route("/shared/<runid>/owner", methods=["GET"])
+    @optional_enrollment
+    def get_shared_run_owner(runid: str):
+        """Get the owner userid of a shared run.
+
+        This endpoint allows anyone (authenticated or not) to look up the owner
+        of a run, but ONLY if the run has is_shared=True in its metadata.json.
+
+        Args:
+            runid: Run identifier
+
+        Returns:
+            JSON response with runid and userid, or 404 if not found/not shared.
+
+        Security Note:
+            Returns 404 for both "run doesn't exist" and "run exists but not shared"
+            to avoid information leakage about run existence.
+        """
+        req = GetSharedRunOwnerRequestModel(runid=runid)
+
+        try:
+            manager = get_job_manager()
+
+            # Get the owner userid if the run is shared
+            userid = manager.get_shared_run_owner(req.runid)
+
+            if userid is None:
+                # Could be: run doesn't exist OR run exists but not shared
+                # Return 404 in both cases to prevent information leakage
+                return jsonify({"error": "Shared run not found"}), 404
+
+            resp = GetSharedRunOwnerResponseModel(
+                runid=req.runid,
+                userid=userid
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to get shared run owner for {req.runid}: {e}")
+            return jsonify({"error": "Internal server error"}), 500
 
     return api

@@ -144,6 +144,11 @@ export interface ShareRunResponseBody {
     is_shared: boolean;
 }
 
+export interface GetSharedRunOwnerResponseBody {
+    runid: string;
+    userid: string;
+}
+
 export class RunsApi extends BaseApi {
     async createRun() {
         return this.request<RunResponseBody>({
@@ -236,8 +241,9 @@ export class RunsApi extends BaseApi {
     }
 
     async cancelRun(runId: string) {
+        const userid = await this.getUserId();
         return this.request<void>({
-            url: `${RUNS_URL_PREFIX}/${runId}/cancel`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/cancel`,
             method: 'POST',
         });
     }
@@ -300,10 +306,18 @@ export class RunsApi extends BaseApi {
     }
 
     async shareRun({ runId, isShared }: { runId: string; isShared: boolean }) {
+        const userid = await this.getUserId();
         return this.request<ShareRunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/share`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/share`,
             method: 'POST',
             body: { is_shared: isShared },
+        });
+    }
+
+    async getSharedRunOwner({ runId }: { runId: string }) {
+        return this.request<GetSharedRunOwnerResponseBody>({
+            url: `${RUNS_URL_PREFIX}/shared/${encodeURIComponent(runId)}/owner`,
+            method: 'GET',
         });
     }
 }

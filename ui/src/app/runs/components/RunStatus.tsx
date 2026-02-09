@@ -171,6 +171,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
                 cancelling={cancelling}
                 handleStop={handleStop}
                 experimentsLabel={experimentsLabel}
+                isReadOnly={isReadOnly}
             />
         </RunExperimentsProvider>
     );
@@ -183,6 +184,7 @@ interface RunStatusContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
+    isReadOnly: boolean;
 }
 
 function RunStatusContent({
@@ -192,6 +194,7 @@ function RunStatusContent({
     cancelling,
     handleStop,
     experimentsLabel,
+    isReadOnly,
 }: RunStatusContentProps) {
     const runsApi = getRunsApi();
     const {
@@ -217,7 +220,7 @@ function RunStatusContent({
             const newIsShared = !isSharedState;
             setIsSharedState(newIsShared);
 
-            const shareUrl = `${window.location.origin}/runs/${run.id}/share`;
+            const shareUrl = `${window.location.origin}/runs/shared/${run.id}`;
             const sharePromise = navigator.clipboard.writeText(shareUrl);
 
             const apiPromise = runsApi.shareRun({
@@ -355,12 +358,14 @@ function RunStatusContent({
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
                                 </ParametersButton>
-                                <ParametersButton
-                                    variant="outlined"
-                                    startIcon={<ShareOutlinedIcon />}
-                                    onClick={onShareClick}>
-                                    {isSharedState ? 'Unshare' : 'Share'}
-                                </ParametersButton>
+                                {!isReadOnly && (
+                                    <ParametersButton
+                                        variant="outlined"
+                                        startIcon={<ShareOutlinedIcon />}
+                                        onClick={onShareClick}>
+                                        {isSharedState ? 'Unshare' : 'Share'}
+                                    </ParametersButton>
+                                )}
                                 {canStop && (
                                     <StopButton
                                         variant="outlined"

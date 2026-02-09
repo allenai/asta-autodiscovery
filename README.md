@@ -104,6 +104,10 @@ After making and committing those changes, submit a [request to be onboarded](ht
 
 Aftering being onboarded, changes will be automatically deployed as commits are pushed to the `main` branch.
 
+**Environments:**
+- **Development:** `main` branch → https://autodiscovery-dev.example.com/
+- **Production:** `env/prod` branch → https://autodiscovery.example.com/
+
 You can find more details about your application via [Marina](https://deploy.example.com).
 
 ## Getting Help

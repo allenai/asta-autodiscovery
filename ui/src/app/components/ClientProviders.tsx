@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 
 import { Auth0Provider } from '@/contexts/Auth0Context';
 import { ViewerCreditsProvider } from '@/contexts/ViewerCreditsContext';
+import { ToastsContextProvider } from '@/contexts/ToastsContext';
 
 interface ClientProvidersProps {
     children: ReactNode;
@@ -12,7 +13,9 @@ interface ClientProvidersProps {
 export default function ClientProviders({ children }: ClientProvidersProps) {
     return (
         <Auth0Provider>
-            <ViewerCreditsProvider>{children}</ViewerCreditsProvider>
+            <ToastsContextProvider>
+                <ViewerCreditsProvider>{children}</ViewerCreditsProvider>
+            </ToastsContextProvider>
         </Auth0Provider>
     );
 }

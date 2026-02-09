@@ -407,3 +407,16 @@ class ShareRunResponseModel(BaseModel):
 
     is_shared: bool = Field(..., description="Updated sharing status")
     message: str = Field(..., description="Success message")
+
+
+class GetSharedRunOwnerRequestModel(BaseModel):
+    """Request model for getting a shared run's owner"""
+
+    runid: str = Field(..., description="Identifier of the shared run")
+
+
+class GetSharedRunOwnerResponseModel(BaseModel):
+    """Response model containing a shared run's owner"""
+
+    runid: str = Field(..., description="Identifier of the run")
+    userid: str = Field(..., description="User ID of the run owner")

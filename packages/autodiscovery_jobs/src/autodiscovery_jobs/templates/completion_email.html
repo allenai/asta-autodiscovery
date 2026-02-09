@@ -4,55 +4,53 @@
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .status { color: {{ status_color }}; font-weight: bold; }
-        .details { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .details dt { font-weight: bold; }
-        .details dd { margin-left: 0; margin-bottom: 10px; }
-        .footer { color: #6c757d; font-size: 12px; margin-top: 30px; border-top: 1px solid #dee2e6; padding-top: 15px; }
+        .summary { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .summary-title { font-weight: bold; margin-bottom: 15px; }
+        .summary-item { margin-bottom: 8px; }
+        .summary-label { font-weight: bold; }
+        .dataset-list { margin: 5px 0 0 20px; padding: 0; }
+        .dataset-list li { margin-bottom: 3px; }
+        .button { display: inline-block; background: #007bff; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { color: #6c757d; font-size: 12px; margin-top: 30px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>AutoDiscovery Run Complete</h2>
-        <p class="status">{{ status_message }}</p>
+        <p>Your AutoDiscovery session has completed successfully. Here is a quick look at the run details:</p>
 
-        <a href="{{ run_url }}" style="display: inline-block; background: #007bff; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 15px 0;">View Results</a>
-
-        <div class="details">
-            <dl>
-                <dt>Run Name</dt>
-                <dd>{{ name }}</dd>
-                <dt>Status</dt>
-                <dd>{{ status }}</dd>
-                <dt>Started</dt>
-                <dd>{{ started_at }}</dd>
-                <dt>Completed</dt>
-                <dd>{{ finished_at }}</dd>
-                {%- if description %}
-                <dt>Description</dt>
-                <dd>{{ description }}</dd>
-                {%- endif %}
-                {%- if domain %}
-                <dt>Domain</dt>
-                <dd>{{ domain }}</dd>
-                {%- endif %}
-                {%- if intent %}
-                <dt>Intent</dt>
-                <dd>{{ intent }}</dd>
-                {%- endif %}
-                {%- if datasets %}
-                <dt>Datasets</dt>
-                <dd>{{ datasets }}</dd>
-                {%- endif %}
-                {%- if n_experiments %}
-                <dt>Experiments</dt>
-                <dd>{{ n_experiments }}</dd>
-                {%- endif %}
-            </dl>
+        <div class="summary">
+            <div class="summary-title">Discovery Session Summary:</div>
+            <div class="summary-item"><span class="summary-label">Name:</span> {{ name }}</div>
+            {%- if description %}
+            <div class="summary-item"><span class="summary-label">Dataset context:</span> {{ description }}</div>
+            {%- endif %}
+            {%- if dataset_names %}
+            <div class="summary-item">
+                <span class="summary-label">Datasets:</span>
+                <ul class="dataset-list">
+                    {%- for dataset in dataset_names %}
+                    <li>{{ dataset }}</li>
+                    {%- endfor %}
+                </ul>
+            </div>
+            {%- endif %}
+            {%- if n_experiments %}
+            <div class="summary-item"><span class="summary-label">Experiment budget:</span> {{ n_experiments }}</div>
+            {%- endif %}
+            {%- if high_surprisal_count is defined and surprisal_width is defined %}
+            <div class="summary-item"><span class="summary-label">Surprisal &gt; {{ surprisal_width }}:</span> {{ high_surprisal_count }}</div>
+            {%- endif %}
+            {%- if duration %}
+            <div class="summary-item"><span class="summary-label">Duration:</span> {{ duration }}</div>
+            {%- endif %}
         </div>
 
+        <p>You can now review your discovered insights and experiments by clicking the button below:</p>
+
+        <a href="{{ run_url }}" style="display: inline-block; background: #007bff; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0;">View Results</a>
+
         <div class="footer">
-            This is an automated message from AutoDiscovery (ASTA).
+            <p>Best regards,<br>The AstaLabs Team</p>
         </div>
     </div>
 </body>

@@ -4,6 +4,6 @@
     "team": "asta",
     "replicas": { "prod": 2 },
     "customDomains": {
-        "env/prod": ["autodiscovery.allen.ai"]
+        "prod": ["autodiscovery.allen.ai"]
     }
 }

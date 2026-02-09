@@ -815,6 +815,47 @@ def read_experiment_node(
         return None
 
 
+def count_high_surprisal_experiments(
+    userid: str,
+    jobid: str,
+    threshold: float,
+    config: JobConfig | None = None,
+) -> tuple[int, int] | None:
+    """Count experiments with surprisal above threshold.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        threshold: Surprisal threshold
+        config: Configuration (uses default if None)
+
+    Returns:
+        Tuple of (high_surprisal_count, total_experiments), or None if loading fails
+    """
+    config = config or JobConfig()
+
+    try:
+        # List all experiment files
+        filenames = list_experiment_files(userid, jobid, config)
+
+        total = len(filenames)
+        high_count = 0
+
+        # Count experiments with high surprisal
+        for filename in filenames:
+            node_data = read_experiment_node(userid, jobid, filename, config)
+            if node_data:
+                surprisal = node_data.get("normalized_surprisal")
+                if surprisal is not None and surprisal > threshold:
+                    high_count += 1
+
+        return (high_count, total)
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to count high surprisal for {userid}/{jobid}: {e}")
+        return None
+
+
 def read_rich_outputs(
     userid: str,
     jobid: str,

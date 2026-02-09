@@ -141,7 +141,7 @@ def count_high_surprisal(
     runid: str,
     config: JobConfig,
     threshold: float,
-) -> int | None:
+) -> tuple[int, int] | None:
     """Count experiments with surprisal above threshold.
 
     Args:
@@ -151,14 +151,16 @@ def count_high_surprisal(
         threshold: Surprisal threshold (surprisal_width from run parameters)
 
     Returns:
-        Count of high surprisal experiments, or None if loading fails
+        Tuple of (high_surprisal_count, total_experiments), or None if loading fails
     """
     try:
         tree = ExperimentTree.load(userid, runid, config)
-        return sum(
-            1 for node in tree.as_list()
+        nodes = tree.as_list()
+        high_count = sum(
+            1 for node in nodes
             if node.surprise is not None and node.surprise > threshold
         )
+        return (high_count, len(nodes))
     except Exception as e:
         logger.warning(f"Failed to count high surprisal for {userid}/{runid}: {e}")
         return None
@@ -173,6 +175,7 @@ def build_email_body(
     origin_url: str | None = None,
     metadata: dict | None = None,
     high_surprisal_count: int | None = None,
+    total_experiments: int | None = None,
     surprisal_width: float | None = None,
 ) -> str:
     """Build email body using Jinja2 template."""
@@ -189,8 +192,9 @@ def build_email_body(
         "n_experiments": metadata.get("n_experiments", ""),
         "duration": format_duration(started_at, finished_at),
     }
-    if high_surprisal_count is not None and surprisal_width is not None:
+    if high_surprisal_count is not None and total_experiments is not None and surprisal_width is not None:
         context["high_surprisal_count"] = high_surprisal_count
+        context["total_experiments"] = total_experiments
         context["surprisal_width"] = surprisal_width
 
     template = jinja_env.get_template("completion_email.html")
@@ -293,11 +297,14 @@ def send_completion_emails(
 
                 # Count high surprisal experiments (only for successful runs)
                 high_surprisal_count = None
+                total_experiments = None
                 surprisal_width = None
                 if status == "SUCCEEDED" and metadata:
                     surprisal_width = metadata.get("surprisal_width")
                     if surprisal_width is not None:
-                        high_surprisal_count = count_high_surprisal(userid, runid, config, surprisal_width)
+                        result = count_high_surprisal(userid, runid, config, surprisal_width)
+                        if result:
+                            high_surprisal_count, total_experiments = result
 
                 # Build email content
                 subject = build_email_subject(status, run_name)
@@ -305,6 +312,7 @@ def send_completion_emails(
                     runid, status, run_name, started_at, run_details.finished_at,
                     origin_url=origin_url, metadata=metadata,
                     high_surprisal_count=high_surprisal_count,
+                    total_experiments=total_experiments,
                     surprisal_width=surprisal_width,
                 )
 

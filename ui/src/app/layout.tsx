@@ -15,6 +15,7 @@ import '@fontsource/manrope/700.css';
 import ClientProviders from '@/components/ClientProviders';
 import AuthErrorDialog from '@/components/AuthErrorDialog';
 import HeapAnalyticsLoader from '@/components/HeapAnalyticsLoader';
+import { Toasts } from '@/components/Toasts';
 
 export const metadata: Metadata = {
     title: 'AstaLabs AutoDiscovery',
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                                     minHeight: '100vh',
                                     position: 'relative',
                                 }}>
+                                <Toasts />
                                 {children}
                             </div>
                         </VarnishApp>

@@ -440,7 +440,7 @@ def expire_datasets(
             # Delete if not dry run
             if not dry_run:
                 print(f"Deleting dataset file: {gcs_path}")
-                # blob.delete()
+                blob.delete()
 
         return expired_paths
     except Exception as e:

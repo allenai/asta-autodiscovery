@@ -350,16 +350,16 @@ function RunStatusContent({
                             <RunToolbarButtons>
                                 <ParametersButton
                                     variant="outlined"
-                                    startIcon={<ShareOutlinedIcon />}
-                                    onClick={onShareClick}>
-                                    {isSharedState ? 'Unshare Run' : 'Share Run'}
-                                </ParametersButton>
-                                <ParametersButton
-                                    variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
+                                </ParametersButton>
+                                <ParametersButton
+                                    variant="outlined"
+                                    startIcon={<ShareOutlinedIcon />}
+                                    onClick={onShareClick}>
+                                    {isSharedState ? 'Unshare' : 'Share'}
                                 </ParametersButton>
                                 {canStop && (
                                     <StopButton

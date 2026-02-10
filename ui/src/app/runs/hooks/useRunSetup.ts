@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
-import { useRuns } from '@/contexts/RunsContext';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
@@ -81,7 +81,7 @@ interface FieldErrors {
 
 export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
-    const { updateViewerRun } = useRuns();
+    const { updateViewerRun } = useViewerRuns();
     const api = getRunsApi();
 
     const creditsAvailable = credits?.available ?? 0;

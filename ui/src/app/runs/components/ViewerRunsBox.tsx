@@ -4,7 +4,7 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { useMemo, useState, useEffect } from 'react';
 
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
-import { useRuns } from '@/contexts/RunsContext';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { RunSummary } from '@/runs/components/RunSummary';
 import { Run, RunStatus } from '@/types/Run';
 
@@ -39,7 +39,7 @@ const BUCKET_LABELS: Record<Bucket, string> = {
 };
 
 export const ViewerRunsBox = () => {
-    const { viewerRuns, isViewerRunsLoading } = useRuns();
+    const { viewerRuns, isViewerRunsLoading } = useViewerRuns();
 
     // Group runs by status, sorted for display by STATUS_BUCKETS order
     const runsByBucket = useMemo(() => {

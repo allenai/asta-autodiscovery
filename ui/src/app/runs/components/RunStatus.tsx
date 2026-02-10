@@ -36,6 +36,7 @@ import {
     mkSessionConfigBtnAttrs,
 } from '@/analytics/runDetails';
 import { getRunStatusString } from '@/runs/utils/runUtils';
+import { useToasts } from '@/contexts/ToastsContext';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -206,8 +207,8 @@ function RunStatusContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isTableExpanded, setIsTableExpanded] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
-    const [isSharedState, setIsSharedState] = useState(run.metadata?.isShared ?? false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
+    const { addSuccessToast, addErrorToast } = useToasts();
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
@@ -217,28 +218,25 @@ function RunStatusContent({
     const onShareClick = useCallback(
         async (event: React.MouseEvent<HTMLButtonElement>) => {
             event.preventDefault();
-            const newIsShared = !isSharedState;
-            setIsSharedState(newIsShared);
 
             const shareUrl = `${window.location.origin}/runs/shared/${run.id}`;
             const sharePromise = navigator.clipboard.writeText(shareUrl);
 
             const apiPromise = runsApi.shareRun({
                 runId: run.id,
-                isShared: newIsShared,
+                isShared: true,
             });
 
-            // TODO: Show UI with URL
-
             try {
-                await Promise.all([sharePromise, apiPromise]);
+                await sharePromise;
+                addSuccessToast('Share URL copied to clipboard.', shareUrl);
+                await apiPromise;
             } catch (err) {
-                // TODO: Report error in a toast notification
+                addErrorToast('Error sharing run.');
                 console.error('Error sharing run:', err);
-                setIsSharedState(!newIsShared); // Revert view
             }
         },
-        [isSharedState, run.id]
+        [run.id]
     );
 
     // Read from URL: Initial selection when exp param is present
@@ -363,7 +361,7 @@ function RunStatusContent({
                                         variant="outlined"
                                         startIcon={<ShareOutlinedIcon />}
                                         onClick={onShareClick}>
-                                        {isSharedState ? 'Unshare' : 'Share'}
+                                        Share
                                     </ParametersButton>
                                 )}
                                 {canStop && (

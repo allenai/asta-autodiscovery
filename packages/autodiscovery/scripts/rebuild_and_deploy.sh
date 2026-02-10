@@ -9,7 +9,9 @@ cd "${ROOT_DIR}"
 PROJECT_ID=$(gcloud config get-value project)
 REGION="us-west1"
 VERTEX_LOCATION="${VERTEX_LOCATION:-$REGION}"
-IMAGE="us-west1-docker.pkg.dev/${PROJECT_ID}/autodiscovery/autodiscovery:latest"
+ENV_TAG="${ENV_TAG:-dev}"  # Default to dev, override with ENV_TAG=prod
+SKIP_BUILD="${SKIP_BUILD:-false}"  # Set SKIP_BUILD=true to skip image build
+IMAGE="us-west1-docker.pkg.dev/${PROJECT_ID}/autodiscovery/autodiscovery:${ENV_TAG}"
 JOB_NAME="autodiscovery-job"
 BUCKET="example-gcp-project"
 OPENAI_SECRET_NAME="openai-api-key-secret"
@@ -21,6 +23,7 @@ MODAL_IMAGE_BUILDER_SECRET_NAME="modal-image-builder-secret"
 
 echo "Project: ${PROJECT_ID}"
 echo "Region: ${REGION}"
+echo "Environment: ${ENV_TAG}"
 echo "Image: ${IMAGE}"
 echo "Job: ${JOB_NAME}"
 echo ""
@@ -53,15 +56,30 @@ fi
 echo "All required secrets are present."
 echo ""
 
-# Step 1: Build and push image using Cloud Build
-echo "========================================="
-echo "Step 1: Building and pushing Docker image"
-echo "========================================="
-gcloud builds submit --config="${ROOT_DIR}/packages/autodiscovery/cloudbuild.yaml" "${ROOT_DIR}"
+# Step 1: Build and push image using Cloud Build (optional)
+if [ "$SKIP_BUILD" = "false" ]; then
+    echo "========================================="
+    echo "Step 1: Building and pushing Docker image"
+    echo "========================================="
+    echo "Note: Building with tag ${ENV_TAG} using Cloud Build"
+    echo "      To skip build and use existing image, set SKIP_BUILD=true"
+    echo ""
+
+    gcloud builds submit \
+        --config="${ROOT_DIR}/packages/autodiscovery/cloudbuild.yaml" \
+        --substitutions="_IMAGE_TAG=${ENV_TAG}" \
+        "${ROOT_DIR}"
+else
+    echo "========================================="
+    echo "Step 1: Skipping image build (SKIP_BUILD=true)"
+    echo "========================================="
+    echo "Using existing image: ${IMAGE}"
+    echo ""
+fi
 
 echo ""
 echo "========================================="
-echo "Step 2: Updating Cloud Run Job with GCS mount"
+echo "Step 2: Updating Cloud Run Job"
 echo "========================================="
 UPDATE_SECRETS=(
     "OPENAI_API_KEY=${OPENAI_SECRET_NAME}:latest"

@@ -1,4 +1,4 @@
-name: Build Scripts Image
+name: Build AutoDiscovery Image
 
 on:
   push:
@@ -6,19 +6,21 @@ on:
       - main
       - env/prod
     paths:
-      - 'scripts/**'
-      - 'packages/autodiscovery_jobs/**'
-      - '.github/workflows/maintenance-build.yml'
+      - 'packages/autodiscovery/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/autodiscovery-build.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'scripts/**'
-      - 'packages/autodiscovery_jobs/**'
+      - 'packages/autodiscovery/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  IMAGE_NAME: us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts
+  IMAGE_NAME: us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery
 
 jobs:
   build-and-push:
@@ -46,12 +48,15 @@ jobs:
 
       - name: Build image
         run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" > .github_token.tmp
           docker build \
             --platform linux/amd64 \
+            --secret id=github_token,src=.github_token.tmp \
             -t ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }} \
             -t ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }} \
-            -f scripts/Dockerfile \
+            -f packages/autodiscovery/Dockerfile \
             .
+          rm -f .github_token.tmp
 
       - name: Push image
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')

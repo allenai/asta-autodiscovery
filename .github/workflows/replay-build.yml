@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - env/prod
     paths:
       - 'packages/devtools/**'
       - '.github/workflows/replay-build.yml'
@@ -32,17 +33,26 @@ jobs:
         run: |
           echo '${{ secrets.GCP_SA_KEY }}' | docker login -u _json_key --password-stdin https://us-west1-docker.pkg.dev
 
+      - name: Determine environment tag
+        id: env-tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/env/prod" ]]; then
+            echo "env=prod" >> $GITHUB_OUTPUT
+          else
+            echo "env=dev" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build image
         run: |
           docker build \
             --platform linux/amd64 \
-            -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -t ${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }} \
+            -t ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }} \
             -f packages/devtools/Dockerfile \
             .
 
       - name: Push image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
         run: |
-          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }}
+          docker push ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}

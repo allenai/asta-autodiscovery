@@ -7,7 +7,7 @@
 Install all required packages (including those for testing and documentation) using:
 
 ```sh
-just sync
+make sync
 ```
 
 ## Running Tests
@@ -15,11 +15,11 @@ just sync
 Execute the test suites with:
 
 ```sh
-just test           # Run main test suite. Excludes Modal Tests
-just test-modal     # Run Modal tests only
-just test-all       # Run all tests
+make test           # Run main test suite. Excludes Modal Tests
+make test-modal     # Run Modal tests only
+make test-all       # Run all tests
 
-just test -- --cov  # Run main tests and report coverage
+make test -- --cov  # Run main tests and report coverage
 ```
 
 ## Linting and Formatting
@@ -27,13 +27,13 @@ just test -- --cov  # Run main tests and report coverage
 Run Ruff via uv to check code style and lint errors:
 
 ```sh
-just lint
+make lint
 ```
 
 To apply Ruff's formatter, use:
 
 ```sh
-just format
+make format
 ```
 
 ## Typing
@@ -41,7 +41,7 @@ just format
 Run the static type checker with
 
 ```sh
-just type-check
+make type-check
 ```
 
 ## Documentation
@@ -49,7 +49,7 @@ just type-check
 Serve the documentation with
 
 ```sh
-just serve-docs
+make serve-docs
 ```
 
 # skiff-template-nextjs
@@ -110,7 +110,7 @@ Commits to the `main` branch are automatically deployed to the development envir
 - **Production:** `env/prod` branch → https://autodiscovery.example.com/
   - Manually deployed by pointing the branch at a good commit. 
 
-You can find more details about your application via [Marina](https://deploy.example.com).
+You can find more details about your application via [Marina](https://deploy.example.com/a/asta-autodiscovery).
 
 ## Getting Help
 

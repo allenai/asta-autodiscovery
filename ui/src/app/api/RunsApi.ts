@@ -174,12 +174,8 @@ export class RunsApi extends BaseApi {
     async getRunMetadata({ userid, runid }: { userid?: string; runid: string }) {
         const effectiveUserid = userid ?? (await this.getUserId());
 
-        if (!effectiveUserid) {
-            throw new Error('User ID is required to fetch run metadata');
-        }
-
         return this.request<GetRunMetadataResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/metadata`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
         });
     }
@@ -195,17 +191,13 @@ export class RunsApi extends BaseApi {
     }) {
         const effectiveUserid = userid ?? (await this.getUserId());
 
-        if (!effectiveUserid) {
-            throw new Error('User ID is required to fetch run experiments');
-        }
-
         const query: Record<string, string> = {};
         if (afterExperimentId) {
             query.after_experiment_id = afterExperimentId;
         }
 
         return this.request<GetRunExperimentsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments`,
             method: 'GET',
             query,
         });
@@ -222,12 +214,8 @@ export class RunsApi extends BaseApi {
     }) {
         const effectiveUserid = userid ?? (await this.getUserId());
 
-        if (!effectiveUserid) {
-            throw new Error('User ID is required to fetch experiment details');
-        }
-
         return this.request<GetRunExperimentDetailsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,
             method: 'GET',
@@ -237,12 +225,8 @@ export class RunsApi extends BaseApi {
     async getRun({ userid, runId }: { userid?: string; runId: string }) {
         const effectiveUserid = userid ?? (await this.getUserId());
 
-        if (!effectiveUserid) {
-            throw new Error('User ID is required to fetch run');
-        }
-
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runId)}`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}`,
             method: 'GET',
         });
     }
@@ -250,12 +234,8 @@ export class RunsApi extends BaseApi {
     async getRunStatus({ userid, runId }: { userid?: string; runId: string }) {
         const effectiveUserid = userid ?? (await this.getUserId());
 
-        if (!effectiveUserid) {
-            throw new Error('User ID is required to fetch run status');
-        }
-
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runId)}/status`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}/status`,
             method: 'GET',
         });
     }

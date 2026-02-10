@@ -25,7 +25,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { useRuns } from '@/contexts/RunsContext';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { getRunsApi } from '@/api/RunsApi';
 import { mkDeleteRunBtnAttrs, mkRunListItemAttrs } from '@/analytics/run';
@@ -45,7 +45,7 @@ interface RunsListProps {
  * - Loading and error states
  */
 export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) {
-    const { viewerRuns, isViewerRunsLoading, removeViewerRun } = useRuns();
+    const { viewerRuns, isViewerRunsLoading, removeViewerRun } = useViewerRuns();
     const router = useRouter();
     const api = getRunsApi();
 

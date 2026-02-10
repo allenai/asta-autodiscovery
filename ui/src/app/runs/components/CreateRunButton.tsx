@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { getRunFromApi } from '@/types/Run';
-import { useRuns } from '@/contexts/RunsContext';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { mkCreateNewRunBtnAttrs } from '@/analytics/run';
 
 export const CreateRunButton = () => {
     const router = useRouter();
     const api = getRunsApi();
-    const { addViewerRun } = useRuns();
+    const { addViewerRun } = useViewerRuns();
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState<string | null>();
 

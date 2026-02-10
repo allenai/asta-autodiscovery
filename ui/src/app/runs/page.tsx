@@ -64,6 +64,9 @@ export default function RunsPage() {
                         experiment.
                     </Attribution>
                 </Section>
+                <Section>
+                    <ExamplesRunsBox />
+                </Section>
                 <FooterWrapper>
                     <ToS />
                 </FooterWrapper>

@@ -21,14 +21,14 @@ interface SharedRunPageProps {
  */
 export default function SharedRunPage({ params }: SharedRunPageProps) {
     const api = getRunsApi();
-    const { isAuthenticated, isLoading: authLoading } = useAuth0();
+    const { isLoading: authLoading } = useAuth0();
     const { runId } = params;
     const [userid, setUserid] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isLoadingOwner, setIsLoadingOwner] = useState(true);
 
     useEffect(() => {
-        if (!isAuthenticated || authLoading) return;
+        if (authLoading) return;
 
         const fetchOwner = async () => {
             try {
@@ -43,18 +43,10 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
         };
 
         fetchOwner();
-    }, [runId, isAuthenticated, authLoading]);
+    }, [runId, authLoading]);
 
     if (authLoading || isLoadingOwner) {
         return <LoadingSpinner />;
-    }
-
-    if (!isAuthenticated) {
-        return (
-            <Box sx={{ p: 3 }}>
-                <Alert severity="warning">Please log in to view this run.</Alert>
-            </Box>
-        );
     }
 
     if (error || !userid) {

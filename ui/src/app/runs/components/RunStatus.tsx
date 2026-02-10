@@ -26,8 +26,9 @@ import { getRunsApi } from '@/api/RunsApi';
 import { Run, getRunFromApi } from '@/types/Run';
 import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
-import { ExperimentDetails } from './ExperimentDetails';
+import { ExperimentDetails } from '@/runs/components/ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { TopSurprisalsList } from '@/runs/components/TopSurprisalsList';
 import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
@@ -334,6 +335,8 @@ function RunStatusContent({
                     </RunHeader>
 
                     <RunContent>
+                        <TopSurprisalsList />
+
                         <RunToolbar>
                             {run.stats && (
                                 <ExperimentCount>

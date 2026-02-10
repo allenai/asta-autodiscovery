@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Send completion notification emails for finished AutoDiscovery runs.
+"""Send completion notification emails for successful AutoDiscovery runs.
 
-This script scans for completed runs and sends email notifications to users.
+This script scans for successfully completed runs and sends email notifications to users.
+Failed and cancelled runs do not trigger notifications.
 It tracks sent emails in email_state.json to avoid duplicates.
 
 Uses a GCS-based lock to prevent concurrent executions when scheduled frequently.
@@ -261,6 +262,11 @@ def send_completion_emails(
 
                 # Skip soft-deleted runs
                 if run_details.status == "DELETED":
+                    continue
+
+                # Only send emails for successful runs
+                if run_details.status != "SUCCEEDED":
+                    logger.debug(f"Skipping {userid}/{runid}: status is {run_details.status} (only notifying on success)")
                     continue
 
                 # Check finish time

@@ -4,10 +4,11 @@ This directory contains scripts that run as scheduled Cloud Run Jobs.
 
 ## send_completion_emails.py
 
-Sends email notifications when AutoDiscovery runs complete. Tracks sent emails in GCS to avoid duplicates.
+Sends email notifications when AutoDiscovery runs complete successfully. Failed and cancelled runs do not trigger notifications. Tracks sent emails in GCS to avoid duplicates.
 
 **Features:**
-- Scans for runs completed within the last 24 hours (configurable)
+- Scans for successful runs completed within the last 24 hours (configurable)
+- Only sends notifications for SUCCEEDED status (not FAILED or CANCELLED)
 - Looks up user emails from Auth0
 - Uses GCS-based distributed lock to prevent concurrent executions
 - Supports dry-run mode for testing

@@ -27,7 +27,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     };
 
     return (
-        <Wrapper>
+        <Wrapper $isAuthenticated={isAuthenticated}>
             <Layout $showSidebar={isAuthenticated}>
                 {/* Sidebar - RunsList */}
                 {isAuthenticated && (
@@ -63,8 +63,16 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     );
 }
 
-const Wrapper = styled(Box)`
+const Wrapper = styled(Box)<{ $isAuthenticated: boolean }>`
     background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    ${({ $isAuthenticated }) =>
+        !$isAuthenticated &&
+        `
+        background-image: url(/autods-bg.png);
+        background-position: bottom right;
+        background-repeat: no-repeat;
+        background-size: contain;
+    `}
     position: absolute;
     inset: 0;
 `;

@@ -278,6 +278,36 @@ class JobManager:
         """
         return gcs.get_job_args(userid, jobid, self.config)
 
+    def get_shared_run_owner(self, runid: str) -> str | None:
+        """Get the owner userid for a shared run.
+
+        Args:
+            runid: Run identifier
+
+        Returns:
+            User ID if the run exists and is shared, None otherwise
+
+        Note:
+            Returns None for runs that don't exist OR exist but are not shared.
+            This prevents information leakage about run existence.
+        """
+        # Find who owns this run using existing GCS function
+        userid = gcs.get_userid_for_job(runid, self.config)
+
+        if userid is None:
+            return None
+
+        # Verify the run is marked as shared
+        try:
+            metadata = self.get_metadata(userid, runid)
+            if metadata and metadata.get("is_shared") is True:
+                return userid
+        except Exception:
+            # If we can't read metadata, treat as not shared
+            pass
+
+        return None
+
     # Job execution
 
     def run_job(

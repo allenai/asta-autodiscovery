@@ -129,3 +129,49 @@ def requires_enrollment(f):
     """
     default_permission = os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
     return requires_auth(required_permission=default_permission)(f)
+
+
+def optional_enrollment(f):
+    """Decorator that authenticates if a token is present, but allows unauthenticated access.
+
+    If a valid Authorization header is present, validates the token and sets request.user
+    (same as requires_enrollment). If no Authorization header is present, sets request.user
+    to an empty dict and continues. This enables endpoints to serve both authenticated
+    and unauthenticated users (e.g., for shared runs).
+    """
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", None)
+
+        if not auth_header:
+            request.user = {}
+            return f(*args, **kwargs)
+
+        # Token is present, validate it
+        auth0_domain = os.environ.get("AUTH0_DOMAIN")
+        auth0_audience = os.environ.get("AUTH0_AUDIENCE")
+
+        if not auth0_domain or not auth0_audience:
+            return jsonify({"error": "Auth0 configuration missing"}), 500
+
+        parts = auth_header.split()
+        if parts[0].lower() != "bearer" or len(parts) != 2:
+            request.user = {}
+            return f(*args, **kwargs)
+
+        token = parts[1]
+
+        try:
+            payload = verify_token(token, auth0_domain, auth0_audience)
+            masquerade_user = os.environ.get("DEV_MASQUERADE_USER")
+            if masquerade_user:
+                payload["sub"] = masquerade_user
+            request.user = payload
+        except ValueError:
+            # Invalid token - treat as unauthenticated
+            request.user = {}
+
+        return f(*args, **kwargs)
+
+    return decorated

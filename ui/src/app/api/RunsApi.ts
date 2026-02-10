@@ -28,6 +28,8 @@ export interface RunMetadataFromApi {
         content_type: string | null;
         file_size_bytes: number | null;
     }[];
+    // Sharing
+    is_shared?: boolean | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -120,6 +122,8 @@ export interface MetadataFromApi {
     domain: string | null;
     intent: string | null;
     datasets: MetadataDatasetFromApi[];
+    // Sharing
+    is_shared?: boolean | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -133,6 +137,16 @@ export interface MetadataFromApi {
 export interface GetRunMetadataResponseBody {
     runid: string;
     metadata: MetadataFromApi;
+}
+
+export interface ShareRunResponseBody {
+    runid: string;
+    is_shared: boolean;
+}
+
+export interface GetSharedRunOwnerResponseBody {
+    runid: string;
+    userid: string;
 }
 
 export class RunsApi extends BaseApi {
@@ -227,8 +241,9 @@ export class RunsApi extends BaseApi {
     }
 
     async cancelRun(runId: string) {
+        const userid = await this.getUserId();
         return this.request<void>({
-            url: `${RUNS_URL_PREFIX}/${runId}/cancel`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/cancel`,
             method: 'POST',
         });
     }
@@ -287,6 +302,22 @@ export class RunsApi extends BaseApi {
         return this.request<{ message: string }>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}`,
             method: 'DELETE',
+        });
+    }
+
+    async shareRun({ runId, isShared }: { runId: string; isShared: boolean }) {
+        const userid = await this.getUserId();
+        return this.request<ShareRunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/share`,
+            method: 'POST',
+            body: { is_shared: isShared },
+        });
+    }
+
+    async getSharedRunOwner({ runId }: { runId: string }) {
+        return this.request<GetSharedRunOwnerResponseBody>({
+            url: `${RUNS_URL_PREFIX}/shared/${encodeURIComponent(runId)}/owner`,
+            method: 'GET',
         });
     }
 }

@@ -14,53 +14,45 @@ import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, Run } from '@/types/Run';
 import { useAuth0 } from '@/contexts/Auth0Context';
 
-export interface RunsState {
+export interface ViewerRunsState {
     viewerRuns: Run[] | null;
-    isViewerRunsLoading?: boolean;
+    isViewerRunsLoading: boolean;
     updateViewerRuns: () => Promise<void>;
     addViewerRun: (run: Run) => void;
     updateViewerRun: (run: Partial<Run> & { id: string }) => void;
     removeViewerRun: (runId: string) => void;
-    exampleRuns: Run[] | null;
-    isExampleRunsLoading?: boolean;
-    updateExampleRuns: () => Promise<void>;
     lastError: string | null;
 }
 
-export const DEFAULT_STATE: RunsState = {
+export const DEFAULT_STATE: ViewerRunsState = {
     viewerRuns: null,
     isViewerRunsLoading: false,
     updateViewerRuns: async () => {},
     addViewerRun: () => {},
     updateViewerRun: () => {},
     removeViewerRun: () => {},
-    exampleRuns: null,
-    updateExampleRuns: async () => {},
-    isExampleRunsLoading: false,
     lastError: null,
 };
 
-const RunsContext = createContext<RunsState>(DEFAULT_STATE);
+const ViewerRunsContext = createContext<ViewerRunsState>(DEFAULT_STATE);
 
-export const useRuns = (): RunsState => {
-    const context = useContext(RunsContext);
+export const useViewerRuns = (): ViewerRunsState => {
+    const context = useContext(ViewerRunsContext);
     if (!context) {
-        throw new Error('useRuns must be used within a RunsProvider');
+        throw new Error('useViewerRuns must be used within a ViewerRunsContextProvider');
     }
     return context;
 };
 
-export type RunsProviderProps = PropsWithChildren<{}>;
+export type ViewerRunsProviderProps = PropsWithChildren<{}>;
 
-export const RunsContextProvider = ({ children }: RunsProviderProps) => {
+export const ViewerRunsContextProvider = ({ children }: ViewerRunsProviderProps) => {
     const runsApi = getRunsApi();
     const { isAuthenticated } = useAuth0();
 
     const [lastError, setLastError] = useState<string | null>(null);
     const [viewerRuns, setViewerRuns] = useState<Run[] | null>(null);
     const [isViewerRunsLoading, setIsViewerRunsLoading] = useState<boolean>(false);
-    const [exampleRuns, setExampleRuns] = useState<Run[] | null>(null);
-    const [isExampleRunsLoading, setIsExampleRunsLoading] = useState<boolean>(false);
 
     const addViewerRun = useCallback((run: Run) => {
         setViewerRuns((prevRuns) => {
@@ -88,6 +80,9 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
     }, []);
 
     const updateViewerRuns = useCallback(async () => {
+        if (!isAuthenticated) {
+            return;
+        }
         setIsViewerRunsLoading(true);
         try {
             // No userid needed - API will use authenticated user
@@ -99,55 +94,36 @@ export const RunsContextProvider = ({ children }: RunsProviderProps) => {
         } finally {
             setIsViewerRunsLoading(false);
         }
-    }, [runsApi]);
-
-    const updateExampleRuns = useCallback(async () => {
-        setIsExampleRunsLoading(true);
-        try {
-            const { data } = await runsApi.listRuns({ userid: 'samples' });
-            const runs = data.runs.map((runData) => getRunFromApi(runData));
-            setExampleRuns(runs);
-        } catch (error: any) {
-            // Sample runs are optional - don't set error if they fail
-            setExampleRuns([]);
-        } finally {
-            setIsExampleRunsLoading(false);
-        }
-    }, [runsApi]);
+    }, [runsApi, isAuthenticated]);
 
     useEffect(() => {
         if (isAuthenticated) {
             updateViewerRuns();
-            updateExampleRuns();
         }
-    }, [updateViewerRuns, updateExampleRuns, isAuthenticated]);
+    }, [updateViewerRuns, isAuthenticated]);
 
-    const memoizedState = useMemo<RunsState>(
+    const memoizedState = useMemo<ViewerRunsState>(
         () => ({
             lastError,
             viewerRuns,
             isViewerRunsLoading,
-            exampleRuns,
-            isExampleRunsLoading,
             addViewerRun,
             updateViewerRun,
             removeViewerRun,
             updateViewerRuns,
-            updateExampleRuns,
         }),
         [
             lastError,
             viewerRuns,
             isViewerRunsLoading,
-            exampleRuns,
-            isExampleRunsLoading,
             addViewerRun,
             updateViewerRun,
             removeViewerRun,
             updateViewerRuns,
-            updateExampleRuns,
         ]
     );
 
-    return <RunsContext.Provider value={memoizedState}>{children}</RunsContext.Provider>;
+    return (
+        <ViewerRunsContext.Provider value={memoizedState}>{children}</ViewerRunsContext.Provider>
+    );
 };

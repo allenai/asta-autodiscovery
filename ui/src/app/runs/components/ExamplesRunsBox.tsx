@@ -1,10 +1,10 @@
 import { Box, CircularProgress, Typography, styled } from '@mui/material';
 
 import { RunSummary } from '@/runs/components/RunSummary';
-import { useRuns } from '@/contexts/RunsContext';
+import { useExampleRuns } from '@/contexts/ExampleRunsContext';
 
 export const ExamplesRunsBox = () => {
-    const { exampleRuns, isExampleRunsLoading } = useRuns();
+    const { exampleRuns, isExampleRunsLoading } = useExampleRuns();
     return (
         <>
             <Headline variant="h5">Example Sessions</Headline>

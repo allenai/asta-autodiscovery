@@ -6,7 +6,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';
 import Header from '@/components/Header';
-import { RunsContextProvider } from '@/contexts/RunsContext';
 import { ToS } from '@/components/ToS';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { mkLogoTrackAttrs } from '@/analytics/run';
@@ -28,41 +27,39 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     };
 
     return (
-        <RunsContextProvider>
-            <Wrapper>
-                <Layout $showSidebar={isAuthenticated}>
-                    {/* Sidebar - RunsList */}
-                    {isAuthenticated && (
-                        <Sidebar>
-                            <Logo href="/runs" {...mkLogoTrackAttrs()}>
-                                <IconAutoDSLogo />
-                            </Logo>
-                            <ScrollArea>
-                                <ScrollContainer>
-                                    <ScrollContent>
-                                        <RunsList
-                                            selectedRunId={selectedRunId}
-                                            onSelectRun={handleSelectRun}
-                                        />
-                                    </ScrollContent>
-                                </ScrollContainer>
-                            </ScrollArea>
-                            <ToS />
-                        </Sidebar>
-                    )}
-
-                    {/* Main content */}
-                    <MainContent>
-                        {isAuthenticated && <Header />}
+        <Wrapper>
+            <Layout $showSidebar={isAuthenticated}>
+                {/* Sidebar - RunsList */}
+                {isAuthenticated && (
+                    <Sidebar>
+                        <Logo href="/runs" {...mkLogoTrackAttrs()}>
+                            <IconAutoDSLogo />
+                        </Logo>
                         <ScrollArea>
                             <ScrollContainer>
-                                <ScrollContent>{children}</ScrollContent>
+                                <ScrollContent>
+                                    <RunsList
+                                        selectedRunId={selectedRunId}
+                                        onSelectRun={handleSelectRun}
+                                    />
+                                </ScrollContent>
                             </ScrollContainer>
                         </ScrollArea>
-                    </MainContent>
-                </Layout>
-            </Wrapper>
-        </RunsContextProvider>
+                        <ToS />
+                    </Sidebar>
+                )}
+
+                {/* Main content */}
+                <MainContent>
+                    {isAuthenticated && <Header />}
+                    <ScrollArea>
+                        <ScrollContainer>
+                            <ScrollContent>{children}</ScrollContent>
+                        </ScrollContainer>
+                    </ScrollArea>
+                </MainContent>
+            </Layout>
+        </Wrapper>
     );
 }
 

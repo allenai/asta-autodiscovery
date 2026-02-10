@@ -21,7 +21,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
-import { useRuns } from '@/contexts/RunsContext';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { saveMetadata, submitRun } from '../actions';
 import type { Dataset } from './DatasetUpload';
 
@@ -65,7 +65,7 @@ export default function RunConfiguration({
 }: RunConfigurationProps) {
     const { getAccessToken } = useAuth0();
     const { credits } = useViewerCredits();
-    const { updateViewerRun } = useRuns();
+    const { updateViewerRun } = useViewerRuns();
 
     const [title, setTitle] = useState('');
     const [nExperiments, setNExperiments] = useState(4);

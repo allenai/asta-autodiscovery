@@ -1,6 +1,5 @@
 'use client';
 
-
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';

@@ -217,7 +217,7 @@ def create() -> Blueprint:
         return None, None
 
     @api.route("/<userid>/list", methods=["GET"])
-    @requires_enrollment
+    @optional_enrollment
     def list_runs(userid: str):
         """List runs for a specific user.
 

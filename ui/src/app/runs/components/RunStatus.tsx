@@ -561,9 +561,6 @@ const RunHeaderName = styled('h1')`
     line-height: 24px;
     margin: 0;
     flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 `;
 
 const RunContent = styled(Box)`

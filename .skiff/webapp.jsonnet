@@ -11,7 +11,7 @@
 local config = import '../skiff.json';
 local util = import './util.libsonnet';
 
-function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', branch='', repo='', buildId='')
+function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env, branch='', repo='', buildId='')
     // Produce a list of hostnames served by your application.
     // See: https://skiff.allenai.org/domains.html.
     local domains =
@@ -407,6 +407,14 @@ function(apiImage, uiImage, proxyImage, autodsVizImage, cause, sha, env='prod', 
                                    + gpuLimits # only the first container should have gpuLimits applied
                             },
                             env: [
+                                {
+                                    name: 'ENV',
+                                    value: env
+                                },
+                                {
+                                    name: 'CLOUDRUN_JOB_NAME',
+                                    value: if env == 'prod' then 'autodiscovery-job-prod' else 'autodiscovery-job-dev'
+                                },
                                 {
                                     name: 'LOG_FORMAT',
                                     value: 'google:json'

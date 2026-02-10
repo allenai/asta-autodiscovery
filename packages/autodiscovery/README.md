@@ -4,7 +4,33 @@
 
 ## Deployment
 
-Deploy to GCP with `just deploy-autodiscovery` from the root of the repo.
+### Image Tagging Strategy
+
+The autodiscovery Docker image follows an environment-based tagging strategy:
+- **Dev environment** (`main` branch): `:dev`, `:dev-${commit_sha}`
+- **Prod environment** (`env/prod` branch): `:prod`, `:prod-${commit_sha}`
+
+Images are automatically built and pushed by GitHub Actions when changes merge to `main` or `env/prod`.
+
+**Note:** We do not use `:latest` tags. All deployments must explicitly specify `:dev` or `:prod` to prevent accidental environment mixing.
+
+### Deploying to Cloud Run
+
+Deploy or update the Cloud Run Job from the root of the repo:
+
+**For development environment:**
+```bash
+make deploy-autodiscovery
+# Or with explicit env tag:
+ENV_TAG=dev SKIP_BUILD=true make deploy-autodiscovery
+```
+
+**For production environment:**
+```bash
+ENV_TAG=prod SKIP_BUILD=true make deploy-autodiscovery
+```
+
+The `SKIP_BUILD=true` flag skips building the image (uses the image already built by GitHub Actions). Omit it to build locally.
 
 ## Datasets
 

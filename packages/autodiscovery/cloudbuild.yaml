@@ -10,13 +10,16 @@ steps:
         echo "$$GITHUB_TOKEN" > /workspace/.github_token
         docker build --secret id=github_token,src=/workspace/.github_token \
           -f packages/autodiscovery/Dockerfile \
-          -t us-west1-docker.pkg.dev/$PROJECT_ID/autodiscovery/autodiscovery:latest /workspace
+          -t us-west1-docker.pkg.dev/$PROJECT_ID/autodiscovery/autodiscovery:${_IMAGE_TAG} /workspace
         rm /workspace/.github_token
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'us-west1-docker.pkg.dev/$PROJECT_ID/autodiscovery/autodiscovery:latest'
+      - 'us-west1-docker.pkg.dev/$PROJECT_ID/autodiscovery/autodiscovery:${_IMAGE_TAG}'
+
+substitutions:
+  _IMAGE_TAG: 'dev'
 
 availableSecrets:
   secretManager:

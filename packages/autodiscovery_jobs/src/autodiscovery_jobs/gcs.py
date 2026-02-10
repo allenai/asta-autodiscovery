@@ -144,6 +144,42 @@ def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
     except Exception as e:
         raise GCSError(f"Failed to list jobs for user {userid}: {e}")
 
+def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | None:
+    """Find the user ID that owns a given job ID.
+
+    Args:
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        User ID if found, or None if not found
+
+    Raises:
+        GCSError: If listing fails
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    try:
+        # List all "directories" (common prefixes) under the users prefix
+        match_glob = f"users/*/jobs/{jobid}/metadata.json"
+        blobs = bucket.list_blobs(prefix="users/", match_glob=match_glob)
+
+        # Check each user for the job ID
+        for blob in list(blobs):
+            # blob.name looks like: "users/{userid}/jobs/{jobid}/metadata.json"
+            parts = blob.name.split("/")
+            if len(parts) >= 4:
+                userid = parts[1]
+                user_jobs = list_user_jobs(userid, config)
+                if jobid in user_jobs:
+                    return userid
+
+        return None  # Not found
+    except Exception as e:
+        raise GCSError(f"Failed to find user for job {jobid}: {e}")
+
 
 def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool:
     """Check if a job directory exists.

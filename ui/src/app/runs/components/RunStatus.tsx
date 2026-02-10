@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import {
     Box,
     Button,
@@ -20,6 +20,7 @@ import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Run, getRunFromApi } from '@/types/Run';
@@ -35,6 +36,7 @@ import {
     mkSessionConfigBtnAttrs,
 } from '@/analytics/runDetails';
 import { getRunStatusString } from '@/runs/utils/runUtils';
+import { useToasts } from '@/contexts/ToastsContext';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -170,6 +172,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
                 cancelling={cancelling}
                 handleStop={handleStop}
                 experimentsLabel={experimentsLabel}
+                isReadOnly={isReadOnly}
             />
         </RunExperimentsProvider>
     );
@@ -182,6 +185,7 @@ interface RunStatusContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
+    isReadOnly: boolean;
 }
 
 function RunStatusContent({
@@ -191,7 +195,9 @@ function RunStatusContent({
     cancelling,
     handleStop,
     experimentsLabel,
+    isReadOnly,
 }: RunStatusContentProps) {
+    const runsApi = getRunsApi();
     const {
         experiments,
         selectedExperiment,
@@ -202,11 +208,36 @@ function RunStatusContent({
     const [isTableExpanded, setIsTableExpanded] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
+    const { addSuccessToast, addErrorToast } = useToasts();
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
     const expParam = useSearchValue('exp');
     const hasInitiallySelected = useRef(false);
+
+    const onShareClick = useCallback(
+        async (event: React.MouseEvent<HTMLButtonElement>) => {
+            event.preventDefault();
+
+            const shareUrl = `${window.location.origin}/runs/shared/${run.id}`;
+            const sharePromise = navigator.clipboard.writeText(shareUrl);
+
+            const apiPromise = runsApi.shareRun({
+                runId: run.id,
+                isShared: true,
+            });
+
+            try {
+                await sharePromise;
+                addSuccessToast('Share URL copied to clipboard.', shareUrl);
+                await apiPromise;
+            } catch (err) {
+                addErrorToast('Error sharing run.');
+                console.error('Error sharing run:', err);
+            }
+        },
+        [run.id]
+    );
 
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
@@ -325,6 +356,14 @@ function RunStatusContent({
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
                                 </ParametersButton>
+                                {!isReadOnly && (
+                                    <ParametersButton
+                                        variant="outlined"
+                                        startIcon={<ShareOutlinedIcon />}
+                                        onClick={onShareClick}>
+                                        Share
+                                    </ParametersButton>
+                                )}
                                 {canStop && (
                                     <StopButton
                                         variant="outlined"

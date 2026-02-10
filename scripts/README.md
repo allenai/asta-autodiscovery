@@ -25,25 +25,49 @@ uv run python scripts/send_completion_emails.py --userid "google-oauth2|123" --d
 
 ### Cloud Run Job Setup
 
+**Development environment:**
 ```bash
-gcloud run jobs create autodiscovery-send-emails \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts \
+gcloud run jobs create autodiscovery-send-emails-dev \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
+  --task-timeout 29m \
   --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--dry-run"
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
 ```
 
-Note: Remove `--dry-run` from args once validated.
-
-### Schedule (every 15 minutes)
-
+**Production environment:**
 ```bash
-gcloud scheduler jobs create http autodiscovery-send-emails-schedule \
+gcloud run jobs create autodiscovery-send-emails-prod \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
+  --region us-west1 \
+  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
+  --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
+  --task-timeout 29m \
+  --command "uv" \
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
+```
+
+### Schedule (every 30 minutes)
+
+**Development environment:**
+```bash
+gcloud scheduler jobs create http autodiscovery-send-emails-schedule-dev \
   --location us-west1 \
-  --schedule "*/15 * * * *" \
-  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails:run" \
+  --schedule "*/30 * * * *" \
+  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails-dev:run" \
+  --http-method POST \
+  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
+  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
+```
+
+**Production environment:**
+```bash
+gcloud scheduler jobs create http autodiscovery-send-emails-schedule-prod \
+  --location us-west1 \
+  --schedule "*/30 * * * *" \
+  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails-prod:run" \
   --http-method POST \
   --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
@@ -74,23 +98,44 @@ uv run python scripts/cleanup_old_datasets.py
 uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 ```
 
-## Docker Image
+## Docker Images
 
 All scripts are packaged into a single container image: `us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts`
 
+### Image Tagging Strategy
+
+Images are tagged based on the branch they're built from:
+- **Dev environment** (`main` branch): `:dev`, `:dev-${commit_sha}`
+- **Prod environment** (`env/prod` branch): `:prod`, `:prod-${commit_sha}`
+
+**Note:** We do not use `:latest` tags. All deployments must explicitly specify `:dev` or `:prod` to prevent accidental environment mixing.
+
 ### Automated Builds
 
-The image is automatically built and pushed to Artifact Registry by GitHub Actions when changes are merged to `main` that affect:
+The image is automatically built and pushed to Artifact Registry by GitHub Actions when changes are merged to `main` or `env/prod` that affect:
 - `scripts/**`
 - `packages/autodiscovery_jobs/**`
 
-See `.github/workflows/maintenance-build.yml`
+See `.github/workflows/scripts-build.yml`
 
 ### Manual Build (if needed)
 
+Using Makefile:
 ```bash
-docker build --platform linux/amd64 -t us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts -f scripts/Dockerfile .
-docker push us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts
+# Build and push with dev tag (default)
+make push-scripts-image
+
+# Build and push with prod tag
+IMAGE_TAG=prod make push-scripts-image
+
+# Build and push with custom tag
+IMAGE_TAG=my-tag make push-scripts-image
+```
+
+Using Docker directly:
+```bash
+docker build --platform linux/amd64 -t us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev -f scripts/Dockerfile .
+docker push us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev
 ```
 
 Note: `--platform linux/amd64` is required for Cloud Run compatibility (especially when building on Apple Silicon).
@@ -104,23 +149,45 @@ export CLOUDSDK_CORE_PROJECT=example-legacy-project
 
 ### Create Cloud Run Job
 
+**Development environment:**
 ```bash
-gcloud run jobs create autodiscovery-dataset-cleanup \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts \
+gcloud run jobs create autodiscovery-dataset-cleanup-dev \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --command "uv" \
-  --args "run,python,scripts/cleanup_old_datasets.py,--dry-run"
+  --args "run,python,scripts/cleanup_old_datasets.py"
 ```
-Note: Currently configured with `--dry-run` for safety. Remove `--dry-run` from args once validated.
+
+**Production environment:**
+```bash
+gcloud run jobs create autodiscovery-dataset-cleanup-prod \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
+  --region us-west1 \
+  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
+  --command "uv" \
+  --args "run,python,scripts/cleanup_old_datasets.py"
+```
 
 ### Schedule with Cloud Scheduler
 
+**Development environment:**
 ```bash
-gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule \
+gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule-dev \
   --location us-west1 \
   --schedule "0 2 * * *" \
-  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup:run" \
+  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup-dev:run" \
+  --http-method POST \
+  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
+  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
+```
+
+**Production environment:**
+```bash
+gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule-prod \
+  --location us-west1 \
+  --schedule "0 2 * * *" \
+  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup-prod:run" \
   --http-method POST \
   --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
@@ -128,13 +195,31 @@ gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule \
 
 This runs daily at 2 AM.
 
-### Updating
+### Updating Jobs to Use New Images
 
-The GitHub Action automatically pushes new images when changes merge to main. To manually trigger an update:
+The GitHub Action automatically pushes new images when changes merge to `main` (`:dev` tag) or `env/prod` (`:prod` tag).
 
+After a new image is pushed, update the Cloud Run Job to force it to pull the latest image with that tag:
+
+**Development environment:**
 ```bash
-gcloud run jobs update autodiscovery-dataset-cleanup \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts \
+gcloud run jobs update autodiscovery-send-emails-dev \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
+  --region us-west1
+
+gcloud run jobs update autodiscovery-dataset-cleanup-dev \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
+  --region us-west1
+```
+
+**Production environment:**
+```bash
+gcloud run jobs update autodiscovery-send-emails-prod \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
+  --region us-west1
+
+gcloud run jobs update autodiscovery-dataset-cleanup-prod \
+  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
   --region us-west1
 ```
 
@@ -144,8 +229,10 @@ gcloud run jobs update autodiscovery-dataset-cleanup \
 - Running scheduled Cloud Run Jobs (job runtime identity)
 - Pushing images to Artifact Registry (via GitHub Actions)
 - Invoking Cloud Run Jobs (via Cloud Scheduler)
+- Updating Cloud Run Jobs (via GitHub Actions, optional)
 
 It needs:
 - `roles/storage.objectAdmin` - for GCS operations (list/delete)
 - `roles/artifactregistry.writer` - for pushing images to Artifact Registry
 - `roles/run.invoker` - for Cloud Scheduler to invoke the job
+- `roles/run.developer` - (optional) for GitHub Actions to auto-update jobs after pushing new images

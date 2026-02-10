@@ -27,7 +27,7 @@ export const ExamplesRunsBox = () => {
 };
 
 const Wrapper = styled(Box)(({ theme }) => ({
-    backgroundColor: theme.color['cream-4'].rgba.toString(),
+    backgroundColor: '#162D31',
     color: theme.color['cream-100'].hex,
     fontSize: '1.125rem',
     padding: theme.spacing(2),

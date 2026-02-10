@@ -28,3 +28,9 @@ secrets/
 
 # Claude Code local files
 CLAUDE.local.md
+CLAUDE.md
+UI_DESIGN_GUIDE.md
+
+# macOS
+.DS_Store
+**/.DS_Store

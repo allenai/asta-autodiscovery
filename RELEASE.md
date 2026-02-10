@@ -44,39 +44,23 @@ Monitor the builds:
 - **Workflows:** https://github.com/allenai/asta-autodiscovery/actions
 - **Skiff/Marina:** https://marina.apps.allenai.org/a/asta-autodiscovery
 
-### 4. Update Cloud Run Jobs (Optional)
+### 4. Cloud Run Jobs Updated Automatically ✅
 
-When GitHub Actions pushes a new image with the `:prod` tag, the Cloud Run Jobs already reference that tag. However, Cloud Run caches images, so you need to update the job to force it to pull the latest `:prod` image.
+GitHub Actions automatically updates Cloud Run Jobs after pushing new images. When the workflows detect changes to:
+- `packages/autodiscovery/**` → Updates `autodiscovery-job-{dev|prod}`
+- `scripts/**` or `packages/autodiscovery_jobs/**` → Updates email and cleanup jobs
+- `packages/devtools/**` → Updates `autodiscovery-replay-{dev|prod}`
 
-**Only needed if** the release includes changes to:
-- The autodiscovery job code (`packages/autodiscovery/**`)
-- The scripts job code (`scripts/**`, `packages/autodiscovery_jobs/**`)
-- The replay job code (`packages/devtools/**`)
+No manual intervention needed! The jobs are automatically updated to use the latest `:dev` or `:prod` image.
 
-If the release only touches the webapp/API, you can skip this step.
+**Note:** If the automated update fails (e.g., jobs don't exist yet), you can manually update:
 
 ```bash
-# AutoDiscovery job
+# Example: manually update autodiscovery job in prod
 gcloud run jobs update autodiscovery-job-prod \
   --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery:prod \
   --region us-west1
-
-# Scripts jobs (email, cleanup)
-gcloud run jobs update autodiscovery-send-emails-prod \
-  --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts:prod \
-  --region us-west1
-
-gcloud run jobs update autodiscovery-dataset-cleanup-prod \
-  --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-scripts:prod \
-  --region us-west1
-
-# Replay job
-gcloud run jobs update autodiscovery-replay-prod \
-  --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery-replay:prod \
-  --region us-west1
 ```
-
-**Note:** This doesn't change the job configuration - it just forces Cloud Run to re-pull the image with the `:prod` tag to get the latest version.
 
 ### 5. Verify Production
 

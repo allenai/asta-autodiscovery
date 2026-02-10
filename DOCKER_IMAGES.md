@@ -31,7 +31,7 @@ GitHub Actions automatically build and push images when changes merge to `main` 
 
 | Image | Workflow | Triggers |
 |-------|----------|----------|
-| autodiscovery-scripts | `.github/workflows/maintenance-build.yml` | `scripts/**`, `packages/autodiscovery_jobs/**` |
+| autodiscovery-scripts | `.github/workflows/scripts-build.yml` | `scripts/**`, `packages/autodiscovery_jobs/**` |
 | autodiscovery-replay | `.github/workflows/replay-build.yml` | `packages/devtools/**` |
 | autodiscovery | `.github/workflows/autodiscovery-build.yml` | `packages/autodiscovery/**`, `pyproject.toml`, `uv.lock` |
 
@@ -158,6 +158,26 @@ us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/
 - The `autodiscovery` image requires a GitHub token during build (for private repo access)
 - GitHub Actions uses the `GCP_SA_KEY` secret for Artifact Registry authentication
 - Cloud Run jobs use service accounts for GCS and Secret Manager access
+
+### GitHub Actions Service Account Permissions
+
+The `GCP_SA_KEY` secret contains a key for `ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com`.
+
+**Required permissions:**
+- `roles/artifactregistry.writer` - Push images ✅
+- `roles/storage.objectAdmin` - GCS operations ✅
+- `roles/run.invoker` - Invoke jobs via Cloud Scheduler ✅
+- `roles/run.developer` - Update Cloud Run Jobs after pushing new images ⚠️
+
+**To enable automated job updates, grant the missing permission:**
+
+```bash
+gcloud projects add-iam-policy-binding ai2-aristo \
+  --member="serviceAccount:ai2-autodiscovery-dev@ai2-aristo.iam.gserviceaccount.com" \
+  --role="roles/run.developer"
+```
+
+Once granted, GitHub Actions will automatically update Cloud Run Jobs after pushing new images. The workflows are already configured to do this.
 
 ## See Also
 

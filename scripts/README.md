@@ -113,7 +113,7 @@ The image is automatically built and pushed to Artifact Registry by GitHub Actio
 - `scripts/**`
 - `packages/autodiscovery_jobs/**`
 
-See `.github/workflows/maintenance-build.yml`
+See `.github/workflows/scripts-build.yml`
 
 ### Manual Build (if needed)
 
@@ -226,8 +226,10 @@ gcloud run jobs update autodiscovery-dataset-cleanup-prod \
 - Running scheduled Cloud Run Jobs (job runtime identity)
 - Pushing images to Artifact Registry (via GitHub Actions)
 - Invoking Cloud Run Jobs (via Cloud Scheduler)
+- Updating Cloud Run Jobs (via GitHub Actions, optional)
 
 It needs:
 - `roles/storage.objectAdmin` - for GCS operations (list/delete)
 - `roles/artifactregistry.writer` - for pushing images to Artifact Registry
 - `roles/run.invoker` - for Cloud Scheduler to invoke the job
+- `roles/run.developer` - (optional) for GitHub Actions to auto-update jobs after pushing new images

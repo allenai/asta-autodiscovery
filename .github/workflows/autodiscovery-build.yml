@@ -63,3 +63,26 @@ jobs:
         run: |
           docker push ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }}
           docker push ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}
+
+      - name: Authenticate to Google Cloud
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Update Cloud Run Job
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
+        run: |
+          ENV_SUFFIX=${{ steps.env-tag.outputs.env }}
+
+          echo "Updating Cloud Run Job with :${ENV_SUFFIX} image..."
+
+          gcloud run jobs update autodiscovery-job-${ENV_SUFFIX} \
+            --image ${{ env.IMAGE_NAME }}:${ENV_SUFFIX} \
+            --region us-west1
+
+          echo "✅ Job updated successfully"

@@ -104,8 +104,10 @@ All scripts are packaged into a single container image: `us-west1-docker.pkg.dev
 ### Image Tagging Strategy
 
 Images are tagged based on the branch they're built from:
-- **Dev environment** (`main` branch): `:dev`, `:dev-${commit_sha}`, `:latest`
-- **Prod environment** (`env/prod` branch): `:prod`, `:prod-${commit_sha}`, `:latest`
+- **Dev environment** (`main` branch): `:dev`, `:dev-${commit_sha}`
+- **Prod environment** (`env/prod` branch): `:prod`, `:prod-${commit_sha}`
+
+**Note:** We do not use `:latest` tags. All deployments must explicitly specify `:dev` or `:prod` to prevent accidental environment mixing.
 
 ### Automated Builds
 

@@ -5,8 +5,10 @@ This document describes how to deploy the replay job as a Cloud Run service.
 ## Image Tagging Strategy
 
 The replay Docker image follows an environment-based tagging strategy:
-- **Dev environment** (`main` branch): `:dev`, `:dev-${commit_sha}`, `:latest`
-- **Prod environment** (`env/prod` branch): `:prod`, `:prod-${commit_sha}`, `:latest`
+- **Dev environment** (`main` branch): `:dev`, `:dev-${commit_sha}`
+- **Prod environment** (`env/prod` branch): `:prod`, `:prod-${commit_sha}`
+
+**Note:** We do not use `:latest` tags. All deployments must explicitly specify `:dev` or `:prod` to prevent accidental environment mixing.
 
 Images are automatically built and pushed by GitHub Actions when changes merge to `main` or `env/prod`. See `.github/workflows/replay-build.yml`.
 

@@ -145,6 +145,11 @@ class MetadataModel(BaseModel):
         None, description="List of datasets associated with the run"
     )
 
+    # Sharing
+    is_shared: bool | None = Field(
+        None, description="Whether the run is shared (viewable by anyone). Missing means not shared."
+    )
+
     # Job configuration parameters
     n_experiments: int | None = Field(None, description="Number of experiments to run")
     exploration_weight: float | None = Field(None, description="Weight for exploration in MCTS")
@@ -173,6 +178,7 @@ class MetadataModel(BaseModel):
             domain=data.get("domain"),
             intent=data.get("intent"),
             datasets=datasets,
+            is_shared=data.get("is_shared"),
             n_experiments=data.get("n_experiments"),
             exploration_weight=data.get("exploration_weight"),
             mcts_selection=data.get("mcts_selection"),
@@ -386,3 +392,31 @@ class CancelRunResponseModel(BaseModel):
     """Model for the response when cancelling a run"""
 
     message: str = Field(..., description="Success message confirming cancellation")
+
+
+class ShareRunRequestModel(BaseModel):
+    """Model for the request to share or unshare a run"""
+
+    runid: str = Field(..., description="Identifier of the run to share/unshare")
+    userid: str = Field(..., description="User identifier who owns the run")
+    is_shared: bool = Field(..., description="Whether to share (true) or unshare (false) the run")
+
+
+class ShareRunResponseModel(BaseModel):
+    """Model for the response when sharing/unsharing a run"""
+
+    is_shared: bool = Field(..., description="Updated sharing status")
+    message: str = Field(..., description="Success message")
+
+
+class GetSharedRunOwnerRequestModel(BaseModel):
+    """Request model for getting a shared run's owner"""
+
+    runid: str = Field(..., description="Identifier of the shared run")
+
+
+class GetSharedRunOwnerResponseModel(BaseModel):
+    """Response model containing a shared run's owner"""
+
+    runid: str = Field(..., description="Identifier of the run")
+    userid: str = Field(..., description="User ID of the run owner")

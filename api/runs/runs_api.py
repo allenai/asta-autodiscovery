@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import requires_enrollment
+from utils.auth import optional_enrollment, requires_enrollment
 from utils.credits import (
     ExperimentLimitExceededError,
     InsufficientCreditsError,
@@ -46,6 +46,10 @@ from runs.models import (
     RunStatsModel,
     SaveMetadataRequestModel,
     SaveMetadataResponseModel,
+    ShareRunRequestModel,
+    ShareRunResponseModel,
+    GetSharedRunOwnerRequestModel,
+    GetSharedRunOwnerResponseModel,
     SubmitRunRequestModel,
     SubmitRunResponseModel,
     UploadDatasetResponseModel,
@@ -167,14 +171,35 @@ def create() -> Blueprint:
     def _get_userid_for_read() -> tuple[str | None, tuple | None]:
         """Get the authenticated user's ID from JWT token.
 
+        Returns None with no error for unauthenticated users (when using optional_enrollment).
+
         Returns:
-            Tuple of (userid, error_response). If error_response is not None,
-            it should be returned directly from the endpoint.
+            Tuple of (userid, error_response). userid may be None for unauthenticated users.
         """
         userid = request.user.get("sub")
-        if not userid:
-            return None, (jsonify({"error": "User ID not found in token"}), 401)
         return userid, None
+
+    def _can_read_run(token_userid: str | None, userid: str, runid: str) -> bool:
+        """Check if the requesting user can read the given run.
+
+        Access is granted if:
+        1. The requesting user owns the run, OR
+        2. The run owner is in PUBLIC_USERS, OR
+        3. The run is marked as shared (is_shared=True in metadata.json)
+        """
+        if token_userid and userid == token_userid:
+            return True
+        if userid in PUBLIC_USERS:
+            return True
+        # Check if the run is shared
+        try:
+            manager = get_job_manager()
+            metadata = manager.get_metadata(userid, runid)
+            if metadata and metadata.get("is_shared"):
+                return True
+        except Exception:
+            pass
+        return False
 
     def _check_run_not_deleted(userid: str, runid: str) -> tuple[None, None] | tuple[dict, int]:
         """Check if a run is deleted and return 404 error if so.
@@ -302,12 +327,13 @@ def create() -> Blueprint:
         return jsonify(resp.model_dump()), 200
 
     @api.route("/<userid>/<runid>")
-    @requires_enrollment
+    @optional_enrollment
     def get_run(userid: str, runid: str):
         """Get details for a specific run.
 
         Args:
-            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
+            userid: User ID from URL path. Must match authenticated user, be in PUBLIC_USERS,
+                    or own a shared run.
             runid: Run identifier.
 
         Returns:
@@ -317,8 +343,7 @@ def create() -> Blueprint:
         if error:
             return error
 
-        # Validate access: either viewing own data or viewing public user
-        if userid != token_userid and userid not in PUBLIC_USERS:
+        if not _can_read_run(token_userid, userid, runid):
             return jsonify({"error": "User cannot view other user's data"}), 403
 
         req = GetRunRequestModel(runid=runid, userid=userid)
@@ -619,20 +644,20 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("<userid>/<runid>/metadata", methods=["GET"])
-    @requires_enrollment
+    @optional_enrollment
     def get_run_metadata(userid: str, runid: str):
         """Fetch metadata for a specific run.
 
         Args:
-            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
+            userid: User ID from URL path. Must match authenticated user, be in PUBLIC_USERS,
+                    or own a shared run.
             runid: Run identifier
         """
         token_userid, error = _get_userid_for_read()
         if error:
             return error
 
-        # Validate access: either viewing own data or viewing public user
-        if userid != token_userid and userid not in PUBLIC_USERS:
+        if not _can_read_run(token_userid, userid, runid):
             return jsonify({"error": "User cannot view other user's data"}), 403
 
         # Check if run is deleted
@@ -794,14 +819,15 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/status")
-    @requires_enrollment
+    @optional_enrollment
     def get_run_status(userid: str, runid: str):
         """Get the current status of a run.
 
         Checks the Cloud Run execution status and updates run_details.json.
 
         Args:
-            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
+            userid: User ID from URL path. Must match authenticated user, be in PUBLIC_USERS,
+                    or own a shared run.
             runid: Run identifier
 
         Returns:
@@ -811,8 +837,7 @@ def create() -> Blueprint:
         if error:
             return error
 
-        # Validate access: either viewing own data or viewing public user
-        if userid != token_userid and userid not in PUBLIC_USERS:
+        if not _can_read_run(token_userid, userid, runid):
             return jsonify({"error": "User cannot view other user's data"}), 403
 
         req = GetRunStatusRequestModel(runid=runid, userid=userid)
@@ -844,13 +869,14 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/experiments", methods=["GET"])
-    @requires_enrollment
+    @optional_enrollment
     def get_run_experiments(userid: str, runid: str):
         """Fetch details about the experiments within a run. This is used to build
         the experiments table in the UI.
 
         Args:
-            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
+            userid: User ID from URL path. Must match authenticated user, be in PUBLIC_USERS,
+                    or own a shared run.
             runid: Run identifier
 
         Query Parameters:
@@ -860,8 +886,7 @@ def create() -> Blueprint:
         if error:
             return error
 
-        # Validate access: either viewing own data or viewing public user
-        if userid != token_userid and userid not in PUBLIC_USERS:
+        if not _can_read_run(token_userid, userid, runid):
             return jsonify({"error": "User cannot view other user's data"}), 403
 
         # Check if run is deleted
@@ -890,12 +915,13 @@ def create() -> Blueprint:
         return jsonify(resp.model_dump()), 200
 
     @api.route("/<userid>/<runid>/experiments/<experiment_id>", methods=["GET"])
-    @requires_enrollment
+    @optional_enrollment
     def get_run_experiment_details(userid: str, runid: str, experiment_id: str):
         """Fetch details about a specific experiment within a run.
 
         Args:
-            userid: User ID from URL path. Must match authenticated user or be in PUBLIC_USERS.
+            userid: User ID from URL path. Must match authenticated user, be in PUBLIC_USERS,
+                    or own a shared run.
             runid: Run identifier
             experiment_id: Experiment identifier
         """
@@ -903,8 +929,7 @@ def create() -> Blueprint:
         if error:
             return error
 
-        # Validate access: either viewing own data or viewing public user
-        if userid != token_userid and userid not in PUBLIC_USERS:
+        if not _can_read_run(token_userid, userid, runid):
             return jsonify({"error": "User cannot view other user's data"}), 403
 
         # Check if run is deleted
@@ -944,20 +969,25 @@ def create() -> Blueprint:
         )
         return jsonify(resp.model_dump()), 200
 
-    @api.route("/<runid>/cancel", methods=["POST"])
+    @api.route("/<userid>/<runid>/cancel", methods=["POST"])
     @requires_enrollment
-    def cancel_run(runid: str):
+    def cancel_run(userid: str, runid: str):
         """Cancel a running job.
 
         Args:
+            userid: User ID from URL path. Must match authenticated user.
             runid: Run identifier
 
         Returns:
             JSON response confirming cancellation
         """
-        userid = request.user.get("sub")
-        if not userid:
+        token_userid = request.user.get("sub")
+        if not token_userid:
             return jsonify({"error": "User ID not found in token"}), 401
+
+        # Validate that the requesting user owns the run
+        if userid != token_userid:
+            return jsonify({"error": "User cannot cancel other user's runs"}), 403
 
         req = CancelRunRequestModel(runid=runid, userid=userid)
 
@@ -991,5 +1021,104 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to cancel run: {e}")
             return jsonify({"error": str(e)}), 500
+
+    @api.route("/<userid>/<runid>/share", methods=["POST"])
+    @requires_enrollment
+    def share_run(userid: str, runid: str):
+        """Share or unshare a run. Only the run owner can toggle sharing.
+
+        Args:
+            userid: User ID from URL path. Must match authenticated user.
+            runid: Run identifier
+
+        Request body:
+            is_shared: boolean - whether to share (true) or unshare (false)
+
+        Returns:
+            JSON response with updated sharing status.
+        """
+        token_userid = request.user.get("sub")
+        if not token_userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        # Validate that the requesting user owns the run
+        if userid != token_userid:
+            return jsonify({"error": "User cannot share other user's runs"}), 403
+
+        data = request.get_json()
+        if not data or "is_shared" not in data:
+            raise BadRequest("is_shared is required")
+
+        try:
+            req = ShareRunRequestModel(
+                runid=runid, userid=userid, is_shared=data["is_shared"]
+            )
+        except Exception as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        try:
+            manager = get_job_manager()
+
+            # Read current metadata
+            metadata_dict = manager.get_metadata(req.userid, req.runid)
+            if metadata_dict is None:
+                metadata_dict = {}
+
+            # Update is_shared
+            metadata_dict["is_shared"] = req.is_shared
+
+            # Write back
+            manager.upload_metadata(req.userid, req.runid, metadata_dict)
+
+            resp = ShareRunResponseModel(
+                is_shared=req.is_shared,
+                message="Run shared successfully" if req.is_shared else "Run unshared successfully",
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to share run: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route("/shared/<runid>/owner", methods=["GET"])
+    @optional_enrollment
+    def get_shared_run_owner(runid: str):
+        """Get the owner userid of a shared run.
+
+        This endpoint allows anyone (authenticated or not) to look up the owner
+        of a run, but ONLY if the run has is_shared=True in its metadata.json.
+
+        Args:
+            runid: Run identifier
+
+        Returns:
+            JSON response with runid and userid, or 404 if not found/not shared.
+
+        Security Note:
+            Returns 404 for both "run doesn't exist" and "run exists but not shared"
+            to avoid information leakage about run existence.
+        """
+        req = GetSharedRunOwnerRequestModel(runid=runid)
+
+        try:
+            manager = get_job_manager()
+
+            # Get the owner userid if the run is shared
+            userid = manager.get_shared_run_owner(req.runid)
+
+            if userid is None:
+                # Could be: run doesn't exist OR run exists but not shared
+                # Return 404 in both cases to prevent information leakage
+                return jsonify({"error": "Shared run not found"}), 404
+
+            resp = GetSharedRunOwnerResponseModel(
+                runid=req.runid,
+                userid=userid
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to get shared run owner for {req.runid}: {e}")
+            return jsonify({"error": "Internal server error"}), 500
 
     return api

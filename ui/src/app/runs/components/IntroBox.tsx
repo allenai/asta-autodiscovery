@@ -8,7 +8,7 @@ interface IntroBoxProps {
 
 export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => {
     return (
-        <Wrapper>
+        <Wrapper $showLogin={showLogin}>
             <Title>AutoDiscovery</Title>
             <Subtitle>Uncover surprising insights hidden in your data.</Subtitle>
             <Description>
@@ -33,14 +33,15 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
     );
 };
 
-const Wrapper = styled(Box)(({ theme }) => ({
-    background: `radial-gradient(155.14% 72.67% at 0% 0%, rgba(255, 163, 28, 0.10) 0%, rgba(255, 163, 28, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%)`,
+const Wrapper = styled(Box)<{ $showLogin: boolean }>(({ theme, $showLogin }) => ({
+    background: `radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%), #162D31`,
     border: '1px solid rgba(250, 242, 233, 0.30)',
     borderColor:
-        'radial-gradient(155.14% 72.67% at 0% 0%, rgba(255, 163, 28, 0.10) 0%, rgba(255, 163, 28, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%);',
+        'radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%);',
     borderRadius: theme.spacing(1.5),
     color: theme.color['cream-100'].hex,
     fontSize: '1.125rem',
+    marginTop: $showLogin ? '72px' : 0,
     padding: theme.spacing(4.5),
 }));
 

@@ -63,7 +63,11 @@ class _FakeChatResponse:
 
 
 class _FakeCompletions:
+    def __init__(self):
+        self.calls: list[dict] = []
+
     def create(self, **kwargs):
+        self.calls.append(dict(kwargs))
         n = int(kwargs.get("n", 1))
         return _FakeChatResponse(
             model=str(kwargs.get("model", "gpt-4o")),
@@ -269,3 +273,35 @@ def test_query_llm_records_actual_n_per_request(tmp_path: Path) -> None:
         events = [json.loads(line) for line in f if line.strip()]
 
     assert [event["metadata"]["n"] for event in events] == [8, 8, 8, 6]
+
+
+def test_query_llm_passes_reasoning_effort_for_gemini() -> None:
+    """Ensure Gemini OpenAI-compatible requests include reasoning_effort."""
+    client = _FakeClient()
+    _ = query_llm(
+        messages=[{"role": "user", "content": "Return JSON."}],
+        n_samples=1,
+        model="gemini-3-flash-preview",
+        reasoning_effort="minimal",
+        client=client,
+    )
+
+    assert len(client.chat.completions.calls) == 1
+    request = client.chat.completions.calls[0]
+    assert request["reasoning_effort"] == "minimal"
+
+
+def test_query_llm_maps_minimal_reasoning_effort_for_openai_reasoning_models() -> None:
+    """Ensure OpenAI reasoning models map minimal effort to low."""
+    client = _FakeClient()
+    _ = query_llm(
+        messages=[{"role": "user", "content": "Return JSON."}],
+        n_samples=1,
+        model="gpt-5-mini",
+        reasoning_effort="minimal",
+        client=client,
+    )
+
+    assert len(client.chat.completions.calls) == 1
+    request = client.chat.completions.calls[0]
+    assert request["reasoning_effort"] == "low"

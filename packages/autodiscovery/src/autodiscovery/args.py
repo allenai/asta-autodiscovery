@@ -47,9 +47,19 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--reasoning_effort",
             type=str,
-            help="Reasoning effort for OpenAI o-series models",
+            help="Reasoning effort for non-belief agent calls.",
             choices=["low", "medium", "high"],
             default="medium",
+        )
+        self.add_argument(
+            "--belief_reasoning_effort",
+            type=str,
+            choices=["minimal", "low", "medium", "high"],
+            default="minimal",
+            help=(
+                "Reasoning effort for belief model calls. "
+                "Supports Gemini and reasoning-capable OpenAI models."
+            ),
         )
         self.add_argument(
             "--continue_from_dir",

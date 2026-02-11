@@ -49,6 +49,31 @@ def max_n_for_model(model: str) -> int | None:
     return None
 
 
+def normalize_reasoning_effort(model: str, reasoning_effort: str | None) -> str | None:
+    """Normalize reasoning effort values across providers.
+
+    Args:
+        model: Model name provided by the caller.
+        reasoning_effort: Requested reasoning effort value.
+
+    Returns:
+        A provider-compatible reasoning effort value or ``None``.
+    """
+    if reasoning_effort is None:
+        return None
+    if is_gemini_model(model):
+        return reasoning_effort
+    if is_reasoning_model(model) and reasoning_effort == "minimal":
+        # OpenAI reasoning models use low/medium/high. Keep CLI semantics consistent
+        # by mapping minimal to low for non-Gemini models.
+        print(
+            f"[query_llm] model={model} does not support reasoning_effort='minimal'; "
+            "using 'low' instead."
+        )
+        return "low"
+    return reasoning_effort
+
+
 def get_vertex_access_token() -> str:
     """Return the Vertex AI access token from environment variables.
 
@@ -112,7 +137,7 @@ def query_llm(
         n_samples: Number of samples to request.
         model: Model name to use.
         temperature: Sampling temperature.
-        reasoning_effort: Optional reasoning effort for o-series models.
+        reasoning_effort: Optional reasoning effort for reasoning-capable models.
         response_format: Optional structured output schema.
         client: Optional pre-configured client instance.
         debug_requests: Whether to log request batching details.
@@ -130,6 +155,7 @@ def query_llm(
         client = get_openai_client_for_model(model)
     is_gemini = is_gemini_model(model)
     is_reasoning = is_reasoning_model(model)
+    normalized_reasoning_effort = normalize_reasoning_effort(model, reasoning_effort)
     model_name = normalize_vertex_model_name(model) if is_gemini else model
 
     max_n = max_n_for_model(model)
@@ -169,8 +195,8 @@ def query_llm(
         if temperature is not None and not is_reasoning:
             kwargs["temperature"] = temperature
 
-        if is_reasoning and reasoning_effort is not None:
-            kwargs["reasoning_effort"] = reasoning_effort
+        if (is_reasoning or is_gemini) and normalized_reasoning_effort is not None:
+            kwargs["reasoning_effort"] = normalized_reasoning_effort
 
         def _send_request():
             try:

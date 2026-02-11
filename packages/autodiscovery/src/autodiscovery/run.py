@@ -79,7 +79,7 @@ def compute_and_store_reward(
     node,
     belief_model_name,
     belief_temperature,
-    reasoning_effort,
+    belief_reasoning_effort,
     n_belief_samples,
     implicit_bayes_posterior,
     surprisal_width,
@@ -99,7 +99,7 @@ def compute_and_store_reward(
         node: Node whose reward will be computed.
         belief_model_name: Model name for belief elicitation.
         belief_temperature: Temperature for belief sampling.
-        reasoning_effort: Reasoning effort for compatible models.
+        belief_reasoning_effort: Reasoning effort for belief-model calls.
         n_belief_samples: Number of belief samples.
         implicit_bayes_posterior: Whether posterior uses implicit prior knowledge.
         surprisal_width: Width threshold for binary surprisal.
@@ -138,7 +138,7 @@ def compute_and_store_reward(
                 node,
                 model=belief_model_name,
                 temperature=belief_temperature,
-                reasoning_effort=reasoning_effort,
+                reasoning_effort=belief_reasoning_effort,
                 n_samples=n_belief_samples,
                 implicit_bayes_posterior=implicit_bayes_posterior,
                 surprisal_width=surprisal_width,
@@ -188,7 +188,7 @@ def compute_and_store_reward(
             node,
             model=belief_model_name,
             temperature=belief_temperature,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
             implicit_bayes_posterior=implicit_bayes_posterior,
             surprisal_width=surprisal_width,
@@ -223,7 +223,7 @@ def compute_and_store_reward(
             node,
             model=belief_model_name,
             temperature=belief_temperature,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
             implicit_bayes_posterior=implicit_bayes_posterior,
             surprisal_width=surprisal_width,
@@ -296,6 +296,7 @@ def run_mcts(
     temperature=1.0,
     belief_temperature=1.0,
     reasoning_effort="medium",
+    belief_reasoning_effort="minimal",
     implicit_bayes_posterior=False,
     surprisal_width=0.2,
     user_query=None,
@@ -336,7 +337,8 @@ def run_mcts(
         k_parents: Number of parent levels to include in logs (None for all).
         temperature: Temperature setting for all agents (except belief agent).
         belief_temperature: Temperature setting for the belief agent.
-        reasoning_effort: Reasoning effort for OpenAI o-series models.
+        reasoning_effort: Reasoning effort for non-belief agent model calls.
+        belief_reasoning_effort: Reasoning effort for belief-model calls.
         implicit_bayes_posterior: Whether to use the belief samples with evidence as the direct posterior or to use a Bayesian update that explicitly combines it with the prior.
         surprisal_width: Minimum difference in mean prior and posterior probabilities required to count as a surprisal.
         user_query: Custom user query to condition experiment generation during exploration.
@@ -632,7 +634,7 @@ def run_mcts(
                         node,
                         belief_model_name,
                         belief_temperature,
-                        reasoning_effort,
+                        belief_reasoning_effort,
                         n_belief_samples,
                         implicit_bayes_posterior,
                         surprisal_width,
@@ -954,6 +956,7 @@ if __name__ == "__main__":
         temperature=args.temperature,
         belief_temperature=args.belief_temperature,
         reasoning_effort=args.reasoning_effort,
+        belief_reasoning_effort=args.belief_reasoning_effort,
         implicit_bayes_posterior=args.implicit_bayes_posterior,
         surprisal_width=args.surprisal_width,
         user_query=args.user_query,

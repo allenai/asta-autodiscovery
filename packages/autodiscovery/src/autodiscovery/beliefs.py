@@ -1232,7 +1232,7 @@ def get_belief(
         belief_mode: The belief mode to use for parsing responses (e.g., BeliefTrueFalse, BeliefCategorical)
         n_samples: Number of samples to draw from the LLM
         temperature: Temperature for sampling
-        reasoning_effort: Reasoning effort for o-series models
+        reasoning_effort: Reasoning effort for supported models.
         use_llm_prior: Whether to use implicit Bayesian posterior
         explicit_prior: Optional prior distribution to use for Bayesian updates
         n_retries: Number of retries for querying the LLM in case of errors
@@ -1341,7 +1341,7 @@ def calculate_prior_and_posterior_beliefs(
         n_samples: Number of samples to draw from the LLM
         model: The LLM model to use for querying
         temperature: Temperature for sampling
-        reasoning_effort: Reasoning effort for o-series models
+        reasoning_effort: Reasoning effort for supported models.
         implicit_bayes_posterior: Whether to use implicit Bayesian posterior
         surprisal_width: Minimum difference in mean prior and posterior probabilities required to count as a surprisal
         belief_mode: The belief mode to use for parsing responses (e.g., "boolean", "categorical")

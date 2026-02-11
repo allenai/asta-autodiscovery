@@ -111,11 +111,18 @@ const Section = styled(Box)(({ theme }) => ({
     padding: theme.spacing(3),
 }));
 
-const FooterWrapper = styled(Box)({
+const FooterWrapper = styled(Box)(({ theme }) => ({
     '& > div': {
         borderTop: 'none',
     },
-});
+    '& a': {
+        opacity: 0.8,
+        '&:hover': {
+            opacity: 1,
+            color: `${theme.color['cream-100'].hex} !important`,
+        },
+    },
+}));
 
 const Attribution = styled(Typography)(({ theme }) => ({
     color: theme.color['cream-100'].hex,

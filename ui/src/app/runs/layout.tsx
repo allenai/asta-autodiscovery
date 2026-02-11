@@ -52,6 +52,9 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                 {/* Main content */}
                 <MainContent>
                     {isAuthenticated && <Header />}
+                    {!isAuthenticated && pathname.startsWith('/shared') && (
+                        <Header showBackButton />
+                    )}
                     <ScrollArea>
                         <ScrollContainer>
                             <ScrollContent>{children}</ScrollContent>

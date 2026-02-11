@@ -24,7 +24,7 @@ export default function AuthButton() {
             variant="outlined"
             endIcon={isAuthenticated ? <LogoutOutlinedIcon /> : <LoginOutlinedIcon />}
             {...(isAuthenticated ? mkLogoutBtnTrackAttrs() : mkLoginBtnTrackAttrs())}>
-            {isAuthenticated ? 'Logout' : 'Login'}
+            {isAuthenticated ? 'Sign out' : 'Sign in'}
         </StyledButton>
     );
 }

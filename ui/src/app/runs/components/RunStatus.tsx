@@ -575,8 +575,8 @@ const RunContent = styled(Box)`
     }
 `;
 
-const RunHeaderExpandButton = styled(Button)`
-    color: ${({ theme }) => theme.color['green-100'].hex};
+const RunHeaderExpandButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
 `;
 
 const LargeScreenAction = styled('div')`

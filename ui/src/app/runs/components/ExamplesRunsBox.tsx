@@ -7,7 +7,7 @@ export const ExamplesRunsBox = () => {
     const { exampleRuns, isExampleRunsLoading } = useExampleRuns();
     return (
         <>
-            <Headline variant="h5">Example Sessions</Headline>
+            <Headline variant="h5">Example sessions</Headline>
             {exampleRuns && exampleRuns.length > 0 && (
                 <Wrapper>
                     {exampleRuns.map((run) => (

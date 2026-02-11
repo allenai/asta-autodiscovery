@@ -345,8 +345,8 @@ export const ExperimentGraph = () => {
                     const isInPath = pathIds.has(n.data.data.id);
                     const isDescendant = descendantIds.has(n.data.data.id);
                     if (isSelected) return '#0FCB8C';
-                    if (isInPath && n.data.data.id !== 'node_1_0') return '#F0529C';
-                    if (isDescendant && n.data.data.id !== 'node_1_0') return '#f472b6';
+                    if (isInPath && n.data.data.id !== 'node_1_0') return '#FAF2E9';
+                    if (isDescendant && n.data.data.id !== 'node_1_0') return '#FAF2E9';
                     return '#0f172a';
                 });
 
@@ -365,8 +365,8 @@ export const ExperimentGraph = () => {
                             pathIds.has(sourceId) && descendantIds.has(targetId);
 
                         if (inSelectedPath) return '#0FCB8C';
-                        if (bothInPath) return '#F0529C';
-                        if (bothInDescendants || connectsToDescendants) return '#f472b6';
+                        if (bothInPath) return '#FAF2E9';
+                        if (bothInDescendants || connectsToDescendants) return '#FAF2E9';
                         return '#334155';
                     })
                     .attr('stroke-width', (l: any) => {
@@ -454,8 +454,8 @@ export const ExperimentGraph = () => {
                     const isInPath = pathIds.has(n.data.data.id);
                     const isDescendant = descendantIds.has(n.data.data.id);
                     if (isSelected) return '#0FCB8C';
-                    if (isInPath && n.data.data.id !== 'node_1_0') return '#F0529C';
-                    if (isDescendant && n.data.data.id !== 'node_1_0') return '#f472b6';
+                    if (isInPath && n.data.data.id !== 'node_1_0') return '#FAF2E9';
+                    if (isDescendant && n.data.data.id !== 'node_1_0') return '#FAF2E9';
                     return '#0f172a';
                 });
 
@@ -474,8 +474,8 @@ export const ExperimentGraph = () => {
                             pathIds.has(sourceId) && descendantIds.has(targetId);
 
                         if (inSelectedPath) return '#0FCB8C';
-                        if (bothInPath) return '#F0529C';
-                        if (bothInDescendants || connectsToDescendants) return '#f472b6';
+                        if (bothInPath) return '#FAF2E9';
+                        if (bothInDescendants || connectsToDescendants) return '#FAF2E9';
                         return '#334155';
                     })
                     .attr('stroke-width', (l: any) => {

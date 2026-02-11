@@ -40,7 +40,8 @@ export const TopSurprisalsListImpl = () => {
                 {surprisalsToShow.map((experiment) => (
                     <Item
                         key={experiment.experimentId}
-                        $isSelected={selectedExperiment?.experimentId === experiment.experimentId}>
+                        $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
+                        onClick={() => selectExperiment(experiment)}>
                         <Description>
                             <Belief>
                                 It's{' '}
@@ -51,7 +52,7 @@ export const TopSurprisalsListImpl = () => {
                             </Belief>
                             <Hypothesis>{experiment.hypothesis}</Hypothesis>
                         </Description>
-                        <Link onClick={() => selectExperiment(experiment)}>
+                        <Link className="view-details">
                             View details <ArrowForwardIcon fontSize="small" />
                         </Link>
                     </Item>
@@ -96,11 +97,21 @@ const List = styled('ul')`
 `;
 
 const Item = styled('li')<{ $isSelected?: boolean }>`
-    padding: 16px;
+    padding: 14px 16px 12px 16px;
     background-color: ${({ theme }) => theme.color['cream-100'].hex}0C;
     border: 1px solid ${({ theme }) => theme.color['cream-100'].hex}2F;
     border-radius: 4px;
     position: relative;
+    cursor: pointer;
+    transition: all 250ms ease-in-out;
+
+    &:hover {
+        border-color: ${({ theme }) => theme.color['cream-100'].hex}80;
+
+        .view-details {
+            color: ${({ theme }) => theme.color['green-100'].hex};
+        }
+    }
 
     &:after {
         content: '';
@@ -125,13 +136,23 @@ const BeliefLabel = styled('strong')`
 
 const Hypothesis = styled('span')``;
 
-const Link = styled(Button)`
-    margin-left: ${({ theme }) => theme.spacing(-1)};
+const Link = styled('div')`
+    margin-top: ${({ theme }) => theme.spacing(1)};
     color: ${({ theme }) => theme.color['green-30'].hex};
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    transition: color 250ms ease-in-out;
 `;
 
 const ExpandListButton = styled(Button)`
-    margin-top: ${({ theme }) => theme.spacing(2)};
+    margin-top: ${({ theme }) => theme.spacing(1)};
     color: ${({ theme }) => theme.color['green-30'].hex};
     border-color: ${({ theme }) => theme.color['green-30'].hex}CC;
+
+    &:hover {
+        color: ${({ theme }) => theme.color['green-100'].hex};
+        border-color: ${({ theme }) => theme.color['green-100'].hex};
+    }
 `;

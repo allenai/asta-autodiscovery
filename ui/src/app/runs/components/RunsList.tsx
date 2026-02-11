@@ -131,7 +131,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                 </Box>
             ) : (
                 <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-                    <SectionTitle>Your Sessions</SectionTitle>
+                    <SectionTitle>Your sessions</SectionTitle>
                     <List disablePadding>
                         {sortedRuns.map((run) => (
                             <ListItem

@@ -18,7 +18,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--belief_model",
             type=str,
-            default="gemini-3-flash-preview",
+            default="gemini-3-pro-preview",
             help="LLM to use for belief distribution agent.",
         )
         self.add_argument(

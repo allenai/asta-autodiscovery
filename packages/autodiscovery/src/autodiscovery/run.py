@@ -285,7 +285,7 @@ def run_mcts(
     log_dirname,
     work_dir,
     model_name="gpt-4o",
-    belief_model_name="gpt-4o",
+    belief_model_name="gemini-3-pro-preview",
     max_iterations=100,
     branching_factor=8,
     max_rounds=100000,

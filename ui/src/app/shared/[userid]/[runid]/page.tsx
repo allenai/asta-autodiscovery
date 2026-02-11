@@ -4,6 +4,7 @@ import { useAuth0 } from '@/contexts/Auth0Context';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import RunStatus from '@/runs/components/RunStatus';
+import Header from '@/components/Header';
 
 interface SharedRunPageProps {
     params: {
@@ -17,7 +18,7 @@ interface SharedRunPageProps {
  * These runs are read-only - no setup or cancel actions allowed.
  */
 export default function SharedRunPage({ params }: SharedRunPageProps) {
-    const { isLoading } = useAuth0();
+    const { isLoading, isAuthenticated } = useAuth0();
     const { userid, runid } = params;
 
     if (isLoading) {
@@ -26,6 +27,7 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
 
     return (
         <URLSearchParamsProvider>
+            {!isAuthenticated && <Header showBackButton />}
             <RunStatus runid={runid} userid={userid} />
         </URLSearchParamsProvider>
     );

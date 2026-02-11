@@ -3,17 +3,26 @@ import math
 import os
 import shutil
 import threading
+import traceback
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from time import time
-import traceback
 
 from autodiscovery.agents import get_agents
 from autodiscovery.args import ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
 from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
 from autodiscovery.future_utils import gather_completed_futures
+from autodiscovery.llm_retry import apply_openai_wrapper_usage_tracking
+from autodiscovery.llm_usage import (
+    UsageTracker,
+    clear_ag2_usage_context,
+    configure_ag2_usage_tracking,
+    extract_local_image_usage_markers,
+    set_ag2_usage_context,
+    snapshot_agents_actual_usage,
+)
 from autodiscovery.logger import TreeLogger
 from autodiscovery.mcts import (
     MCTSNode,
@@ -82,7 +91,28 @@ def compute_and_store_reward(
     kl_scale=20.0,
     reward_mode="belief",
     TEMP_LOG=None,
+    usage_tracker: UsageTracker | None = None,
 ):
+    """Compute node belief metrics, reward, and surprisal flags.
+
+    Args:
+        node: Node whose reward will be computed.
+        belief_model_name: Model name for belief elicitation.
+        belief_temperature: Temperature for belief sampling.
+        reasoning_effort: Reasoning effort for compatible models.
+        n_belief_samples: Number of belief samples.
+        implicit_bayes_posterior: Whether posterior uses implicit prior knowledge.
+        surprisal_width: Width threshold for binary surprisal.
+        belief_mode: Belief elicitation mode.
+        use_binary_reward: Whether to compute binary reward.
+        all_surprisals: Running list of surprising nodes.
+        use_online_beliefs: Whether to condition prior on prior surprising nodes.
+        evidence_weight: Weight for current evidence in posterior update.
+        kl_scale: Scale factor for KL reward normalization.
+        reward_mode: Reward mode combining belief and KL terms.
+        TEMP_LOG: Optional debug log collector.
+        usage_tracker: Optional usage tracker.
+    """
     s_conditioned_prior = None
     evidence_msg = []
 
@@ -114,6 +144,9 @@ def compute_and_store_reward(
                 surprisal_width=surprisal_width,
                 belief_mode=belief_mode,
                 evidence_msg=evidence_msg,
+                usage_tracker=usage_tracker,
+                usage_node_id=node.id,
+                usage_context_label="surprisal_conditioned",
             )
         except ValueError as e:
             print(f"Error for node {node.id}: {e}")
@@ -163,6 +196,9 @@ def compute_and_store_reward(
             prior=s_conditioned_prior,
             evidence_msg=evidence_msg,
             evidence_weight=evidence_weight,
+            usage_tracker=usage_tracker,
+            usage_node_id=node.id,
+            usage_context_label="main",
         )
     except ValueError as e:
         print(f"Error for node {node.id}: {e}")
@@ -195,6 +231,9 @@ def compute_and_store_reward(
             prior=pt_prior,
             evidence_msg=evidence_msg[-1:],
             evidence_weight=evidence_weight,
+            usage_tracker=usage_tracker,
+            usage_node_id=node.id,
+            usage_context_label="offline_diagnostic",
         )
 
         TEMP_LOG[-1]["current_evidence"] = evidence_msg[-1]["content"]
@@ -276,6 +315,7 @@ def run_mcts(
     vision_model="gpt-4o",
     batch_size=1,
     n_threads=1,
+    agent_usage_mode: str = "per_response",
 ):
     """Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
 
@@ -316,6 +356,9 @@ def run_mcts(
         vision_model: Model used for image analysis in code execution.
         batch_size: Number of nodes to select and expand per iteration.
         n_threads: Number of threads to use for parallel node expansion.
+        agent_usage_mode: Tracking mode for agents chat usage. ``per_response`` records
+            usage from each AG2 model response. ``summary_delta`` records usage from
+            AG2 usage-summary deltas.
     """
 
     def _get_executor_rich_outputs(code_executor_agent) -> list:
@@ -333,6 +376,12 @@ def run_mcts(
         with open(output_path, "w") as f:
             json.dump(rich_outputs, f, indent=2)
 
+    def _set_executor_usage_context(code_executor_agent, node_id: str | None) -> None:
+        """Set usage context on executors that support direct image-analysis tracking."""
+        executor = getattr(code_executor_agent, "code_executor", None)
+        if executor is not None and hasattr(executor, "set_usage_context"):
+            executor.set_usage_context(usage_tracker, node_id=node_id)
+
     # Setup logger
     logger = TreeLogger(log_dirname)
 
@@ -342,61 +391,81 @@ def run_mcts(
     # Create work directory if it doesn't exist
     os.makedirs(work_dir, exist_ok=True)
 
-    # Copy the dataset file paths to the working directory (to avoid modifying the original dataset)
-    # Note: For Modal sandbox, files are in GCS and will be mounted directly
-    if not use_modal_sandbox:
-        for dataset_fpath in dataset_paths:
-            shutil.copy(dataset_fpath, work_dir)
-
-    base_agent_objs = None
-    if n_threads <= 1:
-        base_agent_objs = get_agents(
-            work_dir,
-            model_name=model_name,
-            temperature=temperature,
-            reasoning_effort=reasoning_effort,
-            branching_factor=branching_factor,
-            user_query=user_query,
-            experiment_first=experiment_first,
-            code_timeout=code_timeout,
-            use_modal_sandbox=use_modal_sandbox,
-            bucket_path=bucket_path,
-            dataset_paths=dataset_paths,
-            vision_model=vision_model,
-        )
-
-    if selection_method is None:
-        # Default selection method is UCB1
-        selection_method = default_mcts_selection(exploration_weight=1.0)
-
-    # Store the list of (level, node_idx) tuples for surprising nodes; if resuming, load them from the previous run
-    all_surprisals = []
-    for level in nodes_by_level:
-        for node in nodes_by_level[level]:
-            if node.surprising:
-                all_surprisals.append((node.level, node.node_idx))
-
-    # Load warmstart experiments if provided
-    _warmstart_experiments = None
-    if warmstart_experiments is not None:
-        with open(warmstart_experiments) as f:
-            _warmstart_experiments = json.load(f)
-
-    # TEMPORARY LOGGING
-    TEMP_LOG = []
-
-    total_to_sample = max_iterations
-    n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
-    warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
-    remaining_after_warmstart = max(0, total_to_sample - n_root_iteration - warmstart_remaining)
-    n_iterations = (
-        n_root_iteration
-        + math.ceil(warmstart_remaining / batch_size)
-        + math.ceil(remaining_after_warmstart / batch_size)
-    )
-    n_sampled = 0
+    usage_tracker = UsageTracker()
+    usage_tracker.save_events(log_dirname)
 
     try:
+        if agent_usage_mode == "per_response":
+            if not apply_openai_wrapper_usage_tracking():
+                raise RuntimeError(
+                    "Agent usage mode 'per_response' requires AG2 OpenAIWrapper patching, "
+                    "but the patch could not be applied. Rerun with "
+                    "--agent_usage_mode=summary_delta to use explicit fallback mode."
+                )
+            configure_ag2_usage_tracking(usage_tracker)
+        elif agent_usage_mode == "summary_delta":
+            configure_ag2_usage_tracking(None)
+        else:
+            raise ValueError(
+                f"Unknown agent_usage_mode '{agent_usage_mode}'. "
+                "Expected one of ['per_response', 'summary_delta']."
+            )
+
+        # Copy the dataset file paths to the working directory (to avoid modifying the original dataset)
+        # Note: For Modal sandbox, files are in GCS and will be mounted directly
+        if not use_modal_sandbox:
+            for dataset_fpath in dataset_paths:
+                shutil.copy(dataset_fpath, work_dir)
+
+        base_agent_objs = None
+        if n_threads <= 1:
+            base_agent_objs = get_agents(
+                work_dir,
+                model_name=model_name,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+                branching_factor=branching_factor,
+                user_query=user_query,
+                experiment_first=experiment_first,
+                code_timeout=code_timeout,
+                use_modal_sandbox=use_modal_sandbox,
+                bucket_path=bucket_path,
+                dataset_paths=dataset_paths,
+                vision_model=vision_model,
+                usage_tracker=usage_tracker,
+            )
+
+        if selection_method is None:
+            # Default selection method is UCB1
+            selection_method = default_mcts_selection(exploration_weight=1.0)
+
+        # Store the list of (level, node_idx) tuples for surprising nodes; if resuming, load them from the previous run
+        all_surprisals = []
+        for level in nodes_by_level:
+            for node in nodes_by_level[level]:
+                if node.surprising:
+                    all_surprisals.append((node.level, node.node_idx))
+
+        # Load warmstart experiments if provided
+        _warmstart_experiments = None
+        if warmstart_experiments is not None:
+            with open(warmstart_experiments) as f:
+                _warmstart_experiments = json.load(f)
+
+        # TEMPORARY LOGGING
+        TEMP_LOG = []
+
+        total_to_sample = max_iterations
+        n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
+        warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
+        remaining_after_warmstart = max(0, total_to_sample - n_root_iteration - warmstart_remaining)
+        n_iterations = (
+            n_root_iteration
+            + math.ceil(warmstart_remaining / batch_size)
+            + math.ceil(remaining_after_warmstart / batch_size)
+        )
+        n_sampled = 0
+
         for iteration_idx in range(n_iterations):
             # MCTS SELECTION, EXPANSION, and EXECUTION
             print(f"\n\n######### ITERATION {iteration_idx + 1} / {n_iterations} #########\n")
@@ -498,14 +567,33 @@ def run_mcts(
                 # Set up the group chat
                 groupchat, chat_manager = setup_group_chat(agent_objs, max_rounds)
                 _, last_message = chat_manager.resume(messages=node_messages)
+                agent_usage_before = None
+                if agent_usage_mode == "summary_delta":
+                    agent_usage_before = snapshot_agents_actual_usage(agent_objs)
+                _set_executor_usage_context(agent_objs["code_executor"], node.id)
+                if agent_usage_mode == "per_response":
+                    set_ag2_usage_context(node_id=node.id, component="agents.chat")
 
                 # Track time per node
                 _node_start_time = time()
 
                 # Execute current experiment and generate new experiments
-                user_proxy_local.initiate_chat(
-                    recipient=chat_manager, message=last_message, clear_history=False
-                )
+                try:
+                    user_proxy_local.initiate_chat(
+                        recipient=chat_manager, message=last_message, clear_history=False
+                    )
+                finally:
+                    if agent_usage_mode == "per_response":
+                        clear_ag2_usage_context()
+                if agent_usage_mode == "summary_delta":
+                    assert agent_usage_before is not None
+                    agent_usage_after = snapshot_agents_actual_usage(agent_objs)
+                    usage_tracker.record_agent_usage_deltas(
+                        agent_usage_before,
+                        agent_usage_after,
+                        node_id=node.id,
+                        component="agents.chat",
+                    )
 
                 # Store the raw message logs for the node
                 logger_obj.log_node(
@@ -519,6 +607,22 @@ def run_mcts(
                     if node.level == 1 and _warmstart_experiments is not None
                     else True
                 )
+                if node.code_output:
+                    image_usage_entries, cleaned_output = extract_local_image_usage_markers(
+                        node.code_output
+                    )
+                    for usage_entry in image_usage_entries:
+                        usage_tracker.record_event(
+                            source=usage_entry.get("source", "openai"),
+                            component=usage_entry.get("component", "image_analysis.local"),
+                            model=usage_entry.get("model"),
+                            prompt_tokens=usage_entry.get("prompt_tokens", 0),
+                            completion_tokens=usage_entry.get("completion_tokens", 0),
+                            total_tokens=usage_entry.get("total_tokens"),
+                            agent_name=usage_entry.get("agent_name", "code_executor"),
+                            node_id=node.id,
+                        )
+                    node.code_output = cleaned_output
                 rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
                 _write_rich_outputs(node.level, node.node_idx, rich_outputs)
 
@@ -540,6 +644,7 @@ def run_mcts(
                         kl_scale=kl_scale,
                         reward_mode=reward_mode,
                         TEMP_LOG=TEMP_LOG,
+                        usage_tracker=usage_tracker,
                     )
 
                     if node.success:  # i.e., reward was computed successfully
@@ -562,6 +667,7 @@ def run_mcts(
                     node.update_counts(visits=1, reward=node.self_value)
                     # Save the new node and its parents' updated counts to JSON files
                     save_mcts_node(node, log_dirname, to_root=True)
+                    usage_tracker.save_events(log_dirname)
 
                 if update_mcts_lock is not None:
                     with update_mcts_lock:
@@ -604,6 +710,7 @@ def run_mcts(
                             bucket_path=bucket_path,
                             dataset_paths=dataset_paths,
                             vision_model=vision_model,
+                            usage_tracker=usage_tracker,
                         )
                     return thread_local.agent_objs
 
@@ -655,6 +762,7 @@ def run_mcts(
                         bucket_path=bucket_path,
                         dataset_paths=dataset_paths,
                         vision_model=vision_model,
+                        usage_tracker=usage_tracker,
                     )
 
                 next_node_idx_by_level = defaultdict(
@@ -684,6 +792,9 @@ def run_mcts(
                 nodes_by_level[node.level].append(node)
     except KeyboardInterrupt:
         print("\n\n######### EXPLORATION INTERRUPTED! SAVING THE CURRENT STATE... #########\n\n")
+    finally:
+        clear_ag2_usage_context()
+        configure_ag2_usage_tracking(None)
 
     # End time tracking
     end_time = time()
@@ -691,8 +802,15 @@ def run_mcts(
 
     # Save all MCTS nodes
     save_nodes(
-        nodes_by_level, log_dirname, run_dedupe, belief_model_name, time_elapsed=time_elapsed
+        nodes_by_level,
+        log_dirname,
+        run_dedupe,
+        belief_model_name,
+        time_elapsed=time_elapsed,
+        usage_tracker=usage_tracker,
     )
+    usage_tracker.save_events(log_dirname)
+    usage_tracker.save_summary(log_dirname)
 
 
 if __name__ == "__main__":
@@ -855,6 +973,7 @@ if __name__ == "__main__":
         vision_model=args.vision_model,
         batch_size=args.batch_size,
         n_threads=args.n_threads,
+        agent_usage_mode=args.agent_usage_mode,
     )
 
     if args.delete_work_dir:

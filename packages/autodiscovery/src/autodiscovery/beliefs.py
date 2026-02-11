@@ -4,6 +4,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 from scipy.special import betaln, gammaln, psi  # betaln = log Beta function, psi = digamma
 
+from autodiscovery.llm_usage import UsageTracker
 from autodiscovery.mcts import MCTSNode
 from autodiscovery.mcts_utils import get_context_string
 from autodiscovery.utils import fuse_gaussians, query_llm
@@ -1217,6 +1218,10 @@ def get_belief(
     explicit_prior=None,
     n_retries=3,
     weight: float = 1.0,
+    usage_tracker: UsageTracker | None = None,
+    usage_component: str = "belief",
+    usage_node_id: str | None = None,
+    usage_metadata: dict | None = None,
 ):
     """Get belief distribution for a hypothesis with optional evidence.
 
@@ -1232,6 +1237,10 @@ def get_belief(
         explicit_prior: Optional prior distribution to use for Bayesian updates
         n_retries: Number of retries for querying the LLM in case of errors
         weight: Weight to apply to the empirical distribution
+        usage_tracker: Optional usage tracker.
+        usage_component: Component label used for usage tracking.
+        usage_node_id: Optional node id used for usage tracking.
+        usage_metadata: Optional metadata attached to usage events.
     """
     belief_cls = BELIEF_MODE_TO_CLS.get(belief_mode)
     if belief_cls is None:
@@ -1282,6 +1291,11 @@ def get_belief(
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
                 response_format=belief_cls.ResponseFormat,
+                usage_tracker=usage_tracker,
+                usage_component=usage_component,
+                usage_agent_name="belief_agent",
+                usage_node_id=usage_node_id,
+                usage_metadata=usage_metadata,
             )
             prior_params_or_none = {}
             if explicit_prior is not None:
@@ -1316,6 +1330,9 @@ def calculate_prior_and_posterior_beliefs(
     evidence_msg=None,
     prior=None,
     evidence_weight=1.0,
+    usage_tracker: UsageTracker | None = None,
+    usage_node_id: str | None = None,
+    usage_context_label: str = "default",
 ):
     """Calculate prior and posterior belief distributions for a hypothesis.
 
@@ -1331,6 +1348,9 @@ def calculate_prior_and_posterior_beliefs(
         evidence_msg: Optional evidence messages to condition the posterior belief
         prior: Optional pre-computed prior distribution to use for posterior calculation
         evidence_weight: Weight to apply to the evidence when calculating the posterior belief
+        usage_tracker: Optional usage tracker.
+        usage_node_id: Optional node id used for usage tracking.
+        usage_context_label: Context label used for usage tracking.
     """
     # MODEL_CTXT_LIMITS = {
     #     "o4-mini": 200_000,
@@ -1378,6 +1398,9 @@ def calculate_prior_and_posterior_beliefs(
             temperature=temperature,
             reasoning_effort=reasoning_effort,
             use_llm_prior=True,
+            usage_tracker=usage_tracker,
+            usage_component=f"belief.{usage_context_label}.prior",
+            usage_node_id=usage_node_id,
         )
 
     posterior, _ = get_belief(
@@ -1391,6 +1414,9 @@ def calculate_prior_and_posterior_beliefs(
         use_llm_prior=implicit_bayes_posterior,
         explicit_prior=prior,
         weight=evidence_weight,
+        usage_tracker=usage_tracker,
+        usage_component=f"belief.{usage_context_label}.posterior",
+        usage_node_id=usage_node_id,
     )
 
     if prior is None or posterior is None:

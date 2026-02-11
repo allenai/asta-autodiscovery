@@ -250,3 +250,15 @@ class ArgParser(argparse.ArgumentParser):
             type=str,
             help="Path to JSON file containing a list of warmstart experiments to run before MCTS",
         )
+        self.add_argument(
+            "--agent_usage_mode",
+            type=str,
+            choices=["per_response", "summary_delta"],
+            default="per_response",
+            help=(
+                "How to track agent chat usage. "
+                "'per_response' records one usage event per AG2 model response "
+                "(includes detailed usage payloads when available); "
+                "'summary_delta' uses AG2 usage-summary deltas as an explicit fallback."
+            ),
+        )

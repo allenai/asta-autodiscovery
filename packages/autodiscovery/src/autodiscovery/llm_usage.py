@@ -629,7 +629,7 @@ def _usage_payload_with_token_counts(
 
 
 def _event_token_counts(event: dict[str, Any]) -> tuple[int, int, int]:
-    """Get token counts for an event from usage payload with legacy fallback.
+    """Get token counts for an event from the usage payload.
 
     Args:
         event: Usage event dictionary.
@@ -641,12 +641,6 @@ def _event_token_counts(event: dict[str, Any]) -> tuple[int, int, int]:
     prompt = _coerce_int(_get_usage_value(usage_obj, "prompt_tokens"))
     completion = _coerce_int(_get_usage_value(usage_obj, "completion_tokens"))
     total = _coerce_int(_get_usage_value(usage_obj, "total_tokens"))
-
-    # Legacy fallback for events written before the usage-only schema.
-    if prompt == 0 and completion == 0 and total == 0:
-        prompt = _coerce_int(event.get("prompt_tokens"))
-        completion = _coerce_int(event.get("completion_tokens"))
-        total = _coerce_int(event.get("total_tokens"))
 
     if total == 0:
         total = prompt + completion

@@ -64,15 +64,22 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
 }
 
 const Wrapper = styled(Box)<{ $isAuthenticated: boolean; $isRunsHome: boolean }>`
-    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    background: ${({ theme, $isAuthenticated, $isRunsHome }) => {
+        const gradient = `radial-gradient(141.38% 60.74% at 50% 113.89%, #245555 0%, rgba(36, 85, 85, 0.20) 50%, rgba(36, 85, 85, 0.00) 100%)`;
+        const fallbackColor = theme.color['extra-dark-teal-100'].hex;
+
+        if (!$isAuthenticated && $isRunsHome) {
+            return `url(/autods-bg.png), ${gradient}, ${fallbackColor}`;
+        }
+        return `${gradient}, ${fallbackColor}`;
+    }};
     ${({ $isAuthenticated, $isRunsHome }) =>
         !$isAuthenticated &&
         $isRunsHome &&
         `
-        background-image: url(/autods-bg.png);
-        background-position: bottom right;
-        background-repeat: no-repeat;
-        background-size: contain;
+        background-position: bottom right, center, center;
+        background-repeat: no-repeat, no-repeat, no-repeat;
+        background-size: contain, cover, cover;
     `}
     position: absolute;
     inset: 0;

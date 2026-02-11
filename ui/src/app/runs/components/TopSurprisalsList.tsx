@@ -58,11 +58,13 @@ export const TopSurprisalsListImpl = () => {
                     </Item>
                 ))}
             </List>
-            {!isListExpanded && (
-                <ExpandListButton variant="outlined" onClick={() => setIsListExpanded(true)}>
-                    View all {surprisals.length.toLocaleString()} surprisals
-                </ExpandListButton>
-            )}
+            <ExpandListButton
+                variant="outlined"
+                onClick={() => setIsListExpanded(() => !isListExpanded)}>
+                {isListExpanded
+                    ? 'Collapse surprisals'
+                    : `View all ${surprisals.length.toLocaleString()} surprisals`}
+            </ExpandListButton>
         </Wrapper>
     );
 };

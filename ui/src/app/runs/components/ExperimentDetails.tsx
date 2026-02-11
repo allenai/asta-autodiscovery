@@ -3,7 +3,11 @@ import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
-import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
+import {
+    getPriorAndPosteriorLabel,
+    getSurprisalDirection,
+    escapeMarkdown,
+} from '@/runs/utils/ExperimentUtils';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
@@ -72,7 +76,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                                 {experiment.prior?.toFixed(3)})
                             </PinkText>
                         </BeliefChip>
-                        <StyledMarkdown>{experiment.hypothesis}</StyledMarkdown>
+                        <StyledMarkdown>{escapeMarkdown(experiment.hypothesis)}</StyledMarkdown>
                     </Box>
                 )}
 
@@ -86,7 +90,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                                 {experiment.posterior?.toFixed(3)})
                             </GreenText>
                         </BeliefChip>
-                        <StyledMarkdown>{experiment.analysis}</StyledMarkdown>
+                        <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
                     </Box>
                 )}
 
@@ -94,16 +98,22 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                     <>
                         <Box>
                             <SectionHeader>Experiment Plan</SectionHeader>
-                            <StyledMarkdown>{`Objective: ${experiment.experimentPlan.objective}`}</StyledMarkdown>
+                            <StyledMarkdown>
+                                {escapeMarkdown(
+                                    `Objective: ${experiment.experimentPlan.objective}`
+                                )}
+                            </StyledMarkdown>
                         </Box>
                         <Box>
                             <SectionHeader>Steps</SectionHeader>
-                            <StyledMarkdown>{experiment.experimentPlan.steps}</StyledMarkdown>
+                            <StyledMarkdown>
+                                {escapeMarkdown(experiment.experimentPlan.steps)}
+                            </StyledMarkdown>
                         </Box>
                         <Box>
                             <SectionHeader>Deliverables</SectionHeader>
                             <StyledMarkdown>
-                                {experiment.experimentPlan.deliverables}
+                                {escapeMarkdown(experiment.experimentPlan.deliverables)}
                             </StyledMarkdown>
                         </Box>
 
@@ -137,7 +147,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                 {experiment.review && (
                     <Box>
                         <SectionHeader>Review</SectionHeader>
-                        <StyledMarkdown>{experiment.review}</StyledMarkdown>
+                        <StyledMarkdown>{escapeMarkdown(experiment.review)}</StyledMarkdown>
                     </Box>
                 )}
             </ContentWrapper>

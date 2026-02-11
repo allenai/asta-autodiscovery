@@ -12,22 +12,14 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
             <Title>AutoDiscovery</Title>
             <Subtitle>Uncover surprising insights hidden in your data.</Subtitle>
             <Description>
-                AutoDiscovery uses <strong>Bayesian surprise</strong> (a measure of how much new
-                experimental evidence shifts our beliefs) to autonomously explore your datasets. It
-                identifies discoveries that genuinely change what we know, challenging assumptions
-                to inspire entirely new lines of inquiry.
+                AutoDiscovery uses <strong>Bayesian surprise</strong> to autonomously explore your
+                datasets. It identifies discoveries that genuinely change what we know, challenging
+                assumptions to inspire entirely new lines of inquiry.
             </Description>
             {showLogin && (
-                <>
-                    <LoginHeading>Sign in to continue</LoginHeading>
-                    <LoginDescription>
-                        Your datasets and discoveries are kept private and secure. Signing in
-                        ensures that only you can access your research.
-                    </LoginDescription>
-                    <LoginButton onClick={onLoginClick} variant="contained" endIcon={<LoginIcon />}>
-                        Sign in to get started
-                    </LoginButton>
-                </>
+                <LoginButton onClick={onLoginClick} variant="contained" endIcon={<LoginIcon />}>
+                    Sign in to get started
+                </LoginButton>
             )}
         </Wrapper>
     );
@@ -72,28 +64,10 @@ const Description = styled(Typography)(({ theme }) => ({
     lineHeight: '150%',
 }));
 
-const LoginHeading = styled(Typography)(({ theme }) => ({
-    color: '#9FEAD1',
-    fontFamily: '"PP Telegraf", Manrope, sans-serif',
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    lineHeight: '115%',
-    marginTop: theme.spacing(4),
-    marginBottom: theme.spacing(1),
-}));
-
-const LoginDescription = styled(Typography)(({ theme }) => ({
-    color: theme.color['cream-100'].hex,
-    fontFamily: 'Manrope',
-    fontSize: '1rem',
-    fontWeight: 400,
-    lineHeight: '150%',
-    marginBottom: theme.spacing(3),
-}));
-
 const LoginButton = styled(Button)(({ theme }) => ({
     backgroundColor: theme.color['green-100'].hex,
     color: theme.color['extra-dark-teal-100'].hex,
+    marginTop: theme.spacing(3),
     padding: theme.spacing(1.5, 3),
     fontFamily: 'Manrope',
     fontSize: '1rem',

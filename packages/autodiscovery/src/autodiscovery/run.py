@@ -393,78 +393,79 @@ def run_mcts(
 
     usage_tracker = UsageTracker()
     usage_tracker.save_events(log_dirname)
-    if agent_usage_mode == "per_response":
-        if not apply_openai_wrapper_usage_tracking():
-            raise RuntimeError(
-                "Agent usage mode 'per_response' requires AG2 OpenAIWrapper patching, "
-                "but the patch could not be applied. Rerun with "
-                "--agent_usage_mode=summary_delta to use explicit fallback mode."
-            )
-        configure_ag2_usage_tracking(usage_tracker)
-    elif agent_usage_mode == "summary_delta":
-        configure_ag2_usage_tracking(None)
-    else:
-        raise ValueError(
-            f"Unknown agent_usage_mode '{agent_usage_mode}'. "
-            "Expected one of ['per_response', 'summary_delta']."
-        )
-
-    # Copy the dataset file paths to the working directory (to avoid modifying the original dataset)
-    # Note: For Modal sandbox, files are in GCS and will be mounted directly
-    if not use_modal_sandbox:
-        for dataset_fpath in dataset_paths:
-            shutil.copy(dataset_fpath, work_dir)
-
-    base_agent_objs = None
-    if n_threads <= 1:
-        base_agent_objs = get_agents(
-            work_dir,
-            model_name=model_name,
-            temperature=temperature,
-            reasoning_effort=reasoning_effort,
-            branching_factor=branching_factor,
-            user_query=user_query,
-            experiment_first=experiment_first,
-            code_timeout=code_timeout,
-            use_modal_sandbox=use_modal_sandbox,
-            bucket_path=bucket_path,
-            dataset_paths=dataset_paths,
-            vision_model=vision_model,
-            usage_tracker=usage_tracker,
-        )
-
-    if selection_method is None:
-        # Default selection method is UCB1
-        selection_method = default_mcts_selection(exploration_weight=1.0)
-
-    # Store the list of (level, node_idx) tuples for surprising nodes; if resuming, load them from the previous run
-    all_surprisals = []
-    for level in nodes_by_level:
-        for node in nodes_by_level[level]:
-            if node.surprising:
-                all_surprisals.append((node.level, node.node_idx))
-
-    # Load warmstart experiments if provided
-    _warmstart_experiments = None
-    if warmstart_experiments is not None:
-        with open(warmstart_experiments) as f:
-            _warmstart_experiments = json.load(f)
-
-    # TEMPORARY LOGGING
-    TEMP_LOG = []
-
-    total_to_sample = max_iterations
-    n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
-    warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
-    remaining_after_warmstart = max(0, total_to_sample - n_root_iteration - warmstart_remaining)
-    n_iterations = (
-        n_root_iteration
-        + math.ceil(warmstart_remaining / batch_size)
-        + math.ceil(remaining_after_warmstart / batch_size)
-    )
-    n_sampled = 0
 
     try:
+        if agent_usage_mode == "per_response":
+            if not apply_openai_wrapper_usage_tracking():
+                raise RuntimeError(
+                    "Agent usage mode 'per_response' requires AG2 OpenAIWrapper patching, "
+                    "but the patch could not be applied. Rerun with "
+                    "--agent_usage_mode=summary_delta to use explicit fallback mode."
+                )
+            configure_ag2_usage_tracking(usage_tracker)
+        elif agent_usage_mode == "summary_delta":
+            configure_ag2_usage_tracking(None)
+        else:
+            raise ValueError(
+                f"Unknown agent_usage_mode '{agent_usage_mode}'. "
+                "Expected one of ['per_response', 'summary_delta']."
+            )
+
+        # Copy the dataset file paths to the working directory (to avoid modifying the original dataset)
+        # Note: For Modal sandbox, files are in GCS and will be mounted directly
+        if not use_modal_sandbox:
+            for dataset_fpath in dataset_paths:
+                shutil.copy(dataset_fpath, work_dir)
+
+        base_agent_objs = None
+        if n_threads <= 1:
+            base_agent_objs = get_agents(
+                work_dir,
+                model_name=model_name,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+                branching_factor=branching_factor,
+                user_query=user_query,
+                experiment_first=experiment_first,
+                code_timeout=code_timeout,
+                use_modal_sandbox=use_modal_sandbox,
+                bucket_path=bucket_path,
+                dataset_paths=dataset_paths,
+                vision_model=vision_model,
+                usage_tracker=usage_tracker,
+            )
+
+        if selection_method is None:
+            # Default selection method is UCB1
+            selection_method = default_mcts_selection(exploration_weight=1.0)
+
+        # Store the list of (level, node_idx) tuples for surprising nodes; if resuming, load them from the previous run
+        all_surprisals = []
+        for level in nodes_by_level:
+            for node in nodes_by_level[level]:
+                if node.surprising:
+                    all_surprisals.append((node.level, node.node_idx))
+
+        # Load warmstart experiments if provided
+        _warmstart_experiments = None
+        if warmstart_experiments is not None:
+            with open(warmstart_experiments) as f:
+                _warmstart_experiments = json.load(f)
+
+        # TEMPORARY LOGGING
+        TEMP_LOG = []
+
+        total_to_sample = max_iterations
+        n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
+        warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
+        remaining_after_warmstart = max(0, total_to_sample - n_root_iteration - warmstart_remaining)
+        n_iterations = (
+            n_root_iteration
+            + math.ceil(warmstart_remaining / batch_size)
+            + math.ceil(remaining_after_warmstart / batch_size)
+        )
+        n_sampled = 0
+
         for iteration_idx in range(n_iterations):
             # MCTS SELECTION, EXPANSION, and EXECUTION
             print(f"\n\n######### ITERATION {iteration_idx + 1} / {n_iterations} #########\n")

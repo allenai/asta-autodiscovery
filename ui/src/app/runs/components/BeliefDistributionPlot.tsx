@@ -10,6 +10,7 @@ import type { BeliefDistribution } from '@/types/Run';
 type BeliefDistributionPlotProps = {
     prior: BeliefDistribution | null;
     posterior: BeliefDistribution | null;
+    isSurprising?: boolean;
 };
 
 // Encodes the belief-category -> score mapping so we can convert categorical counts
@@ -81,7 +82,11 @@ const toTrace = (label: string, params: { alpha: number; beta: number }, color: 
  *   prior: Belief distribution payload for the prior update.
  *   posterior: Belief distribution payload for the posterior update.
  */
-export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionPlotProps) {
+export function BeliefDistributionPlot({
+    prior,
+    posterior,
+    isSurprising,
+}: BeliefDistributionPlotProps) {
     const theme = useTheme() as any;
     const plotContainerRef = useRef<HTMLDivElement | null>(null);
     const [containerWidth, setContainerWidth] = useState<number | null>(null);
@@ -169,41 +174,24 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
                 : null,
         ].filter(Boolean);
 
-        const surprisalLine =
+        const surprisalArrow =
             priorMean !== null && posteriorMean !== null
-                ? [
-                      {
-                          type: 'line',
-                          xref: 'x',
-                          yref: 'paper',
-                          x0: Math.min(priorMean, posteriorMean),
-                          x1: Math.max(priorMean, posteriorMean),
-                          y0: -0.16,
-                          y1: -0.16,
-                          line: { color: axisColor, width: 1.5 },
-                      },
-                      {
-                          type: 'line',
-                          xref: 'x',
-                          yref: 'paper',
-                          x0: priorMean,
-                          x1: priorMean,
-                          y0: -0.18,
-                          y1: -0.14,
-                          line: { color: axisColor, width: 1.5 },
-                      },
-                      {
-                          type: 'line',
-                          xref: 'x',
-                          yref: 'paper',
-                          x0: posteriorMean,
-                          x1: posteriorMean,
-                          y0: -0.18,
-                          y1: -0.14,
-                          line: { color: axisColor, width: 1.5 },
-                      },
-                  ]
-                : [];
+                ? {
+                      x: posteriorMean,
+                      y: -0.16,
+                      ax: priorMean,
+                      ay: -0.16,
+                      xref: 'x',
+                      yref: 'paper',
+                      axref: 'x',
+                      ayref: 'paper',
+                      showarrow: true,
+                      arrowhead: 2,
+                      arrowsize: 1,
+                      arrowwidth: 1.5,
+                      arrowcolor: isSurprising ? '#FFA31C' : axisColor,
+                  }
+                : null;
 
         const clamp = (value: number, min: number, max: number) =>
             Math.max(min, Math.min(max, value));
@@ -271,6 +259,7 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
         const annotations = [
             priorLabel,
             posteriorLabel,
+            surprisalArrow,
             {
                 x: 0,
                 y: -0.14,
@@ -317,7 +306,7 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
             },
             showlegend: false,
             hovermode: false,
-            shapes: [...verticalGridLines, ...meanLines, ...surprisalLine],
+            shapes: [...verticalGridLines, ...meanLines],
             annotations,
             dragmode: false,
             xaxis: {
@@ -350,7 +339,7 @@ export function BeliefDistributionPlot({ prior, posterior }: BeliefDistributionP
         };
 
         return { traces, layout, config };
-    }, [prior, posterior, theme, containerWidth]);
+    }, [prior, posterior, theme, containerWidth, isSurprising]);
 
     useEffect(() => {
         const node = plotContainerRef.current;

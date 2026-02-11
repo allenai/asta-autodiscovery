@@ -72,12 +72,9 @@ export default function CreditsChip() {
                         The credits are a one-time fixed allocation to support public access for
                         scientific and education purposes and cannot be reloaded once consumed. If
                         you are interested in discussing potential research collaborations to
-                        further scientific discovery, please{' '}
-                        <StyledLink
-                            href="https://allenai.org/contact"
-                            target="_blank"
-                            rel="noopener noreferrer">
-                            contact us
+                        further scientific discovery, please contact us at{' '}
+                        <StyledLink href="mailto:asta-support@allenai.org">
+                            asta-support@allenai.org
                         </StyledLink>
                         .
                     </PopoverParagraph>

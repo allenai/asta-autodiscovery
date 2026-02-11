@@ -32,6 +32,7 @@ from runs.models import (
     GenerateUploadUrlRequestModel,
     GenerateUploadUrlResponseModel,
     GetExperimentStatusResponseModel,
+    GetRunExperimentsRequestModel,
     GetRunExperimentsResponseModel,
     GetRunMetadataRequestModel,
     GetRunMetadataResponseModel,
@@ -868,7 +869,7 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to get run status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/<userid>/<runid>/experiments", methods=["GET"])
+    @api.route("/<userid>/<runid>/experiments", methods=["POST"])
     @optional_enrollment
     def get_run_experiments(userid: str, runid: str):
         """Fetch details about the experiments within a run. This is used to build
@@ -879,8 +880,8 @@ def create() -> Blueprint:
                     or own a shared run.
             runid: Run identifier
 
-        Query Parameters:
-            after_experiment_id: Node ID after which to fetch experiments (for smaller payloads when polling)
+        Request Body:
+            known_experiment_ids: List of experiment IDs the client already has
         """
         token_userid, error = _get_userid_for_read()
         if error:
@@ -894,7 +895,9 @@ def create() -> Blueprint:
         if error_response:
             return error_response, status_code
 
-        after_experiment_id = request.args.get("after_experiment_id", None)
+        # Parse request body
+        request_body = GetRunExperimentsRequestModel(**(request.json or {}))
+        known_experiment_ids = request_body.known_experiment_ids
 
         # Get job status to determine if polling can stop
         job_manager = get_job_manager()
@@ -903,12 +906,11 @@ def create() -> Blueprint:
 
         # Load experiment tree and convert to models
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        experiment_nodes = tree.to_experiment_models(after_experiment_id=after_experiment_id)
+        experiment_nodes = tree.to_experiment_models(exclude_experiment_ids=known_experiment_ids)
         experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
         resp = GetRunExperimentsResponseModel(
             runid=runid,
-            after_experiment_id=after_experiment_id,
             experiments=experiment_models,
             has_job_completed=has_job_completed,
         )

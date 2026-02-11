@@ -227,12 +227,11 @@ class ExperimentTree:
         """
         return self._nodes.get(node_id)
 
-    def as_list(self, after_experiment_id: str | None = None) -> list[ExperimentNode]:
+    def as_list(self, exclude_experiment_ids: list[str] | None = None) -> list[ExperimentNode]:
         """Get flat list of nodes, optionally filtered.
 
         Args:
-            after_experiment_id: If provided, only return nodes with creation_idx
-                                 greater than the node with this ID
+            exclude_experiment_ids: If provided, exclude nodes with IDs in this list
 
         Returns:
             List of ExperimentNode sorted by creation_idx
@@ -240,18 +239,12 @@ class ExperimentTree:
         if self._list_cache is None:
             self._list_cache = sorted(self._nodes.values(), key=lambda n: n.creation_idx)
 
-        if after_experiment_id is None:
+        if exclude_experiment_ids is None:
             return self._list_cache
 
-        # Find the creation_idx of the after_experiment_id
-        after_node = self._nodes.get(after_experiment_id)
-        if after_node is None:
-            # If node not found, return all nodes
-            return self._list_cache
-
-        # Filter to nodes created after this one
-        after_idx = after_node.creation_idx
-        return [node for node in self._list_cache if node.creation_idx > after_idx]
+        # Filter out nodes in the exclusion list
+        exclude_set = set(exclude_experiment_ids)
+        return [node for node in self._list_cache if node.id not in exclude_set]
 
     def as_tree(self) -> ExperimentNode | None:
         """Get root node with children populated.
@@ -266,16 +259,16 @@ class ExperimentTree:
         """Access root node directly."""
         return self._root
 
-    def to_experiment_models(self, after_experiment_id: str | None = None) -> list[dict[str, Any]]:
+    def to_experiment_models(self, exclude_experiment_ids: list[str] | None = None) -> list[dict[str, Any]]:
         """Convert to list of ExperimentModel dicts for API response.
 
         Args:
-            after_experiment_id: Optional filter for pagination
+            exclude_experiment_ids: Optional list of experiment IDs to exclude
 
         Returns:
             List of dictionaries matching ExperimentModel schema
         """
-        nodes = self.as_list(after_experiment_id=after_experiment_id)
+        nodes = self.as_list(exclude_experiment_ids=exclude_experiment_ids)
         return [node.to_dict() for node in nodes]
 
     def __len__(self) -> int:

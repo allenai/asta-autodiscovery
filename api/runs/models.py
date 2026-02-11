@@ -239,13 +239,19 @@ class GetViewerRunsResponseModel(BaseModel):
     runs: list[RunModel] = Field(..., description="List of runs available to the viewer")
 
 
+class GetRunExperimentsRequestModel(BaseModel):
+    """Model for the request to get experiments within a run"""
+
+    known_experiment_ids: list[str] = Field(
+        default_factory=list,
+        description="List of experiment IDs the client already has"
+    )
+
+
 class GetRunExperimentsResponseModel(BaseModel):
     """Model for the response containing a list of experiments within a run"""
 
     runid: str = Field(..., description="Identifier of the run")
-    after_experiment_id: str | None = Field(
-        None, description="Experiment ID after which experiments are fetched"
-    )
     has_job_completed: bool = Field(
         ..., description="Flag indicating if the job has completed, polling can stop"
     )

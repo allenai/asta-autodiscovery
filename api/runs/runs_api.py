@@ -896,8 +896,7 @@ def create() -> Blueprint:
             return error_response, status_code
 
         # Parse request body
-        request_body = GetRunExperimentsRequestModel(**(request.json or {}))
-        known_experiment_ids = request_body.known_experiment_ids
+        req = GetRunExperimentsRequestModel(**(request.json or {}))
 
         # Get job status to determine if polling can stop
         job_manager = get_job_manager()
@@ -906,7 +905,7 @@ def create() -> Blueprint:
 
         # Load experiment tree and convert to models
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        experiment_nodes = tree.to_experiment_models(exclude_experiment_ids=known_experiment_ids)
+        experiment_nodes = tree.to_experiment_models(exclude_experiment_ids=req.known_experiment_ids)
         experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
         resp = GetRunExperimentsResponseModel(

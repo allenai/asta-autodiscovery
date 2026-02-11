@@ -180,20 +180,23 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     // Convert experiments to rows for DataGrid
     const rows = useMemo(() => {
         const experimentRows = experiments.map((experiment) => {
+            // For failed or inconclusive experiments, show N/A in all cells
+            const isInconclusiveOrFailed = experiment.status !== 'SUCCEEDED';
+
             return {
                 id: experiment.idInRun,
                 hypothesis: experiment.hypothesis ?? 'N/A',
-                prior: getPriorAndPosteriorLabel(experiment.prior),
-                priorValue: experiment.prior,
-                posterior: getPriorAndPosteriorLabel(experiment.posterior),
-                posteriorValue: experiment.posterior,
-                surprisal: experiment.surprise
+                prior: isInconclusiveOrFailed ? 'N/A' : getPriorAndPosteriorLabel(experiment.prior),
+                priorValue: isInconclusiveOrFailed ? null : experiment.prior,
+                posterior: isInconclusiveOrFailed ? 'N/A' : getPriorAndPosteriorLabel(experiment.posterior),
+                posteriorValue: isInconclusiveOrFailed ? null : experiment.posterior,
+                surprisal: isInconclusiveOrFailed ? null : (experiment.surprise
                     ? Math.abs(experiment.surprise)
-                    : experiment.surprise,
-                isSurprising: experiment.isSurprising,
-                direction: getSurprisalDirection(experiment.surprise),
+                    : experiment.surprise),
+                isSurprising: isInconclusiveOrFailed ? false : experiment.isSurprising,
+                direction: isInconclusiveOrFailed ? 'N/A' : getSurprisalDirection(experiment.surprise),
                 creationIdx: experiment.creationIdx,
-                runtimeMs: experiment.runtimeMs ?? 'N/A',
+                runtimeMs: isInconclusiveOrFailed ? 'N/A' : (experiment.runtimeMs ?? 'N/A'),
                 isSkeleton: false,
             };
         });

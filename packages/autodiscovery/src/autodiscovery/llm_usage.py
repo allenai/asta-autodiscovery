@@ -1,4 +1,4 @@
-"""Utilities for tracking LLM token usage and post-processing cost estimates."""
+"""Utilities for tracking LLM token usage."""
 
 from __future__ import annotations
 
@@ -6,82 +6,13 @@ import copy
 import json
 import os
 import threading
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 LOCAL_IMAGE_USAGE_MARKER = "__AUTODISCOVERY_LLM_USAGE__"
 _AG2_USAGE_TRACKER = None
 _AG2_USAGE_CONTEXT = threading.local()
-
-
-@dataclass(frozen=True)
-class PricingEntry:
-    """Per-model token pricing in USD per 1K tokens.
-
-    Attributes:
-        prompt_per_1k: Price for prompt/input tokens per 1K tokens.
-        completion_per_1k: Price for completion/output tokens per 1K tokens.
-    """
-
-    prompt_per_1k: float
-    completion_per_1k: float
-
-
-def load_pricing_catalog(pricing_file: str | None = None) -> dict[str, PricingEntry]:
-    """Load pricing catalog from AG2 defaults and optional override file.
-
-    Args:
-        pricing_file: Optional path to a JSON pricing file.
-
-    Returns:
-        Mapping from model name to pricing entry.
-    """
-    catalog = _load_ag2_pricing_catalog()
-    if pricing_file is None:
-        return catalog
-
-    with open(pricing_file) as f:
-        raw_catalog = json.load(f)
-
-    if not isinstance(raw_catalog, dict):
-        raise ValueError("Pricing file must contain a JSON object keyed by model name.")
-
-    for model, raw_price in raw_catalog.items():
-        entry = _parse_pricing_entry(raw_price)
-        if entry is None:
-            continue
-        catalog[model] = entry
-
-    return catalog
-
-
-def estimate_cost_usd(
-    model: str | None,
-    prompt_tokens: int,
-    completion_tokens: int,
-    pricing_catalog: dict[str, PricingEntry],
-) -> float | None:
-    """Estimate usage cost using a pricing catalog.
-
-    Args:
-        model: Model name.
-        prompt_tokens: Number of prompt/input tokens.
-        completion_tokens: Number of completion/output tokens.
-        pricing_catalog: Catalog of per-model prices.
-
-    Returns:
-        Estimated cost in USD if model pricing is known, otherwise None.
-    """
-    if not model:
-        return None
-    entry = pricing_catalog.get(model)
-    if entry is None:
-        return None
-    return (
-        (max(0, prompt_tokens) * entry.prompt_per_1k)
-        + (max(0, completion_tokens) * entry.completion_per_1k)
-    ) / 1000.0
 
 
 def load_usage_events(events_path: str) -> list[dict[str, Any]]:
@@ -116,61 +47,6 @@ def save_usage_events(events: list[dict[str, Any]], out_path: str) -> None:
         for event in events:
             f.write(json.dumps(event))
             f.write("\n")
-
-
-def price_usage_events(
-    events: list[dict[str, Any]],
-    pricing_catalog: dict[str, PricingEntry],
-) -> list[dict[str, Any]]:
-    """Attach cost estimates to token-usage events.
-
-    Args:
-        events: Token-usage event dictionaries.
-        pricing_catalog: Pricing catalog keyed by model.
-
-    Returns:
-        Copied event dictionaries with ``cost_usd`` and ``unpriced`` fields.
-    """
-    priced_events: list[dict[str, Any]] = []
-    for event in events:
-        priced_event = copy.deepcopy(event)
-        model = priced_event.get("model")
-        prompt, completion, _ = _event_token_counts(priced_event)
-        estimated_cost = estimate_cost_usd(model, prompt, completion, pricing_catalog)
-        priced_event["cost_usd"] = 0.0 if estimated_cost is None else estimated_cost
-        priced_event["unpriced"] = estimated_cost is None
-        priced_events.append(priced_event)
-    return priced_events
-
-
-def build_priced_summary(priced_events: list[dict[str, Any]]) -> dict[str, Any]:
-    """Build aggregate summary for priced usage events.
-
-    Args:
-        priced_events: Priced usage events.
-
-    Returns:
-        Aggregate summary dictionary.
-    """
-    summary = {
-        "totals": _empty_priced_bucket(),
-        "by_model": {},
-        "by_agent": {},
-        "by_node": {},
-        "by_component": {},
-        "unpriced_models": [],
-    }
-    unpriced_models: set[str] = set()
-    for event in priced_events:
-        _accumulate_priced(summary["totals"], event)
-        _accumulate_priced(summary["by_model"], event, key=event.get("model") or "unknown")
-        _accumulate_priced(summary["by_agent"], event, key=event.get("agent_name") or "unassigned")
-        _accumulate_priced(summary["by_node"], event, key=event.get("node_id") or "run_level")
-        _accumulate_priced(summary["by_component"], event, key=event.get("component") or "unknown")
-        if event.get("unpriced") and event.get("model"):
-            unpriced_models.add(str(event["model"]))
-    summary["unpriced_models"] = sorted(unpriced_models)
-    return summary
 
 
 def snapshot_agents_actual_usage(agents: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -531,23 +407,6 @@ def _accumulate(target: dict[str, Any], event: dict[str, Any], key: str | None =
     bucket["reasoning_tokens"] += reasoning
 
 
-def _accumulate_priced(
-    target: dict[str, Any],
-    event: dict[str, Any],
-    key: str | None = None,
-) -> None:
-    """Accumulate one priced event into an aggregate bucket."""
-    bucket = target if key is None else target.setdefault(key, _empty_priced_bucket())
-    prompt, completion, total = _event_token_counts(event)
-    reasoning = _event_reasoning_tokens(event)
-    bucket["calls"] += 1
-    bucket["prompt_tokens"] += prompt
-    bucket["completion_tokens"] += completion
-    bucket["total_tokens"] += total
-    bucket["reasoning_tokens"] += reasoning
-    bucket["cost_usd"] += float(event.get("cost_usd", 0.0))
-
-
 def _empty_bucket() -> dict[str, Any]:
     """Return an empty aggregate bucket."""
     return {
@@ -557,19 +416,6 @@ def _empty_bucket() -> dict[str, Any]:
         "total_tokens": 0,
         "reasoning_tokens": 0,
     }
-
-
-def _empty_priced_bucket() -> dict[str, Any]:
-    """Return an empty aggregate bucket including cost."""
-    return {
-        "calls": 0,
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
-        "total_tokens": 0,
-        "reasoning_tokens": 0,
-        "cost_usd": 0.0,
-    }
-
 
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""
@@ -729,44 +575,3 @@ def _positive_delta(current: Any, previous: Any) -> int:
     previous_value = _coerce_int(previous)
     delta = current_value - previous_value
     return delta if delta > 0 else 0
-
-
-def _parse_pricing_entry(raw_price: Any) -> PricingEntry | None:
-    """Parse one pricing entry from JSON values."""
-    if isinstance(raw_price, (list, tuple)) and len(raw_price) >= 2:
-        return PricingEntry(
-            prompt_per_1k=float(raw_price[0]),
-            completion_per_1k=float(raw_price[1]),
-        )
-    if isinstance(raw_price, dict):
-        prompt = raw_price.get("prompt_per_1k")
-        completion = raw_price.get("completion_per_1k")
-        if prompt is not None and completion is not None:
-            return PricingEntry(prompt_per_1k=float(prompt), completion_per_1k=float(completion))
-    if isinstance(raw_price, (float, int)):
-        value = float(raw_price)
-        return PricingEntry(prompt_per_1k=value, completion_per_1k=value)
-    return None
-
-
-def _load_ag2_pricing_catalog() -> dict[str, PricingEntry]:
-    """Load AG2 built-in price table if available."""
-    try:
-        from autogen.oai.openai_utils import OAI_PRICE1K
-    except Exception:
-        return {}
-
-    pricing_catalog: dict[str, PricingEntry] = {}
-    for model_name, raw_price in OAI_PRICE1K.items():
-        if isinstance(raw_price, tuple):
-            pricing_catalog[model_name] = PricingEntry(
-                prompt_per_1k=float(raw_price[0]),
-                completion_per_1k=float(raw_price[1]),
-            )
-        else:
-            price_value = float(raw_price)
-            pricing_catalog[model_name] = PricingEntry(
-                prompt_per_1k=price_value,
-                completion_per_1k=price_value,
-            )
-    return pricing_catalog

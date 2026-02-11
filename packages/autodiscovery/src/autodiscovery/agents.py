@@ -7,7 +7,8 @@ from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
 from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
 
-from autodiscovery.llm_retry import apply_gemini_client_backoff, call_with_backoff
+from autodiscovery.llm_retry import apply_openai_client_vertex_token_refresh, call_with_backoff
+from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER, UsageTracker
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -16,7 +17,7 @@ from autodiscovery.structured_outputs import (
     ExperimentList,
     ExperimentReviewer,
 )
-from autodiscovery.utils import is_gemini_model, normalize_vertex_model_name
+from autodiscovery.utils import get_vertex_access_token, is_gemini_model, normalize_vertex_model_name
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
 from autodiscovery.vertex_config import get_vertex_openai_base_url
 
@@ -38,19 +39,28 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 class ModalSandboxExecutor(CodeExecutor):
     """Wrapper for ModalSandboxIPythonBackend to work with Autogen's executor interface."""
 
-    def __init__(self, backend, timeout: int = 30 * 60, vision_model: str = "gpt-4o"):
+    def __init__(
+        self,
+        backend,
+        timeout: int = 30 * 60,
+        vision_model: str = "gpt-4o",
+        usage_tracker: UsageTracker | None = None,
+    ):
         """Initialize the Modal sandbox executor.
 
         Args:
             backend: ModalSandboxIPythonBackend instance
             timeout: Timeout in seconds (for compatibility, not used by Modal sandbox)
             vision_model: Model to use for image analysis
+            usage_tracker: Optional usage tracker for image analysis calls.
         """
         from code_execution import IPythonExecutor
 
         self._executor = IPythonExecutor(backend)
         self._timeout = timeout
         self.vision_model = vision_model
+        self._usage_tracker = usage_tracker
+        self._usage_node_id: str | None = None
 
     def _get_vision_client(self):
         from openai import OpenAI
@@ -111,6 +121,14 @@ class ModalSandboxExecutor(CodeExecutor):
             ),
             label=f"vision_analysis(model={self.vision_model})",
         )
+        if self._usage_tracker is not None:
+            self._usage_tracker.record_response(
+                response,
+                source="openai",
+                component="image_analysis.modal",
+                agent_name="code_executor",
+                node_id=self._usage_node_id,
+            )
 
         return response.choices[0].message.content
 
@@ -202,6 +220,20 @@ class ModalSandboxExecutor(CodeExecutor):
         """Get rich outputs from the last execution."""
         return getattr(self, "_last_rich_outputs", [])
 
+    def set_usage_context(
+        self,
+        usage_tracker: UsageTracker | None,
+        node_id: str | None = None,
+    ) -> None:
+        """Set usage tracking context for subsequent image analysis requests.
+
+        Args:
+            usage_tracker: Usage tracker instance.
+            node_id: Node id to attach to usage events.
+        """
+        self._usage_tracker = usage_tracker
+        self._usage_node_id = node_id
+
     @property
     def timeout(self) -> int:
         """Return the timeout value."""
@@ -252,10 +284,12 @@ import matplotlib.pyplot as plt
 import functools
 from io import BytesIO
 import base64
+import json
 import os
 from openai import OpenAI
 
 VISION_MODEL = __VISION_MODEL__
+USAGE_MARKER = __USAGE_MARKER__
 VERTEX_OPENAI_BASE_URL_ENV = "VERTEX_OPENAI_BASE_URL"
 VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
 VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
@@ -353,6 +387,18 @@ def image_to_text():
                 messages=messages,
                 max_tokens=1000,
             )
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                usage_payload = {
+                    "source": "openai",
+                    "component": "image_analysis.local",
+                    "agent_name": "code_executor",
+                    "model": getattr(response, "model", VISION_MODEL),
+                    "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
+                    "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
+                    "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+                }
+                print(USAGE_MARKER + json.dumps(usage_payload, sort_keys=True))
             analysis = response.choices[0].message.content
             print(f"\\n=== Plot Analysis (fig. {{fig_num}}) ===\\n")
             print(analysis)
@@ -369,8 +415,10 @@ def patch_matplotlib_show():
 # Apply the patch
 patch_matplotlib_show()
 """
-    return template.replace("__VISION_MODEL__", repr(vision_model)).replace(
-        "__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT)
+    return (
+        template.replace("__VISION_MODEL__", repr(vision_model))
+        .replace("__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT))
+        .replace("__USAGE_MARKER__", repr(LOCAL_IMAGE_USAGE_MARKER))
     )
 
 
@@ -455,25 +503,19 @@ def get_openai_config(
     is_gemini = is_gemini_model(model_name)
 
     if is_gemini:
-        apply_gemini_client_backoff()
-        # Configure Gemini via AG2's native Google/Vertex client.
-        project_id = os.getenv("VERTEX_PROJECT_ID")
-        location = os.getenv("VERTEX_LOCATION") or "global"
-        google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        model = model_name.split("/")[-1]
+        # Route Gemini through Vertex's OpenAI-compatible endpoint so usage metadata
+        # (including provider-native total token counts) is preserved.
+        apply_openai_client_vertex_token_refresh()
+        base_url = get_vertex_openai_base_url()
         config = {
-            "api_type": "google",
-            "model": model,
+            "api_type": "openai",
+            "model": normalize_vertex_model_name(model_name),
             "timeout": timeout,
+            "api_key": get_vertex_access_token(),
+            "base_url": base_url,
             "max_retries": 3,
             "cache_seed": None,
         }
-        if project_id:
-            config["project_id"] = project_id
-        if location:
-            config["location"] = location
-        if google_application_credentials:
-            config["google_application_credentials"] = google_application_credentials
         if temperature is not None:
             config["temperature"] = temperature
     else:
@@ -512,7 +554,28 @@ def get_agents(
     bucket_path=None,
     dataset_paths=None,
     vision_model: str = "gpt-4o",
+    usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
+    """Build and return the conversational agents used by AutoDiscovery.
+
+    Args:
+        work_dir: Working directory for code execution.
+        model_name: Model used for AG2 conversational agents.
+        temperature: Sampling temperature for non-reasoning models.
+        reasoning_effort: Reasoning effort for compatible models.
+        branching_factor: Number of experiment candidates to request.
+        user_query: Optional user query injected into generator prompts.
+        experiment_first: Whether generator returns experiment-first outputs.
+        code_timeout: Timeout in seconds for code execution.
+        use_modal_sandbox: Whether to run code in Modal sandbox.
+        bucket_path: Optional GCS bucket path for Modal datasets.
+        dataset_paths: Optional dataset paths (reserved for future use).
+        vision_model: Vision model used for plot analysis.
+        usage_tracker: Optional usage tracker for direct image-analysis calls.
+
+    Returns:
+        Dictionary mapping agent name to agent instance.
+    """
     is_gemini = is_gemini_model(model_name)
     api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
     llm_config = get_openai_config(
@@ -695,7 +758,12 @@ def install(package):
             env={"DATASET_ROOT": modal_working_dir},
         )
 
-        executor = ModalSandboxExecutor(backend, timeout=code_timeout, vision_model=vision_model)
+        executor = ModalSandboxExecutor(
+            backend,
+            timeout=code_timeout,
+            vision_model=vision_model,
+            usage_tracker=usage_tracker,
+        )
         print(
             f"Using Modal sandbox with bucket gs://{bucket_name}/{key_prefix} mounted at {modal_mount_path}"
         )

@@ -188,15 +188,21 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 hypothesis: experiment.hypothesis ?? 'N/A',
                 prior: isInconclusiveOrFailed ? 'N/A' : getPriorAndPosteriorLabel(experiment.prior),
                 priorValue: isInconclusiveOrFailed ? null : experiment.prior,
-                posterior: isInconclusiveOrFailed ? 'N/A' : getPriorAndPosteriorLabel(experiment.posterior),
+                posterior: isInconclusiveOrFailed
+                    ? 'N/A'
+                    : getPriorAndPosteriorLabel(experiment.posterior),
                 posteriorValue: isInconclusiveOrFailed ? null : experiment.posterior,
-                surprisal: isInconclusiveOrFailed ? null : (experiment.surprise
-                    ? Math.abs(experiment.surprise)
-                    : experiment.surprise),
+                surprisal: isInconclusiveOrFailed
+                    ? null
+                    : experiment.surprise
+                      ? Math.abs(experiment.surprise)
+                      : experiment.surprise,
                 isSurprising: isInconclusiveOrFailed ? false : experiment.isSurprising,
-                direction: isInconclusiveOrFailed ? 'N/A' : getSurprisalDirection(experiment.surprise),
+                direction: isInconclusiveOrFailed
+                    ? 'N/A'
+                    : getSurprisalDirection(experiment.surprise),
                 creationIdx: experiment.creationIdx,
-                runtimeMs: isInconclusiveOrFailed ? 'N/A' : (experiment.runtimeMs ?? 'N/A'),
+                runtimeMs: isInconclusiveOrFailed ? 'N/A' : experiment.runtimeMs ?? 'N/A',
                 isSkeleton: false,
             };
         });

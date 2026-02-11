@@ -57,6 +57,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
                         <BeliefDistributionPlot
                             prior={experiment.priorBelief}
                             posterior={experiment.posteriorBelief}
+                            isSurprising={experiment.isSurprising}
                         />
                     </Box>
                 )}

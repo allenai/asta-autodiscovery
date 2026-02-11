@@ -136,38 +136,6 @@ def call_with_backoff(
     return retrying(func)
 
 
-def apply_gemini_client_backoff(retry_config: RetryConfig | None = None) -> bool:
-    """Wrap Autogen's Gemini client with backoff logic to handle 429 errors.
-
-    Args:
-        retry_config: Optional override for retry configuration.
-
-    Returns:
-        True if the patch is applied or already active, otherwise False.
-    """
-    try:
-        from autogen.oai.gemini import GeminiClient
-    except Exception:
-        return False
-
-    if getattr(GeminiClient.create, "_autodiscovery_backoff_wrapped", False):
-        return True
-
-    original_create = GeminiClient.create
-
-    @functools.wraps(original_create)
-    def wrapped(self, params):
-        return call_with_backoff(
-            lambda: original_create(self, params),
-            label="GeminiClient.create",
-            retry_config=retry_config,
-        )
-
-    wrapped._autodiscovery_backoff_wrapped = True  # type: ignore[attr-defined]
-    GeminiClient.create = wrapped
-    return True
-
-
 def apply_openai_client_vertex_token_refresh() -> bool:
     """Patch AG2 OpenAI client to refresh Vertex tokens for Gemini requests.
 

@@ -32,3 +32,11 @@ export const getSurprisalDirection = (surprise: number | null): string => {
     }
     return surprise > 0 ? 'Positive' : 'Negative';
 };
+
+/**
+ * Escapes markdown special characters to prevent unintended formatting.
+ * Primarily used to escape tildes (~) which are interpreted as strikethrough syntax.
+ */
+export const escapeMarkdown = (text: string): string => {
+    return text.replace(/~/g, '\\~');
+};

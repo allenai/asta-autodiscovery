@@ -47,9 +47,10 @@ const DEFAULT_COLUMNS: GridColDef[] = [
     {
         field: 'surprisal',
         headerName: 'Surprisal',
-        flex: 1,
-        minWidth: 70,
-        maxWidth: 90,
+        // flex: 1,
+        // minWidth: 70,
+        // maxWidth: 90,
+        width: 80,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="70%" />;
@@ -73,9 +74,10 @@ const DEFAULT_COLUMNS: GridColDef[] = [
         field: 'prior',
         headerName: 'Belief Before',
         align: 'center',
-        flex: 1,
-        minWidth: 80,
-        maxWidth: 120,
+        // flex: 1,
+        // minWidth: 80,
+        // maxWidth: 120,
+        width: 100,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -93,9 +95,10 @@ const DEFAULT_COLUMNS: GridColDef[] = [
         field: 'posterior',
         headerName: 'Belief After',
         align: 'center',
-        flex: 1,
-        minWidth: 80,
-        maxWidth: 120,
+        // flex: 1,
+        // minWidth: 80,
+        // maxWidth: 120,
+        width: 100,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="80%" />;
@@ -113,9 +116,10 @@ const DEFAULT_COLUMNS: GridColDef[] = [
         field: 'direction',
         headerName: 'Direction',
         align: 'center',
-        flex: 1,
-        minWidth: 50,
-        maxWidth: 120,
+        // flex: 1,
+        // minWidth: 50,
+        // maxWidth: 120,
+        width: 100,
         renderCell: (params: GridRenderCellParams) => {
             if (params.row.isSkeleton) {
                 return <StyledSkeleton variant="text" width="60%" />;

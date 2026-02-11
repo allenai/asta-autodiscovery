@@ -165,7 +165,11 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
     }
 
     return (
-        <RunExperimentsProvider runid={runid} userid={userid} autoStart>
+        <RunExperimentsProvider
+            runid={runid}
+            userid={userid}
+            autoStart
+            demoMode={{ durationSeconds: 20, timingFunction: 'linear', enabled: true }}>
             <RunStatusContent
                 run={run as Run & { details: NonNullable<Run['details']> }}
                 error={error}

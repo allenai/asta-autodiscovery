@@ -328,8 +328,16 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     },
 
     '.MuiDataGrid-row.Mui-selected': {
-        outline: '2px solid #0FCB8C',
-        outlineOffset: '-2px',
+        position: 'relative',
+        '&::before': {
+            content: '""',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '4px',
+            backgroundColor: theme.color['green-100'].hex,
+        },
     },
 
     '.MuiDataGrid-row.Mui-selected:not(:nth-of-type(even))': {
@@ -338,8 +346,6 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
 
     '.MuiDataGrid-row.Mui-selected:hover, .MuiDataGrid-row.Mui-selected.Mui-hovered': {
         backgroundColor: theme.color['cream-10'].rgba.toString(),
-        outline: '2px solid #0FCB8C',
-        outlineOffset: '-2px',
     },
 
     '.MuiTablePagination-root, .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows, .MuiTablePagination-select, .MuiTablePagination-selectIcon':

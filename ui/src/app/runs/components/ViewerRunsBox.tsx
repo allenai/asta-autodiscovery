@@ -110,7 +110,7 @@ export const ViewerRunsBox = () => {
     return (
         <>
             <Header>
-                <Headline>Your Sessions</Headline>
+                <Headline>Your sessions</Headline>
                 <div>
                     <CreateRunButton />
                 </div>

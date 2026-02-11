@@ -36,6 +36,7 @@ from autodiscovery_jobs.gcs import (
     list_user_jobs,
 )
 from autodiscovery_jobs.run_details import get_run_details
+from autodiscovery_jobs.user_profile import get_user_granted_credits
 
 # Credit configuration
 DEFAULT_CREDITS_GRANTED = 1000
@@ -128,14 +129,15 @@ class ExperimentLimitExceededError(Exception):
         super().__init__(self.message)
 
 
-def get_user_credits_granted(userid: str) -> int:  # pylint: disable=unused-argument
+def get_user_credits_granted(userid: str, config: JobConfig | None = None) -> int:
     """Get the number of credits granted to a user.
 
-    Currently returns a constant, but designed to support future
-    per-user credit allocation from database or configuration.
+    Checks for custom allocation in GCS (users/{userid}/user.json).
+    Falls back to DEFAULT_CREDITS_GRANTED if no custom allocation exists.
 
     Args:
         userid: User identifier
+        config: Job configuration (uses default if None)
 
     Returns:
         Number of credits granted to user
@@ -144,9 +146,14 @@ def get_user_credits_granted(userid: str) -> int:  # pylint: disable=unused-argu
         >>> credits_granted = get_user_credits_granted("user123")
         >>> print(f"User has {credits_granted} total credits")
     """
-    # TODO: (#2316) Query database or config service for per-user credit allocation
-    # return db.query_user_credits(userid)
-    return DEFAULT_CREDITS_GRANTED
+    # Try to get custom allocation from user profile
+    custom_credits = get_user_granted_credits(userid, config)
+
+    # Fall back to default if no custom allocation
+    if custom_credits is None:
+        return DEFAULT_CREDITS_GRANTED
+
+    return custom_credits
 
 
 def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> JobStats | None:

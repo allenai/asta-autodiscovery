@@ -71,6 +71,16 @@ from .email_state import (
     was_email_sent,
 )
 
+# User profile management
+from .user_profile import (
+    UserProfile,
+    create_user_profile,
+    get_user_granted_credits,
+    get_user_profile,
+    get_user_profile_path,
+    update_user_profile,
+)
+
 # Auth0 client
 from .auth0 import (
     Auth0Error,
@@ -130,6 +140,13 @@ __all__ = [
     "get_email_state",
     "record_email_sent",
     "was_email_sent",
+    # User profile functions
+    "UserProfile",
+    "get_user_profile_path",
+    "get_user_profile",
+    "create_user_profile",
+    "update_user_profile",
+    "get_user_granted_credits",
     # Auth0 functions
     "get_user",
     # Email functions

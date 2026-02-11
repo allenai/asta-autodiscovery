@@ -7,11 +7,8 @@ from pathlib import Path
 
 from autodiscovery.llm_usage import (
     LOCAL_IMAGE_USAGE_MARKER,
-    PricingEntry,
     UsageTracker,
-    build_priced_summary,
     extract_local_image_usage_markers,
-    price_usage_events,
 )
 from autodiscovery.utils import query_llm
 
@@ -170,40 +167,6 @@ def test_usage_tracker_records_agent_usage_deltas() -> None:
     assert node_summary["totals"]["completion_tokens"] == 10
     assert node_summary["totals"]["total_tokens"] == 30
     assert node_summary["totals"]["reasoning_tokens"] == 0
-
-
-def test_price_usage_events_and_summary() -> None:
-    """Ensure post-processing pricing annotates events and summary correctly."""
-    events = [
-        {
-            "source": "ag2",
-            "component": "agents.chat",
-            "agent_name": "experiment_generator",
-            "node_id": "node_2_0",
-            "model": "gemini-3-flash-preview",
-            "usage": {
-                "prompt_tokens": 1000,
-                "completion_tokens": 100,
-                "total_tokens": 1100,
-                "completion_tokens_details": {"reasoning_tokens": 45},
-            },
-            "metadata": {},
-        }
-    ]
-    pricing = {
-        "gemini-3-flash-preview": PricingEntry(prompt_per_1k=0.0005, completion_per_1k=0.003)
-    }
-
-    priced_events = price_usage_events(events, pricing)
-    assert priced_events[0]["unpriced"] is False
-    assert priced_events[0]["cost_usd"] == 0.0008
-
-    summary = build_priced_summary(priced_events)
-    assert summary["totals"]["calls"] == 1
-    assert summary["totals"]["total_tokens"] == 1100
-    assert summary["totals"]["reasoning_tokens"] == 45
-    assert summary["totals"]["cost_usd"] == 0.0008
-    assert summary["unpriced_models"] == []
 
 
 def test_extract_local_image_usage_markers() -> None:

@@ -9,6 +9,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 
 from autodiscovery.llm_retry import call_with_backoff
+from autodiscovery.llm_usage import UsageTracker
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
 from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
 
@@ -98,6 +99,11 @@ def query_llm(
     response_format=None,
     client: Any = None,
     debug_requests: bool = False,
+    usage_tracker: UsageTracker | None = None,
+    usage_component: str = "query_llm",
+    usage_agent_name: str | None = None,
+    usage_node_id: str | None = None,
+    usage_metadata: dict[str, Any] | None = None,
 ):
     """Query an LLM and return parsed responses.
 
@@ -110,6 +116,12 @@ def query_llm(
         response_format: Optional structured output schema.
         client: Optional pre-configured client instance.
         debug_requests: Whether to log request batching details.
+        usage_tracker: Optional usage tracker.
+        usage_component: Usage component label for tracking.
+        usage_agent_name: Optional agent label for tracking.
+        usage_node_id: Optional node id for tracking.
+        usage_metadata: Optional metadata attached to each usage event.
+            The actual per-request sample count is always recorded as ``metadata["n"]``.
 
     Returns:
         A list of parsed response objects.
@@ -179,18 +191,30 @@ def query_llm(
         )
 
     responses = []
+    response_items: list[tuple[int, Any]] = []
     if len(batch_sizes) == 1:
-        response = _call_llm(batch_sizes[0])
-        response_list = [response]
+        batch_n = batch_sizes[0]
+        response_items = [(batch_n, _call_llm(batch_n))]
     elif is_gemini:
         max_workers = min(8, len(batch_sizes))
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_call_llm, batch_n) for batch_n in batch_sizes]
-            response_list = [future.result() for future in futures]
+            futures = [(batch_n, executor.submit(_call_llm, batch_n)) for batch_n in batch_sizes]
+            response_items = [(batch_n, future.result()) for batch_n, future in futures]
     else:
-        response_list = [_call_llm(batch_n) for batch_n in batch_sizes]
+        response_items = [(batch_n, _call_llm(batch_n)) for batch_n in batch_sizes]
 
-    for response in response_list:
+    for batch_n, response in response_items:
+        if usage_tracker is not None:
+            metadata = dict(usage_metadata or {})
+            metadata["n"] = batch_n
+            usage_tracker.record_response(
+                response,
+                source="openai",
+                component=usage_component,
+                agent_name=usage_agent_name,
+                node_id=usage_node_id,
+                metadata=metadata,
+            )
         for choice in response.choices:
             if response_format is not None and getattr(choice.message, "parsed", None) is not None:
                 parsed = choice.message.parsed

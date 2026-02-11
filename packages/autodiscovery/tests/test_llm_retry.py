@@ -1,10 +1,11 @@
 import http.client
+import sys
+import types
 
 import pytest
 import requests
-from urllib3.exceptions import ProtocolError
-
 from autodiscovery import llm_retry
+from urllib3.exceptions import ProtocolError
 
 
 class FakeStatusError(Exception):
@@ -85,3 +86,112 @@ def test_call_with_backoff_retries_on_connection_error():
 def test_extract_retry_after_seconds_from_header():
     exc = FakeRetryAfterError("7")
     assert llm_retry._extract_retry_after_seconds(exc) == 7.0
+
+
+class _DummyOpenAIClient:
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.api_key = "stale-token"
+
+
+class _DummyAG2OpenAIClient:
+    def __init__(self, base_url: str):
+        self._oai_client = _DummyOpenAIClient(base_url=base_url)
+
+    def create(self, params: dict):
+        _ = params
+        return self._oai_client.api_key
+
+
+class _DummyOpenAIWrapper:
+    def create(self, **config):
+        _ = config
+        return {
+            "model": "google/gemini-3-flash-preview",
+            "usage": {"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12},
+        }
+
+
+def test_refresh_vertex_openai_api_key_if_needed(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "autodiscovery.utils.get_vertex_access_token",
+        lambda: "fresh-token",
+    )
+    client = _DummyAG2OpenAIClient(
+        base_url="https://aiplatform.googleapis.com/v1/projects/p/locations/global/endpoints/openapi"
+    )
+
+    refreshed = llm_retry._refresh_vertex_openai_api_key_if_needed(
+        client,
+        {"model": "google/gemini-3-flash-preview"},
+    )
+
+    assert refreshed is True
+    assert client._oai_client.api_key == "fresh-token"
+
+
+def test_refresh_vertex_openai_api_key_if_needed_skips_non_gemini(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        "autodiscovery.utils.get_vertex_access_token",
+        lambda: "fresh-token",
+    )
+    client = _DummyAG2OpenAIClient(
+        base_url="https://aiplatform.googleapis.com/v1/projects/p/locations/global/endpoints/openapi"
+    )
+
+    refreshed = llm_retry._refresh_vertex_openai_api_key_if_needed(
+        client,
+        {"model": "gpt-4o"},
+    )
+
+    assert refreshed is False
+    assert client._oai_client.api_key == "stale-token"
+
+
+def test_apply_openai_client_vertex_token_refresh_wraps_create(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    fake_module = types.SimpleNamespace(OpenAIClient=_DummyAG2OpenAIClient)
+    monkeypatch.setitem(sys.modules, "autogen.oai.client", fake_module)
+    monkeypatch.setattr(
+        "autodiscovery.utils.get_vertex_access_token",
+        lambda: "fresh-token",
+    )
+
+    applied = llm_retry.apply_openai_client_vertex_token_refresh()
+    assert applied is True
+
+    client = _DummyAG2OpenAIClient(
+        base_url="https://aiplatform.googleapis.com/v1/projects/p/locations/global/endpoints/openapi"
+    )
+    result = client.create({"model": "google/gemini-3-flash-preview"})
+    assert result == "fresh-token"
+
+
+def test_extract_openai_wrapper_config_prefers_kwargs() -> None:
+    extracted = llm_retry._extract_openai_wrapper_config(({"a": 1},), {"b": 2})
+    assert extracted == {"a": 1, "b": 2}
+
+
+def test_apply_openai_wrapper_usage_tracking_records_response(monkeypatch: pytest.MonkeyPatch):
+    fake_module = types.SimpleNamespace(OpenAIWrapper=_DummyOpenAIWrapper)
+    monkeypatch.setitem(sys.modules, "autogen.oai.client", fake_module)
+    captured = {}
+
+    def _capture(response, *, agent_name=None):
+        captured["response"] = response
+        captured["agent_name"] = agent_name
+        return {"ok": True}
+
+    monkeypatch.setattr("autodiscovery.llm_usage.record_ag2_response_usage", _capture)
+
+    applied = llm_retry.apply_openai_wrapper_usage_tracking()
+    assert applied is True
+
+    wrapper = _DummyOpenAIWrapper()
+    result = wrapper.create(agent=types.SimpleNamespace(name="experiment_generator"))
+    assert result["usage"]["total_tokens"] == 12
+    assert captured["agent_name"] == "experiment_generator"
+    assert captured["response"]["usage"]["total_tokens"] == 12

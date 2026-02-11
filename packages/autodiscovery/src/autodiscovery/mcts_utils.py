@@ -102,6 +102,7 @@ def save_nodes(
     model="gpt-4o",
     save_csv=True,
     time_elapsed=None,
+    usage_tracker=None,
 ):
     """Save MCTS nodes to JSON and optionally to CSV.
 
@@ -112,6 +113,7 @@ def save_nodes(
         model: Model to use for deduplication.
         save_csv: Whether to save nodes to a CSV file.
         time_elapsed: Optional time elapsed for logging purposes.
+        usage_tracker: Optional usage tracker for dedupe-related LLM calls.
     """
     from autodiscovery.mcts import MCTSNode  # Import here to avoid circular import issues
 
@@ -135,6 +137,7 @@ def save_nodes(
         run_dedupe=run_dedupe,
         dedupe_model=model,
         time_elapsed=time_elapsed,
+        usage_tracker=usage_tracker,
     )
 
     # Save nodes to CSV
@@ -150,6 +153,7 @@ def save_nodes_to_json(
     dedupe_model="gpt-4o",
     log_dedupe_comparisons=False,
     time_elapsed=None,
+    usage_tracker=None,
 ):
     """Save all MCTS nodes to a JSON file.
 
@@ -160,6 +164,7 @@ def save_nodes_to_json(
         dedupe_model: Model to use for deduplication.
         log_dedupe_comparisons: Whether to log deduplication comparisons to a file.
         time_elapsed: Optional time elapsed for logging purposes.
+        usage_tracker: Optional usage tracker for dedupe-related LLM calls.
     """
     # Optionally deduplicate nodes based on hypothesis
     if run_dedupe:
@@ -170,6 +175,7 @@ def save_nodes_to_json(
             if not log_dedupe_comparisons
             else os.path.join(log_dirname, "dedupe_log.json"),
             verbose=False,
+            usage_tracker=usage_tracker,
         )
         file_to_save = deduped_nodes
         nonempty_clusters = {k: v for k, v in duplicates.items() if len(v) > 0}

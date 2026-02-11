@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from scipy.cluster.hierarchy import linkage
 from tqdm import tqdm
 
+from autodiscovery.llm_usage import UsageTracker
 from autodiscovery.utils import query_llm
 
 
@@ -134,13 +135,21 @@ def get_hypotheses(in_nodes_list):
     return node_list
 
 
-def get_embedding(texts, model="text-embedding-3-large", batch_size=128, client=None, n_attempts=1):
+def get_embedding(
+    texts,
+    model="text-embedding-3-large",
+    batch_size=128,
+    client=None,
+    n_attempts=1,
+    usage_tracker: UsageTracker | None = None,
+):
     """Compute embeddings for a list of texts using the OpenAI Embeddings API.
 
     Args:
         texts (list): A list of text strings to be embedded.
         model (str, optional): The identifier for the embedding model to use.
         batch_size (int, optional): The number of texts to process in one API call.
+        usage_tracker: Optional usage tracker for embedding requests.
 
     Returns:
         numpy.ndarray: An array of embeddings for the input texts.
@@ -156,6 +165,13 @@ def get_embedding(texts, model="text-embedding-3-large", batch_size=128, client=
                 batch = texts[i : i + batch_size]
                 # Request embeddings for the current batch from the API
                 response = client.embeddings.create(input=batch, model=model)
+                if usage_tracker is not None:
+                    usage_tracker.record_response(
+                        response,
+                        source="openai",
+                        component="dedupe.embeddings",
+                        agent_name="dedupe",
+                    )
                 for item in response.data:
                     # Convert the embedding to a NumPy array and add it to the list
                     all_embeddings.append(np.array(item.embedding))
@@ -176,6 +192,7 @@ def get_llm_merge_decision(
     model: str = "gpt-4o",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
+    usage_tracker: UsageTracker | None = None,
 ):
     """Determine whether two hypotheses are semantically equivalent.
 
@@ -187,6 +204,7 @@ def get_llm_merge_decision(
         model: LLM model identifier.
         temperature: Sampling temperature.
         reasoning_effort: Reasoning effort for the model.
+        usage_tracker: Optional usage tracker for merge decision calls.
 
     Returns:
         True if the hypotheses should be merged, False otherwise.
@@ -210,6 +228,9 @@ def get_llm_merge_decision(
         temperature=temperature,
         reasoning_effort=reasoning_effort,
         response_format=ResponseFormat,
+        usage_tracker=usage_tracker,
+        usage_component="dedupe.merge",
+        usage_agent_name="dedupe",
     )
     true_prop = sum([1 for _res in response if _res["is_same"]]) / n_samples
 
@@ -226,6 +247,7 @@ def dedupe(
     n_nodes=None,
     verbose=False,
     log_comparisons_fname=None,
+    usage_tracker: UsageTracker | None = None,
 ):
     """Deduplicate hypotheses using embeddings + LLM similarity checks.
 
@@ -239,6 +261,7 @@ def dedupe(
         n_nodes: Optional cap on nodes processed.
         verbose: Whether to print verbose details.
         log_comparisons_fname: Optional JSON path to log LLM comparisons.
+        usage_tracker: Optional usage tracker.
 
     Returns:
         Tuple of (deduplicated nodes list, duplicates mapping).
@@ -264,7 +287,7 @@ def dedupe(
     n_dedup = len(dedup_hyp)
 
     # Generate embeddings for deduplicated hypotheses
-    embeds = np.array(get_embedding(dedup_hyp, n_attempts=3))
+    embeds = np.array(get_embedding(dedup_hyp, n_attempts=3, usage_tracker=usage_tracker))
 
     # Initialize assignment structures
     clusters = {i: [i] for i in range(n_dedup)}
@@ -319,7 +342,12 @@ def dedupe(
         struct_left, struct_right = dedup_hyp[rep_left], dedup_hyp[rep_right]
         # Get the LLM merge decision
         llm_decision = get_llm_merge_decision(
-            struct_left, struct_right, n_samples=n_samples, threshold=merge_threshold, model=model
+            struct_left,
+            struct_right,
+            n_samples=n_samples,
+            threshold=merge_threshold,
+            model=model,
+            usage_tracker=usage_tracker,
         )
         if verbose:
             print(f"""\n\n

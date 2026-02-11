@@ -98,7 +98,6 @@ export interface ExperimentFromApi {
 
 export interface GetRunExperimentsResponseBody {
     runid: string;
-    after_experiment_id: string | null;
     has_job_completed: boolean;
     experiments: ExperimentFromApi[];
 }
@@ -183,23 +182,18 @@ export class RunsApi extends BaseApi {
     async getRunExperiments({
         userid,
         runid,
-        afterExperimentId,
+        knownExperimentIds,
     }: {
         userid?: string;
         runid: string;
-        afterExperimentId?: string;
+        knownExperimentIds: string[];
     }) {
         const effectiveUserid = userid ?? (await this.getUserId());
 
-        const query: Record<string, string> = {};
-        if (afterExperimentId) {
-            query.after_experiment_id = afterExperimentId;
-        }
-
         return this.request<GetRunExperimentsResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments`,
-            method: 'GET',
-            query,
+            method: 'POST',
+            body: { known_experiment_ids: knownExperimentIds },
         });
     }
 

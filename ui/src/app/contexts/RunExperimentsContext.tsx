@@ -83,7 +83,7 @@ export const RunExperimentsProvider = ({
     const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
     const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
 
-    const afterExperimentId = useRef<string | null>(null);
+    const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
 
     const startPolling = useCallback(() => {
@@ -169,7 +169,7 @@ export const RunExperimentsProvider = ({
             setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
             setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
             setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
-            afterExperimentId.current = null;
+            knownExperimentIds.current = new Set();
             selectedExperimentRequestId.current += 1;
             return;
         }
@@ -186,12 +186,24 @@ export const RunExperimentsProvider = ({
                 const { data } = await runsApi.getRunExperiments({
                     userid,
                     runid,
-                    afterExperimentId: afterExperimentId.current ?? undefined,
+                    knownExperimentIds: Array.from(knownExperimentIds.current),
                 });
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
                 if (newExperiments.length > 0) {
-                    setExperiments((prevExperiments) => [...prevExperiments, ...newExperiments]);
-                    afterExperimentId.current = newExperiments.at(-1)?.experimentId ?? null;
+                    setExperiments((prevExperiments) => {
+                        // Deduplicate: only add experiments we don't already have
+                        const existingIds = new Set(prevExperiments.map((e) => e.experimentId));
+                        const trulyNewExperiments = newExperiments.filter(
+                            (exp) => !existingIds.has(exp.experimentId)
+                        );
+
+                        // Update the ref with new IDs
+                        trulyNewExperiments.forEach((exp) => {
+                            knownExperimentIds.current.add(exp.experimentId);
+                        });
+
+                        return [...prevExperiments, ...trulyNewExperiments];
+                    });
                 }
 
                 // Handle job completion

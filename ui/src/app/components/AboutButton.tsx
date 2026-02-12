@@ -4,7 +4,7 @@ import Link from 'next/link';
 export const AboutButton = () => {
     return (
         <Link
-            href="https://arxiv.org/pdf/2507.00310"
+            href="https://allenai.org/blog/autodiscovery"
             passHref
             target="_blank"
             rel="noopener noreferrer">

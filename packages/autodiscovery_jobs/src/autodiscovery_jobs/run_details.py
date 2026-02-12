@@ -164,8 +164,6 @@ def update_run_details(
 ) -> RunDetails:
     """Update run details in GCS.
 
-    Automatically sets finished_at when status changes to a terminal status.
-
     Args:
         userid: User identifier
         runid: Run identifier
@@ -185,17 +183,6 @@ def update_run_details(
         run_details = RunDetails.create_new()
 
     run_details_dict = run_details.to_dict()
-
-    # Check if this update transitions to a terminal status
-    old_status = run_details.status
-    new_status = updates.get("status")
-    if (
-        new_status
-        and new_status in TERMINAL_STATUSES
-        and old_status not in TERMINAL_STATUSES
-        and not run_details.finished_at_raw
-    ):
-        updates["finished_at"] = datetime.now(UTC).isoformat()
 
     # Update fields
     run_details_dict.update(updates)
@@ -240,10 +227,6 @@ def refresh_run_status(
     if not run_details:
         return None
 
-    # If already finished, no need to query Cloud Run
-    if run_details.is_finished:
-        return run_details
-
     # If no execution_id, can't query Cloud Run
     if not run_details.execution_id:
         return run_details
@@ -252,15 +235,35 @@ def refresh_run_status(
     try:
         status_response = get_job_status(run_details.execution_id, config)
         phase = status_response.get("phase", status_response.get("status", "UNKNOWN"))
+        created_at = status_response.get("create_time", run_details.created_at)
+        finished_at = status_response.get("completion_time")
+
+        # Build update dict
+        updates = {
+            "status": phase,
+            "status_checked_at": datetime.now(UTC).isoformat(),
+        }
+
+        if created_at:
+            if isinstance(created_at, datetime):
+                updates["created_at"] = created_at.isoformat()
+            else:
+                updates["created_at"] = created_at
+
+
+        # Only include finished_at if present and ensure it's formatted correctly
+        if finished_at:
+            if isinstance(finished_at, datetime):
+                updates["finished_at"] = finished_at.isoformat()
+            else:
+                updates["finished_at"] = finished_at
+
 
         # Update run details with new status
         run_details = update_run_details(
             userid,
             runid,
-            {
-                "status": phase,
-                "status_checked_at": datetime.now(UTC).isoformat(),
-            },
+            updates,
             config,
         )
     except Exception:

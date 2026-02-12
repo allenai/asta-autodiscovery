@@ -40,10 +40,14 @@ const Wrapper = styled(Box)<{ $showLogin: boolean }>(({ theme, $showLogin }) => 
 const Title = styled(Typography)(({ theme }) => ({
     color: theme.color['green-100'].hex,
     fontFamily: '"PP Telegraf", Manrope, sans-serif',
-    fontSize: '2.5rem',
+    fontSize: '2rem',
     fontWeight: 700,
     lineHeight: '115%',
     marginBottom: '4px',
+
+    [theme.breakpoints.up('sm')]: {
+        fontSize: '2.5rem',
+    },
 }));
 
 const Subtitle = styled(Typography)(() => ({

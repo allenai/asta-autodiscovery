@@ -55,25 +55,32 @@ export function URLSearchParamsProvider({ children }: PropsWithChildren) {
             }
 
             updateTimeoutRef.current = setTimeout(() => {
-                const params = new URLSearchParams(searchParams);
+                // Read from window.location to avoid recreating callback on every URL change
+                const params = new URLSearchParams(window.location.search);
                 params.set(key, value);
-                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+                router.replace(`${window.location.pathname}?${params.toString()}`, { scroll: false });
             }, 250);
         },
-        [router, pathname, searchParams]
+        [router]
     );
 
     const deleteSearchParam = useCallback(
         (key: string) => {
+            // Clear any pending setSearchParam operations to prevent race condition
+            if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current);
+            }
+
             // No debounce for deletion - immediate feedback
-            const params = new URLSearchParams(searchParams);
+            // Read from window.location to avoid recreating callback on every URL change
+            const params = new URLSearchParams(window.location.search);
             params.delete(key);
             const queryString = params.toString();
-            router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+            router.replace(queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname, {
                 scroll: false,
             });
         },
-        [router, pathname, searchParams]
+        [router]
     );
 
     const getSearchParam = useCallback(

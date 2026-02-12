@@ -91,12 +91,17 @@ def _count_experiments_inline(
     userid: str,
     jobid: str,
 ) -> int:
-    """Count completed experiment result files using match_glob on the shared bucket."""
+    """Count completed experiment result files using match_glob on the shared bucket.
+
+    Excludes the root node (mcts_node_1_0.json) which is the initialisation node,
+    not a real experiment.
+    """
+    root_node = f"users/{userid}/jobs/{jobid}/output/mcts_node_1_0.json"
     try:
         blobs = bucket.list_blobs(
             match_glob=f"users/{userid}/jobs/{jobid}/output/mcts_node_*_*.json",
         )
-        return sum(1 for _ in blobs)
+        return sum(1 for b in blobs if b.name != root_node)
     except Exception:
         return 0
 

@@ -146,7 +146,6 @@ export default function MetricsOverviewPage() {
                     <MetricCard
                         value={data.hypotheses_with_usage.toLocaleString()}
                         label="Hypotheses with Usage Data"
-                        subValue={`of ${data.total_experiments.toLocaleString()} total`}
                     />
                 </CardGrid>
             </Subsection>

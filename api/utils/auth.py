@@ -120,14 +120,14 @@ def requires_enrollment(f):
     """Decorator that requires authentication with the default permission from AUTH0_REQUIRED_PERMISSION env var.
 
     This is a convenience wrapper around requires_auth that automatically uses the
-    AUTH0_REQUIRED_PERMISSION environment variable (defaulting to "enroll:autodiscovery_v0").
+    AUTH0_REQUIRED_PERMISSION environment variable. If not set or empty, no permission is required.
 
     Usage:
         @requires_default_permission
         def my_route():
             ...
     """
-    default_permission = os.environ.get("AUTH0_REQUIRED_PERMISSION", "enroll:autodiscovery_v0")
+    default_permission = os.environ.get("AUTH0_REQUIRED_PERMISSION") or None
     return requires_auth(required_permission=default_permission)(f)
 
 

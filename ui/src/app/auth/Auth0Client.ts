@@ -5,8 +5,8 @@ export const auth0Config = {
     domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || 'auth.example.com',
     clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || 'YOUR_AUTH0_CLIENT_ID',
     audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://autodiscovery.example.com',
-    requiredPermission:
-        process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || 'enroll:autodiscovery_v0',
+    // If not set or empty, no permission is required (any authenticated user can access)
+    requiredPermission: process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || undefined,
 };
 
 export const auth0Client =

@@ -85,6 +85,12 @@ export const RunExperimentsProvider = ({
 
     const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
+    const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
+
+    // Keep ref in sync with prop
+    useEffect(() => {
+        refreshIntervalMsRef.current = refreshIntervalMs;
+    }, [refreshIntervalMs]);
 
     const startPolling = useCallback(() => {
         if (!runid) {
@@ -102,7 +108,14 @@ export const RunExperimentsProvider = ({
 
     const selectExperiment = useCallback(
         (experiment: Experiment | null) => {
-            setSelectedExperiment(experiment);
+            // Prevent redundant selections - check before setting state
+            setSelectedExperiment((prev) => {
+                if (prev?.experimentId === experiment?.experimentId) {
+                    return prev; // No change needed
+                }
+                return experiment;
+            });
+
             setSelectedExperimentError(null);
 
             if (!experiment || !runid) {
@@ -223,11 +236,11 @@ export const RunExperimentsProvider = ({
         };
 
         fetchLatestExperiments();
-        const interval = setInterval(fetchLatestExperiments, refreshIntervalMs);
+        const interval = setInterval(fetchLatestExperiments, refreshIntervalMsRef.current);
         return () => {
             clearInterval(interval);
         };
-    }, [runid, userid, isPolling]);
+    }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted]);
 
     const memoizedState = useMemo<RunExperimentsState>(
         () => ({

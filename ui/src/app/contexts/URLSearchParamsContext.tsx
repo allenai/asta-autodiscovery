@@ -8,10 +8,10 @@ import {
     useRef,
     useEffect,
 } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams, ReadonlyURLSearchParams } from 'next/navigation';
 
 interface URLSearchParamsContextValue {
-    searchParams: URLSearchParams;
+    searchParams: ReadonlyURLSearchParams;
     setSearchParam: (key: string, value: string) => void;
     deleteSearchParam: (key: string) => void;
     getSearchParam: (key: string) => string | null;
@@ -37,6 +37,8 @@ export function URLSearchParamsProvider({ children }: PropsWithChildren) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const pendingChanges = useRef<Map<string, string>>(new Map());
+    const pendingDeletions = useRef<Set<string>>(new Set());
 
     // Clean up timeout on unmount
     useEffect(() => {
@@ -49,31 +51,73 @@ export function URLSearchParamsProvider({ children }: PropsWithChildren) {
 
     const setSearchParam = useCallback(
         (key: string, value: string) => {
+            // Accumulate this change
+            pendingChanges.current.set(key, value);
+            pendingDeletions.current.delete(key); // Remove from deletions if it was marked
+
             // Debounce: Clear existing timeout
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
 
             updateTimeoutRef.current = setTimeout(() => {
-                const params = new URLSearchParams(searchParams);
-                params.set(key, value);
+                // Start with current URL params
+                const params = new URLSearchParams(window.location.search);
+
+                // Apply all pending changes
+                pendingChanges.current.forEach((val, k) => {
+                    params.set(k, val);
+                });
+
+                // Apply all pending deletions
+                pendingDeletions.current.forEach((k) => {
+                    params.delete(k);
+                });
+
                 router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
+                // Clear pending changes
+                pendingChanges.current.clear();
+                pendingDeletions.current.clear();
             }, 250);
         },
-        [router, pathname, searchParams]
+        [router, pathname]
     );
 
     const deleteSearchParam = useCallback(
         (key: string) => {
-            // No debounce for deletion - immediate feedback
-            const params = new URLSearchParams(searchParams);
-            params.delete(key);
+            // Accumulate this deletion
+            pendingDeletions.current.add(key);
+            pendingChanges.current.delete(key); // Remove from changes if it was set
+
+            // Clear any pending timeout to apply changes immediately
+            if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current);
+            }
+
+            // Apply immediately (no debounce for deletions - immediate feedback)
+            const params = new URLSearchParams(window.location.search);
+
+            // Apply all pending changes
+            pendingChanges.current.forEach((val, k) => {
+                params.set(k, val);
+            });
+
+            // Apply all pending deletions
+            pendingDeletions.current.forEach((k) => {
+                params.delete(k);
+            });
+
             const queryString = params.toString();
             router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
                 scroll: false,
             });
+
+            // Clear pending changes
+            pendingChanges.current.clear();
+            pendingDeletions.current.clear();
         },
-        [router, pathname, searchParams]
+        [router, pathname]
     );
 
     const getSearchParam = useCallback(

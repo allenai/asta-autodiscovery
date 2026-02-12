@@ -215,6 +215,8 @@ function RunStatusContent({
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
     const expParam = useSearchValue('exp');
     const hasInitiallySelected = useRef(false);
+    const isUpdatingFromURL = useRef(false);
+    const lastSyncedExpId = useRef<number | null>(null);
 
     const onShareClick = useCallback(
         async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -247,21 +249,32 @@ function RunStatusContent({
 
         const expId = parseInt(expParam, 10);
         if (!expId || expId <= 0 || isNaN(expId)) return;
+        if (lastSyncedExpId.current === expId) return; // Prevent redundant
 
         const experimentToSelect = experiments.find((exp) => exp.idInRun === expId);
         if (experimentToSelect) {
+            isUpdatingFromURL.current = true;
             selectExperiment(experimentToSelect);
+            lastSyncedExpId.current = expId;
             hasInitiallySelected.current = true;
+            isUpdatingFromURL.current = false;
         }
     }, [expParam, experiments, isLoadingExperiments, selectExperiment]);
 
     // Write to URL: Update URL when selection changes
     useEffect(() => {
+        if (isUpdatingFromURL.current) return; // BREAK CIRCULAR DEPENDENCY
+
+        const currentExpId = selectedExperiment?.idInRun ?? null;
+        if (lastSyncedExpId.current === currentExpId) return; // Already synced
+
         if (selectedExperiment) {
             setSearchParam('exp', selectedExperiment.idInRun.toString());
+            lastSyncedExpId.current = selectedExperiment.idInRun;
         } else if (hasInitiallySelected.current) {
             // Only delete if we've previously selected (don't delete on initial load)
             deleteSearchParam('exp');
+            lastSyncedExpId.current = null;
         }
     }, [selectedExperiment, setSearchParam, deleteSearchParam]);
 

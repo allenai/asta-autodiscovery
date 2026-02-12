@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 # Statuses that indicate a run was "attempted" (not just created)
 STARTED_STATUSES = {"PENDING", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"}
 TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
+# Historical runs may use either root filename; both are non-experiment init nodes.
+ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
 
 
 @dataclass
@@ -82,6 +84,35 @@ def _read_gcs_json(bucket: storage.Bucket, blob_path: str) -> dict | None:
         return None
 
 
+def _coerce_nonnegative_int(value: object) -> int:
+    """Parse a value into a non-negative int, returning 0 on invalid input."""
+    try:
+        return max(0, int(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+def _derive_requested_experiments(
+    metadata: dict | None,
+    run_args: dict | None,
+) -> int:
+    """Derive requested experiment count from metadata and args.
+
+    Includes warmstart experiments so requested/completed are measured on
+    the same basis.
+    """
+    metadata = metadata or {}
+    run_args = run_args or {}
+
+    requested_main = _coerce_nonnegative_int(
+        metadata.get("n_experiments") or run_args.get("n_experiments"),
+    )
+    requested_warmstart = _coerce_nonnegative_int(
+        metadata.get("n_warmstart") or run_args.get("n_warmstart"),
+    )
+    return requested_main + requested_warmstart
+
+
 # ---------------------------------------------------------------------------
 # Job scanning
 # ---------------------------------------------------------------------------
@@ -93,15 +124,18 @@ def _count_experiments_inline(
 ) -> int:
     """Count completed experiment result files using match_glob on the shared bucket.
 
-    Excludes the root node (mcts_node_1_0.json) which is the initialisation node,
-    not a real experiment.
+    Excludes the root initialisation node (legacy filename variants),
+    which is not a real experiment.
     """
-    root_node = f"users/{userid}/jobs/{jobid}/output/mcts_node_1_0.json"
     try:
         blobs = bucket.list_blobs(
             match_glob=f"users/{userid}/jobs/{jobid}/output/mcts_node_*_*.json",
         )
-        return sum(1 for b in blobs if b.name != root_node)
+        return sum(
+            1
+            for b in blobs
+            if b.name.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
+        )
     except Exception:
         return 0
 
@@ -141,10 +175,18 @@ def _scan_job(
         is_shared = bool(metadata.get("is_shared")) if metadata else False
         name = metadata.get("name") if metadata else None
         domain = metadata.get("domain") if metadata else None
-        n_requested = (metadata.get("n_experiments") or 0) if metadata else 0
+        # Read output/args.json as fallback for legacy runs where metadata.json
+        # is missing or incomplete.
+        run_args = _read_gcs_json(bucket, f"{base_path}/output/args.json")
+        n_requested = _derive_requested_experiments(metadata, run_args)
 
         # Count completed experiments using shared bucket
-        n_completed = _count_experiments_inline(bucket, userid, jobid)
+        n_completed_raw = _count_experiments_inline(bucket, userid, jobid)
+        if n_requested == 0 and n_completed_raw > 0:
+            # Legacy/partial runs may be missing requested counts in both metadata
+            # and args. Use completed as a floor so aggregates remain consistent.
+            n_requested = n_completed_raw
+        n_completed = min(n_completed_raw, n_requested)
 
         # Read LLM usage summary
         llm_summary = _read_gcs_json(bucket, f"{base_path}/output/llm_usage_summary.json")
@@ -209,6 +251,12 @@ def _scan_all_jobs(
     if previous:
         for j in previous.jobs:
             if j.status in TERMINAL_STATUSES:
+                # Self-heal stale bad snapshots by forcing a rescan when completed > requested.
+                if (
+                    j.n_experiments_requested > 0
+                    and j.n_experiments_completed > j.n_experiments_requested
+                ):
+                    continue
                 cached_terminal[(j.userid, j.jobid)] = j
 
     # Discover all jobs in one glob call

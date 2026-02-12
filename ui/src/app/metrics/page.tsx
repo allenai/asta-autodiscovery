@@ -111,8 +111,12 @@ export default function MetricsOverviewPage() {
                 />
                 <MetricCard value={data.unique_users.toLocaleString()} label="Unique Users" />
                 <MetricCard
+                    value={data.total_experiments_requested.toLocaleString()}
+                    label="Experiments Requested"
+                />
+                <MetricCard
                     value={data.total_experiments.toLocaleString()}
-                    label="Experiments"
+                    label="Experiments Completed"
                     subValue={`${fmtPct(data.experiment_completion_rate)} completion rate`}
                 />
                 <MetricCard

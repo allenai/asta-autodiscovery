@@ -85,7 +85,10 @@ export default function RunPage({ params }: RunPageProps) {
                 <Alert severity="warning">
                     Please log in to view this run.
                     <Box sx={{ mt: 2 }}>
-                        <Button variant="contained" color="primary" onClick={() => loginWithRedirect()}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => loginWithRedirect()}>
                             Log In
                         </Button>
                     </Box>

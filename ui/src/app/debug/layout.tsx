@@ -3,9 +3,9 @@
 import { Box, styled } from '@mui/material';
 
 /**
- * Layout for debug authentication pages
+ * Layout for debug pages
  */
-export default function DebugAuthLayout({ children }: { children: React.ReactNode }) {
+export default function DebugLayout({ children }: { children: React.ReactNode }) {
     return (
         <ScrollContainer>
             <ScrollableArea>{children}</ScrollableArea>

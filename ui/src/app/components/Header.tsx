@@ -24,44 +24,31 @@ export default function Header({ showBackButton = false }: HeaderProps) {
 
     return (
         <StyledHeader>
-            <LeftSection>
-                {showBackButton && (
-                    <BackButton
-                        onClick={handleBack}
-                        variant="outlined"
-                        startIcon={<ArrowBackIcon />}>
-                        Back
-                    </BackButton>
-                )}
-            </LeftSection>
-            <RightSection>
-                {isAuthenticated && <CreditsChip />}
-                <FeedbackButton />
-                <AboutButton />
-                <AuthButton />
-            </RightSection>
+            {showBackButton && (
+                <BackButton onClick={handleBack} variant="outlined" startIcon={<ArrowBackIcon />}>
+                    Back
+                </BackButton>
+            )}
+            {isAuthenticated && <CreditsChip />}
+            <FeedbackButton />
+            <AboutButton />
+            <AuthButton />
         </StyledHeader>
     );
 }
 
 const StyledHeader = styled(Box)`
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
+    flex-wrap: wrap;
+    gap: ${({ theme }) => theme.spacing(2)};
     padding: ${({ theme }) => theme.spacing(2)};
 `;
 
-const LeftSection = styled(Box)`
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(2)};
-`;
-
-const RightSection = styled(Box)`
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(2)};
-`;
-
 const BackButton = styled(Button)`
+    margin-right: auto;
+
     &.MuiButton-root {
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};

@@ -252,7 +252,7 @@ class ArgParser(argparse.ArgumentParser):
             "--reward_mode",
             type=str,
             choices=["belief", "kl", "belief_and_kl"],
-            default="kl",
+            default="belief",
             help="Reward mode for MCTS (belief change, KL divergence or both)",
         )
         self.add_argument(

@@ -31,6 +31,8 @@ services:
       - GOOGLE_ACCESS_KEY_ID=${GOOGLE_ACCESS_KEY_ID}
       - GOOGLE_ACCESS_KEY_SECRET=${GOOGLE_ACCESS_KEY_SECRET}
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
+      # Cloud Run job name for local dev (use -dev suffix)
+      - CLOUDRUN_JOB_NAME=${CLOUDRUN_JOB_NAME:-autodiscovery-job-dev}
   ui:
     build:
       context: ./ui

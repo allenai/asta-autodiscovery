@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Box, CircularProgress, Alert } from '@mui/material';
+import { Box, CircularProgress, Alert, Button } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -25,7 +25,7 @@ interface RunPageProps {
  * For viewing shared/public runs, use /shared/{userid}/{runid} instead.
  */
 export default function RunPage({ params }: RunPageProps) {
-    const { isAuthenticated, isLoading, getAccessToken } = useAuth0();
+    const { isAuthenticated, isLoading, getAccessToken, loginWithRedirect } = useAuth0();
     const router = useRouter();
     const runId = params.runId;
     const api = getRunsApi();
@@ -82,7 +82,17 @@ export default function RunPage({ params }: RunPageProps) {
     if (!isAuthenticated) {
         return (
             <Box sx={{ p: 3 }}>
-                <Alert severity="warning">Please log in to view this run.</Alert>
+                <Alert severity="warning">
+                    Please log in to view this run.
+                    <Box sx={{ mt: 2 }}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => loginWithRedirect()}>
+                            Log In
+                        </Button>
+                    </Box>
+                </Alert>
             </Box>
         );
     }

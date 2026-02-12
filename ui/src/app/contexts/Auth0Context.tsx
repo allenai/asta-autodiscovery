@@ -42,8 +42,11 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
                     window.location.search.includes('code=') &&
                     window.location.search.includes('state=')
                 ) {
-                    await auth0Client.handleRedirectCallback();
-                    window.history.replaceState({}, document.title, window.location.pathname);
+                    const result = await auth0Client.handleRedirectCallback();
+                    // Redirect to the original URL if provided in appState
+                    const targetUrl = result.appState?.returnTo || window.location.pathname;
+                    window.history.replaceState({}, document.title, targetUrl);
+                    window.location.pathname = targetUrl;
                 }
 
                 // Check if user is authenticated
@@ -102,6 +105,9 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
             await auth0Client.loginWithRedirect({
                 authorizationParams: {
                     redirect_uri: window.location.origin,
+                },
+                appState: {
+                    returnTo: window.location.pathname + window.location.search,
                 },
             });
         }

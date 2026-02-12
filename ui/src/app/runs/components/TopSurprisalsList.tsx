@@ -48,7 +48,7 @@ export const TopSurprisalsListImpl = () => {
                                 <BeliefLabel>
                                     {getPriorAndPosteriorLabel(experiment.posterior)}
                                 </BeliefLabel>{' '}
-                                that{' '}
+                                that:{' '}
                             </Belief>
                             <Hypothesis>{experiment.hypothesis}</Hypothesis>
                         </Description>

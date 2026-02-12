@@ -2,11 +2,20 @@
 
 import { useState } from 'react';
 import { Box, Typography, styled, Tab as MuiTab, Tabs } from '@mui/material';
+
 import type { LLMUsageSummary, LLMUsageBucket } from '@/types/Metrics';
 
 const PALETTE = [
-    '#818cf8', '#a78bfa', '#c084fc', '#e879f9', '#f472b6',
-    '#fb923c', '#2dd4bf', '#38bdf8', '#a3e635', '#fbbf24',
+    '#818cf8',
+    '#a78bfa',
+    '#c084fc',
+    '#e879f9',
+    '#f472b6',
+    '#fb923c',
+    '#2dd4bf',
+    '#38bdf8',
+    '#a3e635',
+    '#fbbf24',
 ];
 
 const fmt = (n: number) => (n || 0).toLocaleString();
@@ -38,9 +47,7 @@ export default function LLMUsageDashboard({ usage, costByModel }: LLMUsageDashbo
     const hasReasoning = (t.reasoning_tokens || 0) > 0;
 
     // Summary cards
-    const cards: { v: string; l: string }[] = [
-        { v: fmt(t.total_tokens), l: 'Total Tokens' },
-    ];
+    const cards: { v: string; l: string }[] = [{ v: fmt(t.total_tokens), l: 'Total Tokens' }];
     if (hasReasoning) cards.push({ v: fmt(t.reasoning_tokens), l: 'Reasoning Tokens' });
     cards.push(
         { v: fmt(t.prompt_tokens), l: 'Prompt Tokens' },
@@ -56,9 +63,7 @@ export default function LLMUsageDashboard({ usage, costByModel }: LLMUsageDashbo
         { key: 'by_node', label: 'By Node' },
         { key: 'by_component', label: 'By Component' },
     ];
-    const views = viewDefs.filter(
-        (v) => usage[v.key] && Object.keys(usage[v.key]).length > 0
-    );
+    const views = viewDefs.filter((v) => usage[v.key] && Object.keys(usage[v.key]).length > 0);
     const [activeView, setActiveView] = useState(0);
 
     // Agent keys for stacked chart
@@ -111,7 +116,8 @@ export default function LLMUsageDashboard({ usage, costByModel }: LLMUsageDashbo
                                         {cP > 8 && <SegLabel>{fmt(a.completion_tokens)}</SegLabel>}
                                     </StackedSeg>
                                     {rP > 0 && (
-                                        <StackedSeg style={{ width: `${rP}%`, background: '#2dd4bf' }}>
+                                        <StackedSeg
+                                            style={{ width: `${rP}%`, background: '#2dd4bf' }}>
                                             {rP > 8 && (
                                                 <SegLabel>{fmt(a.reasoning_tokens)}</SegLabel>
                                             )}
@@ -213,7 +219,7 @@ function TotalTokensChart({
 function DetailTable({ usage }: { usage: LLMUsageSummary }) {
     const agentKeys = Object.keys(usage.by_agent);
     const colors = assignColors(agentKeys);
-    let totals = { calls: 0, prompt: 0, completion: 0, reasoning: 0, total: 0 };
+    const totals = { calls: 0, prompt: 0, completion: 0, reasoning: 0, total: 0 };
 
     agentKeys.forEach((key) => {
         const a = usage.by_agent[key];
@@ -276,8 +282,10 @@ const CardGrid = styled(Box)<{ $count: number }>`
 `;
 
 const StatCard = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 12px;
     padding: ${({ theme }) => theme.spacing(2, 1.5)};
     text-align: center;
@@ -299,8 +307,10 @@ const StatLabel = styled(Typography)`
 `;
 
 const Panel = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
     padding: ${({ theme }) => theme.spacing(3, 2.5)};
     margin-bottom: ${({ theme }) => theme.spacing(2)};
@@ -454,7 +464,8 @@ const Th = styled('th')<{ $align?: string }>`
     font-weight: 500;
     text-align: ${({ $align }) => $align || 'right'};
     padding: 0 10px 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     color: ${({ theme }) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
 `;
 
@@ -463,7 +474,8 @@ const Td = styled('td')<{ $align?: string }>`
     font-variant-numeric: tabular-nums;
     text-align: ${({ $align }) => $align || 'right'};
     padding: 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
     color: ${({ theme }) => theme.color['cream-80']?.rgba?.toString() || 'rgba(255,255,255,0.8)'};
 `;
 
@@ -480,6 +492,7 @@ const TotalRow = styled('tr')`
     & td {
         font-weight: 700;
         border-bottom: none;
-        border-top: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+        border-top: 1px solid
+            ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     }
 `;

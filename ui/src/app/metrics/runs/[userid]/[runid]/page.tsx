@@ -89,11 +89,16 @@ export default function RunMetricsPage() {
                 <Chip
                     label={data.status}
                     size="small"
-                    color={STATUS_COLORS[data.status] as any || 'default'}
+                    color={(STATUS_COLORS[data.status] as any) || 'default'}
                     sx={{ fontSize: '0.7rem', height: 24 }}
                 />
                 {data.is_shared && (
-                    <Chip label="Shared" size="small" variant="outlined" sx={{ fontSize: '0.65rem', height: 22 }} />
+                    <Chip
+                        label="Shared"
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.65rem', height: 22 }}
+                    />
                 )}
             </Box>
 
@@ -149,7 +154,13 @@ export default function RunMetricsPage() {
 
             {!data.llm_usage_summary && (
                 <Panel sx={{ mt: 3 }}>
-                    <Typography variant="body2" sx={{ color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)' }}>
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            color: (theme: any) =>
+                                theme.color['cream-60']?.rgba?.toString() ||
+                                'rgba(255,255,255,0.6)',
+                        }}>
                         LLM usage data is not available for this run.
                     </Typography>
                 </Panel>
@@ -185,8 +196,10 @@ const CardGrid = styled(Box)`
 `;
 
 const Panel = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
     padding: ${({ theme }) => theme.spacing(3, 2.5)};
     margin-top: ${({ theme }) => theme.spacing(2)};

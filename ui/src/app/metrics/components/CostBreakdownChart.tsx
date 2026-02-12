@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Box, Typography, styled } from '@mui/material';
+
 import type { DailyMetrics } from '@/types/Metrics';
 
 interface CostBreakdownChartProps {
@@ -32,7 +33,12 @@ export default function CostBreakdownChart({ timeSeries }: CostBreakdownChartPro
         return (
             <ChartPanel>
                 <PanelTitle>Daily LLM Cost</PanelTitle>
-                <Typography variant="body2" sx={{ color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)' }}>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        color: (theme: any) =>
+                            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                    }}>
                     No data available.
                 </Typography>
             </ChartPanel>
@@ -56,9 +62,12 @@ export default function CostBreakdownChart({ timeSeries }: CostBreakdownChartPro
             <PanelTitle>Daily LLM Cost</PanelTitle>
             <ChartArea>
                 <YAxis>
-                    {ticks.slice().reverse().map((t) => (
-                        <YTick key={t.pct}>{fmtAxis(t.value)}</YTick>
-                    ))}
+                    {ticks
+                        .slice()
+                        .reverse()
+                        .map((t) => (
+                            <YTick key={t.pct}>{fmtAxis(t.value)}</YTick>
+                        ))}
                 </YAxis>
                 <BarRegion>
                     {/* Grid lines — offset by 18px for day labels below bars */}
@@ -73,8 +82,12 @@ export default function CostBreakdownChart({ timeSeries }: CostBreakdownChartPro
                                     key={day.date}
                                     onMouseEnter={(e) => {
                                         setHovered(day);
-                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                        const parent = (e.currentTarget as HTMLElement).closest('[data-chart-area]')?.getBoundingClientRect();
+                                        const rect = (
+                                            e.currentTarget as HTMLElement
+                                        ).getBoundingClientRect();
+                                        const parent = (e.currentTarget as HTMLElement)
+                                            .closest('[data-chart-area]')
+                                            ?.getBoundingClientRect();
                                         if (parent) {
                                             setTooltipPos({
                                                 x: rect.left - parent.left + rect.width / 2,
@@ -94,11 +107,12 @@ export default function CostBreakdownChart({ timeSeries }: CostBreakdownChartPro
                         })}
                     </BarContainer>
                     {hovered && (
-                        <Tooltip style={{
-                            left: Math.min(tooltipPos.x, 280),
-                            top: Math.max(tooltipPos.y - 8, 0),
-                            transform: 'translate(-50%, -100%)',
-                        }}>
+                        <Tooltip
+                            style={{
+                                left: Math.min(tooltipPos.x, 280),
+                                top: Math.max(tooltipPos.y - 8, 0),
+                                transform: 'translate(-50%, -100%)',
+                            }}>
                             <TooltipDate>{hovered.date}</TooltipDate>
                             <TooltipRow>
                                 <TooltipDot style={{ background: '#818cf8' }} />
@@ -113,8 +127,10 @@ export default function CostBreakdownChart({ timeSeries }: CostBreakdownChartPro
 }
 
 const ChartPanel = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
     padding: ${({ theme }) => theme.spacing(3, 2.5)};
 `;
@@ -163,7 +179,7 @@ const GridLine = styled(Box)`
     left: 0;
     right: 0;
     height: 1px;
-    background: rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.06);
     pointer-events: none;
 `;
 
@@ -216,12 +232,12 @@ const Tooltip = styled(Box)`
     position: absolute;
     z-index: 10;
     background: rgba(20, 24, 32, 0.95);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
     padding: 8px 12px;
     pointer-events: none;
     white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 `;
 
 const TooltipDate = styled(Typography)`

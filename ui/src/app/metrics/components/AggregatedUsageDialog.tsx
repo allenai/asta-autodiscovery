@@ -19,8 +19,16 @@ import { getMetricsApi } from '@/api/MetricsApi';
 import type { AggregatedUsageBucket, AggregatedUsageResponse } from '@/types/Metrics';
 
 const PALETTE = [
-    '#818cf8', '#a78bfa', '#c084fc', '#e879f9', '#f472b6',
-    '#fb923c', '#2dd4bf', '#38bdf8', '#a3e635', '#fbbf24',
+    '#818cf8',
+    '#a78bfa',
+    '#c084fc',
+    '#e879f9',
+    '#f472b6',
+    '#fb923c',
+    '#2dd4bf',
+    '#38bdf8',
+    '#a3e635',
+    '#fbbf24',
 ];
 
 const fmt = (n: number) => (n || 0).toLocaleString();
@@ -107,8 +115,7 @@ export default function AggregatedUsageDialog({
                     sx={{
                         fontSize: '1rem',
                         fontWeight: 600,
-                        color: (theme: any) =>
-                            theme.color?.['cream-100']?.hex || '#fff',
+                        color: (theme: any) => theme.color?.['cream-100']?.hex || '#fff',
                     }}>
                     Aggregated LLM Usage
                     <Typography
@@ -118,15 +125,13 @@ export default function AggregatedUsageDialog({
                             fontWeight: 300,
                             ml: 1,
                             color: (theme: any) =>
-                                theme.color?.['cream-40']?.rgba?.toString() || 'rgba(255,255,255,0.4)',
+                                theme.color?.['cream-40']?.rgba?.toString() ||
+                                'rgba(255,255,255,0.4)',
                         }}>
                         across {data?.runs_included ?? '...'} runs with usage data
                     </Typography>
                 </Typography>
-                <IconButton
-                    onClick={onClose}
-                    size="small"
-                    sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.6)' }}>
                     <CloseIcon fontSize="small" />
                 </IconButton>
             </DialogTitle>
@@ -152,9 +157,17 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
     const hasReasoning = t.total_reasoning_tokens > 0;
 
     const cards: { v: string; l: string; sub?: string }[] = [
-        { v: fmt(t.total_tokens), l: 'Total Tokens', sub: `${fmt(Math.round(t.mean_tokens_per_run))} avg/run` },
+        {
+            v: fmt(t.total_tokens),
+            l: 'Total Tokens',
+            sub: `${fmt(Math.round(t.mean_tokens_per_run))} avg/run`,
+        },
         { v: String(t.total_calls), l: 'Total Calls' },
-        { v: fmtCost(t.total_cost_usd), l: 'Total LLM Cost', sub: `${fmtCost(t.mean_cost_per_run)} avg/run` },
+        {
+            v: fmtCost(t.total_cost_usd),
+            l: 'Total LLM Cost',
+            sub: `${fmtCost(t.mean_cost_per_run)} avg/run`,
+        },
         { v: String(data.runs_included), l: 'Runs Included' },
     ];
     if (hasReasoning) {
@@ -172,9 +185,7 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
         { key: 'by_node', label: 'By Node' },
         { key: 'by_component', label: 'By Component' },
     ];
-    const views = viewDefs.filter(
-        (v) => data[v.key] && Object.keys(data[v.key]).length > 0
-    );
+    const views = viewDefs.filter((v) => data[v.key] && Object.keys(data[v.key]).length > 0);
     const [activeView, setActiveView] = useState(0);
 
     const agentKeys = Object.keys(data.by_agent || {});
@@ -197,7 +208,9 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                 <Panel>
                     <PanelTitle>
                         Token Composition{' '}
-                        <PanelSubtitle>cumulative prompt / completion / reasoning per agent</PanelSubtitle>
+                        <PanelSubtitle>
+                            cumulative prompt / completion / reasoning per agent
+                        </PanelSubtitle>
                     </PanelTitle>
                     <LegendRow>
                         <LegendItem>
@@ -211,7 +224,11 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         </LegendItem>
                     </LegendRow>
                     {agentKeys
-                        .sort((a, b) => (data.by_agent[b]?.total_tokens ?? 0) - (data.by_agent[a]?.total_tokens ?? 0))
+                        .sort(
+                            (a, b) =>
+                                (data.by_agent[b]?.total_tokens ?? 0) -
+                                (data.by_agent[a]?.total_tokens ?? 0)
+                        )
                         .map((key) => {
                             const a = data.by_agent[key];
                             const tot = a.total_tokens || 1;
@@ -222,15 +239,28 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                                 <StackedRow key={key}>
                                     <StackedLabel>{prettyName(key)}</StackedLabel>
                                     <StackedTrack>
-                                        <StackedSeg style={{ width: `${pP}%`, background: '#818cf8' }}>
-                                            {pP > 8 && <SegLabel>{fmt(a.total_prompt_tokens)}</SegLabel>}
+                                        <StackedSeg
+                                            style={{ width: `${pP}%`, background: '#818cf8' }}>
+                                            {pP > 8 && (
+                                                <SegLabel>{fmt(a.total_prompt_tokens)}</SegLabel>
+                                            )}
                                         </StackedSeg>
-                                        <StackedSeg style={{ width: `${cP}%`, background: '#f472b6' }}>
-                                            {cP > 8 && <SegLabel>{fmt(a.total_completion_tokens)}</SegLabel>}
+                                        <StackedSeg
+                                            style={{ width: `${cP}%`, background: '#f472b6' }}>
+                                            {cP > 8 && (
+                                                <SegLabel>
+                                                    {fmt(a.total_completion_tokens)}
+                                                </SegLabel>
+                                            )}
                                         </StackedSeg>
                                         {rP > 0 && (
-                                            <StackedSeg style={{ width: `${rP}%`, background: '#2dd4bf' }}>
-                                                {rP > 8 && <SegLabel>{fmt(a.total_reasoning_tokens)}</SegLabel>}
+                                            <StackedSeg
+                                                style={{ width: `${rP}%`, background: '#2dd4bf' }}>
+                                                {rP > 8 && (
+                                                    <SegLabel>
+                                                        {fmt(a.total_reasoning_tokens)}
+                                                    </SegLabel>
+                                                )}
                                             </StackedSeg>
                                         )}
                                     </StackedTrack>
@@ -277,7 +307,8 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
             {agentKeys.length > 0 && (
                 <Panel>
                     <PanelTitle>
-                        Statistics <PanelSubtitle>per agent, across {data.runs_included} runs</PanelSubtitle>
+                        Statistics{' '}
+                        <PanelSubtitle>per agent, across {data.runs_included} runs</PanelSubtitle>
                     </PanelTitle>
                     <StatsTable data={data.by_agent} />
                 </Panel>
@@ -314,13 +345,13 @@ function AggregatedBarChart({
                                 }}>
                                 <BarValue $outside={small}>
                                     {fmt(d.total_tokens)}
-                                    {showCost && d.total_cost_usd > 0 && ` (${fmtCost(d.total_cost_usd)})`}
+                                    {showCost &&
+                                        d.total_cost_usd > 0 &&
+                                        ` (${fmtCost(d.total_cost_usd)})`}
                                 </BarValue>
                             </BarFill>
                         </BarTrack>
-                        <BarAnnotation>
-                            {fmt(Math.round(d.mean_tokens_per_run))} avg
-                        </BarAnnotation>
+                        <BarAnnotation>{fmt(Math.round(d.mean_tokens_per_run))} avg</BarAnnotation>
                     </BarRow>
                 );
             })}
@@ -334,7 +365,7 @@ function StatsTable({ data }: { data: Record<string, AggregatedUsageBucket> }) {
     );
     const colors = assignColors(keys);
 
-    let totals = { calls: 0, prompt: 0, completion: 0, reasoning: 0, total: 0 };
+    const totals = { calls: 0, prompt: 0, completion: 0, reasoning: 0, total: 0 };
     keys.forEach((key) => {
         const a = data[key];
         totals.calls += a.total_calls;
@@ -402,8 +433,10 @@ const CardGrid = styled(Box)<{ $count: number }>`
 `;
 
 const StatCard = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 12px;
     padding: ${({ theme }) => theme.spacing(2, 1.5)};
     text-align: center;
@@ -431,8 +464,10 @@ const StatSub = styled(Typography)`
 `;
 
 const Panel = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
     padding: ${({ theme }) => theme.spacing(3, 2.5)};
     margin-bottom: ${({ theme }) => theme.spacing(2)};
@@ -594,7 +629,8 @@ const Th = styled('th')<{ $align?: string }>`
     font-weight: 500;
     text-align: ${({ $align }) => $align || 'right'};
     padding: 0 10px 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     color: ${({ theme }) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
 `;
 
@@ -603,7 +639,8 @@ const Td = styled('td')<{ $align?: string }>`
     font-variant-numeric: tabular-nums;
     text-align: ${({ $align }) => $align || 'right'};
     padding: 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
     color: ${({ theme }) => theme.color['cream-80']?.rgba?.toString() || 'rgba(255,255,255,0.8)'};
 `;
 
@@ -620,6 +657,7 @@ const TotalRow = styled('tr')`
     & td {
         font-weight: 700;
         border-bottom: none;
-        border-top: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+        border-top: 1px solid
+            ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     }
 `;

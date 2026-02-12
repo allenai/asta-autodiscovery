@@ -64,7 +64,13 @@ export default function MetricsUsersPage() {
 
     return (
         <Box>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: (theme: any) => theme.color['cream-100']?.hex || '#fff' }}>
+            <Typography
+                variant="h6"
+                sx={{
+                    mb: 2,
+                    fontWeight: 600,
+                    color: (theme: any) => theme.color['cream-100']?.hex || '#fff',
+                }}>
                 Users ({users.length})
             </Typography>
 

@@ -19,8 +19,10 @@ export default function MetricCard({ value, label, subValue }: MetricCardProps) 
 }
 
 const Card = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 12px;
     padding: ${({ theme }) => theme.spacing(2.5, 2)};
     text-align: center;

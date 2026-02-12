@@ -61,7 +61,13 @@ export default function MetricsOverviewPage() {
         return (
             <CenteredBox>
                 <CircularProgress />
-                <Typography variant="body2" sx={{ mt: 2, color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)' }}>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        mt: 2,
+                        color: (theme: any) =>
+                            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                    }}>
                     Loading metrics (first load may take a minute while scanning data)...
                 </Typography>
             </CenteredBox>
@@ -128,12 +134,13 @@ export default function MetricsOverviewPage() {
                     </Button>
                 </SubsectionHeader>
                 <CardGrid>
+                    <MetricCard value={fmtCost(data.llm_cost_usd)} label="Total LLM Cost" />
                     <MetricCard
-                        value={fmtCost(data.llm_cost_usd)}
-                        label="Total LLM Cost"
-                    />
-                    <MetricCard
-                        value={data.cost_per_hypothesis_usd != null ? fmtCost(data.cost_per_hypothesis_usd) : 'N/A'}
+                        value={
+                            data.cost_per_hypothesis_usd != null
+                                ? fmtCost(data.cost_per_hypothesis_usd)
+                                : 'N/A'
+                        }
                         label="LLM Cost / Hypothesis"
                     />
                     <MetricCard
@@ -164,11 +171,20 @@ export default function MetricsOverviewPage() {
             {/* Cache info */}
             <CacheInfo>
                 {data.cache_refreshed_at && (
-                    <Typography variant="caption" sx={{ color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)' }}>
+                    <Typography
+                        variant="caption"
+                        sx={{
+                            color: (theme: any) =>
+                                theme.color['cream-60']?.rgba?.toString() ||
+                                'rgba(255,255,255,0.6)',
+                        }}>
                         Data as of {new Date(data.cache_refreshed_at).toLocaleString()}
                     </Typography>
                 )}
-                <Button size="small" onClick={handleRefreshCache} sx={{ textTransform: 'none', fontSize: '0.7rem' }}>
+                <Button
+                    size="small"
+                    onClick={handleRefreshCache}
+                    sx={{ textTransform: 'none', fontSize: '0.7rem' }}>
                     Refresh Cache
                 </Button>
             </CacheInfo>
@@ -205,8 +221,10 @@ const Subsection = styled(Box)`
     margin-top: ${({ theme }: any) => theme.spacing(1)};
     margin-bottom: ${({ theme }: any) => theme.spacing(2)};
     padding: ${({ theme }: any) => theme.spacing(2, 2.5)};
-    background: ${({ theme }: any) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }: any) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }: any) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }: any) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
 `;
 
@@ -220,7 +238,8 @@ const SubsectionHeader = styled(Box)`
 const SubsectionTitle = styled(Typography)`
     font-size: 0.8rem;
     font-weight: 600;
-    color: ${({ theme }: any) => theme.color['cream-80']?.rgba?.toString() || 'rgba(255,255,255,0.8)'};
+    color: ${({ theme }: any) =>
+        theme.color['cream-80']?.rgba?.toString() || 'rgba(255,255,255,0.8)'};
 `;
 
 const CacheInfo = styled(Box)`
@@ -229,5 +248,6 @@ const CacheInfo = styled(Box)`
     gap: ${({ theme }) => theme.spacing(2)};
     margin-top: ${({ theme }) => theme.spacing(3)};
     padding-top: ${({ theme }) => theme.spacing(2)};
-    border-top: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    border-top: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
 `;

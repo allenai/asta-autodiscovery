@@ -36,7 +36,9 @@ export default function StatusDistributionChart({ runsByStatus }: StatusDistribu
                                         width: `${Math.max(pct, 1.5)}%`,
                                         background: color,
                                     }}>
-                                    <BarValue $outside={pct < 12}>{count.toLocaleString()}</BarValue>
+                                    <BarValue $outside={pct < 12}>
+                                        {count.toLocaleString()}
+                                    </BarValue>
                                 </BarFill>
                             </BarTrack>
                         </BarRow>
@@ -48,8 +50,10 @@ export default function StatusDistributionChart({ runsByStatus }: StatusDistribu
 }
 
 const ChartPanel = styled(Box)`
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
-    border: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
     padding: ${({ theme }) => theme.spacing(3, 2.5)};
 `;

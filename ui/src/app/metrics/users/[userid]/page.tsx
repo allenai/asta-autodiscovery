@@ -85,7 +85,14 @@ export default function UserDetailPage() {
                 {userid}
             </Typography>
             {s.last_activity && (
-                <Typography variant="caption" sx={{ color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)', mb: 2, display: 'block' }}>
+                <Typography
+                    variant="caption"
+                    sx={{
+                        color: (theme: any) =>
+                            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                        mb: 2,
+                        display: 'block',
+                    }}>
                     Last active: {new Date(s.last_activity).toLocaleDateString()}
                 </Typography>
             )}
@@ -124,14 +131,12 @@ export default function UserDetailPage() {
                                         `/metrics/runs/${encodeURIComponent(run.userid)}/${encodeURIComponent(run.runid)}`
                                     )
                                 }>
-                                <Td $align="left">
-                                    {run.name || run.runid.slice(0, 8)}
-                                </Td>
+                                <Td $align="left">{run.name || run.runid.slice(0, 8)}</Td>
                                 <Td>
                                     <Chip
                                         label={run.status}
                                         size="small"
-                                        color={STATUS_COLORS[run.status] as any || 'default'}
+                                        color={(STATUS_COLORS[run.status] as any) || 'default'}
                                         sx={{ fontSize: '0.65rem', height: 22 }}
                                     />
                                 </Td>
@@ -141,7 +146,11 @@ export default function UserDetailPage() {
                                 </Td>
                                 <Td>{fmtDuration(run.duration_seconds)}</Td>
                                 <Td>{fmtCost(run.llm_cost_usd)}</Td>
-                                <Td>{run.created_at ? new Date(run.created_at).toLocaleDateString() : '-'}</Td>
+                                <Td>
+                                    {run.created_at
+                                        ? new Date(run.created_at).toLocaleDateString()
+                                        : '-'}
+                                </Td>
                             </ClickableRow>
                         ))}
                     </tbody>
@@ -182,7 +191,8 @@ const Th = styled('th')<{ $align?: string }>`
     font-weight: 500;
     text-align: ${({ $align }) => $align || 'right'};
     padding: 8px 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     color: ${({ theme }) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
     white-space: nowrap;
 `;
@@ -192,7 +202,8 @@ const Td = styled('td')<{ $align?: string }>`
     font-variant-numeric: tabular-nums;
     text-align: ${({ $align }) => $align || 'right'};
     padding: 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
     color: ${({ theme }) => theme.color['cream-80']?.rgba?.toString() || 'rgba(255,255,255,0.8)'};
 `;
 
@@ -200,6 +211,7 @@ const ClickableRow = styled('tr')`
     cursor: pointer;
     transition: background 0.15s;
     &:hover {
-        background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+        background: ${({ theme }) =>
+            theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
     }
 `;

@@ -10,8 +10,20 @@ import { auth0Client } from '@/auth/Auth0Client';
 
 const ADMIN_PERMISSION = 'enroll:autodiscovery_admin';
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const parts = token.split('.');
+    const payloadPart = parts[1];
+    if (!payloadPart) {
+        return null;
+    }
+
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(atob(`${normalized}${padding}`)) as Record<string, unknown>;
+}
+
 export default function MetricsLayout({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+    const { isAuthenticated, isLoading } = useAuth0();
     const router = useRouter();
     const pathname = usePathname();
     const [hasAdminPermission, setHasAdminPermission] = useState<boolean | null>(null);
@@ -24,9 +36,10 @@ export default function MetricsLayout({ children }: { children: React.ReactNode 
             }
             try {
                 const token = await auth0Client.getTokenSilently();
-                const parts = token.split('.');
-                const payload = JSON.parse(atob(parts[1]));
-                const permissions: string[] = payload.permissions || [];
+                const payload = decodeJwtPayload(token);
+                const permissions = Array.isArray(payload?.permissions)
+                    ? (payload.permissions as string[])
+                    : [];
                 setHasAdminPermission(permissions.includes(ADMIN_PERMISSION));
             } catch {
                 setHasAdminPermission(false);
@@ -49,7 +62,13 @@ export default function MetricsLayout({ children }: { children: React.ReactNode 
     if (!isAuthenticated) {
         return (
             <CenteredBox>
-                <Typography variant="h6" sx={{ mb: 2, color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)' }}>
+                <Typography
+                    variant="h6"
+                    sx={{
+                        mb: 2,
+                        color: (theme: any) =>
+                            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                    }}>
                     Sign in to access the Metrics Dashboard
                 </Typography>
                 <AuthButton />
@@ -63,7 +82,13 @@ export default function MetricsLayout({ children }: { children: React.ReactNode 
                 <Typography variant="h6" sx={{ mb: 1 }}>
                     Access Denied
                 </Typography>
-                <Typography variant="body2" sx={{ color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)', mb: 2 }}>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        color: (theme: any) =>
+                            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                        mb: 2,
+                    }}>
                     The metrics dashboard requires the <code>{ADMIN_PERMISSION}</code> permission.
                 </Typography>
                 <AuthButton />
@@ -71,13 +96,12 @@ export default function MetricsLayout({ children }: { children: React.ReactNode 
         );
     }
 
-    const currentTab = pathname === '/metrics' || pathname === '/metrics/'
-        ? 0
-        : pathname.startsWith('/metrics/users')
-            ? 1
-            : pathname.startsWith('/metrics/runs')
-                ? 2
-                : 0;
+    const currentTab =
+        pathname === '/metrics' || pathname === '/metrics/'
+            ? 0
+            : pathname.startsWith('/metrics/users') || pathname.startsWith('/metrics/runs')
+              ? 1
+              : 0;
 
     return (
         <Wrapper>
@@ -132,7 +156,8 @@ const TopBar = styled(Box)`
     justify-content: space-between;
     align-items: center;
     padding: ${({ theme }) => theme.spacing(1.5, 3)};
-    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+    border-bottom: 1px solid
+        ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
 `;
 
 const Title = styled(Typography)`

@@ -270,7 +270,8 @@ class MetricsCache:
 
     @property
     def is_refreshing(self) -> bool:
-        return self._refreshing
+        with self._lock:
+            return self._refreshing
 
     def get_data(self) -> AggregatedData:
         """Get cached data, triggering refresh if stale or empty.
@@ -302,19 +303,23 @@ class MetricsCache:
             return True
 
     def _trigger_background_refresh(self) -> None:
-        if not self._refreshing:
+        with self._lock:
+            if self._refreshing:
+                return
             self._refreshing = True
-            thread = threading.Thread(target=self._background_refresh, daemon=True)
-            thread.start()
+        thread = threading.Thread(target=self._background_refresh, daemon=True)
+        thread.start()
 
     def _background_refresh(self) -> None:
         try:
             self._do_refresh()
         finally:
-            self._refreshing = False
+            with self._lock:
+                self._refreshing = False
 
     def _do_refresh(self) -> None:
-        self._refreshing = True
+        with self._lock:
+            self._refreshing = True
         try:
             with self._lock:
                 previous = self._data
@@ -324,7 +329,8 @@ class MetricsCache:
         except Exception as e:
             logger.error(f"Metrics cache refresh failed: {e}")
         finally:
-            self._refreshing = False
+            with self._lock:
+                self._refreshing = False
 
 
 # Module-level singleton

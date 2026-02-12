@@ -37,11 +37,27 @@ export default function TimePeriodFilter({
                 InputLabelProps={{ shrink: true }}
                 size="small"
             />
-            <Button variant="outlined" size="small" onClick={onApply} sx={{ textTransform: 'none', color: (theme: any) => theme.color['cream-100']?.hex || '#fff', borderColor: 'rgba(255,255,255,0.2)', '&:hover': { borderColor: 'rgba(255,255,255,0.4)' } }}>
+            <Button
+                variant="outlined"
+                size="small"
+                onClick={onApply}
+                sx={{
+                    textTransform: 'none',
+                    color: (theme: any) => theme.color['cream-100']?.hex || '#fff',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    '&:hover': { borderColor: 'rgba(255,255,255,0.4)' },
+                }}>
                 Apply
             </Button>
             {(startDate || endDate) && (
-                <Button size="small" onClick={onClear} sx={{ textTransform: 'none', color: (theme: any) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)' }}>
+                <Button
+                    size="small"
+                    onClick={onClear}
+                    sx={{
+                        textTransform: 'none',
+                        color: (theme: any) =>
+                            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                    }}>
                     Clear
                 </Button>
             )}
@@ -61,21 +77,26 @@ const StyledInput = styled(TextField)`
     & .MuiInputBase-root {
         font-size: 0.8rem;
         color: ${({ theme }) => theme.color['cream-100']?.hex || '#fff'};
-        background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+        background: ${({ theme }) =>
+            theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
         border-radius: 8px;
     }
     & .MuiInputBase-root fieldset {
-        border-color: ${({ theme }) => theme.color['cream-20']?.rgba?.toString() || 'rgba(255,255,255,0.2)'};
+        border-color: ${({ theme }) =>
+            theme.color['cream-20']?.rgba?.toString() || 'rgba(255,255,255,0.2)'};
     }
     & .MuiInputBase-root:hover fieldset {
-        border-color: ${({ theme }) => theme.color['cream-40']?.rgba?.toString() || 'rgba(255,255,255,0.4)'};
+        border-color: ${({ theme }) =>
+            theme.color['cream-40']?.rgba?.toString() || 'rgba(255,255,255,0.4)'};
     }
     & .MuiInputLabel-root {
         font-size: 0.8rem;
-        color: ${({ theme }) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
+        color: ${({ theme }) =>
+            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
     }
     & .MuiSvgIcon-root {
-        color: ${({ theme }) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
+        color: ${({ theme }) =>
+            theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
     }
     width: 160px;
 `;

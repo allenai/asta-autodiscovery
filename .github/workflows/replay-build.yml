@@ -42,20 +42,21 @@ jobs:
             echo "env=dev" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build image
-        run: |
-          docker build \
-            --platform linux/amd64 \
-            -t ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }} \
-            -t ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }} \
-            -f packages/devtools/Dockerfile \
-            .
-
-      - name: Push image
+      - name: Build and push image
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
         run: |
+          # Use Makefile targets for build and push
+          IMAGE_TAG=${{ steps.env-tag.outputs.env }} make push-replay-image
+
+          # Also tag and push with commit SHA for traceability
+          docker tag ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }} \
+            ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }}
           docker push ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}-${{ github.sha }}
-          docker push ${{ env.IMAGE_NAME }}:${{ steps.env-tag.outputs.env }}
+
+      - name: Build image (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          IMAGE_TAG=${{ steps.env-tag.outputs.env }} make build-replay-image
 
       - name: Authenticate to Google Cloud
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
@@ -70,12 +71,5 @@ jobs:
       - name: Update Cloud Run Job
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/env/prod')
         run: |
-          ENV_SUFFIX=${{ steps.env-tag.outputs.env }}
-
-          echo "Updating Cloud Run Job with :${ENV_SUFFIX} image..."
-
-          gcloud run jobs update autodiscovery-replay-${ENV_SUFFIX} \
-            --image ${{ env.IMAGE_NAME }}:${ENV_SUFFIX} \
-            --region us-west1
-
-          echo "✅ Job updated successfully"
+          # Use Makefile target for job update
+          IMAGE_TAG=${{ steps.env-tag.outputs.env }} make update-replay-job

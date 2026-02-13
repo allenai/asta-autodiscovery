@@ -38,12 +38,21 @@ import {
 } from '@/analytics/runDetails';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
+import {
+    PanelLayout,
+    Background,
+    RunPanel,
+    ExperimentPanel,
+    ExperimentActions,
+    ExperimentActionButton,
+    LargeScreenAction,
+} from '@/runs/components/RunViewPanels';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-interface RunStatusProps {
+interface RunViewProps {
     runid: string;
     onRunCancelled?: () => void;
     /** Optional user ID for viewing public runs (e.g., "samples") */
@@ -59,7 +68,7 @@ interface RunStatusProps {
  * - Stop Run button (only shown when status is RUNNING)
  * - Auto-refresh every 30 seconds for active runs
  */
-export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusProps) {
+export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
 
     const [run, setRun] = useState<Run | null>(null);
@@ -166,7 +175,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
 
     return (
         <RunExperimentsProvider runid={runid} userid={userid} autoStart>
-            <RunStatusContent
+            <RunViewContent
                 run={run as Run & { details: NonNullable<Run['details']> }}
                 error={error}
                 canStop={canStop}
@@ -179,7 +188,7 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
     );
 }
 
-interface RunStatusContentProps {
+interface RunViewContentProps {
     run: Run & { details: NonNullable<Run['details']> };
     error: string | null;
     canStop: boolean;
@@ -189,7 +198,7 @@ interface RunStatusContentProps {
     isReadOnly: boolean;
 }
 
-function RunStatusContent({
+function RunViewContent({
     run,
     error,
     canStop,
@@ -197,7 +206,7 @@ function RunStatusContent({
     handleStop,
     experimentsLabel,
     isReadOnly,
-}: RunStatusContentProps) {
+}: RunViewContentProps) {
     const runsApi = getRunsApi();
     const {
         experiments,
@@ -288,7 +297,7 @@ function RunStatusContent({
                         <ExperimentGraph />
                     </Background>
                 )}
-                <TablePanel $isExpanded={isTableExpanded}>
+                <RunPanel $isExpanded={isTableExpanded}>
                     <RunHeader>
                         <Box>
                             <RunHeaderName>{run.name}</RunHeaderName>
@@ -400,13 +409,13 @@ function RunStatusContent({
 
                         <ExperimentsTable runStats={run.stats} />
                     </RunContent>
-                </TablePanel>
+                </RunPanel>
 
                 {!!selectedExperiment && (
-                    <DetailsPanel $isExpanded={isDetailsExpanded}>
-                        <DetailsActions>
+                    <ExperimentPanel $isExpanded={isDetailsExpanded}>
+                        <ExperimentActions>
                             <LargeScreenAction>
-                                <DetailsActionButton
+                                <ExperimentActionButton
                                     onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
                                     size="small">
                                     {isDetailsExpanded ? (
@@ -414,17 +423,17 @@ function RunStatusContent({
                                     ) : (
                                         <OpenInFullOutlinedIcon />
                                     )}
-                                </DetailsActionButton>
+                                </ExperimentActionButton>
                             </LargeScreenAction>
-                            <DetailsActionButton
+                            <ExperimentActionButton
                                 onClick={() => selectExperiment(null)}
                                 size="small"
                                 {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />
-                            </DetailsActionButton>
-                        </DetailsActions>
+                            </ExperimentActionButton>
+                        </ExperimentActions>
                         <ExperimentDetails experiment={selectedExperiment} />
-                    </DetailsPanel>
+                    </ExperimentPanel>
                 )}
             </PanelLayout>
 
@@ -438,101 +447,8 @@ function RunStatusContent({
 }
 
 const Container = styled('div')`
-    container: run-status / inline-size;
+    container: run-view / inline-size;
     height: 100%;
-`;
-
-const PanelLayout = styled('div')`
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(2)};
-    height: 100%;
-    padding: ${({ theme }) => theme.spacing(0, 2, 2)};
-    justify-content: space-between;
-    position: relative;
-
-    @container run-status (width < 1000px) {
-        display: grid;
-    }
-
-    @container run-status (width < 600px) {
-        padding: ${({ theme }) => theme.spacing(0, 1, 1)};
-    }
-
-    @container run-status (width < 425px) {
-        padding: 0;
-    }
-`;
-
-const Background = styled('div')`
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-
-    @container run-status (width < 1000px) {
-        display: none;
-    }
-`;
-
-const TablePanel = styled('div')<{ $isExpanded: boolean }>`
-    flex: 0 1 auto;
-    min-width: 0;
-    width: ${({ $isExpanded }) => ($isExpanded ? '100%' : '500px')};
-    background-color: #163638f3;
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: ${({ theme }) => theme.spacing(2)};
-    overflow: auto;
-    z-index: 2;
-
-    @container run-status (width < 1000px) {
-        flex: initial;
-        width: calc(100cqw - 20px);
-        grid-row: 1;
-        grid-column: 1;
-    }
-
-    @container run-status (width < 600px) {
-        width: 100%;
-    }
-`;
-
-const DetailsPanel = styled('div')<{ $isExpanded: boolean }>`
-    flex: 0 1 auto;
-    max-width: ${({ $isExpanded }) => ($isExpanded ? 'initial' : '500px')};
-    background-color: #163638f3;
-    border-radius: 12px;
-    position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
-    overflow-y: auto;
-    z-index: 2;
-    top: 0;
-    bottom: 0;
-
-    @container run-status (width < 1000px) {
-        flex: 1 1 auto;
-        max-width: initial;
-        position: relative;
-        width: calc(100cqw - 20px);
-        grid-row: 1;
-        grid-column: 1;
-    }
-
-    @container run-status (width < 600px) {
-        width: 100%;
-    }
-`;
-
-const DetailsActions = styled('div')`
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(1)};
-    position: absolute;
-    top: ${({ theme }) => theme.spacing(2)};
-    right: ${({ theme }) => theme.spacing(2)};
-`;
-
-const DetailsActionButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
 `;
 
 const StopButton = styled(Button)`
@@ -579,23 +495,17 @@ const RunHeaderName = styled('h1')`
 const RunContent = styled(Box)`
     padding: ${({ theme }) => theme.spacing(3)};
 
-    @container run-status (width < 700px) {
+    @container run-view (width < 700px) {
         padding: ${({ theme }) => theme.spacing(1)};
     }
 
-    @container run-status (width < 500px) {
+    @container run-view (width < 500px) {
         padding: ${({ theme }) => theme.spacing(0.5)};
     }
 `;
 
 const RunHeaderExpandButton = styled(IconButton)`
     color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
-`;
-
-const LargeScreenAction = styled('div')`
-    @container run-status (width < 1000px) {
-        display: none;
-    }
 `;
 
 const ExperimentCount = styled('div')`

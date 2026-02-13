@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import RunSetup from '@/runs/components/RunSetup';
-import RunStatus from '@/runs/components/RunStatus';
+import RunView from '@/runs/components/RunView';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
 
@@ -20,7 +20,7 @@ interface RunPageProps {
 }
 
 /**
- * Individual run page - shows RunSetup or RunStatus based on run state.
+ * Individual run page - shows RunSetup or RunView based on run state.
  * This page is for the current user's own runs only.
  * For viewing shared/public runs, use /shared/{userid}/{runid} instead.
  */
@@ -128,7 +128,7 @@ export default function RunPage({ params }: RunPageProps) {
                 <RunSetup runid={runId} onSubmitSuccess={handleSubmitSuccess} />
             )}
             {runState === 'submitted' && (
-                <RunStatus runid={runId} onRunCancelled={handleRunCancelled} />
+                <RunView runid={runId} onRunCancelled={handleRunCancelled} />
             )}
         </URLSearchParamsProvider>
     );

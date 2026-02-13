@@ -2,6 +2,8 @@
 
 import { Box, styled } from '@mui/material';
 
+import { scrollbarStyles } from '@/utils/scrollbar';
+
 /**
  * Layout for debug pages
  */
@@ -22,4 +24,5 @@ const ScrollContainer = styled(Box)`
 const ScrollableArea = styled('div')`
     height: 100%;
     overflow: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;

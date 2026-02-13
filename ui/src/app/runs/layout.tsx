@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import { ToS } from '@/components/ToS';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { mkLogoTrackAttrs } from '@/analytics/run';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -147,4 +148,5 @@ const ScrollContainer = styled('div')`
 const ScrollContent = styled('div')`
     height: 100%;
     overflow: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;

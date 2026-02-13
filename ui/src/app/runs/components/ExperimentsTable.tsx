@@ -361,6 +361,23 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         {
             color: theme.color['cream-100'].hex,
         },
+
+    // Custom scrollbar styling
+    '& ::-webkit-scrollbar': {
+        width: '12px',
+        height: '12px',
+    },
+    '& ::-webkit-scrollbar-track': {
+        background: theme.color['cream-4'].rgba.toString(),
+        borderRadius: '6px',
+    },
+    '& ::-webkit-scrollbar-thumb': {
+        background: theme.color['cream-20'].rgba.toString(),
+        borderRadius: '6px',
+        border: `2px solid ${theme.color['cream-4'].rgba.toString()}`,
+    },
+    scrollbarWidth: 'thin',
+    scrollbarColor: `${theme.color['cream-20'].rgba.toString()} ${theme.color['cream-4'].rgba.toString()}`,
 }));
 
 const StyledSkeleton = styled(Skeleton)(({ theme }) => ({

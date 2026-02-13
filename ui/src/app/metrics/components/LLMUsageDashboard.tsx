@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Box, Typography, styled, Tab as MuiTab, Tabs } from '@mui/material';
 
 import type { LLMUsageSummary, LLMUsageBucket } from '@/types/Metrics';
+import { filterTransientProps } from '@/utils/styledProps';
 
 const PALETTE = [
     '#818cf8',
@@ -274,7 +275,9 @@ function DetailTable({ usage }: { usage: LLMUsageSummary }) {
 
 // Styled Components
 
-const CardGrid = styled(Box)<{ $count: number }>`
+const CardGrid = styled(Box, {
+    shouldForwardProp: filterTransientProps,
+})<{ $count: number }>`
     display: grid;
     grid-template-columns: repeat(${({ $count }) => $count}, 1fr);
     gap: ${({ theme }) => theme.spacing(1.5)};

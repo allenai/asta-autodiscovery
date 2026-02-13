@@ -1,6 +1,8 @@
 import { Box, Typography, styled, Button } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
 
+import { filterTransientProps } from '@/utils/styledProps';
+
 interface IntroBoxProps {
     showLogin?: boolean;
     onLoginClick?: () => void;
@@ -25,7 +27,9 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
     );
 };
 
-const Wrapper = styled(Box)<{ $showLogin: boolean }>(({ theme, $showLogin }) => ({
+const Wrapper = styled(Box, {
+    shouldForwardProp: filterTransientProps,
+})<{ $showLogin: boolean }>(({ theme, $showLogin }) => ({
     background: `radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%), #162D31`,
     border: '1px solid rgba(250, 242, 233, 0.30)',
     borderColor:

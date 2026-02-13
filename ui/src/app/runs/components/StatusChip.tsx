@@ -1,6 +1,10 @@
 import { Chip, styled } from '@mui/material';
 
-export const StatusChip = styled(Chip)<{ $status: string }>`
+import { filterTransientProps } from '@/utils/styledProps';
+
+export const StatusChip = styled(Chip, {
+    shouldForwardProp: filterTransientProps,
+})<{ $status: string }>`
     background-color: ${({ theme, $status }) => {
         const status = $status.toUpperCase();
         switch (status) {

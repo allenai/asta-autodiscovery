@@ -17,6 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 
 import { getMetricsApi } from '@/api/MetricsApi';
 import type { AggregatedUsageBucket, AggregatedUsageResponse } from '@/types/Metrics';
+import { filterTransientProps } from '@/utils/styledProps';
 
 const PALETTE = [
     '#818cf8',
@@ -425,7 +426,9 @@ function StatsTable({ data }: { data: Record<string, AggregatedUsageBucket> }) {
 
 // Styled Components
 
-const CardGrid = styled(Box)<{ $count: number }>`
+const CardGrid = styled(Box, {
+    shouldForwardProp: filterTransientProps,
+})<{ $count: number }>`
     display: grid;
     grid-template-columns: repeat(${({ $count }) => $count}, 1fr);
     gap: ${({ theme }) => theme.spacing(1.5)};

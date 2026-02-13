@@ -32,10 +32,14 @@ gcloud run jobs create autodiscovery-send-emails-dev \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
+  --update-secrets=SMTP_USERNAME=smtp-username:latest,SMTP_PASSWORD=smtp-password:latest \
   --task-timeout 29m \
+  --max-retries 0 \
   --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--userid,auth0|EXAMPLE_USER_ID"
 ```
+
+**Note:** The dev job includes `--userid` to limit emails to a single test user, preventing accidental spam to all users during development.
 
 **Production environment:**
 ```bash
@@ -44,9 +48,29 @@ gcloud run jobs create autodiscovery-send-emails-prod \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
+  --update-secrets=SMTP_USERNAME=smtp-username:latest,SMTP_PASSWORD=smtp-password:latest \
   --task-timeout 29m \
+  --max-retries 0 \
   --command "uv" \
   --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
+```
+
+**SMTP Configuration:**
+The jobs use Gmail SMTP relay for sending emails. Credentials are stored in GCP Secrets Manager:
+- `smtp-username`: Gmail/Google Workspace email address
+- `smtp-password`: App password for authentication
+
+To grant the service account access to these secrets:
+```bash
+gcloud secrets add-iam-policy-binding smtp-username \
+  --member="serviceAccount:example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor" \
+  --project=example-legacy-project
+
+gcloud secrets add-iam-policy-binding smtp-password \
+  --member="serviceAccount:example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor" \
+  --project=example-legacy-project
 ```
 
 ### Schedule (every 30 minutes)

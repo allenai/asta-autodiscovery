@@ -29,6 +29,7 @@ import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { getRunsApi } from '@/api/RunsApi';
 import { mkDeleteRunBtnAttrs, mkRunListItemAttrs } from '@/analytics/run';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 interface RunsListProps {
     selectedRunId: string | null;
@@ -130,7 +131,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                     </Typography>
                 </Box>
             ) : (
-                <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                <ScrollableListContainer>
                     <SectionTitle>Your sessions</SectionTitle>
                     <List disablePadding>
                         {sortedRuns.map((run) => (
@@ -175,7 +176,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                             </ListItem>
                         ))}
                     </List>
-                </Box>
+                </ScrollableListContainer>
             )}
 
             <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
@@ -200,6 +201,12 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
 
 const StyledDivider = styled(Divider)`
     border-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+`;
+
+const ScrollableListContainer = styled(Box)`
+    flex-grow: 1;
+    overflow: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;
 
 const SectionTitle = styled(Typography)`

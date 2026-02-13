@@ -1,5 +1,6 @@
 import { styled } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 export const PanelLayout = styled('div')`
     color: ${({ theme }) => theme.color['cream-100'].hex};
@@ -44,6 +45,7 @@ export const RunPanel = styled('div')<{ $isExpanded: boolean }>`
     gap: ${({ theme }) => theme.spacing(2)};
     overflow: auto;
     z-index: 2;
+    ${({ theme }) => scrollbarStyles(theme)}
 
     @container run-view (width < 1000px) {
         flex: initial;
@@ -67,6 +69,7 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
     z-index: 2;
     top: 0;
     bottom: 0;
+    ${({ theme }) => scrollbarStyles(theme)}
 
     @container run-view (width < 1000px) {
         flex: 1 1 auto;

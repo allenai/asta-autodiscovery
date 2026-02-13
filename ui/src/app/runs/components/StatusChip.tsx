@@ -1,4 +1,5 @@
 import { Chip, styled } from '@mui/material';
+
 import { filterTransientProps } from '@/utils/styledProps';
 
 export const StatusChip = styled(Chip, {

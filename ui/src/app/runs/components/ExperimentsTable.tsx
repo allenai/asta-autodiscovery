@@ -13,7 +13,6 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
-import { scrollbarStyles } from '@/utils/scrollbar';
 
 const DEFAULT_COLUMNS: GridColDef[] = [
     {

@@ -1,6 +1,7 @@
 .PHONY: test test-modal test-all lint format type-check modal-deploy sync adk-web serve-docs deploy-docs \
-        build-docker-compose build-ui build-scripts-image push-scripts-image build-replay-image push-replay-image \
-        build-autodiscovery-image push-autodiscovery-image deploy-autodiscovery
+        build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
+        build-replay-image push-replay-image update-replay-job \
+        build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery
 
 # Test targets
 test:
@@ -72,6 +73,31 @@ build-scripts-image:
 push-scripts-image: build-scripts-image
 	docker push $(SCRIPTS_IMAGE):$(IMAGE_TAG)
 
+update-scripts-jobs:
+	@echo "Updating Cloud Run jobs to use $(SCRIPTS_IMAGE):$(IMAGE_TAG)..."
+	@if [ "$(IMAGE_TAG)" = "dev" ]; then \
+		gcloud run jobs update autodiscovery-send-emails-dev \
+			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project && \
+		gcloud run jobs update autodiscovery-dataset-cleanup-dev \
+			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project; \
+	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
+		gcloud run jobs update autodiscovery-send-emails-prod \
+			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project && \
+		gcloud run jobs update autodiscovery-dataset-cleanup-prod \
+			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project; \
+	else \
+		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
+		exit 1; \
+	fi
+
 build-replay-image:
 	docker build \
 		--platform linux/amd64 \
@@ -81,6 +107,23 @@ build-replay-image:
 
 push-replay-image: build-replay-image
 	docker push $(REPLAY_IMAGE):$(IMAGE_TAG)
+
+update-replay-job:
+	@echo "Updating Cloud Run job to use $(REPLAY_IMAGE):$(IMAGE_TAG)..."
+	@if [ "$(IMAGE_TAG)" = "dev" ]; then \
+		gcloud run jobs update autodiscovery-replay-dev \
+			--image $(REPLAY_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project; \
+	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
+		gcloud run jobs update autodiscovery-replay-prod \
+			--image $(REPLAY_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project; \
+	else \
+		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
+		exit 1; \
+	fi
 
 build-autodiscovery-image:
 	@if [ -z "$(GITHUB_TOKEN)" ]; then \
@@ -99,3 +142,20 @@ build-autodiscovery-image:
 
 push-autodiscovery-image: build-autodiscovery-image
 	docker push $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG)
+
+update-autodiscovery-job:
+	@echo "Updating Cloud Run job to use $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG)..."
+	@if [ "$(IMAGE_TAG)" = "dev" ]; then \
+		gcloud run jobs update autodiscovery-job-dev \
+			--image $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project; \
+	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
+		gcloud run jobs update autodiscovery-job-prod \
+			--image $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
+			--region us-west1 \
+			--project example-legacy-project; \
+	else \
+		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
+		exit 1; \
+	fi

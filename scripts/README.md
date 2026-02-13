@@ -7,7 +7,7 @@ This directory contains scripts that run as scheduled Cloud Run Jobs.
 Sends email notifications when AutoDiscovery runs complete successfully. Failed and cancelled runs do not trigger notifications. Tracks sent emails in GCS to avoid duplicates.
 
 **Features:**
-- Scans for successful runs completed within the last 24 hours (configurable)
+- Scans for successful runs completed within the last 8 hours (configurable)
 - Only sends notifications for SUCCEEDED status (not FAILED or CANCELLED)
 - Looks up user emails from Auth0
 - Uses GCS-based distributed lock to prevent concurrent executions
@@ -32,11 +32,13 @@ gcloud run jobs create autodiscovery-send-emails-dev \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
-  --update-secrets=SMTP_USERNAME=smtp-username:latest,SMTP_PASSWORD=smtp-password:latest \
+  --network main \
+  --subnet us-west1 \
+  --vpc-egress private-ranges-only \
   --task-timeout 29m \
   --max-retries 0 \
   --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--userid,auth0|EXAMPLE_USER_ID"
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--max-age-hours,8,--userid,auth0|EXAMPLE_USER_ID"
 ```
 
 **Note:** The dev job includes `--userid` to limit emails to a single test user, preventing accidental spam to all users during development.
@@ -48,45 +50,28 @@ gcloud run jobs create autodiscovery-send-emails-prod \
   --region us-west1 \
   --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
-  --update-secrets=SMTP_USERNAME=smtp-username:latest,SMTP_PASSWORD=smtp-password:latest \
+  --network main \
+  --subnet us-west1 \
+  --vpc-egress private-ranges-only \
   --task-timeout 29m \
   --max-retries 0 \
   --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock"
+  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--max-age-hours,8"
 ```
 
-**SMTP Configuration:**
-The jobs use Gmail SMTP relay for sending emails. Credentials are stored in GCP Secrets Manager:
-- `smtp-username`: Gmail/Google Workspace email address
-- `smtp-password`: App password for authentication
+**Network Configuration:**
+The jobs use Direct VPC egress to connect to the internal AI2 mail server (smtp.example.com):
+- `--network main`: Connects to the main VPC network which has VPN routes to AI2 infrastructure
+- `--subnet us-west1`: Uses the us-west1 subnet (192.0.2.0/20)
+- `--vpc-egress private-ranges-only`: Routes only private IP traffic through VPC (mail server at 192.0.2.10)
 
-To grant the service account access to these secrets:
-```bash
-gcloud secrets add-iam-policy-binding smtp-username \
-  --member="serviceAccount:example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=example-legacy-project
+The mail server does not require authentication when accessed from the VPC.
 
-gcloud secrets add-iam-policy-binding smtp-password \
-  --member="serviceAccount:example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=example-legacy-project
-```
+### Schedule (Production only)
 
-### Schedule (every 30 minutes)
+**Note:** Only production jobs are scheduled. Development jobs are run manually to avoid duplicate email notifications.
 
-**Development environment:**
-```bash
-gcloud scheduler jobs create http autodiscovery-send-emails-schedule-dev \
-  --location us-west1 \
-  --schedule "*/30 * * * *" \
-  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails-dev:run" \
-  --http-method POST \
-  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
-```
-
-**Production environment:**
+**Production schedule (every 30 minutes):**
 ```bash
 gcloud scheduler jobs create http autodiscovery-send-emails-schedule-prod \
   --location us-west1 \
@@ -193,20 +178,11 @@ gcloud run jobs create autodiscovery-dataset-cleanup-prod \
   --args "run,python,scripts/cleanup_old_datasets.py"
 ```
 
-### Schedule with Cloud Scheduler
+### Schedule (Production only)
 
-**Development environment:**
-```bash
-gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule-dev \
-  --location us-west1 \
-  --schedule "0 2 * * *" \
-  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup-dev:run" \
-  --http-method POST \
-  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
-```
+**Note:** Only production jobs are scheduled. Development jobs are run manually to avoid duplicate operations.
 
-**Production environment:**
+**Production schedule (daily at 2 AM):**
 ```bash
 gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule-prod \
   --location us-west1 \
@@ -216,8 +192,6 @@ gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule-prod \
   --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
   --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
 ```
-
-This runs daily at 2 AM.
 
 ### Updating Jobs to Use New Images
 

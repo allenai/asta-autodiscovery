@@ -23,66 +23,9 @@ uv run python scripts/send_completion_emails.py --dry-run
 uv run python scripts/send_completion_emails.py --userid "google-oauth2|123" --dry-run
 ```
 
-### Cloud Run Job Setup
+### Cloud Run Setup
 
-**Development environment:**
-```bash
-gcloud run jobs create autodiscovery-send-emails-dev \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
-  --region us-west1 \
-  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
-  --network main \
-  --subnet us-west1 \
-  --vpc-egress private-ranges-only \
-  --task-timeout 29m \
-  --max-retries 0 \
-  --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--max-age-hours,8,--userid,auth0|EXAMPLE_USER_ID"
-```
-
-**Note:** The dev job includes `--userid` to limit emails to a single test user, preventing accidental spam to all users during development.
-
-**Production environment:**
-```bash
-gcloud run jobs create autodiscovery-send-emails-prod \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
-  --region us-west1 \
-  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --set-env-vars "AUTH0_MGMT_CLIENT_ID=${AUTH0_MGMT_CLIENT_ID},AUTH0_MGMT_CLIENT_SECRET=${AUTH0_MGMT_CLIENT_SECRET}" \
-  --network main \
-  --subnet us-west1 \
-  --vpc-egress private-ranges-only \
-  --task-timeout 29m \
-  --max-retries 0 \
-  --command "uv" \
-  --args "run,python,scripts/send_completion_emails.py,--acquire-lock,--max-age-hours,8"
-```
-
-**Network Configuration:**
-The jobs use Direct VPC egress to connect to the internal AI2 mail server (smtp.example.com):
-- `--network main`: Connects to the main VPC network which has VPN routes to AI2 infrastructure
-- `--subnet us-west1`: Uses the us-west1 subnet (192.0.2.0/20)
-- `--vpc-egress private-ranges-only`: Routes only private IP traffic through VPC (mail server at 192.0.2.10)
-
-The mail server does not require authentication when accessed from the VPC.
-
-### Schedule (Production only)
-
-**Note:** Only production jobs are scheduled. Development jobs are run manually to avoid duplicate email notifications.
-
-**Production schedule (every 30 minutes):**
-```bash
-gcloud scheduler jobs create http autodiscovery-send-emails-schedule-prod \
-  --location us-west1 \
-  --schedule "*/30 * * * *" \
-  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-send-emails-prod:run" \
-  --http-method POST \
-  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
-```
-
-The `--acquire-lock` flag uses a GCS-based lock so overlapping scheduled runs exit cleanly.
+See [INFRASTRUCTURE.md](../INFRASTRUCTURE.md) for Cloud Run job and scheduler creation commands.
 
 ---
 
@@ -106,6 +49,10 @@ uv run python scripts/cleanup_old_datasets.py
 # Custom age
 uv run python scripts/cleanup_old_datasets.py --max-age-days 3
 ```
+
+### Cloud Run Setup
+
+See [INFRASTRUCTURE.md](../INFRASTRUCTURE.md) for Cloud Run job and scheduler creation commands.
 
 ## Docker Images
 
@@ -149,88 +96,3 @@ docker push us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodis
 
 Note: `--platform linux/amd64` is required for Cloud Run compatibility (especially when building on Apple Silicon).
 
-## Cloud Run Job Setup
-
-**Setup your environment:**
-```bash
-export CLOUDSDK_CORE_PROJECT=example-legacy-project
-```
-
-### Create Cloud Run Job
-
-**Development environment:**
-```bash
-gcloud run jobs create autodiscovery-dataset-cleanup-dev \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
-  --region us-west1 \
-  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --command "uv" \
-  --args "run,python,scripts/cleanup_old_datasets.py"
-```
-
-**Production environment:**
-```bash
-gcloud run jobs create autodiscovery-dataset-cleanup-prod \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
-  --region us-west1 \
-  --service-account example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --command "uv" \
-  --args "run,python,scripts/cleanup_old_datasets.py"
-```
-
-### Schedule (Production only)
-
-**Note:** Only production jobs are scheduled. Development jobs are run manually to avoid duplicate operations.
-
-**Production schedule (daily at 2 AM):**
-```bash
-gcloud scheduler jobs create http autodiscovery-dataset-cleanup-schedule-prod \
-  --location us-west1 \
-  --schedule "0 2 * * *" \
-  --uri "https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/example-legacy-project/jobs/autodiscovery-dataset-cleanup-prod:run" \
-  --http-method POST \
-  --oauth-service-account-email example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com \
-  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform"
-```
-
-### Updating Jobs to Use New Images
-
-The GitHub Action automatically pushes new images when changes merge to `main` (`:dev` tag) or `env/prod` (`:prod` tag).
-
-After a new image is pushed, update the Cloud Run Job to force it to pull the latest image with that tag:
-
-**Development environment:**
-```bash
-gcloud run jobs update autodiscovery-send-emails-dev \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
-  --region us-west1
-
-gcloud run jobs update autodiscovery-dataset-cleanup-dev \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev \
-  --region us-west1
-```
-
-**Production environment:**
-```bash
-gcloud run jobs update autodiscovery-send-emails-prod \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
-  --region us-west1
-
-gcloud run jobs update autodiscovery-dataset-cleanup-prod \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:prod \
-  --region us-west1
-```
-
-## Required Permissions
-
-**`example-gcp-project-dev@example-legacy-project.iam.gserviceaccount.com`** is used for:
-- Running scheduled Cloud Run Jobs (job runtime identity)
-- Pushing images to Artifact Registry (via GitHub Actions)
-- Invoking Cloud Run Jobs (via Cloud Scheduler)
-- Updating Cloud Run Jobs (via GitHub Actions, optional)
-
-It needs:
-- `roles/storage.objectAdmin` - for GCS operations (list/delete)
-- `roles/artifactregistry.writer` - for pushing images to Artifact Registry
-- `roles/run.invoker` - for Cloud Scheduler to invoke the job
-- `roles/run.developer` - (optional) for GitHub Actions to auto-update jobs after pushing new images

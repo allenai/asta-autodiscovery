@@ -16,7 +16,7 @@ DEFAULT_SMTP_SERVER = "smtp-relay.gmail.com"
 DEFAULT_SMTP_PORT = 587
 
 # Default sender email
-DEFAULT_SENDER_EMAIL = "no-reply@asta.allenai.org"
+DEFAULT_SENDER_EMAIL = "no-reply@allenai.org"
 
 
 def send_email(

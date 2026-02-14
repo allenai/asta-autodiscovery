@@ -426,8 +426,7 @@ function RunViewContent({
                             side="right"
                             dragWidthPx={runPanelWidthPx ?? undefined}
                             minWidthPx={300}
-                            onDragMove={(widthPx) => setRunPanelWidthPx(widthPx)}
-                            onDragEnd={(widthPx) => setRunPanelWidthPx(widthPx)}
+                            onWidthPxChange={setRunPanelWidthPx}
                         />
                     )}
                 </RunPanel>
@@ -463,8 +462,7 @@ function RunViewContent({
                                 side="left"
                                 dragWidthPx={experimentPanelWidthPx ?? undefined}
                                 minWidthPx={300}
-                                onDragMove={(widthPx) => setExperimentPanelWidthPx(widthPx)}
-                                onDragEnd={(widthPx) => setExperimentPanelWidthPx(widthPx)}
+                                onWidthPxChange={setExperimentPanelWidthPx}
                             />
                         )}
                     </ExperimentPanel>

@@ -4,12 +4,13 @@ import debounce from 'lodash.debounce';
 
 import { scrollbarStyles } from '@/utils/scrollbar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { width } from '@mui/system';
 
 interface UsePanelWidthPxResult {
     widthPx: number | null;
     setWidthPx: (widthPx: number | null | ((prevWidthPx: number | null) => number | null)) => void;
 }
+
+const MS_PER_FRAME = Math.floor(1000 / 60);
 
 export const PanelGroup = ({ children }: { children: React.ReactNode }) => {
     return (
@@ -21,59 +22,58 @@ export const PanelGroup = ({ children }: { children: React.ReactNode }) => {
 
 export const PanelDragHandle = ({
     side,
-    onDragMove,
-    onDragEnd,
+    onWidthPxChange,
     dragWidthPx,
     minWidthPx,
 }: {
     side: 'left' | 'right';
-    onDragMove: (deltaX: number) => void;
-    onDragEnd: (widthPx: number) => void;
+    onWidthPxChange: (widthPx: number) => void;
     dragWidthPx?: number;
     minWidthPx?: number;
 }) => {
-    const widthPxRef = useRef(dragWidthPx ?? 0);
-    useEffect(() => {
-        widthPxRef.current = dragWidthPx ?? 0;
-    }, [dragWidthPx]);
+    const startMouseXRef = useRef<number | null>(null);
+    const startWidthPxRef = useRef<number | null>(null);
 
-    const onDragMoveRef = useRef(onDragMove);
+    const calcWidthPxRef = useRef((e: MouseEvent) => {
+        const deltaX = e.clientX - startMouseXRef.current!;
+        let newWidthPx =
+            side === 'left' ? startWidthPxRef.current! - deltaX : startWidthPxRef.current! + deltaX;
+        return Math.max(minWidthPx ?? 0, newWidthPx);
+    });
+
+    const onDragMoveRef = useRef(onWidthPxChange);
     useEffect(() => {
-        onDragMoveRef.current = onDragMove;
-    }, [onDragMove]);
+        onDragMoveRef.current = onWidthPxChange;
+    }, [onWidthPxChange]);
 
     const reportMoveDebouncedRef = useRef(
         debounce(
             (widthPx: number) => {
                 onDragMoveRef.current(widthPx);
             },
-            16,
-            { leading: true, trailing: true, maxWait: 16 }
+            MS_PER_FRAME,
+            { leading: true, trailing: true, maxWait: MS_PER_FRAME }
         )
     );
 
     const onMouseMoveRef = useRef((e: MouseEvent) => {
         e.preventDefault();
-        const deltaX = side === 'left' ? -e.movementX : e.movementX;
-        const newWidthPx = widthPxRef.current + deltaX;
-        widthPxRef.current =
-            minWidthPx !== undefined ? Math.max(minWidthPx, newWidthPx) : newWidthPx;
-        reportMoveDebouncedRef.current(widthPxRef.current);
+        const newWidthPx = calcWidthPxRef.current(e);
+        reportMoveDebouncedRef.current(newWidthPx);
     });
 
     const onMouseUpRef = useRef((e: MouseEvent) => {
         e.preventDefault();
         document.documentElement.removeEventListener('mousemove', onMouseMoveRef.current);
         document.documentElement.removeEventListener('mouseup', onMouseUpRef.current);
-        const deltaX = side === 'left' ? -e.movementX : e.movementX;
-        const newWidthPx = widthPxRef.current + deltaX;
-        widthPxRef.current =
-            minWidthPx !== undefined ? Math.max(minWidthPx, newWidthPx) : newWidthPx;
-        onDragEnd(widthPxRef.current);
+        const newWidthPx = calcWidthPxRef.current(e);
+        reportMoveDebouncedRef.current(newWidthPx);
     });
 
     const onMouseDown = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
+        startMouseXRef.current = e.clientX;
+        startWidthPxRef.current = dragWidthPx ?? 0;
 
         document.documentElement.addEventListener('mousemove', onMouseMoveRef.current);
         document.documentElement.addEventListener('mouseup', onMouseUpRef.current);

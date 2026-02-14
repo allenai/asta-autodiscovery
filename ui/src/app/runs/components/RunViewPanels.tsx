@@ -1,14 +1,9 @@
 import { styled } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import debounce from 'lodash.debounce';
-
-import { scrollbarStyles } from '@/utils/scrollbar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-interface UsePanelWidthPxResult {
-    widthPx: number | null;
-    setWidthPx: (widthPx: number | null | ((prevWidthPx: number | null) => number | null)) => void;
-}
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 const MS_PER_FRAME = Math.floor(1000 / 60);
 
@@ -36,20 +31,29 @@ export const PanelDragHandle = ({
 
     const calcWidthPxRef = useRef((e: MouseEvent) => {
         const deltaX = e.clientX - startMouseXRef.current!;
-        let newWidthPx =
+        const newWidthPx =
             side === 'left' ? startWidthPxRef.current! - deltaX : startWidthPxRef.current! + deltaX;
-        return Math.max(minWidthPx ?? 0, newWidthPx);
+        const result = Math.max(minWidthPx ?? 0, newWidthPx);
+        console.log({
+            startX: startMouseXRef.current,
+            clientX: e.clientX,
+            deltaX,
+            newWidthPx,
+            result,
+        });
+        return result;
     });
 
-    const onDragMoveRef = useRef(onWidthPxChange);
+    // Save latest onWidthPxChange in ref
+    const onWidthPxChangeRef = useRef(onWidthPxChange);
     useEffect(() => {
-        onDragMoveRef.current = onWidthPxChange;
+        onWidthPxChangeRef.current = onWidthPxChange;
     }, [onWidthPxChange]);
 
     const reportMoveDebouncedRef = useRef(
         debounce(
             (widthPx: number) => {
-                onDragMoveRef.current(widthPx);
+                onWidthPxChangeRef.current(widthPx);
             },
             MS_PER_FRAME,
             { leading: true, trailing: true, maxWait: MS_PER_FRAME }
@@ -70,14 +74,17 @@ export const PanelDragHandle = ({
         reportMoveDebouncedRef.current(newWidthPx);
     });
 
-    const onMouseDown = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        startMouseXRef.current = e.clientX;
-        startWidthPxRef.current = dragWidthPx ?? 0;
+    const onMouseDown = useCallback(
+        (e: React.MouseEvent) => {
+            e.preventDefault();
+            startMouseXRef.current = e.clientX;
+            startWidthPxRef.current = dragWidthPx ?? 0;
 
-        document.documentElement.addEventListener('mousemove', onMouseMoveRef.current);
-        document.documentElement.addEventListener('mouseup', onMouseUpRef.current);
-    }, []);
+            document.documentElement.addEventListener('mousemove', onMouseMoveRef.current);
+            document.documentElement.addEventListener('mouseup', onMouseUpRef.current);
+        },
+        [dragWidthPx]
+    );
 
     useEffect(() => {
         return () => {
@@ -101,7 +108,7 @@ const getWidthFromStorage = (key: string): number | null => {
 export const usePanelWidthPx = (
     key: string,
     initialWidthPx: number | null
-): UsePanelWidthPxResult => {
+): [number | null, React.Dispatch<React.SetStateAction<number | null>>] => {
     const [widthPx, setWidthPx] = useState<number | null>(
         getWidthFromStorage(key) ?? initialWidthPx
     );
@@ -134,8 +141,7 @@ export const usePanelWidthPx = (
         };
     }, [key, widthPx]);
 
-    const result = useMemo(() => ({ widthPx, setWidthPx }), [widthPx, setWidthPx]);
-    return result;
+    return useMemo(() => [widthPx, setWidthPx], [widthPx, setWidthPx]);
 };
 
 export const PanelsContainer = styled('div')`
@@ -175,11 +181,10 @@ export const Background = styled('div')`
     }
 `;
 
-export const RunPanel = styled('div')<{ $isExpanded: boolean; $dragWidthPx: number | null }>`
+export const RunPanel = styled('div')<{ $dragWidthPx: number | null }>`
     flex: 0 1 auto;
     min-width: 0;
-    width: ${({ $isExpanded, $dragWidthPx }) =>
-        $isExpanded ? '100%' : $dragWidthPx ? `${$dragWidthPx}px` : '700px'};
+    width: ${({ $dragWidthPx }) => ($dragWidthPx ? `${$dragWidthPx}px` : '700px')};
     background-color: #163638f3;
     border-radius: 12px;
     display: flex;

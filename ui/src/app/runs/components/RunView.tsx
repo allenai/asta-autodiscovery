@@ -16,7 +16,6 @@ import {
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutlined';
-import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
@@ -49,9 +48,6 @@ import {
     PanelDragHandle,
     usePanelWidthPx,
 } from '@/runs/components/RunViewPanels';
-
-const RUN_PANEL_WIDTH_STORAGE_KEY = 'runPanelWidthRun';
-const EXPERIMENT_PANEL_WIDTH_STORAGE_KEY = 'experimentPanelWidthRun';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -220,17 +216,12 @@ function RunViewContent({
         isLoading: isLoadingExperiments,
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
-    const [isRunPanelExpanded, setIsRunPanelExpanded] = useState(false);
-    const [isExperimentPanelExpanded, setIsExperimentPanelExpanded] = useState(false);
+    const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
     const { addSuccessToast, addErrorToast } = useToasts();
 
-    const { widthPx: runPanelWidthPx, setWidthPx: setRunPanelWidthPx } = usePanelWidthPx(
-        'runPanelWidthRun',
-        700
-    );
-    const { widthPx: experimentPanelWidthPx, setWidthPx: setExperimentPanelWidthPx } =
-        usePanelWidthPx('experimentPanelWidthRun', 500);
+    const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
+    const [expPanelWidthPx, setExpPanelWidthPx] = usePanelWidthPx('expPanelWidthPx', 500);
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
@@ -309,7 +300,7 @@ function RunViewContent({
                         <ExperimentGraph />
                     </Background>
                 )}
-                <RunPanel $isExpanded={isRunPanelExpanded} $dragWidthPx={runPanelWidthPx}>
+                <RunPanel $dragWidthPx={runPanelWidthPx}>
                     <RunHeader>
                         <Box>
                             <RunHeaderName>{run.name}</RunHeaderName>
@@ -356,16 +347,6 @@ function RunViewContent({
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
-                        <LargeScreenAction>
-                            <RunHeaderExpandButton
-                                onClick={() => setIsRunPanelExpanded(!isRunPanelExpanded)}>
-                                {isRunPanelExpanded ? (
-                                    <CloseFullscreenOutlinedIcon />
-                                ) : (
-                                    <OpenInFullOutlinedIcon />
-                                )}
-                            </RunHeaderExpandButton>
-                        </LargeScreenAction>
                     </RunHeader>
 
                     <RunContent>
@@ -421,28 +402,24 @@ function RunViewContent({
 
                         <ExperimentsTable runStats={run.stats} />
                     </RunContent>
-                    {!isRunPanelExpanded && (
-                        <PanelDragHandle
-                            side="right"
-                            dragWidthPx={runPanelWidthPx ?? undefined}
-                            minWidthPx={300}
-                            onWidthPxChange={setRunPanelWidthPx}
-                        />
-                    )}
+                    <PanelDragHandle
+                        side="right"
+                        dragWidthPx={runPanelWidthPx ?? undefined}
+                        minWidthPx={300}
+                        onWidthPxChange={setRunPanelWidthPx}
+                    />
                 </RunPanel>
 
                 {!!selectedExperiment && (
                     <ExperimentPanel
-                        $isExpanded={isExperimentPanelExpanded}
-                        $dragWidthPx={experimentPanelWidthPx}>
+                        $isExpanded={isExpPanelExpanded}
+                        $dragWidthPx={expPanelWidthPx}>
                         <ExperimentActions>
                             <LargeScreenAction>
                                 <ExperimentActionButton
-                                    onClick={() =>
-                                        setIsExperimentPanelExpanded(!isExperimentPanelExpanded)
-                                    }
+                                    onClick={() => setIsExpPanelExpanded(!isExpPanelExpanded)}
                                     size="small">
-                                    {isExperimentPanelExpanded ? (
+                                    {isExpPanelExpanded ? (
                                         <CloseFullscreenOutlinedIcon />
                                     ) : (
                                         <OpenInFullOutlinedIcon />
@@ -450,19 +427,22 @@ function RunViewContent({
                                 </ExperimentActionButton>
                             </LargeScreenAction>
                             <ExperimentActionButton
-                                onClick={() => selectExperiment(null)}
+                                onClick={() => {
+                                    selectExperiment(null);
+                                    setIsExpPanelExpanded(false);
+                                }}
                                 size="small"
                                 {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />
                             </ExperimentActionButton>
                         </ExperimentActions>
                         <ExperimentDetails experiment={selectedExperiment} />
-                        {!isExperimentPanelExpanded && (
+                        {!isExpPanelExpanded && (
                             <PanelDragHandle
                                 side="left"
-                                dragWidthPx={experimentPanelWidthPx ?? undefined}
+                                dragWidthPx={expPanelWidthPx ?? undefined}
                                 minWidthPx={300}
-                                onWidthPxChange={setExperimentPanelWidthPx}
+                                onWidthPxChange={setExpPanelWidthPx}
                             />
                         )}
                     </ExperimentPanel>
@@ -534,10 +514,6 @@ const RunContent = styled(Box)`
     @container run-view (width < 500px) {
         padding: ${({ theme }) => theme.spacing(0.5)};
     }
-`;
-
-const RunHeaderExpandButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
 `;
 
 const ExperimentCount = styled('div')`

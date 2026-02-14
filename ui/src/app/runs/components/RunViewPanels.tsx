@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { scrollbarStyles } from '@/utils/scrollbar';
 
 const MS_PER_FRAME = Math.floor(1000 / 60);
+const SAVE_DEBOUNCE_MS = 500;
 
 export const PanelGroup = ({ children }: { children: React.ReactNode }) => {
     return (
@@ -43,20 +44,22 @@ export const PanelDragHandle = ({
         onWidthPxChangeRef.current = onWidthPxChange;
     }, [onWidthPxChange]);
 
-    const reportMoveDebouncedRef = useRef(
-        debounce(
-            (widthPx: number) => {
-                onWidthPxChangeRef.current(widthPx);
-            },
-            MS_PER_FRAME,
-            { leading: true, trailing: true, maxWait: MS_PER_FRAME }
-        )
+    const reportMoveDebounced = useMemo(
+        () =>
+            debounce(
+                (widthPx: number) => {
+                    onWidthPxChangeRef.current(widthPx);
+                },
+                MS_PER_FRAME,
+                { leading: true, trailing: true, maxWait: MS_PER_FRAME }
+            ),
+        [onWidthPxChangeRef]
     );
 
     const onMouseMoveRef = useRef((e: MouseEvent) => {
         e.preventDefault();
         const newWidthPx = calcWidthPxRef.current(e);
-        reportMoveDebouncedRef.current(newWidthPx);
+        reportMoveDebounced(newWidthPx);
     });
 
     const onMouseUpRef = useRef((e: MouseEvent) => {
@@ -64,7 +67,7 @@ export const PanelDragHandle = ({
         document.documentElement.removeEventListener('mousemove', onMouseMoveRef.current);
         document.documentElement.removeEventListener('mouseup', onMouseUpRef.current);
         const newWidthPx = calcWidthPxRef.current(e);
-        reportMoveDebouncedRef.current(newWidthPx);
+        reportMoveDebounced(newWidthPx);
     });
 
     const onMouseDown = useCallback(
@@ -90,10 +93,14 @@ export const PanelDragHandle = ({
 };
 
 const getWidthFromStorage = (key: string): number | null => {
-    const stored = localStorage.getItem(key);
-    const widthPx = stored ? parseInt(stored, 10) : null;
-    if (widthPx && !isNaN(widthPx)) {
-        return widthPx;
+    try {
+        const stored = localStorage.getItem(key);
+        const widthPx = stored ? parseInt(stored, 10) : null;
+        if (widthPx !== null && !isNaN(widthPx)) {
+            return widthPx;
+        }
+    } catch {
+        // may throw in privacy mode
     }
     return null;
 };
@@ -103,13 +110,13 @@ export const usePanelWidthPx = (
     initialWidthPx: number | null
 ): [number | null, React.Dispatch<React.SetStateAction<number | null>>] => {
     const [widthPx, setWidthPx] = useState<number | null>(
-        getWidthFromStorage(key) ?? initialWidthPx
+        () => getWidthFromStorage(key) ?? initialWidthPx
     );
 
     // Update if key changes
     useEffect(() => {
         const widthPx = getWidthFromStorage(key);
-        if (widthPx) {
+        if (widthPx !== null) {
             setWidthPx(widthPx);
         }
     }, [key]);
@@ -127,7 +134,7 @@ export const usePanelWidthPx = (
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             saveWidthPxToStorage.current(key, widthPx);
-        }, 0);
+        }, SAVE_DEBOUNCE_MS);
         return () => {
             clearTimeout(timeoutId);
             saveWidthPxToStorage.current(key, widthPx);
@@ -174,10 +181,10 @@ export const Background = styled('div')`
     }
 `;
 
-export const RunPanel = styled('div')<{ $dragWidthPx: number | null }>`
+export const RunPanel = styled('div')`
     flex: 0 1 auto;
     min-width: 0;
-    width: ${({ $dragWidthPx }) => ($dragWidthPx ? `${$dragWidthPx}px` : '700px')};
+    width: var(--run-panel-width, 700px);
     background-color: #163638f3;
     border-radius: 12px;
     display: flex;
@@ -200,10 +207,10 @@ export const RunPanel = styled('div')<{ $dragWidthPx: number | null }>`
     }
 `;
 
-export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $dragWidthPx: number | null }>`
+export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
     flex: 0 1 auto;
-    max-width: ${({ $isExpanded, $dragWidthPx }) =>
-        $isExpanded ? 'initial' : $dragWidthPx ? `${$dragWidthPx}px` : '500px'};
+    max-width: ${({ $isExpanded }) =>
+        $isExpanded ? 'initial' : 'var(--experiment-panel-width, 500px)'};
     background-color: #163638f3;
     border-radius: 12px;
     position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
@@ -257,6 +264,7 @@ const DragHandle = styled('div')<{ $side: 'left' | 'right' }>`
     &:after {
         content: '';
         position: fixed;
+        will-change: transform;
         top: 50%;
         width: 5px;
         height: 40px;

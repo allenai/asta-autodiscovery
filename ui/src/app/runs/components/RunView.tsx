@@ -301,7 +301,12 @@ function RunViewContent({
                         <ExperimentGraph />
                     </Background>
                 )}
-                <RunPanel $dragWidthPx={runPanelWidthPx}>
+                <RunPanel
+                    style={
+                        {
+                            '--run-panel-width': runPanelWidthPx ? `${runPanelWidthPx}px` : '700px',
+                        } as React.CSSProperties
+                    }>
                     <RunHeader>
                         <Box>
                             <RunHeaderName>{run.name}</RunHeaderName>
@@ -416,7 +421,13 @@ function RunViewContent({
                 {!!selectedExperiment && (
                     <ExperimentPanel
                         $isExpanded={isExpPanelExpanded}
-                        $dragWidthPx={expPanelWidthPx}>
+                        style={
+                            {
+                                '--experiment-panel-width': expPanelWidthPx
+                                    ? `${expPanelWidthPx}px`
+                                    : '500px',
+                            } as React.CSSProperties
+                        }>
                         <ExperimentActions>
                             <LargeScreenAction>
                                 <ExperimentActionButton

@@ -218,6 +218,7 @@ function RunViewContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
+    const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const { addSuccessToast, addErrorToast } = useToasts();
 
     const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
@@ -402,12 +403,14 @@ function RunViewContent({
 
                         <ExperimentsTable runStats={run.stats} />
                     </RunContent>
-                    <PanelDragHandle
-                        side="right"
-                        dragWidthPx={runPanelWidthPx ?? undefined}
-                        minWidthPx={300}
-                        onWidthPxChange={setRunPanelWidthPx}
-                    />
+                    {isDragEnabled && (
+                        <PanelDragHandle
+                            side="right"
+                            dragWidthPx={runPanelWidthPx ?? undefined}
+                            minWidthPx={300}
+                            onWidthPxChange={setRunPanelWidthPx}
+                        />
+                    )}
                 </RunPanel>
 
                 {!!selectedExperiment && (
@@ -437,7 +440,7 @@ function RunViewContent({
                             </ExperimentActionButton>
                         </ExperimentActions>
                         <ExperimentDetails experiment={selectedExperiment} />
-                        {!isExpPanelExpanded && (
+                        {!isExpPanelExpanded && isDragEnabled && (
                             <PanelDragHandle
                                 side="left"
                                 dragWidthPx={expPanelWidthPx ?? undefined}

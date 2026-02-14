@@ -34,13 +34,6 @@ export const PanelDragHandle = ({
         const newWidthPx =
             side === 'left' ? startWidthPxRef.current! - deltaX : startWidthPxRef.current! + deltaX;
         const result = Math.max(minWidthPx ?? 0, newWidthPx);
-        console.log({
-            startX: startMouseXRef.current,
-            clientX: e.clientX,
-            deltaX,
-            newWidthPx,
-            result,
-        });
         return result;
     });
 

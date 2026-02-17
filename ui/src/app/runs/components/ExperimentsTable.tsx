@@ -269,6 +269,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 slotProps={{
                     row: mkExperimentRowAttrs(),
                 }}
+                showToolbar={true}
             />
         </Wrapper>
     );
@@ -304,9 +305,13 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         },
     },
 
-    '.MuiDataGrid-columnHeaderTitle, .MuiDataGrid-columnHeader svg': {
+    '.MuiDataGrid-columnHeaderTitle, .MuiDataGrid-columnHeader svg, .MuiDataGrid-toolbar svg': {
         color: theme.color['green-40'].hex,
         fontWeight: 700,
+    },
+
+    '.MuiDataGrid-toolbar .MuiInputBase-input': {
+        color: theme.color['cream-100'].hex,
     },
 
     '.MuiDataGrid-footerContainer': {

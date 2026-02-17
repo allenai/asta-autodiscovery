@@ -54,7 +54,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
 
     const sortedRuns = useMemo(
         () =>
-            [...(viewerRuns ?? [])].sort((a, b) => {
+            Object.values(viewerRuns ?? {}).sort((a, b) => {
                 // First, sort by bookmarked status (bookmarked runs first)
                 const aBookmarked = a.metadata?.isBookmarked ?? false;
                 const bBookmarked = b.metadata?.isBookmarked ?? false;
@@ -88,14 +88,14 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
 
     const getIsRunBookmarked = () => {
         if (!menuRunId) return false;
-        const run = viewerRuns?.find((r) => r.id === menuRunId);
+        const run = viewerRuns?.[menuRunId];
         return run?.metadata?.isBookmarked ?? false;
     };
 
     const handleBookmark = async () => {
         if (!menuRunId) return;
 
-        const run = viewerRuns?.find((r) => r.id === menuRunId);
+        const run = viewerRuns?.[menuRunId];
         if (!run?.metadata) return;
 
         const newBookmarkStatus = !run.metadata.isBookmarked;
@@ -166,7 +166,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                         <RunSkeleton key={index} animation="wave" />
                     ))}
                 </SkeletonWrapper>
-            ) : viewerRuns?.length === 0 ? (
+            ) : Object.keys(viewerRuns ?? {}).length === 0 ? (
                 <Box sx={{ p: 2 }}>
                     <Typography
                         variant="body2"

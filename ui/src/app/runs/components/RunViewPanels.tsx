@@ -256,24 +256,31 @@ const DragHandle = styled('div')<{ $side: 'left' | 'right' }>`
     position: absolute;
     top: 0;
     bottom: 0;
-    ${({ $side }) => ($side === 'left' ? 'left: 0;' : 'right: 0;')}
-    width: 8px;
+    ${({ $side }) => ($side === 'left' ? 'left: 0px;' : 'right: 0px;')}
+    width: 10px;
     cursor: ew-resize;
     z-index: 3;
+    display: grid;
+    place-items: center;
+    opacity: 0.5;
+    transition:
+        opacity 0.2s ease-in-out,
+        background-color 0.2s ease-in-out;
 
     &:after {
         content: '';
-        position: fixed;
-        will-change: transform;
-        top: 50%;
-        width: 5px;
+        width: 4px;
         height: 40px;
         border-radius: 8px;
-        background-color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
-        transform: translateY(-50%);
+        background-color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
     }
 
-    &:hover {
-        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    &:hover,
+    &:active {
+        background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+        opacity: 1;
+        transition:
+            opacity 0s,
+            background-color 0s;
     }
 `;

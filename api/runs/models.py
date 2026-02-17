@@ -145,6 +145,11 @@ class MetadataModel(BaseModel):
         None, description="List of datasets associated with the run"
     )
 
+    # Bookmarking
+    is_bookmarked: bool | None = Field(
+        None, description="Whether the run is bookmarked (marked as interesting by the user)"
+    )
+
     # Sharing
     is_shared: bool | None = Field(
         None, description="Whether the run is shared (viewable by anyone). Missing means not shared."
@@ -179,6 +184,7 @@ class MetadataModel(BaseModel):
             intent=data.get("intent"),
             datasets=datasets,
             is_shared=data.get("is_shared"),
+            is_bookmarked=data.get("is_bookmarked"),
             n_experiments=data.get("n_experiments"),
             exploration_weight=data.get("exploration_weight"),
             mcts_selection=data.get("mcts_selection"),
@@ -398,6 +404,19 @@ class CancelRunResponseModel(BaseModel):
     """Model for the response when cancelling a run"""
 
     message: str = Field(..., description="Success message confirming cancellation")
+
+class BookmarkRunRequestModel(BaseModel):
+    """Model for the request to bookmark or unbookmark a run"""
+
+    runid: str = Field(..., description="Identifier of the run to bookmark/unbookmark")
+    userid: str = Field(..., description="User identifier who owns the run")
+    is_bookmarked: bool = Field(..., description="Whether to bookmark (true) or unbookmark (false) the run")
+
+class BookmarkRunResponseModel(BaseModel):
+    """Model for the response when bookmarking/unbookmarking a run"""
+
+    is_bookmarked: bool = Field(..., description="Updated bookmarked status")
+    message: str = Field(..., description="Success message")
 
 
 class ShareRunRequestModel(BaseModel):

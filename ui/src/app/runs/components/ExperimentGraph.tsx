@@ -54,6 +54,7 @@ type D3TreeNode = {
     prior: BeliefDistribution | null;
     posterior: BeliefDistribution | null;
     isSurprising: boolean;
+    idInRun: number;
 };
 
 type TreeNode = {
@@ -76,6 +77,7 @@ const toD3TreeNode = (exp: Experiment): D3TreeNode => ({
     prior: exp.priorBelief,
     posterior: exp.posteriorBelief,
     isSurprising: exp.isSurprising,
+    idInRun: exp.idInRun,
 });
 
 // Calculate node color based on surprisal
@@ -529,6 +531,23 @@ export const ExperimentGraph = () => {
                     selectExperiment(experiment);
                 }
             });
+
+        // Render text labels for idInRun
+        nodesG
+            .selectAll('text.node-label')
+            .data(nodes)
+            .join('text')
+            .attr('class', 'node-label')
+            .attr('x', (d) => d.xPos ?? 0)
+            .attr('y', (d) => d.yPos ?? 0)
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'middle')
+            .attr('fill', '#0f172a')
+            .attr('font-size', '12px')
+            .attr('font-weight', '600')
+            .attr('pointer-events', 'none')
+            .attr('opacity', (d) => (d.data.data.id === 'node_1_0' ? 0 : 1))
+            .text((d) => d.data.data.idInRun);
 
         // Set up zoom behavior
         const zoom = d3

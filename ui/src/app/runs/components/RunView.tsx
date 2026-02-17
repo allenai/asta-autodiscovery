@@ -12,7 +12,10 @@ import {
     ListItem,
     useMediaQuery,
     Link,
+    IconButton,
 } from '@mui/material';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutlined';
@@ -48,6 +51,8 @@ import {
     PanelDragHandle,
     usePanelWidthPx,
 } from '@/runs/components/RunViewPanels';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
+import { mkBookmarkRunBtnAttrs } from '@/analytics/run';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -71,6 +76,8 @@ interface RunViewProps {
  */
 export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
+    const { addSuccessToast, addErrorToast } = useToasts();
+    const { updateViewerRun } = useViewerRuns();
 
     const [run, setRun] = useState<Run | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -147,6 +154,46 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
         }
     };
 
+    const handleBookmark = useCallback(
+        async (newBookmarkStatus: boolean) => {
+            if (!run?.metadata) return;
+
+            // Optimistically update both local and global state
+            const updatedMetadata = {
+                ...run.metadata,
+                isBookmarked: newBookmarkStatus,
+            };
+
+            setRun({
+                ...run,
+                metadata: updatedMetadata,
+            });
+
+            try {
+                await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
+                updateViewerRun({ id: run.id, metadata: updatedMetadata });
+                addSuccessToast(
+                    newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks'
+                );
+            } catch (err) {
+                // Rollback on error
+                const rolledBackMetadata = {
+                    ...run.metadata,
+                    isBookmarked: !newBookmarkStatus,
+                };
+
+                setRun({
+                    ...run,
+                    metadata: rolledBackMetadata,
+                });
+
+                addErrorToast('Error updating bookmark status.');
+                throw err;
+            }
+        },
+        [run, api, setRun]
+    );
+
     // Run is read-only if viewing another user's run (userid prop is provided)
     const isReadOnly = !!userid;
     const canStop = !isReadOnly && run?.details?.status === 'RUNNING';
@@ -182,6 +229,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                 canStop={canStop}
                 cancelling={cancelling}
                 handleStop={handleStop}
+                handleBookmark={handleBookmark}
                 experimentsLabel={experimentsLabel}
                 isReadOnly={isReadOnly}
             />
@@ -195,6 +243,7 @@ interface RunViewContentProps {
     canStop: boolean;
     cancelling: boolean;
     handleStop: () => void;
+    handleBookmark: (newBookmarkStatus: boolean) => Promise<void>;
     experimentsLabel: string;
     isReadOnly: boolean;
 }
@@ -205,6 +254,7 @@ function RunViewContent({
     canStop,
     cancelling,
     handleStop,
+    handleBookmark,
     experimentsLabel,
     isReadOnly,
 }: RunViewContentProps) {
@@ -309,7 +359,24 @@ function RunViewContent({
                     }>
                     <RunHeader>
                         <Box>
-                            <RunHeaderName>{run.name}</RunHeaderName>
+                            <RunHeaderName>
+                                {!isReadOnly && (
+                                    <BookmarkButton
+                                        size="small"
+                                        onClick={() => handleBookmark(!run.metadata?.isBookmarked)}
+                                        {...mkBookmarkRunBtnAttrs({
+                                            runId: run.id,
+                                            isBookmarked: !run.metadata?.isBookmarked,
+                                        })}>
+                                        {run.metadata?.isBookmarked ? (
+                                            <BookmarkBorderOutlinedIcon />
+                                        ) : (
+                                            <BookmarkIcon />
+                                        )}
+                                    </BookmarkButton>
+                                )}
+                                {run.name}
+                            </RunHeaderName>
                             <RunHeaderSubtitle>
                                 <StyledListItem>
                                     {getRunStatusString(run.details, experiments)}
@@ -510,12 +577,24 @@ const RunHeader = styled('div')`
 
 const RunHeaderName = styled('h1')`
     color: ${({ theme }) => theme.color['green-100'].hex};
+    display: flex;
     font-family: 'PP Telegraf', Manrope, sans-serif;
     font-weight: 700;
     font-size: 20px;
+    gap: ${({ theme }) => theme.spacing(0.5)};
     line-height: 24px;
     margin: 0;
     flex: 1 1 auto;
+`;
+
+const BookmarkButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+    padding: 0;
+    transition: color 0.2s ease-in-out;
+
+    &:hover {
+        color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+    }
 `;
 
 const RunContent = styled(Box)`

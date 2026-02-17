@@ -14,6 +14,10 @@ export const mkRunListItemAttrs = (props: { runId: string }) =>
 export const mkDeleteRunBtnAttrs = (props: { runId: string }) =>
     mkTrackAttrs(`${SIDE_BAR_PREFIX}__delete-run-btn`, props);
 
+// Bookmark run button
+export const mkBookmarkRunBtnAttrs = (props: { runId: string; isBookmarked: boolean }) =>
+    mkTrackAttrs(`${SIDE_BAR_PREFIX}__bookmark-run-btn`, props);
+
 // Create new run button
 export const mkCreateNewRunBtnAttrs = () => mkTrackAttrs(`${SIDE_BAR_PREFIX}__create-run-btn`);
 

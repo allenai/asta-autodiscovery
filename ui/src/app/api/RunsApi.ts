@@ -30,6 +30,8 @@ export interface RunMetadataFromApi {
     }[];
     // Sharing
     is_shared?: boolean | null;
+    // Bookmarking
+    is_bookmarked?: boolean | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -123,6 +125,8 @@ export interface MetadataFromApi {
     datasets: MetadataDatasetFromApi[];
     // Sharing
     is_shared?: boolean | null;
+    // Bookmarking
+    is_bookmarked?: boolean | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -141,6 +145,11 @@ export interface GetRunMetadataResponseBody {
 export interface ShareRunResponseBody {
     runid: string;
     is_shared: boolean;
+}
+
+export interface BookmarkRunResponseBody {
+    runid: string;
+    is_bookmarked: boolean;
 }
 
 export interface GetSharedRunOwnerResponseBody {
@@ -312,6 +321,15 @@ export class RunsApi extends BaseApi {
         return this.request<GetSharedRunOwnerResponseBody>({
             url: `${RUNS_URL_PREFIX}/shared/${encodeURIComponent(runId)}/owner`,
             method: 'GET',
+        });
+    }
+
+    async bookmarkRun({ runId, isBookmarked }: { runId: string; isBookmarked: boolean }) {
+        const userid = await this.getUserId();
+        return this.request<BookmarkRunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/bookmark`,
+            method: 'POST',
+            body: { is_bookmarked: isBookmarked },
         });
     }
 }

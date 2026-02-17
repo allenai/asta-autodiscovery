@@ -77,9 +77,9 @@ interface RunViewProps {
 export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
     const { addSuccessToast, addErrorToast } = useToasts();
-    const { updateViewerRun } = useViewerRuns();
+    const { viewerRuns, addViewerRun, updateViewerRun } = useViewerRuns();
 
-    const [run, setRun] = useState<Run | null>(null);
+    const run = viewerRuns?.[runid] ?? null;
     const [isLoading, setIsLoading] = useState(true);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -92,9 +92,13 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
         try {
             // Pass userid (can be undefined for authenticated user's own runs)
             const response = await api.getRun({ userid, runId: runid });
-            const run = getRunFromApi(response.data);
+            const fetchedRun = getRunFromApi(response.data);
 
-            setRun(run);
+            if (viewerRuns?.[runid]) {
+                updateViewerRun(fetchedRun);
+            } else {
+                addViewerRun(fetchedRun);
+            }
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
@@ -158,40 +162,30 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
         async (newBookmarkStatus: boolean) => {
             if (!run?.metadata) return;
 
-            // Optimistically update both local and global state
             const updatedMetadata = {
                 ...run.metadata,
                 isBookmarked: newBookmarkStatus,
             };
 
-            setRun({
-                ...run,
-                metadata: updatedMetadata,
-            });
+            // Optimistically update context
+            updateViewerRun({ id: run.id, metadata: updatedMetadata });
 
             try {
                 await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
-                updateViewerRun({ id: run.id, metadata: updatedMetadata });
                 addSuccessToast(
                     newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks'
                 );
             } catch (err) {
                 // Rollback on error
-                const rolledBackMetadata = {
-                    ...run.metadata,
-                    isBookmarked: !newBookmarkStatus,
-                };
-
-                setRun({
-                    ...run,
-                    metadata: rolledBackMetadata,
+                updateViewerRun({
+                    id: run.id,
+                    metadata: { ...run.metadata, isBookmarked: !newBookmarkStatus },
                 });
-
                 addErrorToast('Error updating bookmark status.');
                 throw err;
             }
         },
-        [run, api, setRun]
+        [run, api, updateViewerRun]
     );
 
     // Run is read-only if viewing another user's run (userid prop is provided)
@@ -369,9 +363,9 @@ function RunViewContent({
                                             isBookmarked: !run.metadata?.isBookmarked,
                                         })}>
                                         {run.metadata?.isBookmarked ? (
-                                            <BookmarkBorderOutlinedIcon />
-                                        ) : (
                                             <BookmarkIcon />
+                                        ) : (
+                                            <BookmarkBorderOutlinedIcon />
                                         )}
                                     </BookmarkButton>
                                 )}

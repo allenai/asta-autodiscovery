@@ -269,6 +269,7 @@ const DragHandle = styled('div')<{ $side: 'left' | 'right' }>`
 
     &:after {
         content: '';
+        position: fixed;
         width: 4px;
         height: 40px;
         border-radius: 8px;

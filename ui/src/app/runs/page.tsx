@@ -105,7 +105,7 @@ const LoggedOutLayout = styled(Box)(({ theme }) => ({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    minHeight: '100vh',
+    minHeight: '100%',
     padding: theme.spacing(4),
     maxWidth: '900px',
     margin: '0 auto',

@@ -37,11 +37,12 @@ const Wrapper = styled(Box, {
     borderRadius: theme.spacing(1.5),
     color: theme.color['cream-100'].hex,
     fontSize: '1.125rem',
-    marginTop: $showLogin ? '72px' : 0,
+    marginTop: $showLogin ? '72px' : 'initial',
     padding: theme.spacing(4.5),
     container: 'intro-box / inline-size',
 
     '@media (max-width: 600px)': {
+        marginTop: $showLogin ? '48px' : 'initial',
         padding: theme.spacing(3),
     },
 }));

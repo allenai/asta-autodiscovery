@@ -2,8 +2,6 @@ import { Box, Typography, styled, Button } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
 
 import { filterTransientProps } from '@/utils/styledProps';
-import { lineHeight } from '@mui/system';
-import { line } from 'd3';
 
 interface IntroBoxProps {
     showLogin?: boolean;

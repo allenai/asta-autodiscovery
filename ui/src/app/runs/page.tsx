@@ -8,6 +8,7 @@ import { IntroBox } from '@/runs/components/IntroBox';
 import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
 import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
 import { ToS } from '@/components/ToS';
+import { AstaAdBanner } from '@/components/AstaAdBanner';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
@@ -31,46 +32,49 @@ export default function RunsPage() {
 
     if (!isAuthenticated) {
         return (
-            <LoggedOutLayout>
-                <Section>
-                    <IntroBox showLogin onLoginClick={loginWithRedirect} />
-                    <Attribution>
-                        AutoDiscovery is developed by{' '}
-                        <Ai2LogoWrapper
-                            href="https://allenai.org"
-                            target="_blank"
-                            rel="noopener noreferrer">
-                            <Image
-                                src="/ai2-logo.svg"
-                                alt="Ai2"
-                                width={50}
-                                height={16}
-                                style={{ display: 'block' }}
-                            />
-                        </Ai2LogoWrapper>{' '}
-                        and is an{' '}
-                        <AstaLabsLogoWrapper
-                            href="https://asta.example.com"
-                            target="_blank"
-                            rel="noopener noreferrer">
-                            <Image
-                                src="/astalabs-logo.svg"
-                                alt="AstaLabs"
-                                width={120.004}
-                                height={17}
-                                style={{ display: 'block', transform: 'translateY(-2px)' }}
-                            />
-                        </AstaLabsLogoWrapper>{' '}
-                        experiment.
-                    </Attribution>
-                </Section>
-                <Section>
-                    <ExamplesRunsBox />
-                </Section>
-                <FooterWrapper>
-                    <ToS />
-                </FooterWrapper>
-            </LoggedOutLayout>
+            <>
+                <LoggedOutLayout>
+                    <Section>
+                        <IntroBox showLogin onLoginClick={loginWithRedirect} />
+                        <Attribution>
+                            AutoDiscovery is developed by{' '}
+                            <Ai2LogoWrapper
+                                href="https://allenai.org"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                <Image
+                                    src="/ai2-logo.svg"
+                                    alt="Ai2"
+                                    width={50}
+                                    height={16}
+                                    style={{ display: 'block' }}
+                                />
+                            </Ai2LogoWrapper>{' '}
+                            and is an{' '}
+                            <AstaLabsLogoWrapper
+                                href="https://asta.example.com"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                <Image
+                                    src="/astalabs-logo.svg"
+                                    alt="AstaLabs"
+                                    width={120.004}
+                                    height={17}
+                                    style={{ display: 'block', transform: 'translateY(-2px)' }}
+                                />
+                            </AstaLabsLogoWrapper>{' '}
+                            experiment.
+                        </Attribution>
+                    </Section>
+                    <Section>
+                        <ExamplesRunsBox />
+                    </Section>
+                    <FooterWrapper>
+                        <ToS />
+                    </FooterWrapper>
+                </LoggedOutLayout>
+                <AstaAdBanner />
+            </>
         );
     }
 

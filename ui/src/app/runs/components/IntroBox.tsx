@@ -40,6 +40,10 @@ const Wrapper = styled(Box, {
     marginTop: $showLogin ? '72px' : 0,
     padding: theme.spacing(4.5),
     container: 'intro-box / inline-size',
+
+    '@media (max-width: 600px)': {
+        padding: theme.spacing(3),
+    },
 }));
 
 const Title = styled(Typography)(({ theme }) => ({
@@ -52,7 +56,7 @@ const Title = styled(Typography)(({ theme }) => ({
 
     '@container intro-box (width < 400px)': {
         fontSize: '14cqw',
-        lineHeight: '1.15',
+        lineHeight: '1.25',
     },
 }));
 
@@ -62,12 +66,7 @@ const Subtitle = styled(Typography)(() => ({
     fontSize: '24px',
     fontStyle: 'normal',
     fontWeight: 400,
-    lineHeight: '1.5',
-
-    '@container intro-box (width < 400px)': {
-        fontSize: '12cqw',
-        lineHeight: '1.1',
-    },
+    lineHeight: '1.2',
 }));
 
 const Description = styled(Typography)(({ theme }) => ({
@@ -77,11 +76,6 @@ const Description = styled(Typography)(({ theme }) => ({
     fontSize: '1.125rem',
     fontWeight: 400,
     lineHeight: '1.5',
-
-    '@container intro-box (width < 400px)': {
-        fontSize: '9cqw',
-        lineHeight: '1.3',
-    },
 }));
 
 const LoginButton = styled(Button)(({ theme }) => ({

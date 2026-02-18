@@ -79,6 +79,8 @@ const LayoutPills = styled('div')(({ theme }) => ({
 }));
 
 const Description = styled(Typography)(({ theme }) => ({
+    overflowWrap: 'anywhere',
+    textWrap: 'pretty',
     margin: 0,
     fontSize: '1rem',
     color: theme.color['cream-100'].hex,
@@ -86,6 +88,7 @@ const Description = styled(Typography)(({ theme }) => ({
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Title = styled('h3')(({ theme }) => ({
+    overflowWrap: 'anywhere',
     color: theme.color['cream-100'].hex,
     margin: 0,
     fontSize: '1.25rem',

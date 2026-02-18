@@ -109,6 +109,10 @@ const LoggedOutLayout = styled(Box)(({ theme }) => ({
     padding: theme.spacing(4),
     maxWidth: '900px',
     margin: '0 auto',
+
+    '@media (max-width: 600px)': {
+        padding: theme.spacing(2),
+    },
 }));
 
 const Section = styled(Box)(({ theme }) => ({

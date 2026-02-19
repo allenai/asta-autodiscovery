@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import { lighten } from '@mui/material/styles';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CloseIcon from '@mui/icons-material/Close';
 import Image from 'next/image';
 
 export const AstaAdBanner = () => {
@@ -12,6 +13,12 @@ export const AstaAdBanner = () => {
 
     useEffect(() => {
         const hasSeenBanner = localStorage.getItem('astaBannerSeen') === 'true';
+        const hasDismissedBanner = localStorage.getItem('astaBannerDismissed') === 'true';
+
+        // Don't show if user has dismissed it
+        if (hasDismissedBanner) {
+            return;
+        }
 
         if (hasSeenBanner) {
             // Already seen - show immediately without animation
@@ -27,6 +34,12 @@ export const AstaAdBanner = () => {
             return () => clearTimeout(timer);
         }
     }, []);
+
+    const handleClose = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        localStorage.setItem('astaBannerDismissed', 'true');
+        setShowBanner(false);
+    };
 
     return (
         <Box
@@ -48,6 +61,12 @@ export const AstaAdBanner = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '16px',
+                '@media (max-width: 600px)': {
+                    alignItems: 'flex-start',
+                    bottom: showBanner ? '0' : '-200px',
+                    width: '100%',
+                    borderRadius: '4px 4px 0 0',
+                },
                 '&:hover': {
                     backgroundColor: (theme) => lighten(theme.color['teal-100'].hex, 0.1),
                     '& .arrow-icon': {
@@ -55,8 +74,22 @@ export const AstaAdBanner = () => {
                     },
                 },
             }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                <Image src="/asta-logo.svg" alt="Asta" width={75} height={18} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <IconButton
+                    onClick={handleClose}
+                    sx={{
+                        color: (theme) => theme.color['cream-100'].hex,
+                        padding: '4px',
+                        flexShrink: 0,
+                        '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        },
+                    }}>
+                    <CloseIcon sx={{ fontSize: '20px' }} />
+                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <Image src="/asta-logo.svg" alt="Asta" width={75} height={18} />
+                </Box>
             </Box>
             <Typography
                 sx={{
@@ -76,6 +109,9 @@ export const AstaAdBanner = () => {
                     transition: 'color 250ms ease-out',
                     fontSize: '20px',
                     flexShrink: 0,
+                    '@media (max-width: 600px)': {
+                        display: 'none',
+                    },
                 }}
             />
         </Box>

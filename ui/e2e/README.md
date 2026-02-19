@@ -78,8 +78,7 @@ Tests the complete user workflow including:
 - Creating a new run
 - Uploading a data file
 - Submitting the run
-- Waiting for completion
-- Verifying results
+- Verifying the run is in progress
 
 **Required environment variables:**
 - `E2E_TEST_USER`: Test user email for Auth0 login
@@ -138,7 +137,7 @@ To run e2e tests in CI:
 
 The Playwright configuration is in `playwright.config.ts`. Key settings:
 
-- **baseURL**: `http://localhost:3000` (configurable via `E2E_BASE_URL`)
+- **baseURL**: `http://localhost:8080` (configurable via `E2E_BASE_URL`)
 - **Test timeout**: 30 seconds for most tests, 10 minutes for the authenticated flow
 - **Retries**: 2 in CI, 0 locally
 - **Browser**: Chromium (Desktop Chrome)
@@ -153,7 +152,7 @@ The Playwright configuration is in `playwright.config.ts`. Key settings:
 
 ### Authentication fails
 
-- Verify `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` are set correctly
+- Verify `E2E_TEST_USER` and `E2E_TEST_PASSWORD` are set correctly
 - Check that the test user exists in Auth0 and has the required permissions
 - Ensure the Auth0 configuration matches the application environment
 

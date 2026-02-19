@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Box, Typography, styled } from '@mui/material';
 
 import type { DailyMetrics } from '@/types/Metrics';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 interface CostBreakdownChartProps {
     timeSeries: DailyMetrics[];
@@ -189,6 +190,7 @@ const BarContainer = styled(Box)`
     align-items: flex-end;
     height: 140px;
     overflow-x: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;
 
 const DayColumn = styled(Box)`

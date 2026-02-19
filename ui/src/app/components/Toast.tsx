@@ -5,6 +5,7 @@ import { Alert, AlertTitle, IconButton, styled } from '@mui/material';
 import { useEffect, useState } from 'react';
 
 import { Toast as ToastModel, ToastType, useToasts } from '@/contexts/ToastsContext';
+import { filterTransientProps } from '@/utils/styledProps';
 
 type ToastProps = {
     toast: ToastModel;
@@ -56,7 +57,9 @@ export const Toast = ({ toast }: ToastProps) => {
     );
 };
 
-const StyledAlert = styled(Alert)<{ $isHidden: boolean }>`
+const StyledAlert = styled(Alert, {
+    shouldForwardProp: filterTransientProps,
+})<{ $isHidden: boolean }>`
     @keyframes slideIn {
         0% {
             transform: translate(-50%, -100%);

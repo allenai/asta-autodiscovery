@@ -240,9 +240,12 @@ def refresh_run_status(
 
         # Build update dict
         updates = {
-            "status": phase,
             "status_checked_at": datetime.now(UTC).isoformat(),
         }
+
+        if not run_details.is_finished:  # If already terminal, keep existing status to preserve terminal state (i.e. deleted, cancelled)
+            updates["status"] = phase
+
 
         if created_at:
             if isinstance(created_at, datetime):

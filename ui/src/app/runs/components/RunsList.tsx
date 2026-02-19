@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import {
-    Alert,
     Box,
     List,
     ListItem,
@@ -16,8 +15,9 @@ import {
     IconButton,
     Menu,
     MenuItem,
-    Snackbar,
 } from '@mui/material';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -28,7 +28,9 @@ import { useRouter } from 'next/navigation';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';
 import { getRunsApi } from '@/api/RunsApi';
-import { mkDeleteRunBtnAttrs, mkRunListItemAttrs } from '@/analytics/run';
+import { mkBookmarkRunBtnAttrs, mkDeleteRunBtnAttrs, mkRunListItemAttrs } from '@/analytics/run';
+import { scrollbarStyles } from '@/utils/scrollbar';
+import { useToasts } from '@/contexts/ToastsContext';
 
 interface RunsListProps {
     selectedRunId: string | null;
@@ -45,13 +47,22 @@ interface RunsListProps {
  * - Loading and error states
  */
 export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) {
-    const { viewerRuns, isViewerRunsLoading, removeViewerRun } = useViewerRuns();
+    const { viewerRuns, isViewerRunsLoading, removeViewerRun, updateViewerRun } = useViewerRuns();
+    const { addErrorToast, addSuccessToast } = useToasts();
     const router = useRouter();
     const api = getRunsApi();
 
     const sortedRuns = useMemo(
         () =>
-            [...(viewerRuns ?? [])].sort((a, b) => {
+            Object.values(viewerRuns ?? {}).sort((a, b) => {
+                // First, sort by bookmarked status (bookmarked runs first)
+                const aBookmarked = a.metadata?.isBookmarked ?? false;
+                const bBookmarked = b.metadata?.isBookmarked ?? false;
+                if (aBookmarked !== bBookmarked) {
+                    return bBookmarked ? 1 : -1; // bookmarked comes first
+                }
+
+                // Then sort by time (newest first)
                 const aTime = a.details?.statusCheckedAt || a.details?.createdAt || '';
                 const bTime = b.details?.statusCheckedAt || b.details?.createdAt || '';
                 return bTime.localeCompare(aTime); // descending (newest first)
@@ -62,7 +73,6 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [menuRunId, setMenuRunId] = useState<string | null>(null);
     const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, runId: string) => {
         event.preventDefault();
@@ -74,6 +84,46 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
     const handleMenuClose = () => {
         setMenuAnchorEl(null);
         setMenuRunId(null);
+    };
+
+    const getIsRunBookmarked = () => {
+        if (!menuRunId) return false;
+        const run = viewerRuns?.[menuRunId];
+        return run?.metadata?.isBookmarked ?? false;
+    };
+
+    const handleBookmark = async () => {
+        if (!menuRunId) return;
+
+        const run = viewerRuns?.[menuRunId];
+        if (!run?.metadata) return;
+
+        const newBookmarkStatus = !run.metadata.isBookmarked;
+        handleMenuClose();
+
+        // Optimistically update
+        updateViewerRun({
+            id: run.id,
+            metadata: {
+                ...run.metadata,
+                isBookmarked: newBookmarkStatus,
+            },
+        });
+
+        try {
+            await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
+            addSuccessToast(newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks');
+        } catch (err) {
+            // Rollback on error
+            updateViewerRun({
+                id: run.id,
+                metadata: {
+                    ...run.metadata,
+                    isBookmarked: !newBookmarkStatus,
+                },
+            });
+            addErrorToast('Error updating bookmark status');
+        }
     };
 
     const handleDelete = async () => {
@@ -91,14 +141,10 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                 router.push('/runs');
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete run');
+            addErrorToast(err instanceof Error ? err.message : 'Failed to delete run');
         } finally {
             setDeletingRunId(null);
         }
-    };
-
-    const handleCloseError = () => {
-        setError(null);
     };
 
     return (
@@ -120,7 +166,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                         <RunSkeleton key={index} animation="wave" />
                     ))}
                 </SkeletonWrapper>
-            ) : viewerRuns?.length === 0 ? (
+            ) : Object.keys(viewerRuns ?? {}).length === 0 ? (
                 <Box sx={{ p: 2 }}>
                     <Typography
                         variant="body2"
@@ -130,7 +176,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                     </Typography>
                 </Box>
             ) : (
-                <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                <ScrollableListContainer>
                     <SectionTitle>Your sessions</SectionTitle>
                     <List disablePadding>
                         {sortedRuns.map((run) => (
@@ -148,6 +194,11 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                                     <RunItemButton
                                         selected={selectedRunId === run.id}
                                         onClick={() => onSelectRun(run.id)}>
+                                        {run.metadata?.isBookmarked && (
+                                            <BookmarkButton>
+                                                <BookmarkIcon fontSize="small" />
+                                            </BookmarkButton>
+                                        )}
                                         <ListItemText
                                             primary={run.name || run.id}
                                             primaryTypographyProps={{
@@ -175,10 +226,26 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                             </ListItem>
                         ))}
                     </List>
-                </Box>
+                </ScrollableListContainer>
             )}
 
             <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
+                <MenuItem
+                    onClick={handleBookmark}
+                    {...(menuRunId &&
+                        mkBookmarkRunBtnAttrs({
+                            runId: menuRunId,
+                            isBookmarked: !getIsRunBookmarked(),
+                        }))}>
+                    <ListItemIcon>
+                        {getIsRunBookmarked() ? (
+                            <BookmarkBorderOutlinedIcon fontSize="small" />
+                        ) : (
+                            <BookmarkIcon fontSize="small" />
+                        )}
+                    </ListItemIcon>
+                    {getIsRunBookmarked() ? 'Unbookmark' : 'Bookmark'}
+                </MenuItem>
                 <MenuItem
                     onClick={handleDelete}
                     {...(menuRunId && mkDeleteRunBtnAttrs({ runId: menuRunId }))}>
@@ -188,18 +255,18 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
                     Delete
                 </MenuItem>
             </Menu>
-
-            <Snackbar open={Boolean(error)} autoHideDuration={6000} onClose={handleCloseError}>
-                <Alert onClose={handleCloseError} severity="error" sx={{ width: '100%' }}>
-                    {`Failed to delete run: ${error}`}
-                </Alert>
-            </Snackbar>
         </Box>
     );
 }
 
 const StyledDivider = styled(Divider)`
     border-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+`;
+
+const ScrollableListContainer = styled(Box)`
+    flex-grow: 1;
+    overflow: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;
 
 const SectionTitle = styled(Typography)`
@@ -248,4 +315,10 @@ const MenuButton = styled(IconButton)`
         color: ${({ theme }) => theme.color['cream-100'].hex};
         background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     }
+`;
+
+const BookmarkButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+    margin-right: ${({ theme }) => theme.spacing(0.5)};
+    padding: 0;
 `;

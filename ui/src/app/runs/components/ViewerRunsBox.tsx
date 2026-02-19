@@ -45,7 +45,7 @@ export const ViewerRunsBox = () => {
     const runsByBucket = useMemo(() => {
         const buckets: Record<string, Run[]> = {};
         if (viewerRuns) {
-            viewerRuns.forEach((run) => {
+            Object.values(viewerRuns).forEach((run) => {
                 const status = run.details?.status ?? RunStatus.UNKNOWN;
                 if (!buckets[status]) {
                     buckets[status] = [];
@@ -115,7 +115,7 @@ export const ViewerRunsBox = () => {
                     <CreateRunButton />
                 </div>
             </Header>
-            {viewerRuns && viewerRuns.length > 0 && (
+            {viewerRuns && Object.keys(viewerRuns).length > 0 && (
                 <Wrapper>
                     {Object.entries(runsByBucket).map(([bucket, runs]) => {
                         if (runs.length === 0) return null;
@@ -219,7 +219,7 @@ const Header = styled('div')(({ theme }) => ({
 }));
 
 const Wrapper = styled(Box)(({ theme }) => ({
-    backgroundColor: theme.color['cream-4'].rgba.toString(),
+    backgroundColor: '#162D31',
     color: theme.color['cream-100'].hex,
     fontSize: '1.125rem',
     padding: theme.spacing(2),

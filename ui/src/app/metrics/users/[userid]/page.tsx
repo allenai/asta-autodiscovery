@@ -8,6 +8,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { getMetricsApi } from '@/api/MetricsApi';
 import type { UserDetailMetrics } from '@/types/Metrics';
 import MetricCard from '../../components/MetricCard';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 const STATUS_COLORS: Record<string, string> = {
     SUCCEEDED: 'success',
@@ -177,6 +178,7 @@ const CardGrid = styled(Box)`
 
 const TableWrapper = styled(Box)`
     overflow-x: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;
 
 const StyledTable = styled('table')`

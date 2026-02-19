@@ -10,11 +10,12 @@ from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
-# Default SMTP server
+# Default SMTP server - Internal AI2 mail server
 DEFAULT_SMTP_SERVER = "smtp.example.com"
+DEFAULT_SMTP_PORT = 25
 
 # Default sender email
-DEFAULT_SENDER_EMAIL = "no-reply@asta.allenai.org"
+DEFAULT_SENDER_EMAIL = "no-reply@allenai.org"
 
 
 def send_email(
@@ -23,6 +24,7 @@ def send_email(
     body_html: str,
     sender_email: str = DEFAULT_SENDER_EMAIL,
     smtp_server: str = DEFAULT_SMTP_SERVER,
+    smtp_port: int = DEFAULT_SMTP_PORT,
 ) -> None:
     """Send an HTML email via SMTP.
 
@@ -32,6 +34,7 @@ def send_email(
         body_html: HTML email body
         sender_email: Sender email address
         smtp_server: SMTP server hostname
+        smtp_port: SMTP server port (default: 25)
 
     Raises:
         smtplib.SMTPException: If email sending fails
@@ -43,7 +46,6 @@ def send_email(
 
     msg.attach(MIMEText(body_html, "html"))
 
-    with smtplib.SMTP(smtp_server) as conn:
-        conn.starttls()  # Upgrade connection to secure
+    with smtplib.SMTP(smtp_server, smtp_port) as conn:
         conn.send_message(msg)
         logger.info(f"Email sent successfully to {recipient_email}")

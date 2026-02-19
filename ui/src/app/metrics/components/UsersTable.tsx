@@ -5,6 +5,7 @@ import { Box, Typography, styled } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 import type { UserMetricsSummary } from '@/types/Metrics';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 type SortKey = keyof UserMetricsSummary;
 
@@ -118,6 +119,7 @@ export default function UsersTable({ users }: UsersTableProps) {
 
 const TableWrapper = styled(Box)`
     overflow-x: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;
 
 const StyledTable = styled('table')`

@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import { ToS } from '@/components/ToS';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { mkLogoTrackAttrs } from '@/analytics/run';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -66,7 +67,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     );
 }
 
-const Wrapper = styled(Box)<{ $isAuthenticated: boolean; $isRunsHome: boolean }>`
+const Wrapper = styled('div')<{ $isAuthenticated: boolean; $isRunsHome: boolean }>`
     background: ${({ theme, $isAuthenticated, $isRunsHome }) => {
         const gradient = `radial-gradient(141.38% 60.74% at 50% 113.89%, #245555 0%, rgba(36, 85, 85, 0.20) 50%, rgba(36, 85, 85, 0.00) 100%)`;
         const fallbackColor = theme.color['extra-dark-teal-100'].hex;
@@ -147,4 +148,5 @@ const ScrollContainer = styled('div')`
 const ScrollContent = styled('div')`
     height: 100%;
     overflow: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;

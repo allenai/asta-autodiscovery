@@ -2,10 +2,12 @@
 
 import { Box, styled } from '@mui/material';
 
+import { scrollbarStyles } from '@/utils/scrollbar';
+
 /**
- * Layout for debug authentication pages
+ * Layout for debug pages
  */
-export default function DebugAuthLayout({ children }: { children: React.ReactNode }) {
+export default function DebugLayout({ children }: { children: React.ReactNode }) {
     return (
         <ScrollContainer>
             <ScrollableArea>{children}</ScrollableArea>
@@ -22,4 +24,5 @@ const ScrollContainer = styled(Box)`
 const ScrollableArea = styled('div')`
     height: 100%;
     overflow: auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;

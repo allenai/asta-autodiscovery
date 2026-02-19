@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import AuthButton from '@/components/AuthButton';
 import { auth0Client } from '@/auth/Auth0Client';
+import { scrollbarStyles } from '@/utils/scrollbar';
 
 const ADMIN_PERMISSION = 'enroll:autodiscovery_admin';
 
@@ -174,4 +175,5 @@ const Content = styled(Box)`
     max-width: 1200px;
     width: 100%;
     margin: 0 auto;
+    ${({ theme }) => scrollbarStyles(theme)}
 `;

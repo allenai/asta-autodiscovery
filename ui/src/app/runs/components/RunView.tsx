@@ -12,11 +12,13 @@ import {
     ListItem,
     useMediaQuery,
     Link,
+    IconButton,
 } from '@mui/material';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutlined';
-import IconButton from '@mui/material/IconButton';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
@@ -38,12 +40,25 @@ import {
 } from '@/analytics/runDetails';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
+import {
+    PanelGroup,
+    Background,
+    RunPanel,
+    ExperimentPanel,
+    ExperimentActions,
+    ExperimentActionButton,
+    LargeScreenAction,
+    PanelDragHandle,
+    usePanelWidthPx,
+} from '@/runs/components/RunViewPanels';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
+import { mkBookmarkRunBtnAttrs } from '@/analytics/run';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-interface RunStatusProps {
+interface RunViewProps {
     runid: string;
     onRunCancelled?: () => void;
     /** Optional user ID for viewing public runs (e.g., "samples") */
@@ -59,10 +74,12 @@ interface RunStatusProps {
  * - Stop Run button (only shown when status is RUNNING)
  * - Auto-refresh every 30 seconds for active runs
  */
-export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusProps) {
+export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
+    const { addSuccessToast, addErrorToast } = useToasts();
+    const { viewerRuns, addViewerRun, updateViewerRun } = useViewerRuns();
 
-    const [run, setRun] = useState<Run | null>(null);
+    const run = viewerRuns?.[runid] ?? null;
     const [isLoading, setIsLoading] = useState(true);
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -75,9 +92,13 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
         try {
             // Pass userid (can be undefined for authenticated user's own runs)
             const response = await api.getRun({ userid, runId: runid });
-            const run = getRunFromApi(response.data);
+            const fetchedRun = getRunFromApi(response.data);
 
-            setRun(run);
+            if (viewerRuns?.[runid]) {
+                updateViewerRun(fetchedRun);
+            } else {
+                addViewerRun(fetchedRun);
+            }
         } catch (err) {
             console.error('Error fetching run status:', err);
             setError(err instanceof Error ? err.message : 'Failed to load run status');
@@ -137,6 +158,36 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
         }
     };
 
+    const handleBookmark = useCallback(
+        async (newBookmarkStatus: boolean) => {
+            if (!run?.metadata) return;
+
+            const updatedMetadata = {
+                ...run.metadata,
+                isBookmarked: newBookmarkStatus,
+            };
+
+            // Optimistically update context
+            updateViewerRun({ id: run.id, metadata: updatedMetadata });
+
+            try {
+                await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
+                addSuccessToast(
+                    newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks'
+                );
+            } catch (err) {
+                // Rollback on error
+                updateViewerRun({
+                    id: run.id,
+                    metadata: { ...run.metadata, isBookmarked: !newBookmarkStatus },
+                });
+                addErrorToast('Error updating bookmark status.');
+                throw err;
+            }
+        },
+        [run, api, updateViewerRun]
+    );
+
     // Run is read-only if viewing another user's run (userid prop is provided)
     const isReadOnly = !!userid;
     const canStop = !isReadOnly && run?.details?.status === 'RUNNING';
@@ -166,12 +217,13 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
 
     return (
         <RunExperimentsProvider runid={runid} userid={userid} autoStart>
-            <RunStatusContent
+            <RunViewContent
                 run={run as Run & { details: NonNullable<Run['details']> }}
                 error={error}
                 canStop={canStop}
                 cancelling={cancelling}
                 handleStop={handleStop}
+                handleBookmark={handleBookmark}
                 experimentsLabel={experimentsLabel}
                 isReadOnly={isReadOnly}
             />
@@ -179,25 +231,27 @@ export default function RunStatus({ runid, onRunCancelled, userid }: RunStatusPr
     );
 }
 
-interface RunStatusContentProps {
+interface RunViewContentProps {
     run: Run & { details: NonNullable<Run['details']> };
     error: string | null;
     canStop: boolean;
     cancelling: boolean;
     handleStop: () => void;
+    handleBookmark: (newBookmarkStatus: boolean) => Promise<void>;
     experimentsLabel: string;
     isReadOnly: boolean;
 }
 
-function RunStatusContent({
+function RunViewContent({
     run,
     error,
     canStop,
     cancelling,
     handleStop,
+    handleBookmark,
     experimentsLabel,
     isReadOnly,
-}: RunStatusContentProps) {
+}: RunViewContentProps) {
     const runsApi = getRunsApi();
     const {
         experiments,
@@ -206,10 +260,13 @@ function RunStatusContent({
         isLoading: isLoadingExperiments,
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
-    const [isTableExpanded, setIsTableExpanded] = useState(false);
-    const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+    const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
+    const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const { addSuccessToast, addErrorToast } = useToasts();
+
+    const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
+    const [expPanelWidthPx, setExpPanelWidthPx] = usePanelWidthPx('expPanelWidthPx', 500);
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
@@ -282,16 +339,38 @@ function RunStatusContent({
 
     return (
         <Container>
-            <PanelLayout>
+            <PanelGroup>
                 {isTreeVisible && (
                     <Background>
                         <ExperimentGraph />
                     </Background>
                 )}
-                <TablePanel $isExpanded={isTableExpanded}>
+                <RunPanel
+                    style={
+                        {
+                            '--run-panel-width': runPanelWidthPx ? `${runPanelWidthPx}px` : '700px',
+                        } as React.CSSProperties
+                    }>
                     <RunHeader>
                         <Box>
-                            <RunHeaderName>{run.name}</RunHeaderName>
+                            <RunHeaderName>
+                                {!isReadOnly && (
+                                    <BookmarkButton
+                                        size="small"
+                                        onClick={() => handleBookmark(!run.metadata?.isBookmarked)}
+                                        {...mkBookmarkRunBtnAttrs({
+                                            runId: run.id,
+                                            isBookmarked: !run.metadata?.isBookmarked,
+                                        })}>
+                                        {run.metadata?.isBookmarked ? (
+                                            <BookmarkIcon />
+                                        ) : (
+                                            <BookmarkBorderOutlinedIcon />
+                                        )}
+                                    </BookmarkButton>
+                                )}
+                                {run.name}
+                            </RunHeaderName>
                             <RunHeaderSubtitle>
                                 <StyledListItem>
                                     {getRunStatusString(run.details, experiments)}
@@ -335,16 +414,6 @@ function RunStatusContent({
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
-                        <LargeScreenAction>
-                            <RunHeaderExpandButton
-                                onClick={() => setIsTableExpanded(!isTableExpanded)}>
-                                {isTableExpanded ? (
-                                    <CloseFullscreenOutlinedIcon />
-                                ) : (
-                                    <OpenInFullOutlinedIcon />
-                                )}
-                            </RunHeaderExpandButton>
-                        </LargeScreenAction>
                     </RunHeader>
 
                     <RunContent>
@@ -400,33 +469,60 @@ function RunStatusContent({
 
                         <ExperimentsTable runStats={run.stats} />
                     </RunContent>
-                </TablePanel>
+                    {isDragEnabled && (
+                        <PanelDragHandle
+                            side="right"
+                            dragWidthPx={runPanelWidthPx ?? undefined}
+                            minWidthPx={300}
+                            onWidthPxChange={setRunPanelWidthPx}
+                        />
+                    )}
+                </RunPanel>
 
                 {!!selectedExperiment && (
-                    <DetailsPanel $isExpanded={isDetailsExpanded}>
-                        <DetailsActions>
+                    <ExperimentPanel
+                        $isExpanded={isExpPanelExpanded}
+                        style={
+                            {
+                                '--experiment-panel-width': expPanelWidthPx
+                                    ? `${expPanelWidthPx}px`
+                                    : '500px',
+                            } as React.CSSProperties
+                        }>
+                        <ExperimentActions>
                             <LargeScreenAction>
-                                <DetailsActionButton
-                                    onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                                <ExperimentActionButton
+                                    onClick={() => setIsExpPanelExpanded(!isExpPanelExpanded)}
                                     size="small">
-                                    {isDetailsExpanded ? (
+                                    {isExpPanelExpanded ? (
                                         <CloseFullscreenOutlinedIcon />
                                     ) : (
                                         <OpenInFullOutlinedIcon />
                                     )}
-                                </DetailsActionButton>
+                                </ExperimentActionButton>
                             </LargeScreenAction>
-                            <DetailsActionButton
-                                onClick={() => selectExperiment(null)}
+                            <ExperimentActionButton
+                                onClick={() => {
+                                    selectExperiment(null);
+                                    setIsExpPanelExpanded(false);
+                                }}
                                 size="small"
                                 {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />
-                            </DetailsActionButton>
-                        </DetailsActions>
+                            </ExperimentActionButton>
+                        </ExperimentActions>
                         <ExperimentDetails experiment={selectedExperiment} />
-                    </DetailsPanel>
+                        {!isExpPanelExpanded && isDragEnabled && (
+                            <PanelDragHandle
+                                side="left"
+                                dragWidthPx={expPanelWidthPx ?? undefined}
+                                minWidthPx={300}
+                                onWidthPxChange={setExpPanelWidthPx}
+                            />
+                        )}
+                    </ExperimentPanel>
                 )}
-            </PanelLayout>
+            </PanelGroup>
 
             <RunParametersModal
                 open={isParametersModalOpen}
@@ -438,101 +534,8 @@ function RunStatusContent({
 }
 
 const Container = styled('div')`
-    container: run-status / inline-size;
+    container: run-view / inline-size;
     height: 100%;
-`;
-
-const PanelLayout = styled('div')`
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(2)};
-    height: 100%;
-    padding: ${({ theme }) => theme.spacing(0, 2, 2)};
-    justify-content: space-between;
-    position: relative;
-
-    @container run-status (width < 1000px) {
-        display: grid;
-    }
-
-    @container run-status (width < 600px) {
-        padding: ${({ theme }) => theme.spacing(0, 1, 1)};
-    }
-
-    @container run-status (width < 425px) {
-        padding: 0;
-    }
-`;
-
-const Background = styled('div')`
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-
-    @container run-status (width < 1000px) {
-        display: none;
-    }
-`;
-
-const TablePanel = styled('div')<{ $isExpanded: boolean }>`
-    flex: 0 1 auto;
-    min-width: 0;
-    width: ${({ $isExpanded }) => ($isExpanded ? '100%' : '500px')};
-    background-color: #163638f3;
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: ${({ theme }) => theme.spacing(2)};
-    overflow: auto;
-    z-index: 2;
-
-    @container run-status (width < 1000px) {
-        flex: initial;
-        width: calc(100cqw - 20px);
-        grid-row: 1;
-        grid-column: 1;
-    }
-
-    @container run-status (width < 600px) {
-        width: 100%;
-    }
-`;
-
-const DetailsPanel = styled('div')<{ $isExpanded: boolean }>`
-    flex: 0 1 auto;
-    max-width: ${({ $isExpanded }) => ($isExpanded ? 'initial' : '500px')};
-    background-color: #163638f3;
-    border-radius: 12px;
-    position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
-    overflow-y: auto;
-    z-index: 2;
-    top: 0;
-    bottom: 0;
-
-    @container run-status (width < 1000px) {
-        flex: 1 1 auto;
-        max-width: initial;
-        position: relative;
-        width: calc(100cqw - 20px);
-        grid-row: 1;
-        grid-column: 1;
-    }
-
-    @container run-status (width < 600px) {
-        width: 100%;
-    }
-`;
-
-const DetailsActions = styled('div')`
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(1)};
-    position: absolute;
-    top: ${({ theme }) => theme.spacing(2)};
-    right: ${({ theme }) => theme.spacing(2)};
-`;
-
-const DetailsActionButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
 `;
 
 const StopButton = styled(Button)`
@@ -568,33 +571,35 @@ const RunHeader = styled('div')`
 
 const RunHeaderName = styled('h1')`
     color: ${({ theme }) => theme.color['green-100'].hex};
+    display: flex;
     font-family: 'PP Telegraf', Manrope, sans-serif;
     font-weight: 700;
     font-size: 20px;
+    gap: ${({ theme }) => theme.spacing(0.5)};
     line-height: 24px;
     margin: 0;
     flex: 1 1 auto;
 `;
 
+const BookmarkButton = styled(IconButton)`
+    color: ${({ theme }) => theme.color['green-100'].hex};
+    padding: 0;
+    transition: color 0.2s ease-in-out;
+
+    &:hover {
+        color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+    }
+`;
+
 const RunContent = styled(Box)`
     padding: ${({ theme }) => theme.spacing(3)};
 
-    @container run-status (width < 700px) {
+    @container run-view (width < 700px) {
         padding: ${({ theme }) => theme.spacing(1)};
     }
 
-    @container run-status (width < 500px) {
+    @container run-view (width < 500px) {
         padding: ${({ theme }) => theme.spacing(0.5)};
-    }
-`;
-
-const RunHeaderExpandButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
-`;
-
-const LargeScreenAction = styled('div')`
-    @container run-status (width < 1000px) {
-        display: none;
     }
 `;
 

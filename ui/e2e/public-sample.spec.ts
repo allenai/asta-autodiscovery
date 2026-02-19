@@ -8,31 +8,22 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('Public shared sample', () => {
     test('loads nls_bmi sample run', async ({ page }) => {
-        // Navigate to the public shared sample
         await page.goto('/shared/samples/nls_bmi');
 
-        // Wait for the page to load
-        await page.waitForLoadState('networkidle');
+        // Wait for experiment rows to appear - confirms page fully rendered and API data loaded
+        await page.waitForSelector('[data-track-name="run_details__experiment-row"]', {
+            timeout: 20000,
+        });
 
-        // Verify the page title/header contains run information
-        // Look for the actual run title or status
-        await expect(page.locator('body')).toContainText(/National Longitudinal Survey|Spending behavior/i);
+        // Verify run status loaded
+        await expect(page.locator('text=Succeeded')).toBeVisible();
 
-        // Verify no authentication error
-        await expect(page.locator('body')).not.toContainText(/Please log in/i);
+        // Verify Top Surprisals section rendered
+        await expect(page.locator('text=Top Surprisals')).toBeVisible();
 
-        // Verify experiments table or content loads
-        // Check for either the experiments table or loading state
-        const hasTable = await page.locator('[role="grid"]').count() > 0;
-        const hasLoading = await page.locator('text=/loading/i').count() > 0;
-
-        expect(hasTable || hasLoading).toBeTruthy();
-
-        // Verify no JavaScript errors occurred
-        const errors: string[] = [];
-        page.on('pageerror', (error) => errors.push(error.message));
-
-        await page.waitForTimeout(2000);
-        expect(errors).toHaveLength(0);
+        // Click first experiment row and verify Belief Shift chart appears
+        await page.locator('[data-track-name="run_details__experiment-row"]').first().click();
+        await expect(page.locator('text=Belief Shift')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.js-plotly-plot')).toBeVisible();
     });
 });

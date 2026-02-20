@@ -230,7 +230,30 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
     }
 
     @container panel-container (width < 600px) {
+        position: fixed;
         width: 100%;
+        height: 95vh;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        border-radius: 12px 12px 0 0;
+        transition: transform 0.3s ease-out;
+    }
+`;
+
+export const ExperimentPanelBackdrop = styled('div')<{ $isVisible: boolean }>`
+    display: none;
+
+    @container panel-container (width < 600px) {
+        display: ${({ $isVisible }) => ($isVisible ? 'block' : 'none')};
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        transition: opacity 0.3s ease-out;
+        opacity: ${({ $isVisible }) => ($isVisible ? 1 : 0)};
     }
 `;
 

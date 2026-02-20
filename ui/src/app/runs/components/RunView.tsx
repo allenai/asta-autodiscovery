@@ -45,6 +45,7 @@ import {
     Background,
     RunPanel,
     ExperimentPanel,
+    ExperimentPanelBackdrop,
     ExperimentActions,
     ExperimentActionButton,
     LargeScreenAction,
@@ -478,6 +479,14 @@ function RunViewContent({
                         />
                     )}
                 </RunPanel>
+
+                <ExperimentPanelBackdrop
+                    $isVisible={!!selectedExperiment}
+                    onClick={() => {
+                        selectExperiment(null);
+                        setIsExpPanelExpanded(false);
+                    }}
+                />
 
                 {!!selectedExperiment && (
                     <ExperimentPanel

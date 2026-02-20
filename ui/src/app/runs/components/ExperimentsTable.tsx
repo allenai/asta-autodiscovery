@@ -5,7 +5,6 @@ import {
     GridRenderCellParams,
     GridRowSelectionModel,
     GridSortModel,
-    useGridApiRef,
 } from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -14,6 +13,7 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
+import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 
 const DEFAULT_COLUMNS: GridColDef[] = [
     {
@@ -127,6 +127,8 @@ const DEFAULT_COLUMNS: GridColDef[] = [
     },
 ];
 
+const DEFAULT_PAGE_SIZE = -1;
+
 interface ExperimentsTableProps {
     runStats?: RunStats | null;
 }
@@ -134,8 +136,26 @@ interface ExperimentsTableProps {
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const { experiments, lastError, selectExperiment, selectedExperiment, hasJobCompleted } =
         useRunExperiments();
+    const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
-    const apiRef = useGridApiRef();
+
+    const [paginationModel, setPaginationModel] = useState(() => {
+        const raw = getSearchParam('pageSize');
+        const pageSize = raw !== null ? parseInt(raw, 10) : DEFAULT_PAGE_SIZE;
+        return { page: 0, pageSize: isNaN(pageSize) ? DEFAULT_PAGE_SIZE : pageSize };
+    });
+
+    const handlePaginationModelChange = useCallback(
+        (newModel: { page: number; pageSize: number }) => {
+            setPaginationModel(newModel);
+            if (newModel.pageSize === DEFAULT_PAGE_SIZE) {
+                deleteSearchParam('pageSize');
+            } else {
+                setSearchParam('pageSize', String(newModel.pageSize));
+            }
+        },
+        [setSearchParam, deleteSearchParam]
+    );
 
     // Apply default Surprisal sort when the session completes.
     useEffect(() => {
@@ -215,8 +235,6 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         return [...experimentRows, ...skeletonRows];
     }, [experiments, runStats, hasJobCompleted]);
 
-    const paginationModel = { page: 0, pageSize: -1 };
-
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
         if (selectedExperiment) {
@@ -244,9 +262,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
 
     // Scroll to the selected experiment when it changes
     useEffect(() => {
-        console.log('Selected experiment changed:', selectedExperiment);
-        if (selectedExperiment) {
-            // find the DOM element of the selected row and scroll it into view
+        if (selectedExperiment?.idInRun) {
             const rowElement = document.querySelector(
                 `[data-id="${selectedExperiment.idInRun}"]`
             ) as HTMLElement | null;
@@ -257,7 +273,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 });
             }
         }
-    }, [selectedExperiment?.idInRun, rows.length, apiRef?.current]);
+    }, [selectedExperiment?.idInRun]);
 
     return (
         <Wrapper>
@@ -267,12 +283,12 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 </Alert>
             )}
             <StyledDataGrid
-                apiRef={apiRef}
                 rows={rows}
                 columns={DEFAULT_COLUMNS}
                 loading={!runStats?.pendingExperiments && !experiments.length}
+                paginationModel={paginationModel}
+                onPaginationModelChange={handlePaginationModelChange}
                 initialState={{
-                    pagination: { paginationModel },
                     sorting: {
                         sortModel:
                             runStats?.completedExperiments === runStats?.requestedExperiments

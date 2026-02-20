@@ -209,7 +209,7 @@ export const RunPanel = styled('div')`
     }
 `;
 
-export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
+export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $isClosing?: boolean }>`
     flex: 0 1 auto;
     max-width: ${({ $isExpanded }) =>
         $isExpanded ? 'initial' : 'var(--experiment-panel-width, 500px)'};
@@ -232,8 +232,41 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
     }
 
     @container panel-container (width < 600px) {
+        position: fixed;
         width: 100%;
-        border-radius: 0;
+        height: 95vh;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        border-radius: 24px 24px 0 0;
+        animation: ${({ $isClosing }) => ($isClosing ? 'none' : 'slideUpFromBottom 0.3s ease-out')};
+        transform: ${({ $isClosing }) => ($isClosing ? 'translateY(100%)' : 'translateY(0)')};
+        transition: ${({ $isClosing }) => ($isClosing ? 'transform 0.3s ease-out' : 'none')};
+    }
+
+    @keyframes slideUpFromBottom {
+        from {
+            transform: translateY(100%);
+        }
+        to {
+            transform: translateY(0);
+        }
+    }
+`;
+
+export const ExperimentPanelBackdrop = styled('div')<{ $isVisible: boolean }>`
+    display: none;
+
+    @container panel-container (width < 600px) {
+        display: ${({ $isVisible }) => ($isVisible ? 'block' : 'none')};
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        transition: opacity 0.3s ease-out;
+        opacity: ${({ $isVisible }) => ($isVisible ? 1 : 0)};
     }
 `;
 

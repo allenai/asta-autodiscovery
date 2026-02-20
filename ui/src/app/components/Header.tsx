@@ -29,13 +29,31 @@ export default function Header({ showBackButton = false }: HeaderProps) {
                     Back
                 </BackButton>
             )}
-            {isAuthenticated && <CreditsChip />}
-            <FeedbackButton />
+            {isAuthenticated && (
+                <LeftAlignedCredits>
+                    <CreditsChip />
+                </LeftAlignedCredits>
+            )}
+            <DesktopFeedback>
+                <FeedbackButton />
+            </DesktopFeedback>
             <AboutButton />
             <AuthButton />
         </StyledHeader>
     );
 }
+
+const LeftAlignedCredits = styled('div')`
+    @media (max-width: 600px) {
+        margin-right: auto;
+    }
+`;
+
+const DesktopFeedback = styled('div')`
+    @media (max-width: 600px) {
+        display: none;
+    }
+`;
 
 const StyledHeader = styled(Box)`
     display: flex;
@@ -44,6 +62,13 @@ const StyledHeader = styled(Box)`
     flex-wrap: wrap;
     gap: ${({ theme }) => theme.spacing(2)};
     padding: ${({ theme }) => theme.spacing(2)};
+
+    @media (max-width: 600px) {
+        flex-wrap: nowrap;
+        padding-top: 0;
+        background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+        border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
 `;
 
 const BackButton = styled(Button)`
@@ -53,6 +78,7 @@ const BackButton = styled(Button)`
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};
         height: 32px;
+        white-space: nowrap;
 
         & .MuiButton-startIcon {
             margin: 0 ${({ theme }) => theme.spacing(0.75)} 0 0;

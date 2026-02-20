@@ -595,11 +595,11 @@ const RunContent = styled(Box)`
     padding: ${({ theme }) => theme.spacing(3)};
 
     @container run-view (width < 700px) {
-        padding: ${({ theme }) => theme.spacing(1)};
+        padding: ${({ theme }) => theme.spacing(3)};
     }
 
     @container run-view (width < 500px) {
-        padding: ${({ theme }) => theme.spacing(0.5)};
+        padding: ${({ theme }) => theme.spacing(3)};
     }
 `;
 
@@ -623,6 +623,12 @@ const RunHeaderSubtitle = styled(List)`
     font-weight: normal;
     gap: ${({ theme }) => theme.spacing(1)};
     padding: 0;
+
+    @media (max-width: 600px) {
+        flex-direction: column;
+        align-items: flex-start;
+        padding-top: 12px;
+    }
 `;
 
 const StyledListItem = styled(ListItem)`
@@ -634,10 +640,20 @@ const StyledListItem = styled(ListItem)`
         content: '•';
         margin-left: ${({ theme }) => theme.spacing(1)};
         color: ${({ theme }) => theme.color['cream-100'].hex};
+
+        @media (max-width: 600px) {
+            content: none;
+        }
     }
 `;
 
 const RunToolbar = styled('div')`
     display: flex;
     justify-content: space-between;
+
+    @media (max-width: 600px) {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: ${({ theme }) => theme.spacing(1)};
+    }
 `;

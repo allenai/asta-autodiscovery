@@ -189,7 +189,7 @@ export const RunPanel = styled('div')`
     border-radius: 12px;
     display: flex;
     flex-direction: column;
-    gap: ${({ theme }) => theme.spacing(2)};
+    gap: 0;
     overflow: auto;
     position: relative;
     z-index: 2;
@@ -204,6 +204,8 @@ export const RunPanel = styled('div')`
 
     @container panel-container (width < 600px) {
         width: 100%;
+        border-radius: 0;
+        background-color: transparent;
     }
 `;
 
@@ -231,6 +233,7 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
 
     @container panel-container (width < 600px) {
         width: 100%;
+        border-radius: 0;
     }
 `;
 

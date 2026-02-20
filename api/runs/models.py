@@ -149,6 +149,9 @@ class MetadataModel(BaseModel):
     is_bookmarked: bool | None = Field(
         None, description="Whether the run is bookmarked (marked as interesting by the user)"
     )
+    bookmarked_experiment_ids: list[str] | None = Field(
+        None, description="List of experiment IDs bookmarked by the user"
+    )
 
     # Sharing
     is_shared: bool | None = Field(
@@ -185,6 +188,7 @@ class MetadataModel(BaseModel):
             datasets=datasets,
             is_shared=data.get("is_shared"),
             is_bookmarked=data.get("is_bookmarked"),
+            bookmarked_experiment_ids=data.get("bookmarked_experiment_ids"),
             n_experiments=data.get("n_experiments"),
             exploration_weight=data.get("exploration_weight"),
             mcts_selection=data.get("mcts_selection"),
@@ -417,6 +421,22 @@ class BookmarkRunResponseModel(BaseModel):
 
     is_bookmarked: bool = Field(..., description="Updated bookmarked status")
     message: str = Field(..., description="Success message")
+
+
+class BookmarkExperimentRequestModel(BaseModel):
+    """Model for the request to bookmark or unbookmark an experiment"""
+
+    runid: str = Field(..., description="Identifier of the run containing the experiment")
+    userid: str = Field(..., description="User identifier who owns the run")
+    experiment_id: str = Field(..., description="Identifier of the experiment to bookmark/unbookmark")
+    is_bookmarked: bool = Field(..., description="Whether to bookmark (true) or unbookmark (false) the experiment")
+
+
+class BookmarkExperimentResponseModel(BaseModel):
+    """Model for the response when bookmarking/unbookmarking an experiment"""
+
+    experiment_id: str = Field(..., description="Identifier of the experiment")
+    is_bookmarked: bool = Field(..., description="Updated bookmarked status")
 
 
 class ShareRunRequestModel(BaseModel):

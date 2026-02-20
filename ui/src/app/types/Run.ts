@@ -97,6 +97,7 @@ export type Metadata = {
     isShared: boolean;
     // Bookmarking
     isBookmarked: boolean;
+    bookmarkedExperimentIds: string[];
     // Job configuration parameters
     nExperiments?: number | null;
     explorationWeight?: number | null;
@@ -194,6 +195,7 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
         isShared: !!metadataFromApi.is_shared,
         isBookmarked: !!metadataFromApi.is_bookmarked,
+        bookmarkedExperimentIds: metadataFromApi.bookmarked_experiment_ids ?? [],
         // Job configuration parameters
         nExperiments: metadataFromApi.n_experiments,
         explorationWeight: metadataFromApi.exploration_weight,

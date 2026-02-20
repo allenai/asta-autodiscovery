@@ -23,6 +23,8 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    BookmarkExperimentRequestModel,
+    BookmarkExperimentResponseModel,
     BookmarkRunRequestModel,
     BookmarkRunResponseModel,
     CancelRunRequestModel,
@@ -1086,6 +1088,69 @@ def create() -> Blueprint:
 
         except Exception as e:
             current_app.logger.error(f"Failed to bookmark run: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route("/<userid>/<runid>/experiments/<experiment_id>/bookmark", methods=["POST"])
+    @requires_enrollment
+    def bookmark_experiment(userid: str, runid: str, experiment_id: str):
+        """Bookmark or unbookmark an experiment within a run. Only the run owner can toggle bookmarking.
+
+        Args:
+            userid: User ID from URL path. Must match authenticated user.
+            runid: Run identifier
+            experiment_id: Experiment identifier
+
+        Request body:
+            is_bookmarked: boolean - whether to bookmark (true) or unbookmark (false)
+
+        Returns:
+            JSON response with updated bookmark status for the experiment.
+        """
+        token_userid = request.user.get("sub")
+        if not token_userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        if userid != token_userid:
+            return jsonify({"error": "User cannot bookmark other user's experiments"}), 403
+
+        data = request.get_json()
+        if not data or "is_bookmarked" not in data:
+            raise BadRequest("is_bookmarked is required")
+
+        try:
+            req = BookmarkExperimentRequestModel(
+                runid=runid,
+                userid=userid,
+                experiment_id=experiment_id,
+                is_bookmarked=data["is_bookmarked"],
+            )
+        except Exception as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        try:
+            manager = get_job_manager()
+
+            metadata_dict = manager.get_metadata(req.userid, req.runid)
+            if metadata_dict is None:
+                metadata_dict = {}
+
+            ids = set(metadata_dict.get("bookmarked_experiment_ids") or [])
+            if req.is_bookmarked:
+                ids.add(req.experiment_id)
+            else:
+                ids.discard(req.experiment_id)
+            metadata_dict["bookmarked_experiment_ids"] = list(ids)
+
+            manager.upload_metadata(req.userid, req.runid, metadata_dict)
+
+            resp = BookmarkExperimentResponseModel(
+                experiment_id=req.experiment_id,
+                is_bookmarked=req.is_bookmarked,
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to bookmark experiment: {e}")
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/share", methods=["POST"])

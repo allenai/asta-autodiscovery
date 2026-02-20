@@ -15,6 +15,8 @@ import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetail
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 
+const DEFAULT_PAGE_SIZE = -1;
+
 const DEFAULT_COLUMNS: GridColDef[] = [
     {
         field: 'id',
@@ -126,8 +128,6 @@ const DEFAULT_COLUMNS: GridColDef[] = [
         },
     },
 ];
-
-const DEFAULT_PAGE_SIZE = -1;
 
 interface ExperimentsTableProps {
     runStats?: RunStats | null;
@@ -262,17 +262,17 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
 
     // Scroll to the selected experiment when it changes
     useEffect(() => {
-        if (selectedExperiment?.idInRun) {
-            const rowElement = document.querySelector(
-                `[data-id="${selectedExperiment.idInRun}"]`
-            ) as HTMLElement | null;
-            if (rowElement) {
-                rowElement.scrollIntoView({
+        const selectedRowID = selectedExperiment?.idInRun;
+        const timeoutId = setTimeout(() => {
+            if (selectedRowID) {
+                const row = document.querySelector(`.MuiDataGrid-row[data-id="${selectedRowID}"]`);
+                row?.scrollIntoView({
                     behavior: 'smooth',
                     block: 'center',
                 });
             }
-        }
+        }, 50); // Debounce to allow DataGrid to render the new selection
+        return () => clearTimeout(timeoutId);
     }, [selectedExperiment?.idInRun]);
 
     return (

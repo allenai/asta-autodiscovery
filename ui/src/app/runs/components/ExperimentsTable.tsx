@@ -6,7 +6,7 @@ import {
     GridRowSelectionModel,
     GridSortModel,
 } from '@mui/x-data-grid';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
@@ -138,6 +138,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         useRunExperiments();
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
+    const rowClickedRef = useRef(false);
 
     const [paginationModel, setPaginationModel] = useState(() => {
         const raw = getSearchParam('pageSize');
@@ -256,21 +257,23 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         }
         const exp = experiments.find((exp) => exp.idInRun === params.id);
         if (exp) {
+            rowClickedRef.current = true;
             selectExperiment(exp);
         }
     };
 
-    // Scroll to the selected experiment when it changes
+    // Scroll to the selected experiment when it changes, unless the change was from a row click
     useEffect(() => {
         const selectedRowID = selectedExperiment?.idInRun;
         const timeoutId = setTimeout(() => {
-            if (selectedRowID) {
+            if (selectedRowID && !rowClickedRef.current) {
                 const row = document.querySelector(`.MuiDataGrid-row[data-id="${selectedRowID}"]`);
                 row?.scrollIntoView({
                     behavior: 'smooth',
                     block: 'center',
                 });
             }
+            rowClickedRef.current = false;
         }, 50); // Debounce to allow DataGrid to render the new selection
         return () => clearTimeout(timeoutId);
     }, [selectedExperiment?.idInRun]);

@@ -2,6 +2,7 @@
 
 import {
     createContext,
+    MutableRefObject,
     PropsWithChildren,
     useCallback,
     useContext,
@@ -26,7 +27,8 @@ export interface RunExperimentsState {
     selectedExperiment: Experiment | null;
     selectedExperimentError: string | null;
     isLoadingSelectedExperiment: boolean;
-    selectExperiment: (experiment: Experiment | null) => void;
+    selectExperiment: (experiment: Experiment | null, options?: { scroll?: boolean }) => void;
+    shouldScrollToSelected: MutableRefObject<boolean>;
 }
 
 export const DEFAULT_STATE: RunExperimentsState = {
@@ -42,6 +44,7 @@ export const DEFAULT_STATE: RunExperimentsState = {
     selectedExperimentError: null,
     isLoadingSelectedExperiment: false,
     selectExperiment: () => {},
+    shouldScrollToSelected: { current: true },
 };
 
 export const DEFAULT_REFRESH_INTERVAL_MS = 15000; // 15 seconds
@@ -86,6 +89,7 @@ export const RunExperimentsProvider = ({
     const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
+    const shouldScrollToSelected = useRef<boolean>(true);
 
     // Keep ref in sync with prop
     useEffect(() => {
@@ -107,7 +111,8 @@ export const RunExperimentsProvider = ({
     }, [runid]);
 
     const selectExperiment = useCallback(
-        (experiment: Experiment | null) => {
+        (experiment: Experiment | null, options?: { scroll?: boolean }) => {
+            shouldScrollToSelected.current = options?.scroll ?? true;
             // Prevent redundant selections - check before setting state
             setSelectedExperiment((prev) => {
                 if (prev?.experimentId === experiment?.experimentId) {
@@ -256,6 +261,7 @@ export const RunExperimentsProvider = ({
             startPolling,
             stopPolling,
             selectExperiment,
+            shouldScrollToSelected,
         }),
         [
             runid,

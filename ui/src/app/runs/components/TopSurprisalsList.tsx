@@ -41,7 +41,7 @@ export const TopSurprisalsListImpl = () => {
                     <Item
                         key={experiment.experimentId}
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
-                        onClick={() => selectExperiment(experiment)}>
+                        onClick={() => selectExperiment(experiment, { scroll: false })}>
                         <Description>
                             <Belief>
                                 It's{' '}

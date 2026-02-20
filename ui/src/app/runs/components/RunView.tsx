@@ -268,6 +268,7 @@ function RunViewContent({
 
     const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
     const [expPanelWidthPx, setExpPanelWidthPx] = usePanelWidthPx('expPanelWidthPx', 500);
+    const [isClosingPanel, setIsClosingPanel] = useState(false);
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
@@ -275,6 +276,15 @@ function RunViewContent({
     const hasInitiallySelected = useRef(false);
     const isUpdatingFromURL = useRef(false);
     const lastSyncedExpId = useRef<number | null>(null);
+
+    const handleClosePanel = useCallback(() => {
+        setIsClosingPanel(true);
+        setTimeout(() => {
+            selectExperiment(null);
+            setIsExpPanelExpanded(false);
+            setIsClosingPanel(false);
+        }, 300);
+    }, [selectExperiment]);
 
     const onShareClick = useCallback(
         async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -482,15 +492,13 @@ function RunViewContent({
 
                 <ExperimentPanelBackdrop
                     $isVisible={!!selectedExperiment}
-                    onClick={() => {
-                        selectExperiment(null);
-                        setIsExpPanelExpanded(false);
-                    }}
+                    onClick={handleClosePanel}
                 />
 
-                {!!selectedExperiment && (
+                {(!!selectedExperiment || isClosingPanel) && (
                     <ExperimentPanel
                         $isExpanded={isExpPanelExpanded}
+                        $isClosing={isClosingPanel}
                         style={
                             {
                                 '--experiment-panel-width': expPanelWidthPx
@@ -511,10 +519,7 @@ function RunViewContent({
                                 </ExperimentActionButton>
                             </LargeScreenAction>
                             <ExperimentActionButton
-                                onClick={() => {
-                                    selectExperiment(null);
-                                    setIsExpPanelExpanded(false);
-                                }}
+                                onClick={handleClosePanel}
                                 size="small"
                                 {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />

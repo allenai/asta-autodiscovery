@@ -209,7 +209,7 @@ export const RunPanel = styled('div')`
     }
 `;
 
-export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
+export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $isClosing?: boolean }>`
     flex: 0 1 auto;
     max-width: ${({ $isExpanded }) =>
         $isExpanded ? 'initial' : 'var(--experiment-panel-width, 500px)'};
@@ -240,8 +240,20 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean }>`
         left: 0;
         right: 0;
         z-index: 1000;
-        border-radius: 12px 12px 0 0;
-        transition: transform 0.3s ease-out;
+        border-radius: 24px 24px 0 0;
+        animation: ${({ $isClosing }) =>
+            $isClosing ? 'none' : 'slideUpFromBottom 0.3s ease-out'};
+        transform: ${({ $isClosing }) => ($isClosing ? 'translateY(100%)' : 'translateY(0)')};
+        transition: ${({ $isClosing }) => ($isClosing ? 'transform 0.3s ease-out' : 'none')};
+    }
+
+    @keyframes slideUpFromBottom {
+        from {
+            transform: translateY(100%);
+        }
+        to {
+            transform: translateY(0);
+        }
     }
 `;
 

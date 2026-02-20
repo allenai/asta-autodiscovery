@@ -60,14 +60,16 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                     )}
                     <ScrollArea>
                         <ScrollContainer>
-                            <ScrollContent>{children}</ScrollContent>
+                            <ScrollContent>
+                                {children}
+                                {isAuthenticated && (
+                                    <MobileFooter>
+                                        <ToS />
+                                    </MobileFooter>
+                                )}
+                            </ScrollContent>
                         </ScrollContainer>
                     </ScrollArea>
-                    {isAuthenticated && (
-                        <MobileFooter>
-                            <ToS />
-                        </MobileFooter>
-                    )}
                 </MainContent>
             </Layout>
         </Wrapper>

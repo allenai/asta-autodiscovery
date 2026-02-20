@@ -235,6 +235,7 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $isClosing?
         position: fixed;
         width: 100%;
         height: 95vh;
+        height: 95svh;
         top: auto;
         bottom: 0;
         left: 0;

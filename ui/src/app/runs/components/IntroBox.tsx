@@ -42,7 +42,7 @@ const Wrapper = styled(Box, {
     container: 'intro-box / inline-size',
 
     '@media (max-width: 600px)': {
-        marginTop: $showLogin ? '48px' : 'initial',
+        marginTop: 0,
         padding: theme.spacing(3),
     },
 }));

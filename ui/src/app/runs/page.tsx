@@ -99,6 +99,10 @@ const Layout = styled(Box)(({ theme }) => ({
     padding: theme.spacing(4),
     maxWidth: '900px',
     margin: '0 auto',
+
+    '@media (max-width: 600px)': {
+        padding: theme.spacing(3),
+    },
 }));
 
 const LoggedOutLayout = styled(Box)(({ theme }) => ({
@@ -111,12 +115,16 @@ const LoggedOutLayout = styled(Box)(({ theme }) => ({
     margin: '0 auto',
 
     '@media (max-width: 600px)': {
-        padding: theme.spacing(2),
+        padding: theme.spacing(3),
     },
 }));
 
 const Section = styled(Box)(({ theme }) => ({
     padding: theme.spacing(3),
+
+    '@media (max-width: 600px)': {
+        padding: 0,
+    },
 }));
 
 const FooterWrapper = styled(Box)(({ theme }) => ({
@@ -140,6 +148,11 @@ const Attribution = styled(Typography)(({ theme }) => ({
     textAlign: 'left',
     marginTop: theme.spacing(1),
     lineHeight: '1.5',
+
+    '@media (max-width: 600px)': {
+        lineHeight: '1.75',
+        opacity: 1,
+    },
 }));
 
 const Ai2LogoWrapper = styled('a')({
@@ -148,6 +161,13 @@ const Ai2LogoWrapper = styled('a')({
     lineHeight: 0,
     margin: '0 4px',
     textDecoration: 'none',
+
+    '@media (max-width: 600px)': {
+        '& img': {
+            height: '14px',
+            width: 'auto',
+        },
+    },
 });
 
 const AstaLabsLogoWrapper = styled('a')({
@@ -156,4 +176,11 @@ const AstaLabsLogoWrapper = styled('a')({
     lineHeight: 0,
     margin: '0 4px',
     textDecoration: 'none',
+
+    '@media (max-width: 600px)': {
+        '& img': {
+            height: '14px',
+            width: 'auto',
+        },
+    },
 });

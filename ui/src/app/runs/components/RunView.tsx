@@ -45,6 +45,7 @@ import {
     Background,
     RunPanel,
     ExperimentPanel,
+    ExperimentPanelBackdrop,
     ExperimentActions,
     ExperimentActionButton,
     LargeScreenAction,
@@ -267,6 +268,7 @@ function RunViewContent({
 
     const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
     const [expPanelWidthPx, setExpPanelWidthPx] = usePanelWidthPx('expPanelWidthPx', 500);
+    const [isClosingPanel, setIsClosingPanel] = useState(false);
 
     // URL synchronization
     const { setSearchParam, deleteSearchParam } = useURLSearchParams();
@@ -274,6 +276,15 @@ function RunViewContent({
     const hasInitiallySelected = useRef(false);
     const isUpdatingFromURL = useRef(false);
     const lastSyncedExpId = useRef<number | null>(null);
+
+    const handleClosePanel = useCallback(() => {
+        setIsClosingPanel(true);
+        setTimeout(() => {
+            selectExperiment(null);
+            setIsExpPanelExpanded(false);
+            setIsClosingPanel(false);
+        }, 300);
+    }, [selectExperiment]);
 
     const onShareClick = useCallback(
         async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -479,9 +490,15 @@ function RunViewContent({
                     )}
                 </RunPanel>
 
-                {!!selectedExperiment && (
+                <ExperimentPanelBackdrop
+                    $isVisible={!!selectedExperiment}
+                    onClick={handleClosePanel}
+                />
+
+                {(!!selectedExperiment || isClosingPanel) && (
                     <ExperimentPanel
                         $isExpanded={isExpPanelExpanded}
+                        $isClosing={isClosingPanel}
                         style={
                             {
                                 '--experiment-panel-width': expPanelWidthPx
@@ -502,16 +519,15 @@ function RunViewContent({
                                 </ExperimentActionButton>
                             </LargeScreenAction>
                             <ExperimentActionButton
-                                onClick={() => {
-                                    selectExperiment(null);
-                                    setIsExpPanelExpanded(false);
-                                }}
+                                onClick={handleClosePanel}
                                 size="small"
                                 {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />
                             </ExperimentActionButton>
                         </ExperimentActions>
-                        <ExperimentDetails experiment={selectedExperiment} />
+                        {selectedExperiment && (
+                            <ExperimentDetails experiment={selectedExperiment} />
+                        )}
                         {!isExpPanelExpanded && isDragEnabled && (
                             <PanelDragHandle
                                 side="left"
@@ -595,11 +611,11 @@ const RunContent = styled(Box)`
     padding: ${({ theme }) => theme.spacing(3)};
 
     @container run-view (width < 700px) {
-        padding: ${({ theme }) => theme.spacing(1)};
+        padding: ${({ theme }) => theme.spacing(3)};
     }
 
     @container run-view (width < 500px) {
-        padding: ${({ theme }) => theme.spacing(0.5)};
+        padding: ${({ theme }) => theme.spacing(3)};
     }
 `;
 
@@ -623,6 +639,12 @@ const RunHeaderSubtitle = styled(List)`
     font-weight: normal;
     gap: ${({ theme }) => theme.spacing(1)};
     padding: 0;
+
+    @media (max-width: 600px) {
+        flex-direction: column;
+        align-items: flex-start;
+        padding-top: 12px;
+    }
 `;
 
 const StyledListItem = styled(ListItem)`
@@ -634,10 +656,20 @@ const StyledListItem = styled(ListItem)`
         content: '•';
         margin-left: ${({ theme }) => theme.spacing(1)};
         color: ${({ theme }) => theme.color['cream-100'].hex};
+
+        @media (max-width: 600px) {
+            content: none;
+        }
     }
 `;
 
 const RunToolbar = styled('div')`
     display: flex;
     justify-content: space-between;
+
+    @media (max-width: 600px) {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: ${({ theme }) => theme.spacing(1)};
+    }
 `;

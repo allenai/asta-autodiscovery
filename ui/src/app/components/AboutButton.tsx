@@ -8,16 +8,25 @@ export const AboutButton = () => {
             passHref
             target="_blank"
             rel="noopener noreferrer">
-            <StyledButton variant="outlined">About AutoDiscovery</StyledButton>
+            <StyledButton variant="outlined">
+                About<DesktopOnly>&nbsp;AutoDiscovery</DesktopOnly>
+            </StyledButton>
         </Link>
     );
 };
+
+const DesktopOnly = styled('span')`
+    @media (max-width: 600px) {
+        display: none;
+    }
+`;
 
 const StyledButton = styled(Button)`
     &.MuiButton-root {
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};
         height: 32px;
+        white-space: nowrap;
 
         & .MuiButton-endIcon {
             margin: 0 0 0 ${({ theme }) => theme.spacing(0.75)};

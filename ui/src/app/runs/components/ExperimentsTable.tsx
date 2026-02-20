@@ -13,6 +13,9 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
+import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
+
+const DEFAULT_PAGE_SIZE = -1;
 
 const DEFAULT_COLUMNS: GridColDef[] = [
     {
@@ -131,9 +134,35 @@ interface ExperimentsTableProps {
 }
 
 export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
-    const { experiments, lastError, selectExperiment, selectedExperiment, hasJobCompleted } =
-        useRunExperiments();
+    const {
+        experiments,
+        lastError,
+        selectExperiment,
+        selectedExperiment,
+        hasJobCompleted,
+        shouldScrollToSelected,
+    } = useRunExperiments();
+    const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
+
+    const [paginationModel, setPaginationModel] = useState(() => {
+        const raw = getSearchParam('pageSize');
+        const pageSize = raw !== null ? parseInt(raw, 10) : DEFAULT_PAGE_SIZE;
+        return { page: 0, pageSize: isNaN(pageSize) ? DEFAULT_PAGE_SIZE : pageSize };
+    });
+
+    const handlePaginationModelChange = useCallback(
+        (newModel: { page: number; pageSize: number }) => {
+            setPaginationModel(newModel);
+            if (newModel.pageSize === DEFAULT_PAGE_SIZE) {
+                deleteSearchParam('pageSize');
+            } else {
+                setSearchParam('pageSize', String(newModel.pageSize));
+            }
+        },
+        [setSearchParam, deleteSearchParam]
+    );
+
     // Apply default Surprisal sort when the session completes.
     useEffect(() => {
         if (hasJobCompleted) {
@@ -212,8 +241,6 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         return [...experimentRows, ...skeletonRows];
     }, [experiments, runStats, hasJobCompleted]);
 
-    const paginationModel = { page: 0, pageSize: 50 };
-
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
         if (selectedExperiment) {
@@ -235,9 +262,25 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         }
         const exp = experiments.find((exp) => exp.idInRun === params.id);
         if (exp) {
-            selectExperiment(exp);
+            selectExperiment(exp, { scroll: false });
         }
     };
+
+    // Scroll to the selected experiment when it changes, unless the caller opted out
+    useEffect(() => {
+        const selectedRowID = selectedExperiment?.idInRun;
+        const timeoutId = setTimeout(() => {
+            if (selectedRowID && shouldScrollToSelected.current) {
+                const row = document.querySelector(`.MuiDataGrid-row[data-id="${selectedRowID}"]`);
+                row?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+            }
+            shouldScrollToSelected.current = true;
+        }, 50); // Debounce to allow DataGrid to render the new selection
+        return () => clearTimeout(timeoutId);
+    }, [selectedExperiment?.idInRun]);
 
     return (
         <Wrapper>
@@ -250,8 +293,9 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 rows={rows}
                 columns={DEFAULT_COLUMNS}
                 loading={!runStats?.pendingExperiments && !experiments.length}
+                paginationModel={paginationModel}
+                onPaginationModelChange={handlePaginationModelChange}
                 initialState={{
-                    pagination: { paginationModel },
                     sorting: {
                         sortModel:
                             runStats?.completedExperiments === runStats?.requestedExperiments
@@ -259,7 +303,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                                 : [],
                     },
                 }}
-                pageSizeOptions={[5, 10, 25, 50]}
+                pageSizeOptions={[5, 10, 25, 50, 100, { value: -1, label: 'All' }]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
                 sortModel={sortModel}

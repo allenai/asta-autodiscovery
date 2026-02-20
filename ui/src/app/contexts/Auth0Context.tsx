@@ -43,10 +43,11 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
                     window.location.search.includes('state=')
                 ) {
                     const result = await auth0Client.handleRedirectCallback();
-                    // Redirect to the original URL if provided in appState
+                    // Redirect to the original URL if provided in appState.
+                    // Use window.location.replace() so the query string in targetUrl is preserved
+                    // (setting window.location.pathname encodes '?' as '%3F').
                     const targetUrl = result.appState?.returnTo || window.location.pathname;
-                    window.history.replaceState({}, document.title, targetUrl);
-                    window.location.pathname = targetUrl;
+                    window.location.replace(targetUrl);
                 }
 
                 // Check if user is authenticated

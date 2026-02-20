@@ -19,7 +19,7 @@ export default function CreditsChip() {
                 ref={anchorRef}
                 label={
                     <span>
-                        Experiment Credits:{' '}
+                        <DesktopOnly>Experiment </DesktopOnly>Credits:{' '}
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
                         ) : credits !== null ? (
@@ -99,6 +99,12 @@ export default function CreditsChip() {
     );
 }
 
+const DesktopOnly = styled('span')`
+    @media (max-width: 600px) {
+        display: none;
+    }
+`;
+
 const StyledChip = styled(Chip)`
     &.MuiChip-root {
         background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
@@ -106,6 +112,7 @@ const StyledChip = styled(Chip)`
         color: ${({ theme }) => theme.color['cream-100'].hex};
         font-size: 0.85rem;
         padding: ${({ theme }) => theme.spacing(0.25, 0.5)};
+        white-space: nowrap;
     }
 `;
 

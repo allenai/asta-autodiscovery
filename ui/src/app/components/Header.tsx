@@ -2,7 +2,7 @@
 
 import { Box, Button, styled } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 import AuthButton from '@/components/AuthButton';
 import CreditsChip from '@/components/CreditsChip';
@@ -17,33 +17,64 @@ interface HeaderProps {
 export default function Header({ showBackButton = false }: HeaderProps) {
     const { isAuthenticated } = useAuth0();
     const router = useRouter();
+    const pathname = usePathname();
 
     const handleBack = () => {
         router.back();
     };
 
+    const isSharedSamples = pathname.startsWith('/shared/samples');
+
     return (
-        <StyledHeader>
+        <StyledHeader $isSharedSamples={isSharedSamples}>
             {showBackButton && (
                 <BackButton onClick={handleBack} variant="outlined" startIcon={<ArrowBackIcon />}>
                     Back
                 </BackButton>
             )}
-            {isAuthenticated && <CreditsChip />}
-            <FeedbackButton />
+            {isAuthenticated && (
+                <LeftAlignedCredits>
+                    <CreditsChip />
+                </LeftAlignedCredits>
+            )}
+            <DesktopFeedback>
+                <FeedbackButton />
+            </DesktopFeedback>
             <AboutButton />
             <AuthButton />
         </StyledHeader>
     );
 }
 
-const StyledHeader = styled(Box)`
+const LeftAlignedCredits = styled('div')`
+    @media (max-width: 600px) {
+        margin-right: auto;
+    }
+`;
+
+const DesktopFeedback = styled('div')`
+    @media (max-width: 600px) {
+        display: none;
+    }
+`;
+
+const StyledHeader = styled(Box)<{ $isSharedSamples: boolean }>`
     display: flex;
     justify-content: flex-end;
     align-items: center;
     flex-wrap: wrap;
     gap: ${({ theme }) => theme.spacing(2)};
     padding: ${({ theme }) => theme.spacing(2)};
+    padding-top: ${({ theme, $isSharedSamples }) =>
+        $isSharedSamples ? theme.spacing(3) : theme.spacing(2)};
+
+    @media (max-width: 600px) {
+        flex-wrap: nowrap;
+        padding-top: ${({ theme, $isSharedSamples }) =>
+            $isSharedSamples ? theme.spacing(2) : '0'};
+        background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+        border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
 `;
 
 const BackButton = styled(Button)`
@@ -53,6 +84,7 @@ const BackButton = styled(Button)`
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};
         height: 32px;
+        white-space: nowrap;
 
         & .MuiButton-startIcon {
             margin: 0 ${({ theme }) => theme.spacing(0.75)} 0 0;

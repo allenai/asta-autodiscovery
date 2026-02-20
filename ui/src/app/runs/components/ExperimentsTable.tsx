@@ -5,6 +5,7 @@ import {
     GridRenderCellParams,
     GridRowSelectionModel,
     GridSortModel,
+    useGridApiRef,
 } from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -134,6 +135,8 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const { experiments, lastError, selectExperiment, selectedExperiment, hasJobCompleted } =
         useRunExperiments();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
+    const apiRef = useGridApiRef();
+
     // Apply default Surprisal sort when the session completes.
     useEffect(() => {
         if (hasJobCompleted) {
@@ -212,7 +215,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         return [...experimentRows, ...skeletonRows];
     }, [experiments, runStats, hasJobCompleted]);
 
-    const paginationModel = { page: 0, pageSize: 50 };
+    const paginationModel = { page: 0, pageSize: -1 };
 
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
@@ -239,6 +242,23 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         }
     };
 
+    // Scroll to the selected experiment when it changes
+    useEffect(() => {
+        console.log('Selected experiment changed:', selectedExperiment);
+        if (selectedExperiment) {
+            // find the DOM element of the selected row and scroll it into view
+            const rowElement = document.querySelector(
+                `[data-id="${selectedExperiment.idInRun}"]`
+            ) as HTMLElement | null;
+            if (rowElement) {
+                rowElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+            }
+        }
+    }, [selectedExperiment?.idInRun, rows.length, apiRef?.current]);
+
     return (
         <Wrapper>
             {lastError && (
@@ -247,6 +267,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 </Alert>
             )}
             <StyledDataGrid
+                apiRef={apiRef}
                 rows={rows}
                 columns={DEFAULT_COLUMNS}
                 loading={!runStats?.pendingExperiments && !experiments.length}
@@ -259,7 +280,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                                 : [],
                     },
                 }}
-                pageSizeOptions={[5, 10, 25, 50]}
+                pageSizeOptions={[5, 10, 25, 50, 100, { value: -1, label: 'All' }]}
                 sx={{ border: 0 }}
                 onRowClick={handleRowClick}
                 sortModel={sortModel}

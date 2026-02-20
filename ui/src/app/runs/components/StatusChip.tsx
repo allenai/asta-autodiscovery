@@ -13,6 +13,9 @@ export const StatusChip = styled(Chip, {
                 return theme.color['error-red-100'].hex;
             case 'CANCELLED':
                 return theme.color['warning-orange-100'].hex;
+            case 'SUCCEEDED':
+            case 'COMPLETED':
+                return theme.color['teal-100'].hex;
             default:
                 return theme.color['extra-dark-teal-100'].hex;
         }

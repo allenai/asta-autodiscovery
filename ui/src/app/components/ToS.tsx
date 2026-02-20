@@ -18,6 +18,12 @@ export const ToS = () => {
     return (
         <>
             <TosWrapper>
+                <MobileFeedbackLink
+                    href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    Feedback
+                </MobileFeedbackLink>
                 <Link onClick={() => setIsDisclaimerOpen(true)} {...mkDisclaimerBtnTrackAttrs()}>
                     Disclaimer
                 </Link>
@@ -58,6 +64,14 @@ export const ToS = () => {
     );
 };
 
+const MobileFeedbackLink = styled(Link)`
+    display: none;
+
+    @media (max-width: 600px) {
+        display: inline;
+    }
+`;
+
 const TosWrapper = styled(Box)(({ theme }) => ({
     borderTop: `1px solid ${theme.color['cream-10'].rgba.toString()}`,
 
@@ -75,5 +89,9 @@ const TosWrapper = styled(Box)(({ theme }) => ({
             cursor: 'pointer',
             transition: 'all 250ms ease-in-out',
         },
+    },
+
+    '@media (max-width: 600px)': {
+        justifyContent: 'center',
     },
 }));

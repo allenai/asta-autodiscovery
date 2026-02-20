@@ -46,7 +46,9 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                                 </ScrollContent>
                             </ScrollContainer>
                         </ScrollArea>
-                        <ToS />
+                        <SidebarFooter>
+                            <ToS />
+                        </SidebarFooter>
                     </Sidebar>
                 )}
 
@@ -61,6 +63,11 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                             <ScrollContent>{children}</ScrollContent>
                         </ScrollContainer>
                     </ScrollArea>
+                    {isAuthenticated && (
+                        <MobileFooter>
+                            <ToS />
+                        </MobileFooter>
+                    )}
                 </MainContent>
             </Layout>
         </Wrapper>
@@ -114,6 +121,10 @@ const Sidebar = styled('div')`
     display: flex;
     flex-direction: column;
     grid-area: sidebar;
+
+    @media (max-width: 600px) {
+        border-right: none;
+    }
 `;
 
 const MainContent = styled('div')`
@@ -133,6 +144,19 @@ const Logo = styled('a')`
         max-width: 300px;
         height: auto;
     }
+
+    @media (max-width: 600px) {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        svg {
+            height: 48px;
+            width: auto;
+            min-width: unset;
+            max-width: unset;
+        }
+    }
 `;
 
 const ScrollArea = styled(Box)`
@@ -149,4 +173,18 @@ const ScrollContent = styled('div')`
     height: 100%;
     overflow: auto;
     ${({ theme }) => scrollbarStyles(theme)}
+`;
+
+const SidebarFooter = styled('div')`
+    @media (max-width: 600px) {
+        display: none;
+    }
+`;
+
+const MobileFooter = styled('div')`
+    display: none;
+
+    @media (max-width: 600px) {
+        display: block;
+    }
 `;

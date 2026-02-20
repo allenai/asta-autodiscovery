@@ -216,6 +216,12 @@ const Header = styled('div')(({ theme }) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+
+    '@media (max-width: 600px)': {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: theme.spacing(1),
+    },
 }));
 
 const Wrapper = styled(Box)(({ theme }) => ({
@@ -235,6 +241,10 @@ const Headline = styled(Typography)(({ theme }) => ({
     fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
+
+    '@media (max-width: 600px)': {
+        marginTop: '36px',
+    },
 }));
 
 const RunsList = styled('div')(({ theme }) => ({

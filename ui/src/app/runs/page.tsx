@@ -99,6 +99,10 @@ const Layout = styled(Box)(({ theme }) => ({
     padding: theme.spacing(4),
     maxWidth: '900px',
     margin: '0 auto',
+
+    '@media (max-width: 600px)': {
+        padding: theme.spacing(3),
+    },
 }));
 
 const LoggedOutLayout = styled(Box)(({ theme }) => ({
@@ -111,7 +115,7 @@ const LoggedOutLayout = styled(Box)(({ theme }) => ({
     margin: '0 auto',
 
     '@media (max-width: 600px)': {
-        padding: theme.spacing(2),
+        padding: theme.spacing(3),
     },
 }));
 
@@ -146,7 +150,6 @@ const Attribution = styled(Typography)(({ theme }) => ({
     lineHeight: '1.5',
 
     '@media (max-width: 600px)': {
-        marginBottom: '36px',
         lineHeight: '1.75',
         opacity: 1,
     },

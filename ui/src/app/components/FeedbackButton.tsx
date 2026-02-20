@@ -21,6 +21,7 @@ const StyledButton = styled(Button)`
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};
         height: 32px;
+        white-space: nowrap;
 
         & .MuiButton-endIcon {
             margin: 0 0 0 ${({ theme }) => theme.spacing(0.75)};

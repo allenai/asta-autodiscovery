@@ -43,6 +43,10 @@ const Headline = styled(Typography)(({ theme }) => ({
     fontStyle: 'normal',
     fontWeight: 700,
     lineHeight: '115%',
+
+    '@media (max-width: 600px)': {
+        marginTop: '36px',
+    },
 }));
 
 const RunItem = styled('div')(({ theme }) => ({

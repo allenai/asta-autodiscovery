@@ -525,7 +525,9 @@ function RunViewContent({
                                 <CloseIcon />
                             </ExperimentActionButton>
                         </ExperimentActions>
-                        <ExperimentDetails experiment={selectedExperiment} />
+                        {selectedExperiment && (
+                            <ExperimentDetails experiment={selectedExperiment} />
+                        )}
                         {!isExpPanelExpanded && isDragEnabled && (
                             <PanelDragHandle
                                 side="left"

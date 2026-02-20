@@ -241,8 +241,7 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $isClosing?
         right: 0;
         z-index: 1000;
         border-radius: 24px 24px 0 0;
-        animation: ${({ $isClosing }) =>
-            $isClosing ? 'none' : 'slideUpFromBottom 0.3s ease-out'};
+        animation: ${({ $isClosing }) => ($isClosing ? 'none' : 'slideUpFromBottom 0.3s ease-out')};
         transform: ${({ $isClosing }) => ($isClosing ? 'translateY(100%)' : 'translateY(0)')};
         transition: ${({ $isClosing }) => ($isClosing ? 'transform 0.3s ease-out' : 'none')};
     }

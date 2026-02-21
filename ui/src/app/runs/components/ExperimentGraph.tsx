@@ -256,7 +256,12 @@ export const ExperimentGraph = () => {
             .append('symbol')
             .attr('id', 'bookmark-icon')
             .attr('viewBox', '0 0 24 24');
-        bookmarkSymbol.append('circle').attr('cx', 12).attr('cy', 12).attr('r', 12).attr('fill', '#0FCB8C');
+        bookmarkSymbol
+            .append('circle')
+            .attr('cx', 12)
+            .attr('cy', 12)
+            .attr('r', 12)
+            .attr('fill', '#0FCB8C');
         // Scale path to 65% and re-center within the 24x24 viewBox for padding inside circle
         bookmarkSymbol
             .append('path')
@@ -571,8 +576,7 @@ export const ExperimentGraph = () => {
             .data(
                 nodes.filter(
                     (d) =>
-                        d.data.data.id !== 'node_1_0' &&
-                        bookmarkedExperimentIds.has(d.data.data.id)
+                        d.data.data.id !== 'node_1_0' && bookmarkedExperimentIds.has(d.data.data.id)
                 )
             )
             .join('use')
@@ -615,7 +619,14 @@ export const ExperimentGraph = () => {
             // Preserve zoom/pan from previous render
             svg.call(zoom.transform, currentTransformRef.current);
         }
-    }, [experiments, dimensions, selectedExperiment, selectExperiment, hasInteracted, bookmarkedExperimentIds]);
+    }, [
+        experiments,
+        dimensions,
+        selectedExperiment,
+        selectExperiment,
+        hasInteracted,
+        bookmarkedExperimentIds,
+    ]);
 
     // Zoom control handlers
     const handleZoomIn = () => {

@@ -28,7 +28,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
             <TitleWrapper>
                 <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
                 <Bookmark>
-                    <ExperimentBookmarkControl experimentId={experiment.experimentId} />
+                    <ExperimentBookmarkControl experiment={experiment} />
                 </Bookmark>
             </TitleWrapper>
             <ContentWrapper spacing={2}>

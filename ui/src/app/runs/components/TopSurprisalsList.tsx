@@ -44,7 +44,7 @@ export const TopSurprisalsListImpl = () => {
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
                         onClick={() => selectExperiment(experiment, { scroll: false })}>
                         <Bookmark>
-                            <ExperimentBookmarkControl experimentId={experiment.experimentId} />
+                            <ExperimentBookmarkControl experiment={experiment} />
                         </Bookmark>
                         <Description>
                             <Belief>

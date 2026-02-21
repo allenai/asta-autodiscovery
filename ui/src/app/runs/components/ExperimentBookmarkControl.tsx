@@ -8,60 +8,26 @@ import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { useToasts } from '@/contexts/ToastsContext';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { Experiment } from '@/types/Run';
 
 export const ExperimentBookmarkControl = ({
-    experimentId,
+    experiment,
     hasBookmarkIcon = true,
     noBookmarkIcon = true,
     isToggleable = true,
     onChange,
 }: {
-    experimentId?: string | null;
+    experiment?: Experiment;
     hasBookmarkIcon?: ReactNode;
     noBookmarkIcon?: ReactNode;
     isToggleable?: boolean;
     onChange?: (newValue: boolean) => void;
 }) => {
     const runsApi = getRunsApi();
-    const { viewerRuns, updateViewerRun } = useViewerRuns();
-    const { runid: runId } = useRunExperiments();
+    const { runid: runId, bookmarkedExperimentIds, updateExperimentBookmark } = useRunExperiments();
     const { addErrorToast } = useToasts();
 
-    const run = runId && viewerRuns ? viewerRuns[runId] : null;
-
-    const isBookmarked = useMemo(() => {
-        if (!run || !experimentId) {
-            return false;
-        }
-        const bookmarkedExperimentIds = new Set(run?.metadata?.bookmarkedExperimentIds || []);
-        return bookmarkedExperimentIds.has(experimentId);
-    }, [run, experimentId]);
-
-    // Update bookmark state locally
-    const setIsBookmarked = useCallback(
-        (isBookmarked: boolean) => {
-            const metadata = run?.metadata;
-            if (!metadata || !experimentId) {
-                return; // Can't update bookmark without both runId and experimentId
-            }
-
-            const bookmarkedExperimentIds = new Set(metadata.bookmarkedExperimentIds || []);
-            if (isBookmarked) {
-                bookmarkedExperimentIds.add(experimentId);
-            } else {
-                bookmarkedExperimentIds.delete(experimentId);
-            }
-
-            updateViewerRun({
-                id: run.id,
-                metadata: {
-                    ...metadata,
-                    bookmarkedExperimentIds: Array.from(bookmarkedExperimentIds),
-                },
-            });
-        },
-        [updateViewerRun, run, experimentId]
-    );
+    const isBookmarked = experiment ? bookmarkedExperimentIds.has(experiment.experimentId) : false;
 
     // Toggle bookmark state optimistically, then make API call. If API call
     // fails, revert state and show error toast.
@@ -71,24 +37,24 @@ export const ExperimentBookmarkControl = ({
             event.stopPropagation(); // Prevent click from propagating to parent elements (e.g., experiment item)
 
             const isNowBookmarked = !isBookmarked;
-            setIsBookmarked(isNowBookmarked);
+            updateExperimentBookmark(experiment!, { isBookmarked: isNowBookmarked });
 
             try {
                 await runsApi.bookmarkExperiment({
                     runId: runId!,
-                    experimentId: experimentId!,
+                    experimentId: experiment!.experimentId,
                     isBookmarked: isNowBookmarked,
                 });
             } catch (error) {
                 console.error('Error toggling bookmark:', error);
                 addErrorToast('Failed to update bookmark. Please try again.');
-                setIsBookmarked(!isNowBookmarked);
+                updateExperimentBookmark(experiment!, { isBookmarked: !isNowBookmarked });
                 return;
             }
 
             onChange?.(isNowBookmarked);
         },
-        [isBookmarked, onChange, runId, experimentId, addErrorToast, setIsBookmarked]
+        [isBookmarked, onChange, runId, experiment, addErrorToast, updateExperimentBookmark]
     );
 
     // If the caller doesn't provide custom icons, use defaults. If they do
@@ -112,8 +78,8 @@ export const ExperimentBookmarkControl = ({
             </IconButton>
         );
 
-    if (!runId || !experimentId) {
-        return null; // Can't bookmark without both runId and experimentId
+    if (!runId || !experiment) {
+        return null; // Can't bookmark without both runId and experiment
     }
     return (
         <ClickableArea

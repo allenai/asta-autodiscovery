@@ -20,16 +20,14 @@ const DEFAULT_PAGE_SIZE = -1;
 
 const DEFAULT_COLUMNS: GridColDef[] = [
     {
-        field: 'bookmarked',
-        headerName: '',
+        field: 'isBookmarked',
+        headerName: 'Bookmarked',
         width: 40,
         minWidth: 40,
         align: 'center',
         renderCell: (params: GridRenderCellParams) => {
-            return <ExperimentBookmarkControl experimentId={params.row.experimentId} />;
+            return <ExperimentBookmarkControl experiment={params.row.experiment} />;
         },
-        sortable: false,
-        filterable: false,
     },
     {
         field: 'id',
@@ -154,6 +152,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         selectedExperiment,
         hasJobCompleted,
         shouldScrollToSelected,
+        bookmarkedExperimentIds,
     } = useRunExperiments();
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
@@ -213,7 +212,8 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiments.length + i,
                 runtimeMs: 'N/A',
                 isSkeleton: true,
-                experimentId: null,
+                isBookmarked: false,
+                experiment: null,
             }));
             return skeletonRows;
         }
@@ -247,14 +247,15 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiment.creationIdx,
                 runtimeMs: isInconclusiveOrFailed ? 'N/A' : experiment.runtimeMs ?? 'N/A',
                 isSkeleton: false,
-                experimentId: experiment.experimentId,
+                isBookmarked: bookmarkedExperimentIds.has(experiment.experimentId),
+                experiment,
             };
         });
 
         // Add skeleton rows for pending experiments if job is not completed
         const skeletonRows = createSkeletonRows();
         return [...experimentRows, ...skeletonRows];
-    }, [experiments, runStats, hasJobCompleted]);
+    }, [experiments, runStats, hasJobCompleted, bookmarkedExperimentIds]);
 
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {

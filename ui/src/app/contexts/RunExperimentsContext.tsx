@@ -14,6 +14,7 @@ import {
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Experiment, getExperimentFromApi } from '@/types/Run';
+import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 
 export interface RunExperimentsState {
     isPolling: boolean;
@@ -21,6 +22,7 @@ export interface RunExperimentsState {
     stopPolling: () => void;
     isLoading: boolean;
     runid: string | null;
+    bookmarkedExperimentIds: Set<string>;
     experiments: Experiment[];
     lastError: string | null;
     hasJobCompleted: boolean;
@@ -28,6 +30,10 @@ export interface RunExperimentsState {
     selectedExperimentError: string | null;
     isLoadingSelectedExperiment: boolean;
     selectExperiment: (experiment: Experiment | null, options?: { scroll?: boolean }) => void;
+    updateExperimentBookmark: (
+        experiment: Experiment,
+        { isBookmarked }: { isBookmarked: boolean }
+    ) => void;
     shouldScrollToSelected: MutableRefObject<boolean>;
 }
 
@@ -37,6 +43,7 @@ export const DEFAULT_STATE: RunExperimentsState = {
     stopPolling: () => {},
     isLoading: false,
     runid: null,
+    bookmarkedExperimentIds: new Set(),
     experiments: [],
     lastError: null,
     hasJobCompleted: false,
@@ -44,6 +51,7 @@ export const DEFAULT_STATE: RunExperimentsState = {
     selectedExperimentError: null,
     isLoadingSelectedExperiment: false,
     selectExperiment: () => {},
+    updateExperimentBookmark: () => {},
     shouldScrollToSelected: { current: true },
 };
 
@@ -76,6 +84,7 @@ export const RunExperimentsProvider = ({
     refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS,
 }: RunExperimentsProps) => {
     const runsApi = getRunsApi();
+    const { viewerRuns, updateViewerRun } = useViewerRuns();
 
     const [isPolling, setIsPolling] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -247,6 +256,43 @@ export const RunExperimentsProvider = ({
         };
     }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted]);
 
+    const bookmarkedExperimentIds = useMemo(() => {
+        if (!runid || !viewerRuns) {
+            return new Set<string>();
+        }
+        const run = viewerRuns[runid];
+        return new Set(run?.metadata?.bookmarkedExperimentIds || []);
+    }, [runid, viewerRuns]);
+
+    const updateExperimentBookmark = useCallback(
+        (experiment: Experiment, { isBookmarked }: { isBookmarked: boolean }) => {
+            if (!runid) {
+                return;
+            }
+            const metadata = viewerRuns?.[runid]?.metadata;
+            if (!metadata) {
+                return;
+            }
+
+            const expIds = new Set(bookmarkedExperimentIds);
+            if (isBookmarked) {
+                expIds.add(experiment.experimentId);
+            } else {
+                expIds.delete(experiment.experimentId);
+            }
+
+            // Optimistically update bookmark state in context
+            updateViewerRun({
+                id: runid,
+                metadata: {
+                    ...metadata,
+                    bookmarkedExperimentIds: Array.from(expIds),
+                },
+            });
+        },
+        [updateViewerRun, viewerRuns, runid, bookmarkedExperimentIds]
+    );
+
     const memoizedState = useMemo<RunExperimentsState>(
         () => ({
             runid,
@@ -261,7 +307,9 @@ export const RunExperimentsProvider = ({
             startPolling,
             stopPolling,
             selectExperiment,
+            updateExperimentBookmark,
             shouldScrollToSelected,
+            bookmarkedExperimentIds,
         }),
         [
             runid,
@@ -276,6 +324,9 @@ export const RunExperimentsProvider = ({
             startPolling,
             stopPolling,
             selectExperiment,
+            updateExperimentBookmark,
+            shouldScrollToSelected,
+            bookmarkedExperimentIds,
         ]
     );
 

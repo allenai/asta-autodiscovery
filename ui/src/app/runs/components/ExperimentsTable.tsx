@@ -14,10 +14,22 @@ import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/E
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
+import { useAuth0 } from '@/contexts/Auth0Context';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 const DEFAULT_PAGE_SIZE = -1;
 
 const DEFAULT_COLUMNS: GridColDef[] = [
+    {
+        field: 'isBookmarked',
+        headerName: 'Bookmarked',
+        width: 40,
+        minWidth: 40,
+        align: 'center',
+        renderCell: (params: GridRenderCellParams) => {
+            return <ExperimentBookmarkControl experiment={params.row.experiment} />;
+        },
+    },
     {
         field: 'id',
         headerName: 'ID',
@@ -141,8 +153,17 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         selectedExperiment,
         hasJobCompleted,
         shouldScrollToSelected,
+        bookmarkedExperimentIds,
     } = useRunExperiments();
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
+    const { isAuthenticated } = useAuth0();
+    const columns = useMemo(
+        () =>
+            isAuthenticated
+                ? DEFAULT_COLUMNS
+                : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked'),
+        [isAuthenticated]
+    );
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
     const [paginationModel, setPaginationModel] = useState(() => {
@@ -200,6 +221,8 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiments.length + i,
                 runtimeMs: 'N/A',
                 isSkeleton: true,
+                isBookmarked: false,
+                experiment: null,
             }));
             return skeletonRows;
         }
@@ -233,13 +256,15 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiment.creationIdx,
                 runtimeMs: isInconclusiveOrFailed ? 'N/A' : experiment.runtimeMs ?? 'N/A',
                 isSkeleton: false,
+                isBookmarked: bookmarkedExperimentIds.has(experiment.experimentId),
+                experiment,
             };
         });
 
         // Add skeleton rows for pending experiments if job is not completed
         const skeletonRows = createSkeletonRows();
         return [...experimentRows, ...skeletonRows];
-    }, [experiments, runStats, hasJobCompleted]);
+    }, [experiments, runStats, hasJobCompleted, bookmarkedExperimentIds]);
 
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
@@ -291,7 +316,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
             )}
             <StyledDataGrid
                 rows={rows}
-                columns={DEFAULT_COLUMNS}
+                columns={columns}
                 loading={!runStats?.pendingExperiments && !experiments.length}
                 paginationModel={paginationModel}
                 onPaginationModelChange={handlePaginationModelChange}

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel } from '../utils/ExperimentUtils';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 export const COLLAPSED_SURPRISALS_COUNT = 2;
 
@@ -42,6 +43,9 @@ export const TopSurprisalsListImpl = () => {
                         key={experiment.experimentId}
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
                         onClick={() => selectExperiment(experiment, { scroll: false })}>
+                        <Bookmark>
+                            <ExperimentBookmarkControl experiment={experiment} />
+                        </Bookmark>
                         <Description>
                             <Belief>
                                 It's{' '}
@@ -128,6 +132,12 @@ const Item = styled('li')<{ $isSelected?: boolean }>`
         background-color: ${({ theme, $isSelected }) =>
             $isSelected ? theme.color['green-100'].hex : 'transparent'};
     }
+`;
+
+const Bookmark = styled('div')`
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
 `;
 
 const Description = styled('div')``;

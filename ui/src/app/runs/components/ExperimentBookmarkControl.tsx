@@ -2,7 +2,7 @@ import { styled } from '@mui/material';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import IconButton from '@mui/material/IconButton';
-import { ReactNode, useCallback, useMemo, useState, MouseEvent } from 'react';
+import { ReactNode, useCallback, useMemo, MouseEvent } from 'react';
 
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { getRunsApi } from '@/api/RunsApi';

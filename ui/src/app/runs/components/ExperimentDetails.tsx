@@ -19,7 +19,7 @@ type ExperimentDetailsProps = {
 };
 
 export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
-    const { runid, isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
+    const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
 
@@ -28,10 +28,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
             <TitleWrapper>
                 <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
                 <Bookmark>
-                    <ExperimentBookmarkControl
-                        runId={runid}
-                        experimentId={experiment.experimentId}
-                    />
+                    <ExperimentBookmarkControl experimentId={experiment.experimentId} />
                 </Bookmark>
             </TitleWrapper>
             <ContentWrapper spacing={2}>

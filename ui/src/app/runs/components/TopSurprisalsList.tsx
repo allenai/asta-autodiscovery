@@ -17,7 +17,7 @@ export const TopSurprisalsList = () => {
 };
 
 export const TopSurprisalsListImpl = () => {
-    const { runid, experiments, selectedExperiment, selectExperiment } = useRunExperiments();
+    const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
 
     const surprisals = experiments
         .filter((exp) => exp.isSurprising)
@@ -44,10 +44,7 @@ export const TopSurprisalsListImpl = () => {
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
                         onClick={() => selectExperiment(experiment, { scroll: false })}>
                         <Bookmark>
-                            <ExperimentBookmarkControl
-                                runId={runid}
-                                experimentId={experiment.experimentId}
-                            />
+                            <ExperimentBookmarkControl experimentId={experiment.experimentId} />
                         </Bookmark>
                         <Description>
                             <Belief>

@@ -7,16 +7,15 @@ import { ReactNode, useCallback, useMemo, useState, MouseEvent } from 'react';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { useToasts } from '@/contexts/ToastsContext';
+import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 
 export const ExperimentBookmarkControl = ({
-    runId,
     experimentId,
     hasBookmarkIcon = true,
     noBookmarkIcon = true,
     isToggleable = true,
     onChange,
 }: {
-    runId?: string | null;
     experimentId?: string | null;
     hasBookmarkIcon?: ReactNode;
     noBookmarkIcon?: ReactNode;
@@ -25,6 +24,7 @@ export const ExperimentBookmarkControl = ({
 }) => {
     const runsApi = getRunsApi();
     const { viewerRuns, updateViewerRun } = useViewerRuns();
+    const { runid: runId } = useRunExperiments();
     const { addErrorToast } = useToasts();
 
     const run = runId && viewerRuns ? viewerRuns[runId] : null;
@@ -88,7 +88,7 @@ export const ExperimentBookmarkControl = ({
 
             onChange?.(isNowBookmarked);
         },
-        [isBookmarked, onChange, runId, experimentId, addErrorToast]
+        [isBookmarked, onChange, runId, experimentId, addErrorToast, setIsBookmarked]
     );
 
     // If the caller doesn't provide custom icons, use defaults. If they do

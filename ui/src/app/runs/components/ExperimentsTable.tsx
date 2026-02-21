@@ -14,10 +14,23 @@ import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/E
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 const DEFAULT_PAGE_SIZE = -1;
 
 const DEFAULT_COLUMNS: GridColDef[] = [
+    {
+        field: 'bookmarked',
+        headerName: '',
+        width: 40,
+        minWidth: 40,
+        align: 'center',
+        renderCell: (params: GridRenderCellParams) => {
+            return <ExperimentBookmarkControl experimentId={params.row.experimentId} />;
+        },
+        sortable: false,
+        filterable: false,
+    },
     {
         field: 'id',
         headerName: 'ID',
@@ -200,6 +213,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiments.length + i,
                 runtimeMs: 'N/A',
                 isSkeleton: true,
+                experimentId: null,
             }));
             return skeletonRows;
         }
@@ -233,6 +247,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiment.creationIdx,
                 runtimeMs: isInconclusiveOrFailed ? 'N/A' : experiment.runtimeMs ?? 'N/A',
                 isSkeleton: false,
+                experimentId: experiment.experimentId,
             };
         });
 

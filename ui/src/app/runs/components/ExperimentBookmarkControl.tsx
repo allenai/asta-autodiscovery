@@ -23,7 +23,7 @@ export const ExperimentBookmarkControl = ({
     onChange?: (newValue: boolean) => void;
 }) => {
     const runsApi = getRunsApi();
-    const { runid: runId, bookmarkedExperimentIds, updateExperimentBookmark } = useRunExperiments();
+    const { runid, bookmarkedExperimentIds, updateExperimentBookmark } = useRunExperiments();
     const { addErrorToast } = useToasts();
 
     const isBookmarked = experiment ? bookmarkedExperimentIds.has(experiment.experimentId) : false;
@@ -40,7 +40,7 @@ export const ExperimentBookmarkControl = ({
 
             try {
                 await runsApi.bookmarkExperiment({
-                    runId: runId!,
+                    runId: runid!,
                     experimentId: experiment!.experimentId,
                     isBookmarked: isNowBookmarked,
                 });
@@ -53,7 +53,7 @@ export const ExperimentBookmarkControl = ({
 
             onChange?.(isNowBookmarked);
         },
-        [isBookmarked, onChange, runId, experiment, addErrorToast, updateExperimentBookmark]
+        [isBookmarked, onChange, runid, experiment, addErrorToast, updateExperimentBookmark]
     );
 
     // If the caller doesn't provide custom icons, use defaults. If they do
@@ -77,7 +77,7 @@ export const ExperimentBookmarkControl = ({
             </IconButton>
         );
 
-    if (!runId || !experiment) {
+    if (!runid || !experiment) {
         return null; // Can't bookmark without both runId and experiment
     }
     return (

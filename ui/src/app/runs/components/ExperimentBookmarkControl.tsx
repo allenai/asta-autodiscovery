@@ -11,51 +11,60 @@ import { useToasts } from '@/contexts/ToastsContext';
 export const ExperimentBookmarkControl = ({
     runId,
     experimentId,
-    hasBookmark = true,
-    noBookmark = true,
+    hasBookmarkIcon = true,
+    noBookmarkIcon = true,
+    isToggleable = true,
     onChange,
-    isTaggable: isToggleable = true,
 }: {
     runId?: string | null;
     experimentId?: string | null;
-    hasBookmark?: ReactNode;
-    noBookmark?: ReactNode;
+    hasBookmarkIcon?: ReactNode;
+    noBookmarkIcon?: ReactNode;
+    isToggleable?: boolean;
     onChange?: (newValue: boolean) => void;
-    isTaggable?: boolean;
 }) => {
     const runsApi = getRunsApi();
-    const { viewerRuns } = useViewerRuns();
+    const { viewerRuns, updateViewerRun } = useViewerRuns();
     const { addErrorToast } = useToasts();
 
-    // Determine if the experiment is currently bookmarked based on viewerRuns context
-    const isBookmarkedInRun = useMemo(() => {
-        if (!runId || !experimentId) {
-            return false; // Can't be bookmarked without both runId and experimentId
+    const run = runId && viewerRuns ? viewerRuns[runId] : null;
+
+    const isBookmarked = useMemo(() => {
+        if (!run || !experimentId) {
+            return false;
         }
-        const run = viewerRuns ? viewerRuns[runId] : null;
         const bookmarkedExperimentIds = new Set(run?.metadata?.bookmarkedExperimentIds || []);
         return bookmarkedExperimentIds.has(experimentId);
-    }, [viewerRuns, runId, experimentId]);
+    }, [run, experimentId]);
 
-    // Allow for optimistic UI update by keeping local state in sync with prop, but decoupled to avoid UI lag during API call
-    const [isBookmarked, setIsBookmarked] = useState(isBookmarkedInRun);
-    const viewHasBookmark =
-        hasBookmark !== true ? (
-            hasBookmark
-        ) : (
-            <IconButton>
-                <BookmarkIcon />
-            </IconButton>
-        );
-    const viewNoBookmark =
-        noBookmark !== true ? (
-            noBookmark
-        ) : (
-            <IconButton>
-                <BookmarkBorderIcon />
-            </IconButton>
-        );
+    // Update bookmark state locally
+    const setIsBookmarked = useCallback(
+        (isBookmarked: boolean) => {
+            const metadata = run?.metadata;
+            if (!metadata || !experimentId) {
+                return; // Can't update bookmark without both runId and experimentId
+            }
 
+            const bookmarkedExperimentIds = new Set(metadata.bookmarkedExperimentIds || []);
+            if (isBookmarked) {
+                bookmarkedExperimentIds.add(experimentId);
+            } else {
+                bookmarkedExperimentIds.delete(experimentId);
+            }
+
+            updateViewerRun({
+                id: run.id,
+                metadata: {
+                    ...metadata,
+                    bookmarkedExperimentIds: Array.from(bookmarkedExperimentIds),
+                },
+            });
+        },
+        [updateViewerRun, run, experimentId]
+    );
+
+    // Toggle bookmark state optimistically, then make API call. If API call
+    // fails, revert state and show error toast.
     const onClickToggle = useCallback(
         async (event: MouseEvent<HTMLElement>) => {
             event.preventDefault();
@@ -73,6 +82,7 @@ export const ExperimentBookmarkControl = ({
             } catch (error) {
                 console.error('Error toggling bookmark:', error);
                 addErrorToast('Failed to update bookmark. Please try again.');
+                setIsBookmarked(!isNowBookmarked);
                 return;
             }
 
@@ -80,6 +90,27 @@ export const ExperimentBookmarkControl = ({
         },
         [isBookmarked, onChange, runId, experimentId, addErrorToast]
     );
+
+    // If the caller doesn't provide custom icons, use defaults. If they do
+    // provide custom icons, use those instead (even if they are just boolean
+    // flags). This allows the caller to control the appearance while we handle
+    // the logic.
+    const viewHasBookmark =
+        hasBookmarkIcon !== true ? (
+            hasBookmarkIcon
+        ) : (
+            <IconButton>
+                <BookmarkIcon />
+            </IconButton>
+        );
+    const viewNoBookmark =
+        noBookmarkIcon !== true ? (
+            noBookmarkIcon
+        ) : (
+            <IconButton>
+                <BookmarkBorderIcon />
+            </IconButton>
+        );
 
     if (!runId || !experimentId) {
         return null; // Can't bookmark without both runId and experimentId

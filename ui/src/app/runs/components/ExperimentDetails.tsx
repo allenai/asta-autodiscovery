@@ -12,13 +12,14 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
 import { BeliefDistributionPlot } from '@/runs/components/BeliefDistributionPlot';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
 };
 
 export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
-    const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
+    const { runid, isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
 
@@ -26,6 +27,12 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
         <DetailsWrapper spacing={0}>
             <TitleWrapper>
                 <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
+                <Bookmark>
+                    <ExperimentBookmarkControl
+                        runId={runid}
+                        experimentId={experiment.experimentId}
+                    />
+                </Bookmark>
             </TitleWrapper>
             <ContentWrapper spacing={2}>
                 {experiment.status !== 'SUCCEEDED' && (
@@ -170,11 +177,18 @@ const ContentWrapper = styled(Stack)`
 
 const ExperimentName = styled('h2')`
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    display: inline-block;
     font-family: 'PP Telegraf', Manrope, sans-serif;
     font-weight: 700;
     font-size: 20px;
     line-height: 24px;
     margin: 0;
+    vertical-align: middle;
+`;
+
+const Bookmark = styled('div')`
+    display: inline-block;
+    vertical-align: middle;
 `;
 
 const SectionHeader = styled(Typography)`

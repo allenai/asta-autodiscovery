@@ -14,6 +14,7 @@ import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/E
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
+import { useAuth0 } from '@/contexts/Auth0Context';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 const DEFAULT_PAGE_SIZE = -1;
@@ -155,6 +156,14 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         bookmarkedExperimentIds,
     } = useRunExperiments();
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
+    const { isAuthenticated } = useAuth0();
+    const columns = useMemo(
+        () =>
+            isAuthenticated
+                ? DEFAULT_COLUMNS
+                : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked'),
+        [isAuthenticated]
+    );
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
     const [paginationModel, setPaginationModel] = useState(() => {
@@ -307,7 +316,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
             )}
             <StyledDataGrid
                 rows={rows}
-                columns={DEFAULT_COLUMNS}
+                columns={columns}
                 loading={!runStats?.pendingExperiments && !experiments.length}
                 paginationModel={paginationModel}
                 onPaginationModelChange={handlePaginationModelChange}

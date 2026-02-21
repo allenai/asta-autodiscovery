@@ -7,6 +7,7 @@ import { ReactNode, useCallback, MouseEvent } from 'react';
 import { getRunsApi } from '@/api/RunsApi';
 import { useToasts } from '@/contexts/ToastsContext';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useAuth0 } from '@/contexts/Auth0Context';
 import { Experiment } from '@/types/Run';
 
 export const ExperimentBookmarkControl = ({
@@ -22,6 +23,7 @@ export const ExperimentBookmarkControl = ({
     isToggleable?: boolean;
     onChange?: (newValue: boolean) => void;
 }) => {
+    const { isAuthenticated } = useAuth0();
     const runsApi = getRunsApi();
     const { runid, bookmarkedExperimentIds, updateExperimentBookmark } = useRunExperiments();
     const { addErrorToast } = useToasts();
@@ -77,8 +79,8 @@ export const ExperimentBookmarkControl = ({
             </IconButton>
         );
 
-    if (!runid || !experiment) {
-        return null; // Can't bookmark without both runId and experiment
+    if (!isAuthenticated || !runid || !experiment) {
+        return null;
     }
     return (
         <ClickableArea

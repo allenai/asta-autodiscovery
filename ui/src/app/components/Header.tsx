@@ -9,30 +9,46 @@ import CreditsChip from '@/components/CreditsChip';
 import { AboutButton } from '@/components/AboutButton';
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { filterTransientProps } from '@/utils/styledProps';
 
-interface HeaderProps {
-    showBackButton?: boolean;
-}
-
-export default function Header({ showBackButton = false }: HeaderProps) {
+// Smart component — reads hooks, computes props, delegates rendering
+export function Header() {
     const { isAuthenticated } = useAuth0();
     const router = useRouter();
     const pathname = usePathname();
 
-    const handleBack = () => {
-        router.back();
-    };
+    return (
+        <HeaderView
+            showBackButton={pathname.startsWith('/shared') && !isAuthenticated}
+            showCredits={isAuthenticated}
+            isSharedSamples={pathname.startsWith('/shared/samples')}
+            onBack={() => router.back()}
+        />
+    );
+}
 
-    const isSharedSamples = pathname.startsWith('/shared/samples');
+// Dumb component — no hooks, accepts all variable data as explicit props
+interface HeaderViewProps {
+    showBackButton: boolean;
+    showCredits: boolean;
+    isSharedSamples: boolean;
+    onBack: () => void;
+}
 
+export function HeaderView({
+    showBackButton,
+    showCredits,
+    isSharedSamples,
+    onBack,
+}: HeaderViewProps) {
     return (
         <StyledHeader $isSharedSamples={isSharedSamples}>
             {showBackButton && (
-                <BackButton onClick={handleBack} variant="outlined" startIcon={<ArrowBackIcon />}>
+                <BackButton onClick={onBack} variant="outlined" startIcon={<ArrowBackIcon />}>
                     Back
                 </BackButton>
             )}
-            {isAuthenticated && (
+            {showCredits && (
                 <LeftAlignedCredits>
                     <CreditsChip />
                 </LeftAlignedCredits>
@@ -58,7 +74,9 @@ const DesktopFeedback = styled('div')`
     }
 `;
 
-const StyledHeader = styled(Box)<{ $isSharedSamples: boolean }>`
+const StyledHeader = styled(Box, { shouldForwardProp: filterTransientProps })<{
+    $isSharedSamples: boolean;
+}>`
     display: flex;
     justify-content: flex-end;
     align-items: center;

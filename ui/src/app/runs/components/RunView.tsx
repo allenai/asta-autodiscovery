@@ -258,7 +258,7 @@ function RunViewContent({
         experiments,
         selectedExperiment,
         selectExperiment,
-        isLoading: isLoadingExperiments,
+        isLoadingInitial: isLoadingInitialExperiments,
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
@@ -313,7 +313,7 @@ function RunViewContent({
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
         if (hasInitiallySelected.current || !expParam) return;
-        if (isLoadingExperiments || experiments.length === 0) return;
+        if (isLoadingInitialExperiments || experiments.length === 0) return;
 
         const expId = parseInt(expParam, 10);
         if (!expId || expId <= 0 || isNaN(expId)) return;
@@ -327,7 +327,7 @@ function RunViewContent({
             hasInitiallySelected.current = true;
             isUpdatingFromURL.current = false;
         }
-    }, [expParam, experiments, isLoadingExperiments, selectExperiment]);
+    }, [expParam, experiments, isLoadingInitialExperiments, selectExperiment]);
 
     // Write to URL: Update URL when selection changes
     useEffect(() => {
@@ -434,7 +434,7 @@ function RunViewContent({
                             {run.stats && (
                                 <ExperimentCount>
                                     <HourglassTopOutlinedIcon />
-                                    {isLoadingExperiments ? (
+                                    {isLoadingInitialExperiments ? (
                                         'Loading experiments...'
                                     ) : (
                                         <>

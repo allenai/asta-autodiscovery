@@ -186,7 +186,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--dedupe",
             action=argparse.BooleanOptionalAction,
-            default=True,
+            default=False,
             help="Run deduplication after MCTS",
         )
         self.add_argument(

@@ -63,6 +63,7 @@ const UploadProgress = ({ upload }: { upload: FileUploadState }) => {
 
 interface DatasetUploadProps {
     fileUploads: FileUploadState[];
+    maxFileSize?: string | null;
     onFileSelect: (files: File[]) => void;
     onRemoveFileUpload: (index: number) => void;
     onDescriptionChange: (index: number, description: string) => void;
@@ -83,6 +84,7 @@ interface DatasetUploadProps {
  */
 export default function DatasetUpload({
     fileUploads,
+    maxFileSize,
     onFileSelect,
     onRemoveFileUpload,
     onDescriptionChange,
@@ -163,7 +165,9 @@ export default function DatasetUpload({
                     Drop files here or browse
                 </Typography>
                 <Typography variant="caption" sx={{ mt: 1, opacity: 0.6 }}>
-                    Max 10GB per file, 20GB total session limit
+                    {maxFileSize
+                        ? `Max ${maxFileSize} per file`
+                        : 'Max 10GB per file, 20GB total session limit'}
                 </Typography>
             </DropZone>
 

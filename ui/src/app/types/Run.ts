@@ -24,6 +24,7 @@ export type Run = {
     stats: RunStats | null;
     executionStatus?: Record<string, unknown> | null;
     metadata?: Metadata | null;
+    maxFileSize?: string | null;
 };
 
 export type RunStats = {
@@ -119,6 +120,7 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         stats: getRunStatsFromApi(runFromApi.run_stats),
         executionStatus: runFromApi.execution_status || null,
         metadata: getMetadataFromApi(runFromApi.run_metadata) || null,
+        maxFileSize: runFromApi.max_file_size || null,
     };
 };
 

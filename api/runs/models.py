@@ -306,6 +306,7 @@ class CreateRunResponseModel(BaseModel):
     path: str = Field(..., description="GCS path where the run is stored")
     message: str = Field(..., description="Success message")
     run_details: RunDetailsModel = Field(..., description="Initial run details")
+    max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
 
 
 class GetRunRequestModel(BaseModel):

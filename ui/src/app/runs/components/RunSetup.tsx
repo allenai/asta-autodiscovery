@@ -47,6 +47,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         settings,
         creditsAvailable,
         fileUploads,
+        maxFileSize,
         fieldErrors,
         isSubmitting,
         formError,
@@ -152,6 +153,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     <StyledFormLabel>Upload source files</StyledFormLabel>
                     <DatasetUpload
                         fileUploads={fileUploads}
+                        maxFileSize={maxFileSize}
                         onFileSelect={handleFileSelect}
                         onRemoveFileUpload={handleRemoveFileUpload}
                         onDescriptionChange={handleFileDescriptionChange}

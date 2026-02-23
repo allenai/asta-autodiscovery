@@ -92,7 +92,8 @@ SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 
 # Max size of files that can be uploaded
 UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
-UPLOAD_MAX_FILE_SIZE_BYTES_HIGHER_LIMIT = 100 * 1024 * 1024 * 1024  # 100GB for users with higher upload limit permission
+UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = 100 * 1024 * 1024 * 1024  # 100GB for users with higher upload limit permission
+UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR = "100GB"
 
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
@@ -138,7 +139,7 @@ def create() -> Blueprint:
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
     @api.route("/create", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def create_run():
         """Create a new run with auto-generated UUID.
 
@@ -165,11 +166,16 @@ def create() -> Blueprint:
             # Create run_details.json
             run_details = create_run_details(userid, runid)
 
+            # Check if user has HIGHER_UPLOAD_LIMIT permission and return the actual limit
+            has_higher_upload_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+            max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+
             resp = CreateRunResponseModel(
                 runid=runid,
                 path=path,
                 message="Run created successfully",
                 run_details=RunDetailsModel(**run_details.to_dict()),
+                max_file_size=max_file_size,
             )
             return jsonify(resp.model_dump()), 200
         except JobAlreadyExistsError as e:
@@ -572,7 +578,7 @@ def create() -> Blueprint:
             # Validate file size - use higher limit for users with permission
             has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
             max_file_size = (
-                UPLOAD_MAX_FILE_SIZE_BYTES_HIGHER_LIMIT if has_higher_limit else UPLOAD_MAX_FILE_SIZE_BYTES
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES if has_higher_limit else UPLOAD_MAX_FILE_SIZE_BYTES
             )
 
             if req.file_size_bytes < 0:

@@ -1,5 +1,6 @@
 import json
 import os
+from enum import Enum
 from functools import wraps
 
 import jwt
@@ -9,6 +10,11 @@ from jwt.algorithms import RSAAlgorithm
 
 # Cache for Auth0 public keys
 _jwks_cache = {}
+
+
+class PermissionType(Enum):
+    ADMIN = "enroll:autodiscovery_admin"
+    HIGHER_UPLOAD_LIMIT = "enroll:higher_upload_limit"
 
 
 def get_public_key(auth0_domain, kid):
@@ -58,8 +64,11 @@ def verify_token(token, auth0_domain, auth0_audience):
         raise ValueError(f"Invalid token: {str(e)}")
 
 
-def requires_auth(required_permission=None):
-    """Decorator to require authentication and optionally a specific permission"""
+def requires_auth(
+    required_permission = None,
+    check_permissions: list[PermissionType] = [],
+):
+    """Decorator to require authentication and optionally check specific permissions"""
 
     def decorator(f):
         @wraps(f)
@@ -93,18 +102,22 @@ def requires_auth(required_permission=None):
                     payload["sub"] = masquerade_user
                 request.user = payload
 
+                # Permissions are typically in the "permissions" claim as an array
+                permissions = payload.get("permissions", [])
+                if not isinstance(permissions, list):
+                    permissions = [permissions]
+
                 # Check for required permission if specified
                 if required_permission:
-                    # Permissions are typically in the "permissions" claim as an array
-                    permissions = payload.get("permissions", [])
-
-                    if not isinstance(permissions, list):
-                        permissions = [permissions]
-
                     if required_permission not in permissions:
                         return jsonify(
                             {"error": f"Access denied. Required permission: {required_permission}"}
                         ), 403
+
+                # Check for optional permissions and set flags on request object
+                if check_permissions:
+                    for perm_type in check_permissions:
+                        setattr(request, perm_type.value, perm_type.value in permissions)
 
             except ValueError as e:
                 return jsonify({"error": str(e)}), 401
@@ -123,7 +136,7 @@ def requires_enrollment(f):
     AUTH0_REQUIRED_PERMISSION environment variable. If not set or empty, no permission is required.
 
     Usage:
-        @requires_default_permission
+        @requires_enrollment
         def my_route():
             ...
     """

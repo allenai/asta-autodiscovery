@@ -19,7 +19,7 @@ export function Header() {
 
     return (
         <HeaderView
-            showBackButton={pathname.startsWith('/shared')}
+            showBackButton={pathname.startsWith('/shared') && !isAuthenticated}
             showCredits={isAuthenticated}
             isSharedSamples={pathname.startsWith('/shared/samples')}
             onBack={() => router.back()}

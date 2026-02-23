@@ -18,7 +18,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--belief_model",
             type=str,
-            default="gemini-3-pro-preview",
+            default="gemini-3-flash-preview",
             help="LLM to use for belief distribution agent.",
         )
         self.add_argument(
@@ -55,7 +55,7 @@ class ArgParser(argparse.ArgumentParser):
             "--belief_reasoning_effort",
             type=str,
             choices=["minimal", "low", "medium", "high"],
-            default="minimal",
+            default="low",
             help=(
                 "Reasoning effort for belief model calls. "
                 "Supports Gemini and reasoning-capable OpenAI models."
@@ -101,7 +101,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--n_belief_samples",
             type=int,
-            default=30,
+            default=5,
             help="Number of samples for belief distribution evaluation",
         )
         self.add_argument(

@@ -9,7 +9,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from utils.auth import requires_auth
+from utils.auth import PermissionType, requires_auth
 
 from .aggregator import (
     compute_aggregated_usage,
@@ -22,8 +22,6 @@ from .aggregator import (
 
 logger = logging.getLogger(__name__)
 
-ADMIN_PERMISSION = "enroll:autodiscovery_admin"
-
 
 def create() -> Blueprint:
     api = Blueprint("metrics_api", __name__)
@@ -33,7 +31,7 @@ def create() -> Blueprint:
         return "", 204
 
     @api.route("/overview")
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def overview():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
@@ -41,7 +39,7 @@ def create() -> Blueprint:
         return jsonify(metrics.model_dump())
 
     @api.route("/users")
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def users_list():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
@@ -54,13 +52,13 @@ def create() -> Blueprint:
         })
 
     @api.route("/users/<userid>")
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def user_detail(userid: str):
         detail = compute_user_detail(userid)
         return jsonify(detail.model_dump())
 
     @api.route("/runs/<userid>/<runid>")
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def run_metrics(userid: str, runid: str):
         metrics = compute_run_metrics(userid, runid)
         if metrics is None:
@@ -68,7 +66,7 @@ def create() -> Blueprint:
         return jsonify(metrics)
 
     @api.route("/usage/aggregated")
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def aggregated_usage():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
@@ -76,7 +74,7 @@ def create() -> Blueprint:
         return jsonify(usage.model_dump())
 
     @api.route("/cache/status")
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def cache_status():
         cache = get_metrics_cache()
         data = cache.get_data()
@@ -90,7 +88,7 @@ def create() -> Blueprint:
         })
 
     @api.route("/cache/refresh", methods=["POST"])
-    @requires_auth(required_permission=ADMIN_PERMISSION)
+    @requires_auth(required_permission=PermissionType.ADMIN.value)
     def cache_refresh():
         cache = get_metrics_cache()
         cache.force_refresh()

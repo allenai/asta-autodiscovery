@@ -11,7 +11,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import optional_enrollment, requires_enrollment
+from utils.auth import (
+    PermissionType,
+    optional_enrollment,
+    requires_auth,
+    requires_enrollment,
+)
 from utils.credits import (
     ExperimentLimitExceededError,
     InsufficientCreditsError,
@@ -86,7 +91,8 @@ except ImportError:
 SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 
 # Max size of files that can be uploaded
-UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB
+UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
+UPLOAD_MAX_FILE_SIZE_BYTES_HIGHER_LIMIT = 100 * 1024 * 1024 * 1024  # 100GB for users with higher upload limit permission
 
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
@@ -527,7 +533,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>/generate-upload-url", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def generate_upload_url(runid: str):
         """Generate a presigned URL for direct GCS upload.
 
@@ -563,10 +569,15 @@ def create() -> Blueprint:
             raise BadRequest(f"Invalid request body: {e}")
 
         try:
-            # Validate file size
+            # Validate file size - use higher limit for users with permission
+            has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+            max_file_size = (
+                UPLOAD_MAX_FILE_SIZE_BYTES_HIGHER_LIMIT if has_higher_limit else UPLOAD_MAX_FILE_SIZE_BYTES
+            )
+
             if req.file_size_bytes < 0:
                 return jsonify({"error": "Invalid file size."}), 400
-            if req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
+            if req.file_size_bytes > max_file_size:
                 return jsonify({"error": "File too large."}), 413
 
             manager = get_job_manager()

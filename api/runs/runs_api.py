@@ -269,6 +269,11 @@ def create() -> Blueprint:
         run_models: list[RunModel] = []
         app_logger = current_app.logger
 
+        # Check if user has HIGHER_UPLOAD_LIMIT permission
+        permissions = request.user.get("permissions", [])
+        has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
+        max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+
         def _build_run_model(run_id: str) -> RunModel | None:
             # Parallelize I/O-heavy GCS calls to reduce tail latency.
             try:
@@ -321,6 +326,7 @@ def create() -> Blueprint:
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
                 execution_status={},
+                max_file_size=max_file_size,
             )
 
         if sliced_run_ids:
@@ -415,6 +421,12 @@ def create() -> Blueprint:
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             ) if job_stats else None
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
+
+            # Check if user has HIGHER_UPLOAD_LIMIT permission
+            permissions = request.user.get("permissions", [])
+            has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
+            max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+
             run_model = RunModel(
                 runid=req.runid,
                 userid=req.userid,
@@ -426,6 +438,7 @@ def create() -> Blueprint:
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
                 execution_status={},
+                max_file_size=max_file_size,
             )
 
             return jsonify(run_model.model_dump()), 200

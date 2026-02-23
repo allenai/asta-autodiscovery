@@ -216,6 +216,7 @@ class RunModel(BaseModel):
     )
     execution_status: dict[str, Any] | None = Field(None, description="Execution status of the run")
     run_metadata: MetadataModel | None = Field(None, description="Metadata associated with the run")
+    max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
 
 
 class GetRunMetadataRequestModel(BaseModel):

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';
-import Header from '@/components/Header';
+import { Header } from '@/components/Header';
 import { ToS } from '@/components/ToS';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { mkLogoTrackAttrs } from '@/analytics/run';
@@ -54,10 +54,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
 
                 {/* Main content */}
                 <MainContent>
-                    {isAuthenticated && <Header />}
-                    {!isAuthenticated && pathname.startsWith('/shared') && (
-                        <Header showBackButton />
-                    )}
+                    <Header />
                     <ScrollArea>
                         <ScrollContainer>
                             <ScrollContent>

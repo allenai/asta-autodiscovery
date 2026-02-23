@@ -81,10 +81,13 @@ interface FieldErrors {
 
 export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
-    const { updateViewerRun } = useViewerRuns();
+    const { updateViewerRun, viewerRuns } = useViewerRuns();
     const api = getRunsApi();
 
     const creditsAvailable = credits?.available ?? 0;
+
+    // Get max file size from the run
+    const maxFileSize = viewerRuns?.[runid]?.maxFileSize || null;
 
     // Dataset upload state
     const [fileUploads, setFileUploads] = useState<FileUploadState[]>([]);
@@ -671,6 +674,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         // Dataset upload state
         fileUploads,
+        maxFileSize,
 
         // Run configuration state
         settings,

@@ -10,11 +10,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
-import { useAuth0 } from '@/contexts/Auth0Context';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 const DEFAULT_PAGE_SIZE = -1;
@@ -153,16 +153,15 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         selectedExperiment,
         hasJobCompleted,
         shouldScrollToSelected,
-        bookmarkedExperimentIds,
     } = useRunExperiments();
+    const { isExperimentBookmarksEnabled, bookmarkedExperimentIds } = useExperimentBookmarks();
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
-    const { isAuthenticated } = useAuth0();
     const columns = useMemo(
         () =>
-            isAuthenticated
+            isExperimentBookmarksEnabled
                 ? DEFAULT_COLUMNS
                 : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked'),
-        [isAuthenticated]
+        [isExperimentBookmarksEnabled]
     );
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 

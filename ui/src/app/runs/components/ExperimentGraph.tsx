@@ -44,6 +44,7 @@ import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong';
 import * as d3 from 'd3';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { Experiment, BeliefDistribution } from '@/types/Run';
 
 // Type definitions for D3 tree nodes
@@ -209,8 +210,8 @@ const assignAngularRanges = (
 };
 
 export const ExperimentGraph = () => {
-    const { experiments, selectedExperiment, selectExperiment, bookmarkedExperimentIds } =
-        useRunExperiments();
+    const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
+    const { bookmarkedExperimentIds } = useExperimentBookmarks();
 
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);

@@ -40,6 +40,7 @@ import {
 } from '@/analytics/runDetails';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
+import { useRunBookmarks } from '@/contexts/RunBookmarksContext';
 import {
     PanelGroup,
     Background,
@@ -77,7 +78,6 @@ interface RunViewProps {
  */
 export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
-    const { addSuccessToast, addErrorToast } = useToasts();
     const { viewerRuns, addViewerRun, updateViewerRun } = useViewerRuns();
 
     const run = viewerRuns?.[runid] ?? null;
@@ -159,36 +159,6 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
         }
     };
 
-    const handleBookmark = useCallback(
-        async (newBookmarkStatus: boolean) => {
-            if (!run?.metadata) return;
-
-            const updatedMetadata = {
-                ...run.metadata,
-                isBookmarked: newBookmarkStatus,
-            };
-
-            // Optimistically update context
-            updateViewerRun({ id: run.id, metadata: updatedMetadata });
-
-            try {
-                await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
-                addSuccessToast(
-                    newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks'
-                );
-            } catch (err) {
-                // Rollback on error
-                updateViewerRun({
-                    id: run.id,
-                    metadata: { ...run.metadata, isBookmarked: !newBookmarkStatus },
-                });
-                addErrorToast('Error updating bookmark status.');
-                throw err;
-            }
-        },
-        [run, api, updateViewerRun]
-    );
-
     // Run is read-only if viewing another user's run (userid prop is provided)
     const isReadOnly = !!userid;
     const canStop = !isReadOnly && run?.details?.status === 'RUNNING';
@@ -224,9 +194,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                 canStop={canStop}
                 cancelling={cancelling}
                 handleStop={handleStop}
-                handleBookmark={handleBookmark}
                 experimentsLabel={experimentsLabel}
-                isReadOnly={isReadOnly}
             />
         </RunExperimentsProvider>
     );
@@ -238,9 +206,7 @@ interface RunViewContentProps {
     canStop: boolean;
     cancelling: boolean;
     handleStop: () => void;
-    handleBookmark: (newBookmarkStatus: boolean) => Promise<void>;
     experimentsLabel: string;
-    isReadOnly: boolean;
 }
 
 function RunViewContent({
@@ -249,10 +215,10 @@ function RunViewContent({
     canStop,
     cancelling,
     handleStop,
-    handleBookmark,
     experimentsLabel,
-    isReadOnly,
 }: RunViewContentProps) {
+    const { isRunBookmarksEnabled, checkRunBookmarked, bookmarkRun, unbookmarkRun } =
+        useRunBookmarks();
     const runsApi = getRunsApi();
     const {
         experiments,
@@ -367,15 +333,19 @@ function RunViewContent({
                     <RunHeader>
                         <Box>
                             <RunHeaderName>
-                                {!isReadOnly && (
+                                {isRunBookmarksEnabled && (
                                     <BookmarkButton
                                         size="small"
-                                        onClick={() => handleBookmark(!run.metadata?.isBookmarked)}
+                                        onClick={() =>
+                                            checkRunBookmarked(run.id)
+                                                ? unbookmarkRun(run.id)
+                                                : bookmarkRun(run.id)
+                                        }
                                         {...mkBookmarkRunBtnAttrs({
                                             runId: run.id,
-                                            isBookmarked: !run.metadata?.isBookmarked,
+                                            isBookmarked: !checkRunBookmarked(run.id),
                                         })}>
-                                        {run.metadata?.isBookmarked ? (
+                                        {checkRunBookmarked(run.id) ? (
                                             <BookmarkIcon />
                                         ) : (
                                             <BookmarkBorderOutlinedIcon />
@@ -454,7 +424,7 @@ function RunViewContent({
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
                                 </ParametersButton>
-                                {!isReadOnly && (
+                                {isRunBookmarksEnabled && (
                                     <ParametersButton
                                         variant="outlined"
                                         startIcon={<ShareOutlinedIcon />}

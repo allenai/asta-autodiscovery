@@ -10,6 +10,8 @@ import { ToS } from '@/components/ToS';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { mkLogoTrackAttrs } from '@/analytics/run';
 import { scrollbarStyles } from '@/utils/scrollbar';
+import { RunBookmarksProvider } from '@/contexts/RunBookmarksContext';
+import { ExperimentBookmarksProvider } from '@/contexts/ExperimentBookmarksContext';
 
 /**
  * Layout for runs pages - shows RunsList in sidebar consistently across all /runs routes
@@ -27,49 +29,59 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
         router.push(`/runs/${runid}`);
     };
 
-    return (
-        <Wrapper $isAuthenticated={isAuthenticated} $isRunsHome={pathname === '/runs'}>
-            <Layout $showSidebar={isAuthenticated}>
-                {/* Sidebar - RunsList */}
-                {isAuthenticated && (
-                    <Sidebar>
-                        <Logo href="/runs" {...mkLogoTrackAttrs()}>
-                            <IconAutoDSLogo />
-                        </Logo>
-                        <ScrollArea>
-                            <ScrollContainer>
-                                <ScrollContent>
-                                    <RunsList
-                                        selectedRunId={selectedRunId}
-                                        onSelectRun={handleSelectRun}
-                                    />
-                                </ScrollContent>
-                            </ScrollContainer>
-                        </ScrollArea>
-                        <SidebarFooter>
-                            <ToS />
-                        </SidebarFooter>
-                    </Sidebar>
-                )}
+    const isSharedRun = pathname.startsWith('/runs/shared/');
+    const isBookmarksEnabled = isAuthenticated && !isSharedRun;
+    const runIdForBookmarks = isSharedRun ? null : selectedRunId;
 
-                {/* Main content */}
-                <MainContent>
-                    <Header />
-                    <ScrollArea>
-                        <ScrollContainer>
-                            <ScrollContent>
-                                {children}
-                                {isAuthenticated && (
-                                    <MobileFooter>
-                                        <ToS />
-                                    </MobileFooter>
-                                )}
-                            </ScrollContent>
-                        </ScrollContainer>
-                    </ScrollArea>
-                </MainContent>
-            </Layout>
-        </Wrapper>
+    return (
+        <RunBookmarksProvider isRunBookmarksEnabled={isBookmarksEnabled}>
+            <ExperimentBookmarksProvider
+                isExperimentBookmarksEnabled={isBookmarksEnabled}
+                runid={runIdForBookmarks}>
+                <Wrapper $isAuthenticated={isAuthenticated} $isRunsHome={pathname === '/runs'}>
+                    <Layout $showSidebar={isAuthenticated}>
+                        {/* Sidebar - RunsList */}
+                        {isAuthenticated && (
+                            <Sidebar>
+                                <Logo href="/runs" {...mkLogoTrackAttrs()}>
+                                    <IconAutoDSLogo />
+                                </Logo>
+                                <ScrollArea>
+                                    <ScrollContainer>
+                                        <ScrollContent>
+                                            <RunsList
+                                                selectedRunId={selectedRunId}
+                                                onSelectRun={handleSelectRun}
+                                            />
+                                        </ScrollContent>
+                                    </ScrollContainer>
+                                </ScrollArea>
+                                <SidebarFooter>
+                                    <ToS />
+                                </SidebarFooter>
+                            </Sidebar>
+                        )}
+
+                        {/* Main content */}
+                        <MainContent>
+                            <Header />
+                            <ScrollArea>
+                                <ScrollContainer>
+                                    <ScrollContent>
+                                        {children}
+                                        {isAuthenticated && (
+                                            <MobileFooter>
+                                                <ToS />
+                                            </MobileFooter>
+                                        )}
+                                    </ScrollContent>
+                                </ScrollContainer>
+                            </ScrollArea>
+                        </MainContent>
+                    </Layout>
+                </Wrapper>
+            </ExperimentBookmarksProvider>
+        </RunBookmarksProvider>
     );
 }
 

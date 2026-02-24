@@ -290,7 +290,9 @@ function RunViewContent({
         async (event: React.MouseEvent<HTMLButtonElement>) => {
             event.preventDefault();
 
-            const shareUrl = `${window.location.origin}/runs/shared/${run.id}`;
+            const shareUrl = selectedExperiment
+                ? `${window.location.origin}/runs/shared/${run.id}?exp=${selectedExperiment.idInRun}`
+                : `${window.location.origin}/runs/shared/${run.id}`;
             const sharePromise = navigator.clipboard.writeText(shareUrl);
 
             const apiPromise = runsApi.shareRun({
@@ -307,7 +309,7 @@ function RunViewContent({
                 console.error('Error sharing run:', err);
             }
         },
-        [run.id]
+        [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]
     );
 
     // Read from URL: Initial selection when exp param is present

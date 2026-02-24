@@ -109,6 +109,9 @@ export interface AggregatedUsageBucket {
     total_reasoning_tokens: number;
     total_tokens: number;
     total_cost_usd: number;
+    total_prompt_cost_usd: number;
+    total_completion_cost_usd: number;
+    total_reasoning_cost_usd: number;
     run_count: number;
     mean_tokens_per_run: number;
     stddev_tokens_per_run: number;

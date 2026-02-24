@@ -40,7 +40,7 @@ jobs:
       - name: Run E2E tests
         run: yarn test:e2e
         env:
-          E2E_BASE_URL: ${{ inputs.base_url }}
+          E2E_BASE_URL: ${{ inputs.base_url || 'https://autodiscovery-dev.example.com' }}
           E2E_TEST_USER: ${{ secrets.E2E_TEST_USER }}
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
 
@@ -51,14 +51,3 @@ jobs:
           name: playwright-report
           path: ui/playwright-report/
           retention-days: 14
-
-      - name: Notify Slack on failure
-        if: failure()
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          payload: |
-            {
-              "text": "🚨 E2E Tests failed on ${{ inputs.base_url }}\nTriggered by: ${{ github.actor }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

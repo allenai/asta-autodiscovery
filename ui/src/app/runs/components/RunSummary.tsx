@@ -80,10 +80,13 @@ const LayoutPills = styled('div')(({ theme }) => ({
 
 const Description = styled(Typography)(({ theme }) => ({
     overflowWrap: 'anywhere',
-    textWrap: 'pretty',
     margin: 0,
     fontSize: '1rem',
     color: theme.color['cream-100'].hex,
+    display: '-webkit-box',
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

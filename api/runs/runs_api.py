@@ -11,7 +11,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import optional_enrollment, requires_enrollment
+from utils.auth import (
+    PermissionType,
+    optional_enrollment,
+    requires_auth,
+    requires_enrollment,
+)
 from utils.credits import (
     ExperimentLimitExceededError,
     InsufficientCreditsError,
@@ -23,6 +28,8 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    BookmarkExperimentRequestModel,
+    BookmarkExperimentResponseModel,
     BookmarkRunRequestModel,
     BookmarkRunResponseModel,
     CancelRunRequestModel,
@@ -84,7 +91,9 @@ except ImportError:
 SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
 
 # Max size of files that can be uploaded
-UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB
+UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
+UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = 100 * 1024 * 1024 * 1024  # 100GB for users with higher upload limit permission
+UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR = "100GB"
 
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
@@ -130,7 +139,7 @@ def create() -> Blueprint:
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
     @api.route("/create", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def create_run():
         """Create a new run with auto-generated UUID.
 
@@ -157,11 +166,16 @@ def create() -> Blueprint:
             # Create run_details.json
             run_details = create_run_details(userid, runid)
 
+            # Check if user has HIGHER_UPLOAD_LIMIT permission and return the actual limit
+            has_higher_upload_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+            max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+
             resp = CreateRunResponseModel(
                 runid=runid,
                 path=path,
                 message="Run created successfully",
                 run_details=RunDetailsModel(**run_details.to_dict()),
+                max_file_size=max_file_size,
             )
             return jsonify(resp.model_dump()), 200
         except JobAlreadyExistsError as e:
@@ -255,6 +269,11 @@ def create() -> Blueprint:
         run_models: list[RunModel] = []
         app_logger = current_app.logger
 
+        # Check if user has HIGHER_UPLOAD_LIMIT permission
+        permissions = request.user.get("permissions", [])
+        has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
+        max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+
         def _build_run_model(run_id: str) -> RunModel | None:
             # Parallelize I/O-heavy GCS calls to reduce tail latency.
             try:
@@ -307,6 +326,7 @@ def create() -> Blueprint:
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
                 execution_status={},
+                max_file_size=max_file_size,
             )
 
         if sliced_run_ids:
@@ -401,6 +421,12 @@ def create() -> Blueprint:
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             ) if job_stats else None
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
+
+            # Check if user has HIGHER_UPLOAD_LIMIT permission
+            permissions = request.user.get("permissions", [])
+            has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
+            max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+
             run_model = RunModel(
                 runid=req.runid,
                 userid=req.userid,
@@ -412,6 +438,7 @@ def create() -> Blueprint:
                 run_details=run_details_model,
                 run_metadata=run_metadata_model,
                 execution_status={},
+                max_file_size=max_file_size,
             )
 
             return jsonify(run_model.model_dump()), 200
@@ -525,7 +552,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>/generate-upload-url", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def generate_upload_url(runid: str):
         """Generate a presigned URL for direct GCS upload.
 
@@ -561,10 +588,15 @@ def create() -> Blueprint:
             raise BadRequest(f"Invalid request body: {e}")
 
         try:
-            # Validate file size
+            # Validate file size - use higher limit for users with permission
+            has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+            max_file_size = (
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES if has_higher_limit else UPLOAD_MAX_FILE_SIZE_BYTES
+            )
+
             if req.file_size_bytes < 0:
                 return jsonify({"error": "Invalid file size."}), 400
-            if req.file_size_bytes > UPLOAD_MAX_FILE_SIZE_BYTES:
+            if req.file_size_bytes > max_file_size:
                 return jsonify({"error": "File too large."}), 413
 
             manager = get_job_manager()
@@ -946,8 +978,7 @@ def create() -> Blueprint:
             return error_response, status_code
 
         job_manager = get_job_manager()
-        tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        node = tree.get_node(experiment_id)
+        node = ExperimentTree.load_node(userid=userid, jobid=runid, experiment_id=experiment_id, config=job_manager.config)
 
         experiment_node = node.to_dict() if node else None
         if experiment_node and node:
@@ -1086,6 +1117,69 @@ def create() -> Blueprint:
 
         except Exception as e:
             current_app.logger.error(f"Failed to bookmark run: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @api.route("/<userid>/<runid>/experiments/<experiment_id>/bookmark", methods=["POST"])
+    @requires_enrollment
+    def bookmark_experiment(userid: str, runid: str, experiment_id: str):
+        """Bookmark or unbookmark an experiment within a run. Only the run owner can toggle bookmarking.
+
+        Args:
+            userid: User ID from URL path. Must match authenticated user.
+            runid: Run identifier
+            experiment_id: Experiment identifier
+
+        Request body:
+            is_bookmarked: boolean - whether to bookmark (true) or unbookmark (false)
+
+        Returns:
+            JSON response with updated bookmark status for the experiment.
+        """
+        token_userid = request.user.get("sub")
+        if not token_userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        if userid != token_userid:
+            return jsonify({"error": "User cannot bookmark other user's experiments"}), 403
+
+        data = request.get_json()
+        if not data or "is_bookmarked" not in data:
+            raise BadRequest("is_bookmarked is required")
+
+        try:
+            req = BookmarkExperimentRequestModel(
+                runid=runid,
+                userid=userid,
+                experiment_id=experiment_id,
+                is_bookmarked=data["is_bookmarked"],
+            )
+        except Exception as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        try:
+            manager = get_job_manager()
+
+            metadata_dict = manager.get_metadata(req.userid, req.runid)
+            if metadata_dict is None:
+                metadata_dict = {}
+
+            ids = set(metadata_dict.get("bookmarked_experiment_ids") or [])
+            if req.is_bookmarked:
+                ids.add(req.experiment_id)
+            else:
+                ids.discard(req.experiment_id)
+            metadata_dict["bookmarked_experiment_ids"] = list(ids)
+
+            manager.upload_metadata(req.userid, req.runid, metadata_dict)
+
+            resp = BookmarkExperimentResponseModel(
+                experiment_id=req.experiment_id,
+                is_bookmarked=req.is_bookmarked,
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to bookmark experiment: {e}")
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/share", methods=["POST"])

@@ -24,6 +24,7 @@ export type Run = {
     stats: RunStats | null;
     executionStatus?: Record<string, unknown> | null;
     metadata?: Metadata | null;
+    maxFileSize?: string | null;
 };
 
 export type RunStats = {
@@ -97,6 +98,7 @@ export type Metadata = {
     isShared: boolean;
     // Bookmarking
     isBookmarked: boolean;
+    bookmarkedExperimentIds: string[];
     // Job configuration parameters
     nExperiments?: number | null;
     explorationWeight?: number | null;
@@ -118,6 +120,7 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         stats: getRunStatsFromApi(runFromApi.run_stats),
         executionStatus: runFromApi.execution_status || null,
         metadata: getMetadataFromApi(runFromApi.run_metadata) || null,
+        maxFileSize: runFromApi.max_file_size || null,
     };
 };
 
@@ -194,6 +197,7 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
         isShared: !!metadataFromApi.is_shared,
         isBookmarked: !!metadataFromApi.is_bookmarked,
+        bookmarkedExperimentIds: metadataFromApi.bookmarked_experiment_ids ?? [],
         // Job configuration parameters
         nExperiments: metadataFromApi.n_experiments,
         explorationWeight: metadataFromApi.exploration_weight,

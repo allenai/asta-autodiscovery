@@ -35,6 +35,42 @@ const PALETTE = [
 const fmt = (n: number) => (n || 0).toLocaleString();
 const fmtCost = (n: number) => `$${n.toFixed(2)}`;
 
+function emptyBucket(): AggregatedUsageBucket {
+    return {
+        total_calls: 0,
+        total_prompt_tokens: 0,
+        total_completion_tokens: 0,
+        total_reasoning_tokens: 0,
+        total_tokens: 0,
+        total_cost_usd: 0,
+        total_prompt_cost_usd: 0,
+        total_completion_cost_usd: 0,
+        total_reasoning_cost_usd: 0,
+        run_count: 0,
+        mean_tokens_per_run: 0,
+        stddev_tokens_per_run: 0,
+        mean_cost_per_run: 0,
+        stddev_cost_per_run: 0,
+    };
+}
+
+function sumBuckets(buckets: AggregatedUsageBucket[]): AggregatedUsageBucket {
+    const acc = emptyBucket();
+    buckets.forEach((b) => {
+        acc.total_calls += b.total_calls || 0;
+        acc.total_prompt_tokens += b.total_prompt_tokens || 0;
+        acc.total_completion_tokens += b.total_completion_tokens || 0;
+        acc.total_reasoning_tokens += b.total_reasoning_tokens || 0;
+        acc.total_tokens += b.total_tokens || 0;
+        acc.total_cost_usd += b.total_cost_usd || 0;
+        acc.total_prompt_cost_usd += b.total_prompt_cost_usd || 0;
+        acc.total_completion_cost_usd += b.total_completion_cost_usd || 0;
+        acc.total_reasoning_cost_usd += b.total_reasoning_cost_usd || 0;
+        acc.run_count = Math.max(acc.run_count, b.run_count || 0);
+    });
+    return acc;
+}
+
 function prettyName(k: string): string {
     return k
         .replace(/^google\//, '')
@@ -178,7 +214,7 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
         });
     }
 
-    // Available views
+    // Available token views
     type ViewKey = 'by_agent' | 'by_model' | 'by_node' | 'by_component';
     const viewDefs: { key: ViewKey; label: string }[] = [
         { key: 'by_agent', label: 'By Agent' },
@@ -188,8 +224,52 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
     ];
     const views = viewDefs.filter((v) => data[v.key] && Object.keys(data[v.key]).length > 0);
     const [activeView, setActiveView] = useState(0);
+    const tokenViewIndex = Math.min(activeView, Math.max(views.length - 1, 0));
+    const activeTokenView = views[tokenViewIndex];
+
+    // Available cost views
+    type CostViewKey = 'by_agent' | 'by_component';
+    const costViewDefs: { key: CostViewKey; label: string }[] = [
+        { key: 'by_agent', label: 'By Agent' },
+        { key: 'by_component', label: 'By Component' },
+    ];
+    const costViews = costViewDefs.filter(
+        (v) =>
+            data[v.key] &&
+            Object.values(data[v.key]).some((bucket) => (bucket.total_cost_usd || 0) > 0)
+    );
+    const [activeCostView, setActiveCostView] = useState(0);
+    const costViewIndex = Math.min(activeCostView, Math.max(costViews.length - 1, 0));
+    const activeCostBreakdownView = costViews[costViewIndex];
 
     const agentKeys = Object.keys(data.by_agent || {});
+    const beliefCostByContext: Record<
+        string,
+        { prior?: AggregatedUsageBucket; posterior?: AggregatedUsageBucket }
+    > = {};
+    Object.entries(data.by_component || {}).forEach(([key, bucket]) => {
+        const match = key.match(/^belief\.(.+)\.(prior|posterior)$/);
+        if (!match) return;
+        const [, context, stage] = match;
+        if (!beliefCostByContext[context]) beliefCostByContext[context] = {};
+        beliefCostByContext[context][stage as 'prior' | 'posterior'] = bucket;
+    });
+
+    const beliefPriorAggregate = sumBuckets(
+        Object.values(beliefCostByContext)
+            .map((v) => v.prior)
+            .filter((v): v is AggregatedUsageBucket => !!v)
+    );
+    const beliefPosteriorAggregate = sumBuckets(
+        Object.values(beliefCostByContext)
+            .map((v) => v.posterior)
+            .filter((v): v is AggregatedUsageBucket => !!v)
+    );
+    const beliefHasData = Object.keys(beliefCostByContext).length > 0;
+    const beliefRatio =
+        beliefPriorAggregate.total_cost_usd > 0
+            ? beliefPosteriorAggregate.total_cost_usd / beliefPriorAggregate.total_cost_usd
+            : null;
 
     return (
         <Box>
@@ -279,7 +359,7 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         Total Tokens <PanelSubtitle>breakdown view</PanelSubtitle>
                     </PanelTitle>
                     <Tabs
-                        value={activeView}
+                        value={tokenViewIndex}
                         onChange={(_, v) => setActiveView(v)}
                         sx={{
                             mb: 2,
@@ -298,9 +378,94 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         ))}
                     </Tabs>
                     <AggregatedBarChart
-                        data={data[views[activeView].key]}
-                        showCost={views[activeView].key === 'by_model'}
+                        data={data[activeTokenView!.key]}
+                        showCost={activeTokenView!.key === 'by_model'}
                     />
+                </Panel>
+            )}
+
+            {/* Cost Breakdown */}
+            {costViews.length > 0 && (
+                <Panel>
+                    <PanelTitle>
+                        Cost Breakdown{' '}
+                        <PanelSubtitle>stacked prompt / completion / reasoning</PanelSubtitle>
+                    </PanelTitle>
+                    <LegendRow>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#818cf8' }} /> Prompt
+                        </LegendItem>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#f472b6' }} /> Completion
+                        </LegendItem>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#2dd4bf' }} /> Reasoning
+                        </LegendItem>
+                    </LegendRow>
+                    <Tabs
+                        value={costViewIndex}
+                        onChange={(_, v) => setActiveCostView(v)}
+                        sx={{
+                            mb: 2,
+                            minHeight: 32,
+                            '& .MuiTab-root': {
+                                minHeight: 32,
+                                fontSize: '0.72rem',
+                                textTransform: 'none',
+                                px: 1.5,
+                                color: 'rgba(255,255,255,0.6)',
+                                '&.Mui-selected': { color: '#FAF2E9' },
+                            },
+                        }}>
+                        {costViews.map((v) => (
+                            <MuiTab key={v.key} label={v.label} />
+                        ))}
+                    </Tabs>
+                    <CostBreakdownBars data={data[activeCostBreakdownView!.key]} />
+                </Panel>
+            )}
+
+            {/* Belief Agent Prior vs Posterior */}
+            {beliefHasData && (
+                <Panel>
+                    <PanelTitle>
+                        Belief Agent: Prior vs Posterior
+                        <PanelSubtitle>event-derived component costs</PanelSubtitle>
+                    </PanelTitle>
+                    <CardGrid $count={3}>
+                        <StatCard>
+                            <StatValue>{fmtCost(beliefPriorAggregate.total_cost_usd)}</StatValue>
+                            <StatLabel>Prior Cost</StatLabel>
+                        </StatCard>
+                        <StatCard>
+                            <StatValue>
+                                {fmtCost(beliefPosteriorAggregate.total_cost_usd)}
+                            </StatValue>
+                            <StatLabel>Posterior Cost</StatLabel>
+                        </StatCard>
+                        <StatCard>
+                            <StatValue>
+                                {beliefRatio != null ? `${beliefRatio.toFixed(2)}x` : 'N/A'}
+                            </StatValue>
+                            <StatLabel>Posterior / Prior</StatLabel>
+                        </StatCard>
+                    </CardGrid>
+                    <LegendRow>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#818cf8' }} /> Prompt
+                        </LegendItem>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#f472b6' }} /> Completion
+                        </LegendItem>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#2dd4bf' }} /> Reasoning
+                        </LegendItem>
+                    </LegendRow>
+                    <BeliefPriorPosteriorBars
+                        prior={beliefPriorAggregate}
+                        posterior={beliefPosteriorAggregate}
+                    />
+                    <BeliefContextTable beliefCostByContext={beliefCostByContext} />
                 </Panel>
             )}
 
@@ -315,6 +480,120 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                 </Panel>
             )}
         </Box>
+    );
+}
+
+function BeliefPriorPosteriorBars({
+    prior,
+    posterior,
+}: {
+    prior: AggregatedUsageBucket;
+    posterior: AggregatedUsageBucket;
+}) {
+    const entries: Array<[string, AggregatedUsageBucket]> = [];
+    if (prior.total_cost_usd > 0) entries.push(['prior', prior]);
+    if (posterior.total_cost_usd > 0) entries.push(['posterior', posterior]);
+
+    if (entries.length === 0) {
+        return null;
+    }
+
+    const maxCost = Math.max(...entries.map(([, b]) => b.total_cost_usd), 0.0001);
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', mb: 2 }}>
+            {entries.map(([stage, b]) => {
+                const total = b.total_cost_usd || 0;
+                const widthPct = (total / maxCost) * 100;
+                const promptPct = total > 0 ? (b.total_prompt_cost_usd / total) * 100 : 0;
+                const completionPct = total > 0 ? (b.total_completion_cost_usd / total) * 100 : 0;
+                const reasoningPct = total > 0 ? (b.total_reasoning_cost_usd / total) * 100 : 0;
+                const small = widthPct < 20;
+                return (
+                    <BarRow key={stage}>
+                        <BarLabel>{stage === 'prior' ? 'Prior' : 'Posterior'}</BarLabel>
+                        <BarTrack>
+                            <CostBarFill style={{ width: `${Math.max(widthPct, 1.5)}%` }}>
+                                {promptPct > 0 && (
+                                    <CostSegment
+                                        style={{ width: `${promptPct}%`, background: '#818cf8' }}
+                                    />
+                                )}
+                                {completionPct > 0 && (
+                                    <CostSegment
+                                        style={{
+                                            width: `${completionPct}%`,
+                                            background: '#f472b6',
+                                        }}
+                                    />
+                                )}
+                                {reasoningPct > 0 && (
+                                    <CostSegment
+                                        style={{ width: `${reasoningPct}%`, background: '#2dd4bf' }}
+                                    />
+                                )}
+                                <CostValue $outside={small}>{fmtCost(total)}</CostValue>
+                            </CostBarFill>
+                        </BarTrack>
+                        <BarAnnotation>{fmt(b.total_calls)} calls</BarAnnotation>
+                    </BarRow>
+                );
+            })}
+        </Box>
+    );
+}
+
+function BeliefContextTable({
+    beliefCostByContext,
+}: {
+    beliefCostByContext: Record<
+        string,
+        { prior?: AggregatedUsageBucket; posterior?: AggregatedUsageBucket }
+    >;
+}) {
+    const rows = Object.entries(beliefCostByContext)
+        .map(([context, buckets]) => {
+            const priorCost = buckets.prior?.total_cost_usd || 0;
+            const posteriorCost = buckets.posterior?.total_cost_usd || 0;
+            const priorCalls = buckets.prior?.total_calls || 0;
+            const posteriorCalls = buckets.posterior?.total_calls || 0;
+            return {
+                context,
+                priorCost,
+                posteriorCost,
+                totalCost: priorCost + posteriorCost,
+                totalCalls: priorCalls + posteriorCalls,
+            };
+        })
+        .sort((a, b) => b.totalCost - a.totalCost);
+
+    if (rows.length === 0) {
+        return null;
+    }
+
+    return (
+        <StyledTable>
+            <thead>
+                <tr>
+                    <Th $align="left">Belief Context</Th>
+                    <Th>Prior Cost</Th>
+                    <Th>Posterior Cost</Th>
+                    <Th>Total Cost</Th>
+                    <Th>Calls</Th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows.map((r) => (
+                    <tr key={r.context}>
+                        <Td $align="left">{prettyName(r.context)}</Td>
+                        <Td>{fmtCost(r.priorCost)}</Td>
+                        <Td>{fmtCost(r.posteriorCost)}</Td>
+                        <Td>{fmtCost(r.totalCost)}</Td>
+                        <Td>{fmt(r.totalCalls)}</Td>
+                    </tr>
+                ))}
+            </tbody>
+        </StyledTable>
     );
 }
 
@@ -353,6 +632,70 @@ function AggregatedBarChart({
                             </BarFill>
                         </BarTrack>
                         <BarAnnotation>{fmt(Math.round(d.mean_tokens_per_run))} avg</BarAnnotation>
+                    </BarRow>
+                );
+            })}
+        </Box>
+    );
+}
+
+function CostBreakdownBars({ data }: { data: Record<string, AggregatedUsageBucket> }) {
+    const entries = Object.entries(data)
+        .filter(([, d]) => d.total_cost_usd > 0)
+        .sort((a, b) => b[1].total_cost_usd - a[1].total_cost_usd);
+
+    if (entries.length === 0) {
+        return (
+            <Typography
+                variant="body2"
+                sx={{
+                    color: (theme: any) =>
+                        theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                }}>
+                No cost data available.
+            </Typography>
+        );
+    }
+
+    const maxCost = Math.max(...entries.map(([, d]) => d.total_cost_usd), 0.0001);
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {entries.map(([key, d]) => {
+                const total = d.total_cost_usd || 0;
+                const widthPct = (total / maxCost) * 100;
+                const promptPct = total > 0 ? (d.total_prompt_cost_usd / total) * 100 : 0;
+                const completionPct = total > 0 ? (d.total_completion_cost_usd / total) * 100 : 0;
+                const reasoningPct = total > 0 ? (d.total_reasoning_cost_usd / total) * 100 : 0;
+                const small = widthPct < 20;
+
+                return (
+                    <BarRow key={key}>
+                        <BarLabel>{prettyName(key)}</BarLabel>
+                        <BarTrack>
+                            <CostBarFill style={{ width: `${Math.max(widthPct, 1.5)}%` }}>
+                                {promptPct > 0 && (
+                                    <CostSegment
+                                        style={{ width: `${promptPct}%`, background: '#818cf8' }}
+                                    />
+                                )}
+                                {completionPct > 0 && (
+                                    <CostSegment
+                                        style={{
+                                            width: `${completionPct}%`,
+                                            background: '#f472b6',
+                                        }}
+                                    />
+                                )}
+                                {reasoningPct > 0 && (
+                                    <CostSegment
+                                        style={{ width: `${reasoningPct}%`, background: '#2dd4bf' }}
+                                    />
+                                )}
+                                <CostValue $outside={small}>{fmtCost(total)}</CostValue>
+                            </CostBarFill>
+                        </BarTrack>
+                        <BarAnnotation>{fmtCost(d.mean_cost_per_run)} avg</BarAnnotation>
                     </BarRow>
                 );
             })}
@@ -593,6 +936,40 @@ const BarFill = styled(Box)`
     min-width: 2px;
     transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
+`;
+
+const CostBarFill = styled(Box)`
+    height: 100%;
+    border-radius: 5px;
+    display: flex;
+    min-width: 2px;
+    overflow: hidden;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+`;
+
+const CostSegment = styled(Box)`
+    height: 100%;
+    min-width: 0;
+`;
+
+const CostValue = styled('span')<{ $outside: boolean }>`
+    font-size: 0.65rem;
+    font-weight: 600;
+    white-space: nowrap;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    ${({ $outside }) =>
+        $outside
+            ? `
+        left: calc(100% + 6px);
+        color: rgba(255,255,255,0.8);
+    `
+            : `
+        right: 8px;
+        color: #fff;
+    `}
 `;
 
 const BarValue = styled('span')<{ $outside: boolean }>`

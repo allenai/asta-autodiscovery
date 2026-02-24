@@ -10,14 +10,26 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 const DEFAULT_PAGE_SIZE = -1;
 
 const DEFAULT_COLUMNS: GridColDef[] = [
+    {
+        field: 'isBookmarked',
+        headerName: 'Bookmarked',
+        width: 40,
+        minWidth: 40,
+        align: 'center',
+        renderCell: (params: GridRenderCellParams) => {
+            return <ExperimentBookmarkControl experiment={params.row.experiment} />;
+        },
+    },
     {
         field: 'id',
         headerName: 'ID',
@@ -142,7 +154,15 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         hasJobCompleted,
         shouldScrollToSelected,
     } = useRunExperiments();
+    const { isExperimentBookmarksEnabled, bookmarkedExperimentIds } = useExperimentBookmarks();
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
+    const columns = useMemo(
+        () =>
+            isExperimentBookmarksEnabled
+                ? DEFAULT_COLUMNS
+                : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked'),
+        [isExperimentBookmarksEnabled]
+    );
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
     const [paginationModel, setPaginationModel] = useState(() => {
@@ -200,6 +220,8 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiments.length + i,
                 runtimeMs: 'N/A',
                 isSkeleton: true,
+                isBookmarked: false,
+                experiment: null,
             }));
             return skeletonRows;
         }
@@ -233,13 +255,15 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                 creationIdx: experiment.creationIdx,
                 runtimeMs: isInconclusiveOrFailed ? 'N/A' : experiment.runtimeMs ?? 'N/A',
                 isSkeleton: false,
+                isBookmarked: bookmarkedExperimentIds.has(experiment.experimentId),
+                experiment,
             };
         });
 
         // Add skeleton rows for pending experiments if job is not completed
         const skeletonRows = createSkeletonRows();
         return [...experimentRows, ...skeletonRows];
-    }, [experiments, runStats, hasJobCompleted]);
+    }, [experiments, runStats, hasJobCompleted, bookmarkedExperimentIds]);
 
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
@@ -255,16 +279,19 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         };
     }, [selectedExperiment]);
 
-    const handleRowClick = (params: any) => {
-        // Don't allow clicking on skeleton rows
-        if (params.row.isSkeleton) {
-            return;
-        }
-        const exp = experiments.find((exp) => exp.idInRun === params.id);
-        if (exp) {
-            selectExperiment(exp, { scroll: false });
-        }
-    };
+    const handleRowClick = useCallback(
+        (params: any) => {
+            // Don't allow clicking on skeleton rows
+            if (params.row.isSkeleton) {
+                return;
+            }
+            const exp = experiments.find((exp) => exp.idInRun === params.id);
+            if (exp) {
+                selectExperiment(exp, { scroll: false });
+            }
+        },
+        [experiments, selectExperiment]
+    );
 
     // Scroll to the selected experiment when it changes, unless the caller opted out
     useEffect(() => {
@@ -291,7 +318,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
             )}
             <StyledDataGrid
                 rows={rows}
-                columns={DEFAULT_COLUMNS}
+                columns={columns}
                 loading={!runStats?.pendingExperiments && !experiments.length}
                 paginationModel={paginationModel}
                 onPaginationModelChange={handlePaginationModelChange}

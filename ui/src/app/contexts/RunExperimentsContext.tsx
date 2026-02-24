@@ -20,6 +20,7 @@ export interface RunExperimentsState {
     startPolling: () => void;
     stopPolling: () => void;
     isLoading: boolean;
+    isLoadingInitial: boolean;
     runid: string | null;
     experiments: Experiment[];
     lastError: string | null;
@@ -36,6 +37,7 @@ export const DEFAULT_STATE: RunExperimentsState = {
     startPolling: () => {},
     stopPolling: () => {},
     isLoading: false,
+    isLoadingInitial: false,
     runid: null,
     experiments: [],
     lastError: null,
@@ -79,6 +81,8 @@ export const RunExperimentsProvider = ({
 
     const [isPolling, setIsPolling] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isLoadingInitial, setIsLoadingInitial] = useState<boolean>(true);
+    const hasLoadedOnce = useRef<boolean>(false);
     const [experiments, setExperiments] = useState<Experiment[]>([]);
     const [lastError, setLastError] = useState<string | null>(null);
     const [hasJobCompleted, setHasJobCompleted] = useState<boolean>(false);
@@ -170,6 +174,12 @@ export const RunExperimentsProvider = ({
         [runid, userid, runsApi]
     );
 
+    // Reset initial loading state when runid changes
+    useEffect(() => {
+        setIsLoadingInitial(true);
+        hasLoadedOnce.current = false;
+    }, [runid]);
+
     // Auto-start polling on mount if autoStart is true
     useEffect(() => {
         if (autoStart && runid && !isPolling) {
@@ -182,6 +192,8 @@ export const RunExperimentsProvider = ({
             setIsPolling(DEFAULT_STATE.isPolling);
             setExperiments(DEFAULT_STATE.experiments);
             setIsLoading(DEFAULT_STATE.isLoading);
+            setIsLoadingInitial(true);
+            hasLoadedOnce.current = false;
             setLastError(DEFAULT_STATE.lastError);
             setHasJobCompleted(DEFAULT_STATE.hasJobCompleted);
             setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
@@ -237,6 +249,10 @@ export const RunExperimentsProvider = ({
                 setLastError(error.message || 'Failed to fetch experiments');
             } finally {
                 setIsLoading(false);
+                if (!hasLoadedOnce.current) {
+                    hasLoadedOnce.current = true;
+                    setIsLoadingInitial(false);
+                }
             }
         };
 
@@ -252,6 +268,7 @@ export const RunExperimentsProvider = ({
             runid,
             isPolling,
             isLoading,
+            isLoadingInitial,
             experiments,
             lastError,
             hasJobCompleted,
@@ -267,6 +284,7 @@ export const RunExperimentsProvider = ({
             runid,
             isPolling,
             isLoading,
+            isLoadingInitial,
             experiments,
             lastError,
             hasJobCompleted,
@@ -276,6 +294,7 @@ export const RunExperimentsProvider = ({
             startPolling,
             stopPolling,
             selectExperiment,
+            shouldScrollToSelected,
         ]
     );
 

@@ -8,7 +8,7 @@ import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { mkCreditsBtnTrackAttrs } from '@/analytics/run';
 
 export default function CreditsChip() {
-    const { credits, lastError } = useViewerCredits();
+    const { credits, lastError, isLoadingInitial } = useViewerCredits();
     const [isOpen, setIsOpen] = useState(false);
 
     const anchorRef = useRef<HTMLDivElement | null>(null);
@@ -22,10 +22,10 @@ export default function CreditsChip() {
                         <DesktopOnly>Experiment </DesktopOnly>Credits:{' '}
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
-                        ) : credits !== null ? (
-                            <CreditsValue>{credits?.available.toLocaleString()}</CreditsValue>
-                        ) : (
+                        ) : isLoadingInitial ? (
                             <LoadingShimmer />
+                        ) : (
+                            <CreditsValue>{credits?.available.toLocaleString()}</CreditsValue>
                         )}
                     </span>
                 }
@@ -79,7 +79,9 @@ export default function CreditsChip() {
                         .
                     </PopoverParagraph>
 
-                    {credits !== null ? (
+                    {isLoadingInitial ? (
+                        <LoadingShimmer />
+                    ) : credits !== null ? (
                         <CreditsReport>
                             <CreditLabel>Credits Consumed:</CreditLabel>
                             <CreditValue>{credits.consumed.toLocaleString()}</CreditValue>
@@ -90,9 +92,7 @@ export default function CreditsChip() {
                             <CreditLabel>Credits Available:</CreditLabel>
                             <CreditValue>{credits.available.toLocaleString()}</CreditValue>
                         </CreditsReport>
-                    ) : (
-                        <LoadingShimmer />
-                    )}
+                    ) : null}
                 </PopoverContent>
             </Popover>
         </>

@@ -26,6 +26,7 @@ Example usage:
     print(f"Available: {credits.available}")
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, NamedTuple
 
 from autodiscovery_jobs import JobConfig
@@ -177,8 +178,6 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
     completed = count_experiment_results(userid=userid, jobid=jobid, config=config)
     requested = metadata.get("n_experiments", None)
     if requested is None:
-        # Fallback, from when args.json contained this data
-        # TODO: Remove this hack after public launch, since "real" users will never see this
         args = get_job_args(userid=userid, jobid=jobid, config=config) or {}
         requested = args.get("n_experiments", 0)
     pending = max(0, requested - completed)
@@ -244,21 +243,28 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
     # Get all jobs for the user
     job_ids = list_user_jobs(userid=userid, config=config)
 
-    # Aggregate credits across all jobs
-    for job_id in job_ids:
+    def _get_job_credit_contribution(job_id: str) -> tuple[int, int] | None:
         try:
             run_details = get_run_details(userid=userid, runid=job_id, config=config)
             run_status = run_details.status if run_details is not None else None
             if run_status is None or run_status in ["CREATED"]:
-                continue
+                return None
             consumed, pending = calculate_job_credits(userid=userid, jobid=job_id, config=config)
-            total_consumed += consumed
-            if run_status in ["PENDING", "QUEUED", "RUNNING"]:
-                total_pending += pending
+            if run_status not in ["PENDING", "QUEUED", "RUNNING"]:
+                pending = 0
+            return (consumed, pending)
         except Exception:
-            # Continue processing other jobs if one fails
-            # This matches the error handling in user_api.py line 100
-            pass
+            return None
+
+    # Aggregate credits across all jobs in parallel
+    if job_ids:
+        max_workers = min(16, len(job_ids))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for result in executor.map(_get_job_credit_contribution, job_ids):
+                if result is not None:
+                    consumed, pending = result
+                    total_consumed += consumed
+                    total_pending += pending
 
     # Get credits granted for this user
     credits_granted = get_user_credits_granted(userid)

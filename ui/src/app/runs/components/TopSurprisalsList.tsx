@@ -1,9 +1,10 @@
 import { Button, styled } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForwardOutlined';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel } from '../utils/ExperimentUtils';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 export const COLLAPSED_SURPRISALS_COUNT = 2;
 
@@ -18,9 +19,13 @@ export const TopSurprisalsList = () => {
 export const TopSurprisalsListImpl = () => {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
 
-    const surprisals = experiments
-        .filter((exp) => exp.isSurprising)
-        .sort((a, b) => (a.surprise ?? 0) - (b.surprise ?? 0));
+    const surprisals = useMemo(
+        () =>
+            experiments
+                .filter((exp) => exp.isSurprising)
+                .sort((a, b) => (a.surprise ?? 0) - (b.surprise ?? 0)),
+        [experiments]
+    );
 
     const [isListExpanded, setIsListExpanded] = useState(
         surprisals.length <= COLLAPSED_SURPRISALS_COUNT
@@ -42,6 +47,9 @@ export const TopSurprisalsListImpl = () => {
                         key={experiment.experimentId}
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
                         onClick={() => selectExperiment(experiment, { scroll: false })}>
+                        <Bookmark>
+                            <ExperimentBookmarkControl experiment={experiment} />
+                        </Bookmark>
                         <Description>
                             <Belief>
                                 It's{' '}
@@ -128,6 +136,12 @@ const Item = styled('li')<{ $isSelected?: boolean }>`
         background-color: ${({ theme, $isSelected }) =>
             $isSelected ? theme.color['green-100'].hex : 'transparent'};
     }
+`;
+
+const Bookmark = styled('div')`
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
 `;
 
 const Description = styled('div')``;

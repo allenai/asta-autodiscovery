@@ -36,7 +36,7 @@
  * The component uses D3.js for tree layout, radial positioning, and zoom/pan interactions.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { styled, Typography, IconButton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -44,6 +44,7 @@ import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong';
 import * as d3 from 'd3';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { Experiment, BeliefDistribution } from '@/types/Run';
 
 // Type definitions for D3 tree nodes
@@ -208,8 +209,9 @@ const assignAngularRanges = (
     node.yPos = node.y * Math.sin(node.angle);
 };
 
-export const ExperimentGraph = () => {
+export const ExperimentGraph = memo(function ExperimentGraph() {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
+    const { bookmarkedExperimentIds } = useExperimentBookmarks();
 
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -248,6 +250,25 @@ export const ExperimentGraph = () => {
 
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove();
+
+        // Define reusable bookmark symbol: green circle with dark green bookmark icon
+        const bookmarkSymbol = svg
+            .append('defs')
+            .append('symbol')
+            .attr('id', 'bookmark-icon')
+            .attr('viewBox', '0 0 24 24');
+        bookmarkSymbol
+            .append('circle')
+            .attr('cx', 12)
+            .attr('cy', 12)
+            .attr('r', 12)
+            .attr('fill', '#0FCB8C');
+        // Scale path to 65% and re-center within the 24x24 viewBox for padding inside circle
+        bookmarkSymbol
+            .append('path')
+            .attr('d', 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z')
+            .attr('transform', 'translate(3, 3) scale(0.75)')
+            .attr('fill', '#0A3235');
 
         // Build hierarchy
         const hierarchy = buildHierarchy(uniqueExperiments);
@@ -549,6 +570,25 @@ export const ExperimentGraph = () => {
             .attr('opacity', (d) => (d.data.data.id === 'node_1_0' ? 0 : 1))
             .text((d) => d.data.data.idInRun);
 
+        // Render bookmark icons for bookmarked nodes
+        // Node radius is 18; top-right point is at ~(xPos+13, yPos-13). Center the 14x14 icon there.
+        nodesG
+            .selectAll('use.bookmark-icon')
+            .data(
+                nodes.filter(
+                    (d) =>
+                        d.data.data.id !== 'node_1_0' && bookmarkedExperimentIds.has(d.data.data.id)
+                )
+            )
+            .join('use')
+            .attr('class', 'bookmark-icon')
+            .attr('href', '#bookmark-icon')
+            .attr('x', (d) => (d.xPos ?? 0) + 6)
+            .attr('y', (d) => (d.yPos ?? 0) - 20)
+            .attr('width', 14)
+            .attr('height', 14)
+            .attr('pointer-events', 'none');
+
         // Set up zoom behavior
         const zoom = d3
             .zoom<SVGSVGElement, unknown>()
@@ -580,7 +620,14 @@ export const ExperimentGraph = () => {
             // Preserve zoom/pan from previous render
             svg.call(zoom.transform, currentTransformRef.current);
         }
-    }, [experiments, dimensions, selectedExperiment, selectExperiment, hasInteracted]);
+    }, [
+        experiments,
+        dimensions,
+        selectedExperiment,
+        selectExperiment,
+        hasInteracted,
+        bookmarkedExperimentIds,
+    ]);
 
     // Zoom control handlers
     const handleZoomIn = () => {
@@ -672,7 +719,7 @@ export const ExperimentGraph = () => {
             </ControlsOverlay>
         </GraphContainer>
     );
-};
+});
 
 // Styled Components
 const GraphContainer = styled('div')`

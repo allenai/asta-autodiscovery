@@ -4,6 +4,8 @@ import { useAuth0 } from '@/contexts/Auth0Context';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import RunView from '@/runs/components/RunView';
+import { RunBookmarksProvider } from '@/contexts/RunBookmarksContext';
+import { ExperimentBookmarksProvider } from '@/contexts/ExperimentBookmarksContext';
 
 interface SharedRunPageProps {
     params: {
@@ -25,8 +27,12 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
     }
 
     return (
-        <URLSearchParamsProvider>
-            <RunView runid={runid} userid={userid} />
-        </URLSearchParamsProvider>
+        <RunBookmarksProvider isRunBookmarksEnabled={false}>
+            <ExperimentBookmarksProvider isExperimentBookmarksEnabled={false} runid={runid}>
+                <URLSearchParamsProvider>
+                    <RunView runid={runid} userid={userid} />
+                </URLSearchParamsProvider>
+            </ExperimentBookmarksProvider>
+        </RunBookmarksProvider>
     );
 }

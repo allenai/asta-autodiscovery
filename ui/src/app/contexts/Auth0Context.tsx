@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    ReactNode,
+} from 'react';
 import { User } from '@auth0/auth0-spa-js';
 
 import { auth0Client, auth0Config } from '@/auth/Auth0Client';
@@ -101,7 +109,7 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
         initAuth0();
     }, [auth0Client]);
 
-    const loginWithRedirect = async () => {
+    const loginWithRedirect = useCallback(async () => {
         if (auth0Client) {
             await auth0Client.loginWithRedirect({
                 authorizationParams: {
@@ -112,9 +120,9 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
                 },
             });
         }
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         if (auth0Client) {
             auth0Client.logout({
                 logoutParams: {
@@ -122,30 +130,39 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
                 },
             });
         }
-    };
+    }, []);
 
-    const getAccessToken = async (): Promise<string> => {
+    const getAccessToken = useCallback(async (): Promise<string> => {
         if (!auth0Client) {
             throw new Error('Auth0 client not initialized');
         }
         return await auth0Client.getTokenSilently();
-    };
+    }, []);
 
-    return (
-        <Auth0Context.Provider
-            value={{
-                isAuthenticated,
-                isLoading,
-                user,
-                loginWithRedirect,
-                logout,
-                getAccessToken,
-                hasRequiredPermission,
-                authError,
-            }}>
-            {children}
-        </Auth0Context.Provider>
+    const contextValue = useMemo(
+        () => ({
+            isAuthenticated,
+            isLoading,
+            user,
+            loginWithRedirect,
+            logout,
+            getAccessToken,
+            hasRequiredPermission,
+            authError,
+        }),
+        [
+            isAuthenticated,
+            isLoading,
+            user,
+            loginWithRedirect,
+            logout,
+            getAccessToken,
+            hasRequiredPermission,
+            authError,
+        ]
     );
+
+    return <Auth0Context.Provider value={contextValue}>{children}</Auth0Context.Provider>;
 }
 
 export function useAuth0(): Auth0ContextType {

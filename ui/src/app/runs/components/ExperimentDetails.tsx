@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { styled, Typography, Box, Stack } from '@mui/material';
 import { Markdown } from '@allenai/varnish2/components';
 
@@ -12,12 +13,15 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
 import { BeliefDistributionPlot } from '@/runs/components/BeliefDistributionPlot';
+import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
 };
 
-export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
+export const ExperimentDetails = memo(function ExperimentDetails({
+    experiment,
+}: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
@@ -26,6 +30,9 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
         <DetailsWrapper spacing={0}>
             <TitleWrapper>
                 <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
+                <Bookmark>
+                    <ExperimentBookmarkControl experiment={experiment} />
+                </Bookmark>
             </TitleWrapper>
             <ContentWrapper spacing={2}>
                 {experiment.status !== 'SUCCEEDED' && (
@@ -153,7 +160,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
             </ContentWrapper>
         </DetailsWrapper>
     );
-}
+});
 
 const DetailsWrapper = styled(Stack)`
     color: ${({ theme }) => theme.color['cream-100'].hex};
@@ -170,11 +177,18 @@ const ContentWrapper = styled(Stack)`
 
 const ExperimentName = styled('h2')`
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    display: inline-block;
     font-family: 'PP Telegraf', Manrope, sans-serif;
     font-weight: 700;
     font-size: 20px;
     line-height: 24px;
     margin: 0;
+    vertical-align: middle;
+`;
+
+const Bookmark = styled('div')`
+    display: inline-block;
+    vertical-align: middle;
 `;
 
 const SectionHeader = styled(Typography)`

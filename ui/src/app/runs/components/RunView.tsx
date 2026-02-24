@@ -40,6 +40,7 @@ import {
 } from '@/analytics/runDetails';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
+import { useRunBookmarks } from '@/contexts/RunBookmarksContext';
 import {
     PanelGroup,
     Background,
@@ -77,7 +78,6 @@ interface RunViewProps {
  */
 export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
-    const { addSuccessToast, addErrorToast } = useToasts();
     const { viewerRuns, addViewerRun, updateViewerRun } = useViewerRuns();
 
     const run = viewerRuns?.[runid] ?? null;
@@ -111,8 +111,9 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
     useEffect(() => {
         fetchStatus();
 
-        // Auto-refresh every 30 seconds if run is still running
+        // Auto-refresh every 30 seconds; also update relative time display
         const interval = setInterval(() => {
+            setTick((prev) => prev + 1);
             if (
                 run?.details?.status === 'RUNNING' ||
                 run?.details?.status === 'PENDING' ||
@@ -124,15 +125,6 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
 
         return () => clearInterval(interval);
     }, [run?.details?.status]);
-
-    // Update relative time display every 30 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTick((prev) => prev + 1);
-        }, 30000);
-
-        return () => clearInterval(interval);
-    }, []);
 
     const handleStop = async () => {
         if (!confirm('Are you sure you want to stop this run?')) {
@@ -158,36 +150,6 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
             setCancelling(false);
         }
     };
-
-    const handleBookmark = useCallback(
-        async (newBookmarkStatus: boolean) => {
-            if (!run?.metadata) return;
-
-            const updatedMetadata = {
-                ...run.metadata,
-                isBookmarked: newBookmarkStatus,
-            };
-
-            // Optimistically update context
-            updateViewerRun({ id: run.id, metadata: updatedMetadata });
-
-            try {
-                await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
-                addSuccessToast(
-                    newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks'
-                );
-            } catch (err) {
-                // Rollback on error
-                updateViewerRun({
-                    id: run.id,
-                    metadata: { ...run.metadata, isBookmarked: !newBookmarkStatus },
-                });
-                addErrorToast('Error updating bookmark status.');
-                throw err;
-            }
-        },
-        [run, api, updateViewerRun]
-    );
 
     // Run is read-only if viewing another user's run (userid prop is provided)
     const isReadOnly = !!userid;
@@ -224,9 +186,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                 canStop={canStop}
                 cancelling={cancelling}
                 handleStop={handleStop}
-                handleBookmark={handleBookmark}
                 experimentsLabel={experimentsLabel}
-                isReadOnly={isReadOnly}
             />
         </RunExperimentsProvider>
     );
@@ -238,9 +198,7 @@ interface RunViewContentProps {
     canStop: boolean;
     cancelling: boolean;
     handleStop: () => void;
-    handleBookmark: (newBookmarkStatus: boolean) => Promise<void>;
     experimentsLabel: string;
-    isReadOnly: boolean;
 }
 
 function RunViewContent({
@@ -249,16 +207,15 @@ function RunViewContent({
     canStop,
     cancelling,
     handleStop,
-    handleBookmark,
     experimentsLabel,
-    isReadOnly,
 }: RunViewContentProps) {
+    const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
     const {
         experiments,
         selectedExperiment,
         selectExperiment,
-        isLoading: isLoadingExperiments,
+        isLoadingInitial: isLoadingInitialExperiments,
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
@@ -290,7 +247,9 @@ function RunViewContent({
         async (event: React.MouseEvent<HTMLButtonElement>) => {
             event.preventDefault();
 
-            const shareUrl = `${window.location.origin}/runs/shared/${run.id}`;
+            const shareUrl = selectedExperiment
+                ? `${window.location.origin}/runs/shared/${run.id}?exp=${selectedExperiment.idInRun}`
+                : `${window.location.origin}/runs/shared/${run.id}`;
             const sharePromise = navigator.clipboard.writeText(shareUrl);
 
             const apiPromise = runsApi.shareRun({
@@ -307,13 +266,13 @@ function RunViewContent({
                 console.error('Error sharing run:', err);
             }
         },
-        [run.id]
+        [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]
     );
 
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
         if (hasInitiallySelected.current || !expParam) return;
-        if (isLoadingExperiments || experiments.length === 0) return;
+        if (isLoadingInitialExperiments || experiments.length === 0) return;
 
         const expId = parseInt(expParam, 10);
         if (!expId || expId <= 0 || isNaN(expId)) return;
@@ -327,7 +286,7 @@ function RunViewContent({
             hasInitiallySelected.current = true;
             isUpdatingFromURL.current = false;
         }
-    }, [expParam, experiments, isLoadingExperiments, selectExperiment]);
+    }, [expParam, experiments, isLoadingInitialExperiments, selectExperiment]);
 
     // Write to URL: Update URL when selection changes
     useEffect(() => {
@@ -365,15 +324,19 @@ function RunViewContent({
                     <RunHeader>
                         <Box>
                             <RunHeaderName>
-                                {!isReadOnly && (
+                                {isRunBookmarksEnabled && (
                                     <BookmarkButton
                                         size="small"
-                                        onClick={() => handleBookmark(!run.metadata?.isBookmarked)}
+                                        onClick={() =>
+                                            updateRunBookmark(run.id, {
+                                                isBookmarked: !checkRunBookmarked(run.id),
+                                            })
+                                        }
                                         {...mkBookmarkRunBtnAttrs({
                                             runId: run.id,
-                                            isBookmarked: !run.metadata?.isBookmarked,
+                                            isBookmarked: !checkRunBookmarked(run.id),
                                         })}>
-                                        {run.metadata?.isBookmarked ? (
+                                        {checkRunBookmarked(run.id) ? (
                                             <BookmarkIcon />
                                         ) : (
                                             <BookmarkBorderOutlinedIcon />
@@ -434,7 +397,7 @@ function RunViewContent({
                             {run.stats && (
                                 <ExperimentCount>
                                     <HourglassTopOutlinedIcon />
-                                    {isLoadingExperiments ? (
+                                    {isLoadingInitialExperiments ? (
                                         'Loading experiments...'
                                     ) : (
                                         <>
@@ -452,7 +415,7 @@ function RunViewContent({
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
                                 </ParametersButton>
-                                {!isReadOnly && (
+                                {isRunBookmarksEnabled && (
                                     <ParametersButton
                                         variant="outlined"
                                         startIcon={<ShareOutlinedIcon />}

@@ -5,8 +5,8 @@ This module provides functions for sending emails via SMTP.
 
 import logging
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.message import EmailMessage
+from email.policy import SMTP as SMTPPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,11 @@ def send_email(
     Raises:
         smtplib.SMTPException: If email sending fails
     """
-    msg = MIMEMultipart("alternative")
+    msg = EmailMessage(policy=SMTPPolicy)
     msg["Subject"] = subject
     msg["From"] = sender_email
     msg["To"] = recipient_email
-
-    msg.attach(MIMEText(body_html, "html"))
+    msg.set_content(body_html, subtype="html", charset="utf-8")
 
     with smtplib.SMTP(smtp_server, smtp_port) as conn:
         conn.send_message(msg)

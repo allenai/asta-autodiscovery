@@ -32,6 +32,7 @@ export interface RunMetadataFromApi {
     is_shared?: boolean | null;
     // Bookmarking
     is_bookmarked?: boolean | null;
+    bookmarked_experiment_ids?: string[] | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -53,6 +54,7 @@ export interface RunFromApi {
     run_stats?: RunStatsFromApi;
     execution_status?: Record<string, unknown>;
     run_metadata?: RunMetadataFromApi;
+    max_file_size?: string;
 }
 
 export interface UploadDatasetResponseBody {
@@ -127,6 +129,7 @@ export interface MetadataFromApi {
     is_shared?: boolean | null;
     // Bookmarking
     is_bookmarked?: boolean | null;
+    bookmarked_experiment_ids?: string[] | null;
     // Job configuration parameters
     n_experiments: number | null;
     exploration_weight: number | null;
@@ -149,6 +152,11 @@ export interface ShareRunResponseBody {
 
 export interface BookmarkRunResponseBody {
     runid: string;
+    is_bookmarked: boolean;
+}
+
+export interface BookmarkExperimentResponseBody {
+    experiment_id: string;
     is_bookmarked: boolean;
 }
 
@@ -328,6 +336,23 @@ export class RunsApi extends BaseApi {
         const userid = await this.getUserId();
         return this.request<BookmarkRunResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/bookmark`,
+            method: 'POST',
+            body: { is_bookmarked: isBookmarked },
+        });
+    }
+
+    async bookmarkExperiment({
+        runId,
+        experimentId,
+        isBookmarked,
+    }: {
+        runId: string;
+        experimentId: string;
+        isBookmarked: boolean;
+    }) {
+        const userid = await this.getUserId();
+        return this.request<BookmarkExperimentResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/bookmark`,
             method: 'POST',
             body: { is_bookmarked: isBookmarked },
         });

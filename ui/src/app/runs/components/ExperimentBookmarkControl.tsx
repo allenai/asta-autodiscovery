@@ -4,10 +4,7 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import IconButton from '@mui/material/IconButton';
 import { ReactNode, useCallback, MouseEvent } from 'react';
 
-import { getRunsApi } from '@/api/RunsApi';
-import { useToasts } from '@/contexts/ToastsContext';
-import { useRunExperiments } from '@/contexts/RunExperimentsContext';
-import { useAuth0 } from '@/contexts/Auth0Context';
+import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { Experiment } from '@/types/Run';
 
 export const ExperimentBookmarkControl = ({
@@ -23,39 +20,28 @@ export const ExperimentBookmarkControl = ({
     isToggleable?: boolean;
     onChange?: (newValue: boolean) => void;
 }) => {
-    const { isAuthenticated } = useAuth0();
-    const runsApi = getRunsApi();
-    const { runid, bookmarkedExperimentIds, updateExperimentBookmark } = useRunExperiments();
-    const { addErrorToast } = useToasts();
+    const { isExperimentBookmarksEnabled, checkExperimentBookmarked, updateExperimentBookmark } =
+        useExperimentBookmarks();
 
-    const isBookmarked = experiment ? bookmarkedExperimentIds.has(experiment.experimentId) : false;
+    const isBookmarked = experiment ? checkExperimentBookmarked(experiment.experimentId) : false;
 
-    // Toggle bookmark state optimistically, then make API call. If API call
-    // fails, revert state and show error toast.
+    // Toggle bookmark state optimistically via context, then make API call. If API call
+    // fails, context reverts state and shows error toast.
     const onClickToggle = useCallback(
         async (event: MouseEvent<HTMLElement>) => {
             event.preventDefault();
             event.stopPropagation(); // Prevent click from propagating to parent elements (e.g., experiment item)
 
             const isNowBookmarked = !isBookmarked;
-            updateExperimentBookmark(experiment!, { isBookmarked: isNowBookmarked });
-
             try {
-                await runsApi.bookmarkExperiment({
-                    runId: runid!,
-                    experimentId: experiment!.experimentId,
-                    isBookmarked: isNowBookmarked,
-                });
-            } catch (error) {
-                console.error('Error toggling bookmark:', error);
-                addErrorToast('Failed to update bookmark. Please try again.');
-                updateExperimentBookmark(experiment!, { isBookmarked: !isNowBookmarked });
+                await updateExperimentBookmark(experiment!, { isBookmarked: isNowBookmarked });
+            } catch {
                 return;
             }
 
             onChange?.(isNowBookmarked);
         },
-        [isBookmarked, onChange, runid, experiment, addErrorToast, updateExperimentBookmark]
+        [isBookmarked, onChange, experiment, updateExperimentBookmark]
     );
 
     // If the caller doesn't provide custom icons, use defaults. If they do
@@ -79,7 +65,7 @@ export const ExperimentBookmarkControl = ({
             </IconButton>
         );
 
-    if (!isAuthenticated || !runid || !experiment) {
+    if (!isExperimentBookmarksEnabled || !experiment) {
         return null;
     }
     return (

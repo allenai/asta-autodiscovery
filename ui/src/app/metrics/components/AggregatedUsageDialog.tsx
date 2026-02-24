@@ -178,7 +178,7 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
         });
     }
 
-    // Available views
+    // Available token views
     type ViewKey = 'by_agent' | 'by_model' | 'by_node' | 'by_component';
     const viewDefs: { key: ViewKey; label: string }[] = [
         { key: 'by_agent', label: 'By Agent' },
@@ -188,6 +188,23 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
     ];
     const views = viewDefs.filter((v) => data[v.key] && Object.keys(data[v.key]).length > 0);
     const [activeView, setActiveView] = useState(0);
+    const tokenViewIndex = Math.min(activeView, Math.max(views.length - 1, 0));
+    const activeTokenView = views[tokenViewIndex];
+
+    // Available cost views
+    type CostViewKey = 'by_agent' | 'by_component';
+    const costViewDefs: { key: CostViewKey; label: string }[] = [
+        { key: 'by_agent', label: 'By Agent' },
+        { key: 'by_component', label: 'By Component' },
+    ];
+    const costViews = costViewDefs.filter(
+        (v) =>
+            data[v.key] &&
+            Object.values(data[v.key]).some((bucket) => (bucket.total_cost_usd || 0) > 0)
+    );
+    const [activeCostView, setActiveCostView] = useState(0);
+    const costViewIndex = Math.min(activeCostView, Math.max(costViews.length - 1, 0));
+    const activeCostBreakdownView = costViews[costViewIndex];
 
     const agentKeys = Object.keys(data.by_agent || {});
 
@@ -279,7 +296,7 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         Total Tokens <PanelSubtitle>breakdown view</PanelSubtitle>
                     </PanelTitle>
                     <Tabs
-                        value={activeView}
+                        value={tokenViewIndex}
                         onChange={(_, v) => setActiveView(v)}
                         sx={{
                             mb: 2,
@@ -298,9 +315,50 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         ))}
                     </Tabs>
                     <AggregatedBarChart
-                        data={data[views[activeView].key]}
-                        showCost={views[activeView].key === 'by_model'}
+                        data={data[activeTokenView!.key]}
+                        showCost={activeTokenView!.key === 'by_model'}
                     />
+                </Panel>
+            )}
+
+            {/* Cost Breakdown */}
+            {costViews.length > 0 && (
+                <Panel>
+                    <PanelTitle>
+                        Cost Breakdown{' '}
+                        <PanelSubtitle>stacked prompt / completion / reasoning</PanelSubtitle>
+                    </PanelTitle>
+                    <LegendRow>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#818cf8' }} /> Prompt
+                        </LegendItem>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#f472b6' }} /> Completion
+                        </LegendItem>
+                        <LegendItem>
+                            <LegendDot style={{ background: '#2dd4bf' }} /> Reasoning
+                        </LegendItem>
+                    </LegendRow>
+                    <Tabs
+                        value={costViewIndex}
+                        onChange={(_, v) => setActiveCostView(v)}
+                        sx={{
+                            mb: 2,
+                            minHeight: 32,
+                            '& .MuiTab-root': {
+                                minHeight: 32,
+                                fontSize: '0.72rem',
+                                textTransform: 'none',
+                                px: 1.5,
+                                color: 'rgba(255,255,255,0.6)',
+                                '&.Mui-selected': { color: '#FAF2E9' },
+                            },
+                        }}>
+                        {costViews.map((v) => (
+                            <MuiTab key={v.key} label={v.label} />
+                        ))}
+                    </Tabs>
+                    <CostBreakdownBars data={data[activeCostBreakdownView!.key]} />
                 </Panel>
             )}
 
@@ -353,6 +411,70 @@ function AggregatedBarChart({
                             </BarFill>
                         </BarTrack>
                         <BarAnnotation>{fmt(Math.round(d.mean_tokens_per_run))} avg</BarAnnotation>
+                    </BarRow>
+                );
+            })}
+        </Box>
+    );
+}
+
+function CostBreakdownBars({ data }: { data: Record<string, AggregatedUsageBucket> }) {
+    const entries = Object.entries(data)
+        .filter(([, d]) => d.total_cost_usd > 0)
+        .sort((a, b) => b[1].total_cost_usd - a[1].total_cost_usd);
+
+    if (entries.length === 0) {
+        return (
+            <Typography
+                variant="body2"
+                sx={{
+                    color: (theme: any) =>
+                        theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
+                }}>
+                No cost data available.
+            </Typography>
+        );
+    }
+
+    const maxCost = Math.max(...entries.map(([, d]) => d.total_cost_usd), 0.0001);
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {entries.map(([key, d]) => {
+                const total = d.total_cost_usd || 0;
+                const widthPct = (total / maxCost) * 100;
+                const promptPct = total > 0 ? (d.total_prompt_cost_usd / total) * 100 : 0;
+                const completionPct = total > 0 ? (d.total_completion_cost_usd / total) * 100 : 0;
+                const reasoningPct = total > 0 ? (d.total_reasoning_cost_usd / total) * 100 : 0;
+                const small = widthPct < 20;
+
+                return (
+                    <BarRow key={key}>
+                        <BarLabel>{prettyName(key)}</BarLabel>
+                        <BarTrack>
+                            <CostBarFill style={{ width: `${Math.max(widthPct, 1.5)}%` }}>
+                                {promptPct > 0 && (
+                                    <CostSegment
+                                        style={{ width: `${promptPct}%`, background: '#818cf8' }}
+                                    />
+                                )}
+                                {completionPct > 0 && (
+                                    <CostSegment
+                                        style={{
+                                            width: `${completionPct}%`,
+                                            background: '#f472b6',
+                                        }}
+                                    />
+                                )}
+                                {reasoningPct > 0 && (
+                                    <CostSegment
+                                        style={{ width: `${reasoningPct}%`, background: '#2dd4bf' }}
+                                    />
+                                )}
+                                <CostValue $outside={small}>{fmtCost(total)}</CostValue>
+                            </CostBarFill>
+                        </BarTrack>
+                        <BarAnnotation>{fmtCost(d.mean_cost_per_run)} avg</BarAnnotation>
                     </BarRow>
                 );
             })}
@@ -593,6 +715,40 @@ const BarFill = styled(Box)`
     min-width: 2px;
     transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
+`;
+
+const CostBarFill = styled(Box)`
+    height: 100%;
+    border-radius: 5px;
+    display: flex;
+    min-width: 2px;
+    overflow: hidden;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+`;
+
+const CostSegment = styled(Box)`
+    height: 100%;
+    min-width: 0;
+`;
+
+const CostValue = styled('span')<{ $outside: boolean }>`
+    font-size: 0.65rem;
+    font-weight: 600;
+    white-space: nowrap;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    ${({ $outside }) =>
+        $outside
+            ? `
+        left: calc(100% + 6px);
+        color: rgba(255,255,255,0.8);
+    `
+            : `
+        right: 8px;
+        color: #fff;
+    `}
 `;
 
 const BarValue = styled('span')<{ $outside: boolean }>`

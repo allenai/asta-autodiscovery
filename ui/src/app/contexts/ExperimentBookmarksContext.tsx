@@ -11,16 +11,17 @@ export interface ExperimentBookmarksState {
     isExperimentBookmarksEnabled: boolean;
     bookmarkedExperimentIds: Set<string>;
     checkExperimentBookmarked: (experimentId: string) => boolean;
-    bookmarkExperiment: (experiment: Experiment) => Promise<void>;
-    unbookmarkExperiment: (experiment: Experiment) => Promise<void>;
+    updateExperimentBookmark: (
+        experiment: Experiment,
+        { isBookmarked }: { isBookmarked: boolean }
+    ) => Promise<void>;
 }
 
 const DEFAULT_STATE: ExperimentBookmarksState = {
     isExperimentBookmarksEnabled: false,
     bookmarkedExperimentIds: new Set(),
     checkExperimentBookmarked: () => false,
-    bookmarkExperiment: async () => {},
-    unbookmarkExperiment: async () => {},
+    updateExperimentBookmark: async () => {},
 };
 
 const ExperimentBookmarksContext = createContext<ExperimentBookmarksState>(DEFAULT_STATE);
@@ -65,55 +66,18 @@ export const ExperimentBookmarksProvider = ({
         [bookmarkedExperimentIds]
     );
 
-    const bookmarkExperiment = useCallback(
-        async (experiment: Experiment) => {
+    const updateExperimentBookmark = useCallback(
+        async (experiment: Experiment, { isBookmarked }: { isBookmarked: boolean }) => {
             if (!isExperimentBookmarksEnabled || !runid) return;
             const metadata = viewerRuns?.[runid]?.metadata;
             if (!metadata) return;
 
             const updatedIds = new Set(bookmarkedExperimentIds);
-            updatedIds.add(experiment.experimentId);
-            updateViewerRun({
-                id: runid,
-                metadata: { ...metadata, bookmarkedExperimentIds: Array.from(updatedIds) },
-            });
-
-            try {
-                await runsApi.bookmarkExperiment({
-                    runId: runid,
-                    experimentId: experiment.experimentId,
-                    isBookmarked: true,
-                });
-            } catch (err) {
-                const revertedIds = new Set(bookmarkedExperimentIds);
-                revertedIds.delete(experiment.experimentId);
-                updateViewerRun({
-                    id: runid,
-                    metadata: { ...metadata, bookmarkedExperimentIds: Array.from(revertedIds) },
-                });
-                addErrorToast('Failed to update bookmark. Please try again.');
-                throw err;
+            if (isBookmarked) {
+                updatedIds.add(experiment.experimentId);
+            } else {
+                updatedIds.delete(experiment.experimentId);
             }
-        },
-        [
-            isExperimentBookmarksEnabled,
-            runid,
-            viewerRuns,
-            bookmarkedExperimentIds,
-            updateViewerRun,
-            runsApi,
-            addErrorToast,
-        ]
-    );
-
-    const unbookmarkExperiment = useCallback(
-        async (experiment: Experiment) => {
-            if (!isExperimentBookmarksEnabled || !runid) return;
-            const metadata = viewerRuns?.[runid]?.metadata;
-            if (!metadata) return;
-
-            const updatedIds = new Set(bookmarkedExperimentIds);
-            updatedIds.delete(experiment.experimentId);
             updateViewerRun({
                 id: runid,
                 metadata: { ...metadata, bookmarkedExperimentIds: Array.from(updatedIds) },
@@ -123,11 +87,11 @@ export const ExperimentBookmarksProvider = ({
                 await runsApi.bookmarkExperiment({
                     runId: runid,
                     experimentId: experiment.experimentId,
-                    isBookmarked: false,
+                    isBookmarked,
                 });
             } catch (err) {
+                // Revert: restore the pre-update set
                 const revertedIds = new Set(bookmarkedExperimentIds);
-                revertedIds.add(experiment.experimentId);
                 updateViewerRun({
                     id: runid,
                     metadata: { ...metadata, bookmarkedExperimentIds: Array.from(revertedIds) },
@@ -152,15 +116,13 @@ export const ExperimentBookmarksProvider = ({
             isExperimentBookmarksEnabled,
             bookmarkedExperimentIds,
             checkExperimentBookmarked,
-            bookmarkExperiment,
-            unbookmarkExperiment,
+            updateExperimentBookmark,
         }),
         [
             isExperimentBookmarksEnabled,
             bookmarkedExperimentIds,
             checkExperimentBookmarked,
-            bookmarkExperiment,
-            unbookmarkExperiment,
+            updateExperimentBookmark,
         ]
     );
 

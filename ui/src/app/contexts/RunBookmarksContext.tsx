@@ -9,15 +9,16 @@ import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 export interface RunBookmarksState {
     isRunBookmarksEnabled: boolean;
     checkRunBookmarked: (runId: string) => boolean;
-    bookmarkRun: (runId: string) => Promise<void>;
-    unbookmarkRun: (runId: string) => Promise<void>;
+    updateRunBookmark: (
+        runId: string,
+        { isBookmarked }: { isBookmarked: boolean }
+    ) => Promise<void>;
 }
 
 const DEFAULT_STATE: RunBookmarksState = {
     isRunBookmarksEnabled: false,
     checkRunBookmarked: () => false,
-    bookmarkRun: async () => {},
-    unbookmarkRun: async () => {},
+    updateRunBookmark: async () => {},
 };
 
 const RunBookmarksContext = createContext<RunBookmarksState>(DEFAULT_STATE);
@@ -47,46 +48,22 @@ export const RunBookmarksProvider = ({ isRunBookmarksEnabled, children }: RunBoo
         [viewerRuns]
     );
 
-    const bookmarkRun = useCallback(
-        async (runId: string) => {
+    const updateRunBookmark = useCallback(
+        async (runId: string, { isBookmarked }: { isBookmarked: boolean }) => {
             if (!isRunBookmarksEnabled) return;
             const run = viewerRuns?.[runId];
             if (!run?.metadata) return;
 
-            updateViewerRun({ id: runId, metadata: { ...run.metadata, isBookmarked: true } });
+            updateViewerRun({ id: runId, metadata: { ...run.metadata, isBookmarked } });
 
             try {
-                await runsApi.bookmarkRun({ runId, isBookmarked: true });
-                addSuccessToast('Run bookmarked');
+                await runsApi.bookmarkRun({ runId, isBookmarked });
+                addSuccessToast(isBookmarked ? 'Run bookmarked' : 'Run removed from bookmarks');
             } catch (err) {
-                updateViewerRun({ id: runId, metadata: { ...run.metadata, isBookmarked: false } });
-                addErrorToast('Error updating bookmark status.');
-                throw err;
-            }
-        },
-        [
-            isRunBookmarksEnabled,
-            viewerRuns,
-            updateViewerRun,
-            runsApi,
-            addSuccessToast,
-            addErrorToast,
-        ]
-    );
-
-    const unbookmarkRun = useCallback(
-        async (runId: string) => {
-            if (!isRunBookmarksEnabled) return;
-            const run = viewerRuns?.[runId];
-            if (!run?.metadata) return;
-
-            updateViewerRun({ id: runId, metadata: { ...run.metadata, isBookmarked: false } });
-
-            try {
-                await runsApi.bookmarkRun({ runId, isBookmarked: false });
-                addSuccessToast('Run removed from bookmarks');
-            } catch (err) {
-                updateViewerRun({ id: runId, metadata: { ...run.metadata, isBookmarked: true } });
+                updateViewerRun({
+                    id: runId,
+                    metadata: { ...run.metadata, isBookmarked: !isBookmarked },
+                });
                 addErrorToast('Error updating bookmark status.');
                 throw err;
             }
@@ -105,10 +82,9 @@ export const RunBookmarksProvider = ({ isRunBookmarksEnabled, children }: RunBoo
         () => ({
             isRunBookmarksEnabled,
             checkRunBookmarked,
-            bookmarkRun,
-            unbookmarkRun,
+            updateRunBookmark,
         }),
-        [isRunBookmarksEnabled, checkRunBookmarked, bookmarkRun, unbookmarkRun]
+        [isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark]
     );
 
     return (

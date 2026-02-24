@@ -217,8 +217,7 @@ function RunViewContent({
     handleStop,
     experimentsLabel,
 }: RunViewContentProps) {
-    const { isRunBookmarksEnabled, checkRunBookmarked, bookmarkRun, unbookmarkRun } =
-        useRunBookmarks();
+    const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
     const {
         experiments,
@@ -337,9 +336,9 @@ function RunViewContent({
                                     <BookmarkButton
                                         size="small"
                                         onClick={() =>
-                                            checkRunBookmarked(run.id)
-                                                ? unbookmarkRun(run.id)
-                                                : bookmarkRun(run.id)
+                                            updateRunBookmark(run.id, {
+                                                isBookmarked: !checkRunBookmarked(run.id),
+                                            })
                                         }
                                         {...mkBookmarkRunBtnAttrs({
                                             runId: run.id,

@@ -20,12 +20,8 @@ export const ExperimentBookmarkControl = ({
     isToggleable?: boolean;
     onChange?: (newValue: boolean) => void;
 }) => {
-    const {
-        isExperimentBookmarksEnabled,
-        checkExperimentBookmarked,
-        bookmarkExperiment,
-        unbookmarkExperiment,
-    } = useExperimentBookmarks();
+    const { isExperimentBookmarksEnabled, checkExperimentBookmarked, updateExperimentBookmark } =
+        useExperimentBookmarks();
 
     const isBookmarked = experiment ? checkExperimentBookmarked(experiment.experimentId) : false;
 
@@ -38,18 +34,14 @@ export const ExperimentBookmarkControl = ({
 
             const isNowBookmarked = !isBookmarked;
             try {
-                if (isNowBookmarked) {
-                    await bookmarkExperiment(experiment!);
-                } else {
-                    await unbookmarkExperiment(experiment!);
-                }
+                await updateExperimentBookmark(experiment!, { isBookmarked: isNowBookmarked });
             } catch {
                 return;
             }
 
             onChange?.(isNowBookmarked);
         },
-        [isBookmarked, onChange, experiment, bookmarkExperiment, unbookmarkExperiment]
+        [isBookmarked, onChange, experiment, updateExperimentBookmark]
     );
 
     // If the caller doesn't provide custom icons, use defaults. If they do

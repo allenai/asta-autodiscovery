@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { styled, Typography, Box, Stack } from '@mui/material';
 import { Markdown } from '@allenai/varnish2/components';
 
@@ -18,7 +19,9 @@ type ExperimentDetailsProps = {
     experiment: Experiment;
 };
 
-export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
+export const ExperimentDetails = memo(function ExperimentDetails({
+    experiment,
+}: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
@@ -157,7 +160,7 @@ export function ExperimentDetails({ experiment }: ExperimentDetailsProps) {
             </ContentWrapper>
         </DetailsWrapper>
     );
-}
+});
 
 const DetailsWrapper = styled(Stack)`
     color: ${({ theme }) => theme.color['cream-100'].hex};

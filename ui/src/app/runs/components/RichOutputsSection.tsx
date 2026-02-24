@@ -51,20 +51,22 @@ const getPreferredRichOutput = (bundle: RichOutputBundle): RichOutputPreview => 
     return null;
 };
 
+const PLOT_ANALYSIS_RE = /=== Plot Analysis \(figure (\d+)\) ===\s*([\s\S]*?)(?:\n=+|\r\n=+|$)/g;
+
 const extractPlotAnalyses = (codeOutput: string | null) => {
     if (!codeOutput) {
         return [];
     }
     const analyses: string[] = [];
-    const pattern = /=== Plot Analysis \(figure (\d+)\) ===\s*([\s\S]*?)(?:\n=+|\r\n=+|$)/g;
-    let match = pattern.exec(codeOutput);
+    PLOT_ANALYSIS_RE.lastIndex = 0;
+    let match = PLOT_ANALYSIS_RE.exec(codeOutput);
     while (match) {
         const index = Number(match[1]);
         const analysis = match[2]?.trim();
         if (!Number.isNaN(index) && analysis) {
             analyses[index - 1] = analysis;
         }
-        match = pattern.exec(codeOutput);
+        match = PLOT_ANALYSIS_RE.exec(codeOutput);
     }
     return analyses;
 };

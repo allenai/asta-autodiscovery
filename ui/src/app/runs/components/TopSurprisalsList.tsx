@@ -1,6 +1,6 @@
 import { Button, styled } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForwardOutlined';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel } from '../utils/ExperimentUtils';
@@ -19,9 +19,13 @@ export const TopSurprisalsList = () => {
 export const TopSurprisalsListImpl = () => {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
 
-    const surprisals = experiments
-        .filter((exp) => exp.isSurprising)
-        .sort((a, b) => (a.surprise ?? 0) - (b.surprise ?? 0));
+    const surprisals = useMemo(
+        () =>
+            experiments
+                .filter((exp) => exp.isSurprising)
+                .sort((a, b) => (a.surprise ?? 0) - (b.surprise ?? 0)),
+        [experiments]
+    );
 
     const [isListExpanded, setIsListExpanded] = useState(
         surprisals.length <= COLLAPSED_SURPRISALS_COUNT

@@ -111,8 +111,9 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
     useEffect(() => {
         fetchStatus();
 
-        // Auto-refresh every 30 seconds if run is still running
+        // Auto-refresh every 30 seconds; also update relative time display
         const interval = setInterval(() => {
+            setTick((prev) => prev + 1);
             if (
                 run?.details?.status === 'RUNNING' ||
                 run?.details?.status === 'PENDING' ||
@@ -124,15 +125,6 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
 
         return () => clearInterval(interval);
     }, [run?.details?.status]);
-
-    // Update relative time display every 30 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTick((prev) => prev + 1);
-        }, 30000);
-
-        return () => clearInterval(interval);
-    }, []);
 
     const handleStop = async () => {
         if (!confirm('Are you sure you want to stop this run?')) {

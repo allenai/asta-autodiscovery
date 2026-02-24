@@ -169,6 +169,32 @@ class ExperimentTree:
         tree._load_from_gcs()
         return tree
 
+    @classmethod
+    def load_node(
+        cls,
+        userid: str,
+        jobid: str,
+        experiment_id: str,
+        config: JobConfig | None = None,
+    ) -> ExperimentNode | None:
+        """Load a single experiment node directly without fetching the full tree.
+
+        Args:
+            userid: User identifier
+            jobid: Job identifier
+            experiment_id: Experiment identifier (e.g. "node_0_0")
+            config: Optional configuration
+
+        Returns:
+            ExperimentNode if found, None otherwise
+        """
+        config = config or JobConfig()
+        filename = f"mcts_{experiment_id}.json"
+        node_data = read_experiment_node(userid, jobid, filename, config)
+        if node_data is None:
+            return None
+        return ExperimentNode(node_data, filename)
+
     def _load_from_gcs(self) -> None:
         """Load all experiment nodes from GCS in parallel."""
         try:

@@ -978,8 +978,7 @@ def create() -> Blueprint:
             return error_response, status_code
 
         job_manager = get_job_manager()
-        tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        node = tree.get_node(experiment_id)
+        node = ExperimentTree.load_node(userid=userid, jobid=runid, experiment_id=experiment_id, config=job_manager.config)
 
         experiment_node = node.to_dict() if node else None
         if experiment_node and node:

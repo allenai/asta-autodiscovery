@@ -279,16 +279,19 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         };
     }, [selectedExperiment]);
 
-    const handleRowClick = (params: any) => {
-        // Don't allow clicking on skeleton rows
-        if (params.row.isSkeleton) {
-            return;
-        }
-        const exp = experiments.find((exp) => exp.idInRun === params.id);
-        if (exp) {
-            selectExperiment(exp, { scroll: false });
-        }
-    };
+    const handleRowClick = useCallback(
+        (params: any) => {
+            // Don't allow clicking on skeleton rows
+            if (params.row.isSkeleton) {
+                return;
+            }
+            const exp = experiments.find((exp) => exp.idInRun === params.id);
+            if (exp) {
+                selectExperiment(exp, { scroll: false });
+            }
+        },
+        [experiments, selectExperiment]
+    );
 
     // Scroll to the selected experiment when it changes, unless the caller opted out
     useEffect(() => {

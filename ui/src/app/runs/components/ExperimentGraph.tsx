@@ -36,7 +36,7 @@
  * The component uses D3.js for tree layout, radial positioning, and zoom/pan interactions.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { styled, Typography, IconButton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -209,7 +209,7 @@ const assignAngularRanges = (
     node.yPos = node.y * Math.sin(node.angle);
 };
 
-export const ExperimentGraph = () => {
+export const ExperimentGraph = memo(function ExperimentGraph() {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
     const { bookmarkedExperimentIds } = useExperimentBookmarks();
 
@@ -719,7 +719,7 @@ export const ExperimentGraph = () => {
             </ControlsOverlay>
         </GraphContainer>
     );
-};
+});
 
 // Styled Components
 const GraphContainer = styled('div')`

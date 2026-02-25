@@ -44,7 +44,6 @@
   },
   "devDependencies": {
     "@allenai/eslint-config-varnish": "^1.2.9",
-    "@browserbasehq/stagehand": "^3.0.8",
     "@playwright/test": "^1.58.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^20.11.24",

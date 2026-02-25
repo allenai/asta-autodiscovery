@@ -5,6 +5,8 @@
 export interface DailyMetrics {
     date: string;
     runs_started: number;
+    unique_users_started: number;
+    hypotheses_conducted: number;
     runs_succeeded: number;
     runs_failed: number;
     llm_cost_usd: number;

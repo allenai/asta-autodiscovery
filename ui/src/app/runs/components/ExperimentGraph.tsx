@@ -46,6 +46,12 @@ import * as d3 from 'd3';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { Experiment, BeliefDistribution } from '@/types/Run';
+import {
+    TEST_ID_EXPERIMENT_GRAPH,
+    TEST_ID_EXPERIMENT_GRAPH_ZOOM_IN,
+    TEST_ID_EXPERIMENT_GRAPH_ZOOM_OUT,
+    TEST_ID_EXPERIMENT_GRAPH_RESET,
+} from '@/testIds';
 
 // Type definitions for D3 tree nodes
 type D3TreeNode = {
@@ -661,7 +667,7 @@ export const ExperimentGraph = memo(function ExperimentGraph() {
     // Handle empty state
     if (experiments.length === 0) {
         return (
-            <GraphContainer ref={containerRef}>
+            <GraphContainer ref={containerRef} data-test-id={TEST_ID_EXPERIMENT_GRAPH}>
                 <EmptyState>
                     <Typography variant="body2" color="textSecondary">
                         No experiments to display
@@ -672,7 +678,7 @@ export const ExperimentGraph = memo(function ExperimentGraph() {
     }
 
     return (
-        <GraphContainer ref={containerRef}>
+        <GraphContainer ref={containerRef} data-test-id={TEST_ID_EXPERIMENT_GRAPH}>
             <StyledSVG ref={svgRef} />
 
             {/* Stats Overlay */}
@@ -704,15 +710,24 @@ export const ExperimentGraph = memo(function ExperimentGraph() {
             {/* Zoom Controls */}
             <ControlsOverlay>
                 <ZoomControls>
-                    <StyledIconButton size="small" onClick={handleZoomIn}>
+                    <StyledIconButton
+                        size="small"
+                        onClick={handleZoomIn}
+                        data-test-id={TEST_ID_EXPERIMENT_GRAPH_ZOOM_IN}>
                         <AddIcon fontSize="small" />
                     </StyledIconButton>
-                    <StyledIconButton size="small" onClick={handleZoomOut}>
+                    <StyledIconButton
+                        size="small"
+                        onClick={handleZoomOut}
+                        data-test-id={TEST_ID_EXPERIMENT_GRAPH_ZOOM_OUT}>
                         <RemoveIcon fontSize="small" />
                     </StyledIconButton>
                 </ZoomControls>
                 {hasInteracted && (
-                    <StyledIconButton size="small" onClick={handleResetView}>
+                    <StyledIconButton
+                        size="small"
+                        onClick={handleResetView}
+                        data-test-id={TEST_ID_EXPERIMENT_GRAPH_RESET}>
                         <CenterFocusStrongIcon fontSize="small" />
                     </StyledIconButton>
                 )}

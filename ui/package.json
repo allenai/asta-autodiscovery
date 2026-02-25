@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "ts-check": "tsc --noEmit",
-    "verify": "yarn ts-check && yarn lint"
+    "verify": "yarn ts-check && yarn lint",
+    "test": "yarn test:e2e",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@allenai/varnish2": "^3.0.8-alpha.0",
@@ -42,6 +44,7 @@
   },
   "devDependencies": {
     "@allenai/eslint-config-varnish": "^1.2.9",
+    "@playwright/test": "^1.58.2",
     "@types/d3": "^7.4.3",
     "@types/node": "^20.11.24",
     "@types/react": "^18.2.61",

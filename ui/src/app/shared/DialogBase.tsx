@@ -2,12 +2,15 @@ import CloseIcon from '@mui/icons-material/Close';
 import { styled, Dialog, DialogContent, DialogProps, DialogTitle, IconButton } from '@mui/material';
 import { ReactNode } from 'react';
 
+import { TEST_ID_DIALOG_CLOSE_BUTTON } from '@/testIds';
+
 type DialogBaseProps = {
     isOpen: boolean;
     onClose: () => void;
     title: string;
     children: ReactNode;
     maxWidth?: DialogProps['maxWidth'];
+    testId?: string;
 };
 
 export const DialogBase = ({
@@ -16,11 +19,19 @@ export const DialogBase = ({
     title,
     children,
     maxWidth = 'sm',
+    testId,
 }: DialogBaseProps) => {
     return (
-        <Dialog open={isOpen} onClose={onClose} maxWidth={maxWidth}>
+        <Dialog
+            open={isOpen}
+            onClose={onClose}
+            maxWidth={maxWidth}
+            PaperProps={testId ? ({ 'data-test-id': testId } as object) : undefined}>
             <ModalTitle>{title}</ModalTitle>
-            <ModalCloseButton onClick={onClose} aria-label="close">
+            <ModalCloseButton
+                onClick={onClose}
+                aria-label="close"
+                data-test-id={TEST_ID_DIALOG_CLOSE_BUTTON}>
                 <CloseIcon />
             </ModalCloseButton>
             <DialogContent>{children}</DialogContent>

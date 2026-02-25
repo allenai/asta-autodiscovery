@@ -10,6 +10,13 @@ import {
     mkResponsibleUseLinkTrackAttrs,
     mkTosLinkTrackAttrs,
 } from '@/analytics/run';
+import {
+    TEST_ID_ATTRIBUTION_BUTTON,
+    TEST_ID_DISCLAIMER_BUTTON,
+    TEST_ID_PRIVACY_POLICY_LINK,
+    TEST_ID_RESPONSIBLE_USE_LINK,
+    TEST_ID_TERMS_OF_USE_LINK,
+} from '@/testIds';
 
 export const ToS = () => {
     const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
@@ -24,16 +31,23 @@ export const ToS = () => {
                     rel="noopener noreferrer">
                     Feedback
                 </MobileFeedbackLink>
-                <Link onClick={() => setIsDisclaimerOpen(true)} {...mkDisclaimerBtnTrackAttrs()}>
+                <Link
+                    onClick={() => setIsDisclaimerOpen(true)}
+                    data-test-id={TEST_ID_DISCLAIMER_BUTTON}
+                    {...mkDisclaimerBtnTrackAttrs()}>
                     Disclaimer
                 </Link>
-                <Link onClick={() => setIsAttributionOpen(true)} {...mkAttributionBtnTrackAttrs()}>
+                <Link
+                    onClick={() => setIsAttributionOpen(true)}
+                    data-test-id={TEST_ID_ATTRIBUTION_BUTTON}
+                    {...mkAttributionBtnTrackAttrs()}>
                     Attribution
                 </Link>
                 <Link
                     href="https://allenai.org/privacy-policy"
                     target="_blank"
                     rel="noopener noreferrer"
+                    data-test-id={TEST_ID_PRIVACY_POLICY_LINK}
                     {...mkPrivacyLinkTrackAttrs()}>
                     Privacy Policy
                 </Link>
@@ -41,6 +55,7 @@ export const ToS = () => {
                     href="https://allenai.org/terms"
                     target="_blank"
                     rel="noopener noreferrer"
+                    data-test-id={TEST_ID_TERMS_OF_USE_LINK}
                     {...mkTosLinkTrackAttrs()}>
                     Terms of Use
                 </Link>
@@ -48,6 +63,7 @@ export const ToS = () => {
                     href="https://allenai.org/responsible-use"
                     target="_blank"
                     rel="noopener noreferrer"
+                    data-test-id={TEST_ID_RESPONSIBLE_USE_LINK}
                     {...mkResponsibleUseLinkTrackAttrs()}>
                     Responsible Use
                 </Link>

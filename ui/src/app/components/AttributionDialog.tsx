@@ -1,6 +1,7 @@
 import { Link, Typography } from '@mui/material';
 
 import { BulletList, DialogBase } from '@/shared/DialogBase';
+import { TEST_ID_ATTRIBUTION_DIALOG } from '@/testIds';
 
 type AttributionDialogProps = {
     isOpen: boolean;
@@ -9,7 +10,7 @@ type AttributionDialogProps = {
 
 export const AttributionDialog = ({ isOpen, onClose }: AttributionDialogProps) => {
     return (
-        <DialogBase isOpen={isOpen} onClose={onClose} title="Attribution & Transparency">
+        <DialogBase isOpen={isOpen} onClose={onClose} title="Attribution & Transparency" testId={TEST_ID_ATTRIBUTION_DIALOG}>
             <Typography variant="body1" sx={{ mb: 2 }}>
                 <strong>Research corpus</strong>
                 <br />

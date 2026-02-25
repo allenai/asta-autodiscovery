@@ -55,6 +55,12 @@ import {
 } from '@/runs/components/RunViewPanels';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { mkBookmarkRunBtnAttrs } from '@/analytics/run';
+import {
+    TEST_ID_SESSION_CONFIG_BUTTON,
+    TEST_ID_SESSION_CONFIG_MODAL,
+    TEST_ID_EXPERIMENT_DETAILS_PANEL,
+    TEST_ID_EXPERIMENT_DETAILS_CLOSE,
+} from '@/testIds';
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -412,6 +418,7 @@ function RunViewContent({
                                     variant="outlined"
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}
+                                    data-test-id={TEST_ID_SESSION_CONFIG_BUTTON}
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session Configuration
                                 </ParametersButton>
@@ -462,6 +469,7 @@ function RunViewContent({
                     <ExperimentPanel
                         $isExpanded={isExpPanelExpanded}
                         $isClosing={isClosingPanel}
+                        data-test-id={TEST_ID_EXPERIMENT_DETAILS_PANEL}
                         style={
                             {
                                 '--experiment-panel-width': expPanelWidthPx
@@ -484,6 +492,7 @@ function RunViewContent({
                             <ExperimentActionButton
                                 onClick={handleClosePanel}
                                 size="small"
+                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
                                 {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
                                 <CloseIcon />
                             </ExperimentActionButton>
@@ -507,6 +516,7 @@ function RunViewContent({
                 open={isParametersModalOpen}
                 onClose={() => setIsParametersModalOpen(false)}
                 metadata={run.metadata}
+                testId={TEST_ID_SESSION_CONFIG_MODAL}
             />
         </Container>
     );

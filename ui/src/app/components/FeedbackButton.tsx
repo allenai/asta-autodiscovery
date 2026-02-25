@@ -2,6 +2,7 @@ import { Button, styled } from '@mui/material';
 import Link from 'next/link';
 
 import { mkFeedbackBtnTrackAttrs } from '@/analytics/run';
+import { TEST_ID_FEEDBACK_BUTTON } from '@/testIds';
 
 export const FeedbackButton = () => {
     return (
@@ -10,6 +11,7 @@ export const FeedbackButton = () => {
             passHref
             target="_blank"
             rel="noopener noreferrer"
+            data-test-id={TEST_ID_FEEDBACK_BUTTON}
             {...mkFeedbackBtnTrackAttrs()}>
             <StyledButton variant="outlined">Feedback</StyledButton>
         </Link>

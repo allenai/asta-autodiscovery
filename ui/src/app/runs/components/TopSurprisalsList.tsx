@@ -5,6 +5,11 @@ import { useMemo, useState } from 'react';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { getPriorAndPosteriorLabel } from '../utils/ExperimentUtils';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
+import {
+    TEST_ID_TOP_SURPRISALS_LIST,
+    TEST_ID_TOP_SURPRISALS_ITEM,
+    TEST_ID_VIEW_ALL_SURPRISALS_BUTTON,
+} from '@/testIds';
 
 export const COLLAPSED_SURPRISALS_COUNT = 2;
 
@@ -36,7 +41,7 @@ export const TopSurprisalsListImpl = () => {
         : surprisals.slice(0, COLLAPSED_SURPRISALS_COUNT);
 
     return (
-        <Wrapper>
+        <Wrapper data-test-id={TEST_ID_TOP_SURPRISALS_LIST}>
             <Header>
                 <Title>Top Surprisals</Title>
                 <Actions>{/* <div>Threshold 0 |------| 100</div> */}</Actions>
@@ -45,6 +50,7 @@ export const TopSurprisalsListImpl = () => {
                 {surprisalsToShow.map((experiment) => (
                     <Item
                         key={experiment.experimentId}
+                        data-test-id={TEST_ID_TOP_SURPRISALS_ITEM}
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
                         onClick={() => selectExperiment(experiment, { scroll: false })}>
                         <Bookmark>
@@ -69,6 +75,7 @@ export const TopSurprisalsListImpl = () => {
             {surprisals.length > COLLAPSED_SURPRISALS_COUNT && (
                 <ExpandListButton
                     variant="outlined"
+                    data-test-id={TEST_ID_VIEW_ALL_SURPRISALS_BUTTON}
                     onClick={() => setIsListExpanded(() => !isListExpanded)}>
                     {isListExpanded
                         ? 'Collapse surprisals'

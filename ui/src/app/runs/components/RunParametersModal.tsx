@@ -20,6 +20,7 @@ interface RunParametersModalProps {
     open: boolean;
     onClose: () => void;
     metadata: Metadata | null | undefined;
+    testId?: string;
 }
 
 /**
@@ -27,7 +28,7 @@ interface RunParametersModalProps {
  * Shows metadata (name, description, datasets, domain, intent) and
  * run arguments (experiments, exploration weight, etc.) - all from metadata.
  */
-export function RunParametersModal({ open, onClose, metadata }: RunParametersModalProps) {
+export function RunParametersModal({ open, onClose, metadata, testId }: RunParametersModalProps) {
     const getMctsSelectionLabel = (value: string | null) => {
         if (!value) return 'Not set';
         const option = Object.values(MCTS_SELECTION).find((opt) => opt.value === value);
@@ -45,7 +46,8 @@ export function RunParametersModal({ open, onClose, metadata }: RunParametersMod
                     maxWidth: '600px',
                     borderRadius: '24px',
                 },
-            }}
+                ...(testId ? { 'data-test-id': testId } : {}),
+            } as object}
             slotProps={{
                 backdrop: {
                     sx: {

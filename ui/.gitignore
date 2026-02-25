@@ -7,6 +7,7 @@
 
 # testing
 /coverage
+/public/e2e-results
 
 # next.js
 /.next/

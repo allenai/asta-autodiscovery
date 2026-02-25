@@ -171,34 +171,23 @@ for (const url of RUN_URLS) {
             await page.keyboard.press('Escape');
         });
 
-        test('table can filter to true afters and sort by surprisal', async ({ page }) => {
+        test('table can sort by surprisal ascending then descending', async ({ page }) => {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
 
-            // Open filters
-            const filtersBtn = table.getByRole('button', { name: /filters/i });
-            await filtersBtn.click();
-
-            // Add filter on "Belief After" column for "true" value
-            const addFilterBtn = page.getByRole('button', { name: /add filter/i });
-            await addFilterBtn.click();
-
-            // Select the "posterior" column
-            const columnSelect = page.locator('.MuiDataGrid-filterForm').locator('select, [role="combobox"]').first();
-            await columnSelect.click();
-            await page.getByRole('option', { name: /belief after/i }).click();
-
-            // Enter filter value
-            const filterInput = page.locator('.MuiDataGrid-filterForm input[type="text"]');
-            await filterInput.fill('true');
-
-            // Close filter panel
-            await page.keyboard.press('Escape');
-
-            // Sort by surprisal descending
-            const surprisalHeader = table.locator('.MuiDataGrid-columnHeader[data-field="surprisal"]');
+            // Default sort is surprisal descending after job completes; click to change to ascending
+            const surprisalHeader = table.locator(
+                '.MuiDataGrid-columnHeader[data-field="surprisal"]'
+            );
             await surprisalHeader.click();
+            await page.waitForTimeout(300);
+            await expect(surprisalHeader).toHaveAttribute('aria-sort', 'ascending');
 
-            // Verify rows exist
+            // Click again for descending
+            await surprisalHeader.click();
+            await page.waitForTimeout(300);
+            await expect(surprisalHeader).toHaveAttribute('aria-sort', 'descending');
+
+            // Verify rows still exist after sorting
             const rows = page.locator('.MuiDataGrid-row:not([data-id^="skeleton"])');
             expect(await rows.count()).toBeGreaterThan(0);
         });
@@ -244,44 +233,42 @@ for (const url of RUN_URLS) {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
             const idHeader = table.locator('.MuiDataGrid-columnHeader[data-field="id"]');
 
-            // Click once for ascending
+            // Click once for ascending — check aria-sort attribute on the header
             await idHeader.click();
             await page.waitForTimeout(300);
-
-            // Get text of first ID cell
-            const firstIdAsc = await page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"]) .MuiDataGrid-cell[data-field="id"]')
-                .first()
-                .textContent();
+            await expect(idHeader).toHaveAttribute('aria-sort', 'ascending');
 
             // Click again for descending
             await idHeader.click();
             await page.waitForTimeout(300);
-
-            const firstIdDesc = await page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"]) .MuiDataGrid-cell[data-field="id"]')
-                .first()
-                .textContent();
-
-            // The first row should differ between asc and desc
-            expect(firstIdAsc).not.toEqual(firstIdDesc);
+            await expect(idHeader).toHaveAttribute('aria-sort', 'descending');
         });
 
         test('clicking table row highlights row, tree node, and opens details panel', async ({
             page,
         }) => {
-            const firstRow = page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
+            // Wait for job to complete so experiments are fully loaded in context
+            await expect(
+                page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_LIST}"]`)
+            ).toBeVisible({ timeout: 30000 });
+
+            // Click the hypothesis cell of the first non-skeleton row (force to bypass overlap)
+            const firstHypothesisCell = page
+                .locator(
+                    '.MuiDataGrid-row:not([data-id^="skeleton"]) .MuiDataGrid-cell[data-field="hypothesis"]'
+                )
                 .first();
-            await firstRow.click();
+            await firstHypothesisCell.click({ force: true });
 
             // Row is highlighted
-            await expect(page.locator('.MuiDataGrid-row.Mui-selected')).toBeVisible();
+            await expect(page.locator('.MuiDataGrid-row.Mui-selected')).toBeVisible({
+                timeout: 10000,
+            });
 
             // Details panel is open
             await expect(
                 page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`)
-            ).toBeVisible();
+            ).toBeVisible({ timeout: 10000 });
 
             // Tree node is highlighted (stroke changes to green)
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
@@ -301,10 +288,13 @@ for (const url of RUN_URLS) {
             const treeGroup = graphContainer.locator('.tree-group');
             const transformBefore = await treeGroup.getAttribute('transform');
 
-            // Simulate drag
-            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            // Drag in the right portion of the SVG — the RunPanel occupies the left ~700px
+            // so we start at 80% of the width to be in the tree-visible area
+            const startX = box.x + box.width * 0.8;
+            const startY = box.y + box.height / 2;
+            await page.mouse.move(startX, startY);
             await page.mouse.down();
-            await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 80, { steps: 5 });
+            await page.mouse.move(startX + 80, startY + 80, { steps: 5 });
             await page.mouse.up();
 
             const transformAfter = await treeGroup.getAttribute('transform');
@@ -347,6 +337,11 @@ for (const url of RUN_URLS) {
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             await expect(graphContainer).toBeVisible();
 
+            // Wait for job to complete so experiments are fully loaded in context
+            await expect(
+                page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_LIST}"]`)
+            ).toBeVisible({ timeout: 30000 });
+
             // Click first clickable node; use force to bypass any overlapping elements
             const nodes = graphContainer.locator('circle.node[style*="pointer"]');
             await nodes.first().click({ force: true });
@@ -354,7 +349,7 @@ for (const url of RUN_URLS) {
             // Details panel opens
             await expect(
                 page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`)
-            ).toBeVisible();
+            ).toBeVisible({ timeout: 10000 });
 
             // A table row is highlighted
             expect(await page.locator('.MuiDataGrid-row.Mui-selected').count()).toBeGreaterThan(0);

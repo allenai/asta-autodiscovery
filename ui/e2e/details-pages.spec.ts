@@ -56,10 +56,10 @@ for (const url of DETAILS_URLS) {
             const selectedNode = graphContainer.locator('circle.node[stroke="#0FCB8C"]');
             expect(await selectedNode.count()).toBeGreaterThan(0);
 
-            // Details panel is open
+            // Details panel is open (wait for URL sync effect to select the experiment)
             await expect(
                 page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`)
-            ).toBeVisible();
+            ).toBeVisible({ timeout: 30000 });
         });
 
         test('sign in button links to auth.example.com', async ({ page }) => {
@@ -92,9 +92,9 @@ for (const url of DETAILS_URLS) {
         });
 
         test('closing details panel clears all selection state', async ({ page }) => {
-            // Panel should be open initially
+            // Panel should be open initially (wait for URL sync effect to select the experiment)
             const detailsPanel = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`);
-            await expect(detailsPanel).toBeVisible();
+            await expect(detailsPanel).toBeVisible({ timeout: 30000 });
 
             // Close via the X button
             const closeBtn = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_CLOSE}"]`);

@@ -1,9 +1,6 @@
 name: "E2E Tests"
 
 on:
-  push:
-    branches:
-      - jason/e2etest
   workflow_dispatch:
     inputs:
       base_url:

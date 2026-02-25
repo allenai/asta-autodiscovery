@@ -9,7 +9,6 @@ import {
     Select,
     MenuItem,
     CircularProgress,
-    Alert,
     FormHelperText,
     styled,
     Chip,
@@ -50,7 +49,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         maxFileSize,
         fieldErrors,
         isSubmitting,
-        formError,
         isLoading,
         isSaving,
         updateSettings,
@@ -92,7 +90,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
 
             <ConfigurationBox>
                 <FormControl fullWidth>
-                    <StyledFormLabel>Discovery session name</StyledFormLabel>
+                    <StyledFormLabel error={!!fieldErrors.name}>
+                        Discovery session name
+                    </StyledFormLabel>
                     <HelperText>Create a unique name to identify these results later.</HelperText>
                     <TextField
                         value={settings.name}
@@ -104,12 +104,13 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.name}
-                        helperText={fieldErrors.name}
                     />
                 </FormControl>
 
                 <FormControl fullWidth>
-                    <StyledFormLabel>Dataset context</StyledFormLabel>
+                    <StyledFormLabel error={!!fieldErrors.datasetsDescription}>
+                        Dataset context
+                    </StyledFormLabel>
                     <HelperText>
                         Describe the origin and nature of the data. Explain how the data was
                         gathered (e.g., collection methods, known gaps). This background helps the
@@ -127,7 +128,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.datasetsDescription}
-                        helperText={fieldErrors.datasetsDescription}
                     />
                 </FormControl>
 
@@ -150,7 +150,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 </FormControl>
 
                 <FormControl fullWidth>
-                    <StyledFormLabel>Upload source files</StyledFormLabel>
+                    <StyledFormLabel error={!!datasetErrors}>Upload source files</StyledFormLabel>
                     <DatasetUpload
                         fileUploads={fileUploads}
                         maxFileSize={maxFileSize}
@@ -162,12 +162,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         disabled={isFormDisabled}
                         error={datasetErrors}
                     />
-
-                    {datasetErrors && (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                            {datasetErrors}
-                        </Alert>
-                    )}
                 </FormControl>
             </ConfigurationBox>
 
@@ -177,7 +171,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
             </SectionHeader>
             <ConfigurationBox>
                 <FormControl>
-                    <StyledFormLabel>Experiment budget</StyledFormLabel>
+                    <StyledFormLabel error={!!fieldErrors.nExperiments}>
+                        Experiment budget
+                    </StyledFormLabel>
                     <HelperText>
                         Set the maximum number of experiments to generate (
                         <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
@@ -192,7 +188,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         disabled={isFormDisabled}
                         required
                         error={!!fieldErrors.nExperiments}
-                        helperText={fieldErrors.nExperiments}
                         fullWidth
                     />
                     <RemainingCreditsChip
@@ -321,12 +316,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 </StyledAccordian>
             </ConfigurationBox>
 
-            {formError && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                    {formError}
-                </Alert>
-            )}
-
             <SubmitButton
                 variant="contained"
                 size="large"
@@ -383,15 +372,28 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
             border: '1px solid ' + theme.color['green-100'].hex,
             transition: 'all 250ms ease-in-out',
         },
+    },
 
-        '&.Mui-disabled': {
-            backgroundColor: theme.color['cream-10'].rgba.toString(),
-            color: theme.color['cream-60'].rgba.toString(),
-            WebkitTextFillColor: theme.color['cream-60'].rgba.toString(),
+    '.MuiInputBase-root.Mui-error .MuiInputBase-input': {
+        border: '1px solid ' + theme.color['error-red-60'].hex,
 
-            '&:hover': {
-                border: '1px solid ' + theme.color['cream-20'].rgba.toString(),
-            },
+        '&::placeholder': {
+            color: theme.color['error-red-60'].hex,
+            opacity: 1,
+        },
+
+        '&:hover, &:focus': {
+            border: '1px solid ' + theme.color['error-red-60'].hex,
+        },
+    },
+
+    '.MuiInputBase-input.Mui-disabled': {
+        backgroundColor: theme.color['cream-10'].rgba.toString(),
+        color: theme.color['cream-60'].rgba.toString(),
+        WebkitTextFillColor: theme.color['cream-60'].rgba.toString(),
+
+        '&:hover': {
+            border: '1px solid ' + theme.color['cream-20'].rgba.toString(),
         },
     },
 
@@ -407,6 +409,9 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
 const StyledFormLabel = styled(FormLabel)(({ theme }) => ({
     color: theme.color['green-40'].hex,
     fontWeight: 700,
+    '&.Mui-error': {
+        color: theme.color['error-red-100'].hex,
+    },
 }));
 
 const HelperText = styled(FormHelperText)(({ theme }) => ({

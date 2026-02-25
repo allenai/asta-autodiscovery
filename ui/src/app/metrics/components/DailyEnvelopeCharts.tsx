@@ -74,7 +74,11 @@ function formatYAxisTick(value: number): string {
     return value.toFixed(1);
 }
 
-function buildDisplaySeries(timeSeries: DailyMetrics[], startDate?: string, endDate?: string): EnvelopeRow[] {
+function buildDisplaySeries(
+    timeSeries: DailyMetrics[],
+    startDate?: string,
+    endDate?: string
+): EnvelopeRow[] {
     const dailyMap = new Map<string, EnvelopeRow>();
     for (const day of timeSeries) {
         dailyMap.set(day.date, {
@@ -87,7 +91,8 @@ function buildDisplaySeries(timeSeries: DailyMetrics[], startDate?: string, endD
 
     const sortedDates = [...dailyMap.keys()].sort();
     const earliestDataDate = sortedDates[0] ? parseDate(sortedDates[0]) : null;
-    const latestDataDate = sortedDates.length > 0 ? parseDate(sortedDates[sortedDates.length - 1]) : null;
+    const latestDataDate =
+        sortedDates.length > 0 ? parseDate(sortedDates[sortedDates.length - 1]) : null;
 
     const startParsed = startDate ? parseDate(startDate) : null;
     const endParsed = endDate ? parseDate(endDate) : null;
@@ -215,9 +220,7 @@ function MiniLineChartCard({ rows, metric }: { rows: EnvelopeRow[]; metric: Metr
 
     const toY = (value: number): number => 42 - (value / maxValue) * 42;
 
-    const linePoints = rows
-        .map((row, index) => `${toX(index)},${toY(row[metric.key])}`)
-        .join(' ');
+    const linePoints = rows.map((row, index) => `${toX(index)},${toY(row[metric.key])}`).join(' ');
 
     const areaPath = `M ${toX(0)} 42 L ${rows
         .map((row, index) => `${toX(index)} ${toY(row[metric.key])}`)
@@ -263,7 +266,12 @@ function MiniLineChartCard({ rows, metric }: { rows: EnvelopeRow[]; metric: Metr
                         {hoverIndex != null && (
                             <>
                                 <HoverLine x1={activePointX} y1="0" x2={activePointX} y2="42" />
-                                <HoverPoint cx={activePointX} cy={activePointY} r="1.3" fill={metric.color} />
+                                <HoverPoint
+                                    cx={activePointX}
+                                    cy={activePointY}
+                                    r="1.3"
+                                    fill={metric.color}
+                                />
                             </>
                         )}
                     </Svg>
@@ -292,7 +300,8 @@ const Section = styled(Box)`
     margin-top: ${({ theme }) => theme.spacing(2.5)};
     margin-bottom: ${({ theme }) => theme.spacing(2)};
     padding: ${({ theme }) => theme.spacing(2.5)};
-    background: ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
+    background: ${({ theme }) =>
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
     border: 1px solid
         ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 14px;
@@ -333,7 +342,8 @@ const Card = styled(Box)`
     border: 1px solid
         ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 12px;
-    background: ${({ theme }) => theme.color['cream-2']?.rgba?.toString() || 'rgba(255,255,255,0.02)'};
+    background: ${({ theme }) =>
+        theme.color['cream-2']?.rgba?.toString() || 'rgba(255,255,255,0.02)'};
     min-width: 0;
 `;
 

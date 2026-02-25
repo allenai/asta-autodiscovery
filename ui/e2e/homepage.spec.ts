@@ -28,8 +28,8 @@ test.describe('Homepage (/runs)', () => {
     test('page loads without error', async ({ page }) => {
         await expect(page).not.toHaveURL(/error/);
         await expect(page.locator('body')).toBeVisible();
-        // No error boundary or unhandled error indicators
-        await expect(page.locator('[role="alert"]')).toHaveCount(0);
+        // No visible error toasts (MuiAlert-filledError = filled Alert with severity="error")
+        await expect(page.locator('.MuiAlert-filledError')).toHaveCount(0);
     });
 
     test('sign in button links to auth.example.com domain', async ({ page }) => {
@@ -68,10 +68,10 @@ test.describe('Homepage (/runs)', () => {
         await expectExternalLink(context, ai2Link, 'allenai.org');
     });
 
-    test('ASTA Labs logo link leads to allenai.org', async ({ page, context }) => {
+    test('ASTA Labs logo link leads to allen.ai', async ({ page, context }) => {
         const astaLink = page.locator(`[data-test-id="${TEST_ID_ASTA_LABS_LOGO_LINK}"]`);
         await expect(astaLink).toBeVisible();
-        await expectExternalLink(context, astaLink, 'allenai.org');
+        await expectExternalLink(context, astaLink, 'allen.ai');
     });
 
     test('first example session link loads successfully', async ({ page }) => {

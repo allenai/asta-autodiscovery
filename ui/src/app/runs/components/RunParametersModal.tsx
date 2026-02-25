@@ -40,14 +40,16 @@ export function RunParametersModal({ open, onClose, metadata, testId }: RunParam
             open={open}
             onClose={onClose}
             maxWidth={false}
-            PaperProps={{
-                sx: {
-                    width: '90%',
-                    maxWidth: '600px',
-                    borderRadius: '24px',
-                },
-                ...(testId ? { 'data-test-id': testId } : {}),
-            } as object}
+            PaperProps={
+                {
+                    sx: {
+                        width: '90%',
+                        maxWidth: '600px',
+                        borderRadius: '24px',
+                    },
+                    ...(testId ? { 'data-test-id': testId } : {}),
+                } as object
+            }
             slotProps={{
                 backdrop: {
                     sx: {

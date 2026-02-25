@@ -10,7 +10,11 @@ type AttributionDialogProps = {
 
 export const AttributionDialog = ({ isOpen, onClose }: AttributionDialogProps) => {
     return (
-        <DialogBase isOpen={isOpen} onClose={onClose} title="Attribution & Transparency" testId={TEST_ID_ATTRIBUTION_DIALOG}>
+        <DialogBase
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Attribution & Transparency"
+            testId={TEST_ID_ATTRIBUTION_DIALOG}>
             <Typography variant="body1" sx={{ mb: 2 }}>
                 <strong>Research corpus</strong>
                 <br />

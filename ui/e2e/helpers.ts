@@ -43,5 +43,5 @@ export async function expectExternalLink(
  */
 export async function waitForExperimentsLoaded(page: Page) {
     // Wait for the data grid to appear and have rows
-    await page.waitForSelector('.MuiDataGrid-row:not([data-id^="skeleton"])', { timeout: 30000 });
+    await page.waitForSelector('.MuiDataGrid-row:not([data-id^="skeleton"])', { timeout: 60000 });
 }

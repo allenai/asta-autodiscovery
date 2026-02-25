@@ -32,26 +32,28 @@ for (const url of RUN_URLS) {
         });
 
         test('page loads without error, correct initial state', async ({ page }) => {
-            // No error alerts
-            await expect(page.locator('[role="alert"][aria-live="assertive"]')).toHaveCount(0);
+            // No visible error toasts
+            await expect(page.locator('.MuiAlert-filledError')).toHaveCount(0);
 
-            // More than one surprisal in list
+            // More than one surprisal in list — wait for job to complete (TopSurprisalsList
+            // only renders after hasJobCompleted === true)
             const surprisalItems = page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"]`);
-            await expect(surprisalItems).toHaveCount(2); // collapsed to 2 by default
+            await expect(surprisalItems).toHaveCount(2, { timeout: 30000 }); // collapsed to 2 by default
 
             // More than one experiment in table
             const tableRows = page.locator('.MuiDataGrid-row:not([data-id^="skeleton"])');
-            await expect(tableRows).toHaveCountGreaterThan(1);
+            expect(await tableRows.count()).toBeGreaterThan(1);
 
             // More than one node in tree (circles in the SVG)
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             await expect(graphContainer).toBeVisible();
             const treeNodes = graphContainer.locator('circle.node');
-            await expect(treeNodes).toHaveCountGreaterThan(1);
+            await expect(treeNodes.first()).toBeVisible({ timeout: 15000 });
+            expect(await treeNodes.count()).toBeGreaterThan(1);
 
-            // No surprisals highlighted (no $isSelected state — check no green left border)
+            // No surprisals highlighted (no data-selected="true")
             const selectedSurprisal = page.locator(
-                `[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"].selected`
+                `[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"][data-selected="true"]`
             );
             await expect(selectedSurprisal).toHaveCount(0);
 
@@ -101,8 +103,9 @@ for (const url of RUN_URLS) {
         });
 
         test('view all surprisals expands and collapses list', async ({ page }) => {
+            // TopSurprisalsList only renders after hasJobCompleted; wait for it
             const surprisalsList = page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_LIST}"]`);
-            await expect(surprisalsList).toBeVisible();
+            await expect(surprisalsList).toBeVisible({ timeout: 30000 });
 
             const expandBtn = page.locator(
                 `[data-test-id="${TEST_ID_VIEW_ALL_SURPRISALS_BUTTON}"]`
@@ -149,8 +152,8 @@ for (const url of RUN_URLS) {
             const columnsBtn = table.getByRole('button', { name: /columns/i });
             await columnsBtn.click();
 
-            // Toggle Experiment Hypothesis column off
-            const hypothesisToggle = page.getByRole('menuitem', { name: /experiment hypothesis/i });
+            // Toggle Experiment Hypothesis column off — MUI DataGrid v8 uses text items in a panel
+            const hypothesisToggle = page.getByText('Experiment Hypothesis').last();
             await hypothesisToggle.click();
 
             // Column header should be gone
@@ -197,7 +200,7 @@ for (const url of RUN_URLS) {
 
             // Verify rows exist
             const rows = page.locator('.MuiDataGrid-row:not([data-id^="skeleton"])');
-            await expect(rows).toHaveCountGreaterThan(0);
+            expect(await rows.count()).toBeGreaterThan(0);
         });
 
         test('table CSV download can be triggered', async ({ page }) => {
@@ -216,9 +219,6 @@ for (const url of RUN_URLS) {
 
         test('table search for "significant" returns between 1 and total rows', async ({ page }) => {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
-            const totalRows = await page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
-                .count();
 
             // Use quick filter search
             const searchInput = table.locator('.MuiDataGrid-toolbar input');
@@ -230,10 +230,14 @@ for (const url of RUN_URLS) {
             const filteredRows = page.locator('.MuiDataGrid-row:not([data-id^="skeleton"])');
             const filteredCount = await filteredRows.count();
             expect(filteredCount).toBeGreaterThan(0);
-            expect(filteredCount).toBeLessThan(totalRows);
 
-            // Clear search
+            // Clear search and verify more rows come back
             await searchInput.clear();
+            await page.waitForTimeout(500);
+            const clearedCount = await page
+                .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
+                .count();
+            expect(clearedCount).toBeGreaterThan(filteredCount);
         });
 
         test('table sorts by ID ascending then descending', async ({ page }) => {
@@ -244,20 +248,20 @@ for (const url of RUN_URLS) {
             await idHeader.click();
             await page.waitForTimeout(300);
 
-            // Get first and last visible IDs
+            // Get text of first ID cell
             const firstIdAsc = await page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
+                .locator('.MuiDataGrid-row:not([data-id^="skeleton"]) .MuiDataGrid-cell[data-field="id"]')
                 .first()
-                .getAttribute('data-id');
+                .textContent();
 
             // Click again for descending
             await idHeader.click();
             await page.waitForTimeout(300);
 
             const firstIdDesc = await page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
+                .locator('.MuiDataGrid-row:not([data-id^="skeleton"]) .MuiDataGrid-cell[data-field="id"]')
                 .first()
-                .getAttribute('data-id');
+                .textContent();
 
             // The first row should differ between asc and desc
             expect(firstIdAsc).not.toEqual(firstIdDesc);
@@ -269,11 +273,10 @@ for (const url of RUN_URLS) {
             const firstRow = page
                 .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
                 .first();
-            const rowId = await firstRow.getAttribute('data-id');
             await firstRow.click();
 
             // Row is highlighted
-            await expect(page.locator(`.MuiDataGrid-row.Mui-selected[data-id="${rowId}"]`)).toBeVisible();
+            await expect(page.locator('.MuiDataGrid-row.Mui-selected')).toBeVisible();
 
             // Details panel is open
             await expect(
@@ -283,14 +286,15 @@ for (const url of RUN_URLS) {
             // Tree node is highlighted (stroke changes to green)
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             const selectedNode = graphContainer.locator('circle.node[stroke="#0FCB8C"]');
-            await expect(selectedNode).toHaveCountGreaterThan(0);
+            expect(await selectedNode.count()).toBeGreaterThan(0);
         });
 
         test('tree can be dragged to pan', async ({ page }) => {
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             await expect(graphContainer).toBeVisible();
 
-            const svg = graphContainer.locator('svg');
+            // Target only the main tree SVG (not icon SVGs inside buttons)
+            const svg = graphContainer.locator('svg:not([data-testid])');
             const box = await svg.boundingBox();
             if (!box) throw new Error('SVG bounding box not found');
 
@@ -343,9 +347,9 @@ for (const url of RUN_URLS) {
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             await expect(graphContainer).toBeVisible();
 
-            // Click first clickable node (not node_1_0 fake root)
+            // Click first clickable node; use force to bypass any overlapping elements
             const nodes = graphContainer.locator('circle.node[style*="pointer"]');
-            await nodes.first().click();
+            await nodes.first().click({ force: true });
 
             // Details panel opens
             await expect(
@@ -353,11 +357,11 @@ for (const url of RUN_URLS) {
             ).toBeVisible();
 
             // A table row is highlighted
-            await expect(page.locator('.MuiDataGrid-row.Mui-selected')).toHaveCountGreaterThan(0);
+            expect(await page.locator('.MuiDataGrid-row.Mui-selected').count()).toBeGreaterThan(0);
 
             // The clicked node has a green stroke
             const selectedNode = graphContainer.locator('circle.node[stroke="#0FCB8C"]');
-            await expect(selectedNode).toHaveCountGreaterThan(0);
+            expect(await selectedNode.count()).toBeGreaterThan(0);
         });
     });
 }

@@ -52,6 +52,11 @@ export const TopSurprisalsListImpl = () => {
                         key={experiment.experimentId}
                         data-test-id={TEST_ID_TOP_SURPRISALS_ITEM}
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
+                        data-selected={
+                            selectedExperiment?.experimentId === experiment.experimentId
+                                ? 'true'
+                                : undefined
+                        }
                         onClick={() => selectExperiment(experiment, { scroll: false })}>
                         <Bookmark>
                             <ExperimentBookmarkControl experiment={experiment} />

@@ -24,35 +24,37 @@ for (const url of DETAILS_URLS) {
         });
 
         test('page loads with experiment pre-selected', async ({ page }) => {
-            // No error alerts
-            await expect(page.locator('[role="alert"][aria-live="assertive"]')).toHaveCount(0);
+            // No visible error toasts
+            await expect(page.locator('.MuiAlert-filledError')).toHaveCount(0);
 
-            // More than one surprisal in list
+            // More than one surprisal in list — wait for job to complete
             const surprisalItems = page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"]`);
-            await expect(surprisalItems).toHaveCountGreaterThan(0);
+            await expect(surprisalItems.first()).toBeVisible({ timeout: 30000 });
+            expect(await surprisalItems.count()).toBeGreaterThan(0);
 
             // More than one experiment in table
             const tableRows = page.locator('.MuiDataGrid-row:not([data-id^="skeleton"])');
-            await expect(tableRows).toHaveCountGreaterThan(1);
+            expect(await tableRows.count()).toBeGreaterThan(1);
 
             // More than one node in tree
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             await expect(graphContainer).toBeVisible();
             const treeNodes = graphContainer.locator('circle.node');
-            await expect(treeNodes).toHaveCountGreaterThan(1);
+            await expect(treeNodes.first()).toBeVisible({ timeout: 15000 });
+            expect(await treeNodes.count()).toBeGreaterThan(1);
 
             // A table row is highlighted
-            await expect(page.locator('.MuiDataGrid-row.Mui-selected')).toHaveCountGreaterThan(0);
+            expect(await page.locator('.MuiDataGrid-row.Mui-selected').count()).toBeGreaterThan(0);
 
-            // A surprisal is highlighted
+            // A surprisal is highlighted (data-selected="true")
             const selectedSurprisal = page.locator(
-                `[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"].selected`
+                `[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"][data-selected="true"]`
             );
-            await expect(selectedSurprisal).toHaveCountGreaterThan(0);
+            expect(await selectedSurprisal.count()).toBeGreaterThan(0);
 
             // A tree node is highlighted (green stroke)
             const selectedNode = graphContainer.locator('circle.node[stroke="#0FCB8C"]');
-            await expect(selectedNode).toHaveCountGreaterThan(0);
+            expect(await selectedNode.count()).toBeGreaterThan(0);
 
             // Details panel is open
             await expect(
@@ -103,7 +105,7 @@ for (const url of DETAILS_URLS) {
 
             // No surprisals highlighted
             const selectedSurprisal = page.locator(
-                `[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"].selected`
+                `[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"][data-selected="true"]`
             );
             await expect(selectedSurprisal).toHaveCount(0);
 

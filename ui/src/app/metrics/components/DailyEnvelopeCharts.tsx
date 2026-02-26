@@ -238,7 +238,6 @@ function MiniLineChartCard({ rows, metric }: { rows: EnvelopeRow[]; metric: Metr
     return (
         <Card>
             <CardTitle>{metric.title}</CardTitle>
-            <ValueLabel>{values[values.length - 1].toLocaleString()}</ValueLabel>
 
             <PlotRow>
                 <YAxis>
@@ -355,16 +354,8 @@ const CardTitle = styled(Typography)`
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    margin-bottom: 8px;
     color: ${({ theme }) => theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)'};
-`;
-
-const ValueLabel = styled(Typography)`
-    margin-top: 4px;
-    margin-bottom: 10px;
-    font-size: 1.15rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: ${({ theme }) => theme.color['cream-100']?.hex || '#fff'};
 `;
 
 const Plot = styled(Box)`

@@ -35,8 +35,11 @@ def _get_management_token() -> str:
     Uses client credentials grant to obtain a token.
     Token is cached for the lifetime of the process.
     """
-    client_id = os.environ["AUTH0_MGMT_CLIENT_ID"]
-    client_secret = os.environ["AUTH0_MGMT_CLIENT_SECRET"]
+    try:
+        client_id = os.environ["AUTH0_MGMT_CLIENT_ID"]
+        client_secret = os.environ["AUTH0_MGMT_CLIENT_SECRET"]
+    except KeyError as e:
+        raise Auth0Error(f"Missing required environment variable: {e}")
 
     token_url = f"https://{AUTH0_MGMT_DOMAIN}/oauth/token"
     payload = {

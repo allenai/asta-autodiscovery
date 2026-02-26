@@ -10,6 +10,7 @@ import TimePeriodFilter from './components/TimePeriodFilter';
 import StatusDistributionChart from './components/StatusDistributionChart';
 import CostBreakdownChart from './components/CostBreakdownChart';
 import AggregatedUsageDialog from './components/AggregatedUsageDialog';
+import DailyEnvelopeCharts from './components/DailyEnvelopeCharts';
 
 export default function MetricsOverviewPage() {
     const [data, setData] = useState<OverviewMetrics | null>(null);
@@ -157,6 +158,12 @@ export default function MetricsOverviewPage() {
             <AggregatedUsageDialog
                 open={usageDialogOpen}
                 onClose={() => setUsageDialogOpen(false)}
+                startDate={startDate || undefined}
+                endDate={endDate || undefined}
+            />
+
+            <DailyEnvelopeCharts
+                timeSeries={data.time_series}
                 startDate={startDate || undefined}
                 endDate={endDate || undefined}
             />

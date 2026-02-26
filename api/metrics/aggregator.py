@@ -626,6 +626,7 @@ def compute_overview(
 
     # Time series
     daily: dict[str, DailyMetrics] = {}
+    daily_started_users: dict[str, set[str]] = defaultdict(set)
     for j in jobs:
         if not j.created_at:
             continue
@@ -633,7 +634,10 @@ def compute_overview(
         if date not in daily:
             daily[date] = DailyMetrics(date=date)
         day = daily[date]
-        day.runs_started += 1
+        if j.status in STARTED_STATUSES:
+            day.runs_started += 1
+            daily_started_users[date].add(j.userid)
+        day.hypotheses_conducted += j.n_experiments_completed
         if j.status == "SUCCEEDED":
             day.runs_succeeded += 1
         if j.status == "FAILED":
@@ -642,6 +646,7 @@ def compute_overview(
 
     # Round daily costs
     for day in daily.values():
+        day.unique_users_started = len(daily_started_users.get(day.date, set()))
         day.llm_cost_usd = round(day.llm_cost_usd, 4)
 
     time_series = sorted(daily.values(), key=lambda d: d.date)

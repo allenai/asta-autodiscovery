@@ -89,7 +89,11 @@ function buildDisplaySeries(
         });
     }
 
-    const sortedDates = [...dailyMap.keys()].sort();
+    const sortedDates: string[] = [];
+    dailyMap.forEach((_, key) => {
+        sortedDates.push(key);
+    });
+    sortedDates.sort();
     const earliestDataDate = sortedDates[0] ? parseDate(sortedDates[0]) : null;
     const latestDataDate =
         sortedDates.length > 0 ? parseDate(sortedDates[sortedDates.length - 1]) : null;

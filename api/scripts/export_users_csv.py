@@ -18,6 +18,11 @@ Usage:
     python export_users_csv.py --output users.csv
     python export_users_csv.py --output users.csv --daily-activity
     python export_users_csv.py --userid auth0|123 --daily-activity
+
+    # From the project root with uv:
+    uv run --env-file .env api/scripts/export_users_csv.py --output users.csv
+    uv run --env-file .env api/scripts/export_users_csv.py --output users.csv --daily-activity
+    uv run --env-file .env api/scripts/export_users_csv.py --userid auth0|123 --daily-activity
 """
 
 import argparse
@@ -143,8 +148,9 @@ def generate_user_csv(
     rows: list[dict] = []
     all_dates: set[str] = set()
 
-    for userid in user_ids:
-        logger.info(f"Processing {userid}")
+    total = len(user_ids)
+    for i, userid in enumerate(user_ids, 1):
+        logger.info(f"[{i}/{total}] Processing {userid}")
 
         # Email from Auth0
         try:

@@ -40,7 +40,7 @@ from autodiscovery_jobs.run_details import get_run_details
 from autodiscovery_jobs.user_profile import get_user_granted_credits
 
 # Credit configuration
-DEFAULT_CREDITS_GRANTED = 500
+DEFAULT_CREDITS_GRANTED = 1000
 
 # Max number of experiments that can run in a single job
 DEFAULT_EXPERIMENT_LIMIT = 500

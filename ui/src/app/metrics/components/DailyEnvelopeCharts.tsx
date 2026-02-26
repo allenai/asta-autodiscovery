@@ -346,7 +346,7 @@ const Card = styled(Box)`
         ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
     border-radius: 12px;
     background: ${({ theme }) =>
-        theme.color['cream-2']?.rgba?.toString() || 'rgba(255,255,255,0.02)'};
+        theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.02)'};
     min-width: 0;
 `;
 

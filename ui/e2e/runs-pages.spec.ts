@@ -232,16 +232,33 @@ for (const url of RUN_URLS) {
         test('table sorts by ID ascending then descending', async ({ page }) => {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
             const idHeader = table.locator('.MuiDataGrid-columnHeader[data-field="id"]');
+            const surprisalHeader = table.locator(
+                '.MuiDataGrid-columnHeader[data-field="surprisal"]'
+            );
 
-            // Click once for ascending — check aria-sort attribute on the header
-            await idHeader.click();
-            await page.waitForTimeout(300);
-            await expect(idHeader).toHaveAttribute('aria-sort', 'ascending');
+            // Wait for the default surprisal-descending sort to be applied — this is the visual
+            // evidence that the hasJobCompleted useEffect in ExperimentsTable has already fired.
+            // Clicking ID before that fires would have its sort overridden by the effect.
+            await expect(surprisalHeader).toHaveAttribute('aria-sort', 'descending', {
+                timeout: 30000,
+            });
+
+            // Click the column header title span specifically — the ID column is only 45px wide
+            // and Playwright's viewport-level click may miss the sort trigger on narrow columns.
+            // Using evaluate() dispatches the click directly in the JS context.
+            const idHeaderTitle = table.locator(
+                '.MuiDataGrid-columnHeader[data-field="id"] .MuiDataGrid-columnHeaderTitle'
+            );
+            await idHeaderTitle.evaluate((el) => {
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            });
+            await expect(idHeader).toHaveAttribute('aria-sort', 'ascending', { timeout: 5000 });
 
             // Click again for descending
-            await idHeader.click();
-            await page.waitForTimeout(300);
-            await expect(idHeader).toHaveAttribute('aria-sort', 'descending');
+            await idHeaderTitle.evaluate((el) => {
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            });
+            await expect(idHeader).toHaveAttribute('aria-sort', 'descending', { timeout: 5000 });
         });
 
         test('clicking table row highlights row, tree node, and opens details panel', async ({
@@ -342,9 +359,15 @@ for (const url of RUN_URLS) {
                 page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_LIST}"]`)
             ).toBeVisible({ timeout: 30000 });
 
-            // Click first clickable node; use force to bypass any overlapping elements
+            // Wait for nodes to be rendered, then dispatch click directly on the element.
+            // We use evaluate() instead of .click({ force: true }) because the tree SVG sits
+            // at z-index 1 behind the RunPanel (z-index 2); a force-click still moves the mouse
+            // to the viewport position and the RunPanel intercepts it.
             const nodes = graphContainer.locator('circle.node[style*="pointer"]');
-            await nodes.first().click({ force: true });
+            await expect(nodes.first()).toBeVisible({ timeout: 15000 });
+            await nodes.first().evaluate((el) => {
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            });
 
             // Details panel opens
             await expect(

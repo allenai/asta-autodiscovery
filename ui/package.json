@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "ts-check": "tsc --noEmit",
-    "verify": "yarn ts-check && yarn lint",
+    "verify": "yarn ts-check && yarn lint && yarn test",
     "test": "yarn test:e2e",
     "test:e2e": "playwright test"
   },

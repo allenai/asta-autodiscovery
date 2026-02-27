@@ -269,6 +269,8 @@ def select_nodes(selection_method, root, nodes_by_level, n_warmstart=0, return_n
     except TypeError:
         selected = selection_method(root, nodes_by_level)
     return_nodes = selected if isinstance(selected, list) else [selected]
+    if len(return_nodes) == 0:
+        return []
     # Repeat return_nodes sequentially if needed to fill the batch
     return_nodes = (
         return_nodes * (return_n // len(return_nodes))

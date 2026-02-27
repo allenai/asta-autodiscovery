@@ -48,31 +48,36 @@ export default function CreditsChip() {
                     <PopoverHeading>How experiment credits work</PopoverHeading>
                     <PopoverParagraph>
                         To support your research, we are providing up to{' '}
-                        <strong>1,000 credits</strong> per user to run experiments.
+                        <strong>500 credits</strong> per user to run experiments.
                     </PopoverParagraph>
                     <ul>
                         <li>
                             <strong>Exchange Rate:</strong> 1 Credit = 1 Experiment.
                         </li>
                         <li>
-                            <strong>Budget Protection:</strong> Discovery sessions are capped at 500
-                            credits to prevent accidental overspending. We recommend starting with a
-                            small budget ({'<'}10) to learn how the system works. Once you're
-                            familiar with the output, you can confidently scale up to 50–100
-                            experiments per session.
+                            <strong>Budget Protection:</strong> We recommend starting with a small
+                            budget ({'<'}10) to learn how the system works. Once you're familiar
+                            with the output, you can confidently scale up to 5-100 experiments per
+                            session.
+                        </li>
+                        <li>
+                            <strong>Early User Benefit:</strong> If you signed up before Feb 28,
+                            2026 and still have more than 500 credits remaining, you keep your full
+                            balance. That's your reward for being here early.
                         </li>
                         <li>
                             <strong>Expiration:</strong> Credits are valid until{' '}
-                            <strong>Feb 28, 2026</strong>.
+                            <strong>May 31, 2026</strong>.
                         </li>
                     </ul>
 
                     <PopoverSubheading>Can I get more credits?</PopoverSubheading>
                     <PopoverParagraph>
-                        The credits are a one-time fixed allocation to support public access for
-                        scientific and education purposes and cannot be reloaded once consumed. If
-                        you are interested in discussing potential research collaborations to
-                        further scientific discovery, please contact us at{' '}
+                        Credits are a fixed allocation to support public access for scientific and
+                        educational purposes. If you've exhausted your credits and your work is
+                        producing promising results, we want to hear about it. If you are interested
+                        in discussing potential research collaborations to further scientific
+                        discovery, please contact us at{' '}
                         <StyledLink href="mailto:asta-support@allenai.org">
                             asta-support@allenai.org
                         </StyledLink>

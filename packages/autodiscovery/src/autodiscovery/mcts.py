@@ -303,27 +303,27 @@ class MCTSNode:
         )
         return context_str
 
-    def get_path_context(self, k: int | None = None, skip_root=True) -> None | list:
+    def get_path_context(self, k: int | None = None, skip_root=True) -> list:
         """Returns messages from the node to the root
 
         Args:
             k: Optional maximum number of parent levels to include. If None, includes all parents.
             skip_root: If True, skips the root node in the context.
         """
-        context = self.parent.get_context() if self.parent is not None else None
-        if context is not None:
-            if skip_root and self.parent.level <= 1:
-                return []
-            context = [context]
+        if self.parent is None:
+            return []
+
+        current_context = self.parent.get_context()
+        context: list = []
+        if current_context is not None and not (skip_root and self.parent.level <= 1):
+            context = [current_context]
+
         k_remaining = None if k is None else k - 1
-        if (
-            context is not None
-            and self.parent is not None
-            and (k_remaining is None or k_remaining > 0)
-        ):
+        if self.parent is not None and (k_remaining is None or k_remaining > 0):
             parent_context = self.parent.get_path_context(k=k_remaining, skip_root=skip_root)
-            if parent_context is not None:
+            if parent_context:
                 context = parent_context + context
+
         return context
 
     def update_counts(self, visits: int = 1, reward: float = 0):

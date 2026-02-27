@@ -165,6 +165,46 @@ def apply_openai_client_vertex_token_refresh() -> bool:
     return True
 
 
+def apply_openai_client_backoff_retry() -> bool:
+    """Patch AG2 OpenAI client create calls with centralized backoff retries.
+
+    This wrapper targets AG2's ``OpenAIClient.create`` path and applies
+    ``call_with_backoff`` to provider requests, including Vertex OpenAI-compatible
+    Gemini calls and regular OpenAI-compatible calls.
+
+    Returns:
+        True when the patch is active, otherwise False.
+    """
+    try:
+        from autogen.oai.client import OpenAIClient
+    except Exception:
+        return False
+
+    if getattr(OpenAIClient.create, "_autodiscovery_backoff_wrapped", False):
+        return True
+
+    original_create = OpenAIClient.create
+
+    @functools.wraps(original_create)
+    def wrapped(self, params):
+        model = params.get("model") if isinstance(params, dict) else None
+        label = (
+            f"openai_client.create(model={model})" if isinstance(model, str) else "openai_client.create"
+        )
+
+        def _call():
+            # Refresh Vertex access token before every attempt for Gemini calls.
+            if isinstance(params, dict):
+                _refresh_vertex_openai_api_key_if_needed(self, params)
+            return original_create(self, params)
+
+        return call_with_backoff(_call, label=label)
+
+    wrapped._autodiscovery_backoff_wrapped = True  # type: ignore[attr-defined]
+    OpenAIClient.create = wrapped
+    return True
+
+
 def apply_openai_wrapper_usage_tracking() -> bool:
     """Patch AG2 OpenAI wrapper to emit per-response usage events.
 

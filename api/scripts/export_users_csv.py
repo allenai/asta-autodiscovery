@@ -31,6 +31,10 @@ import logging
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+# Add api/ to path so we can import from utils
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from autodiscovery_jobs import (
     Auth0Error,
@@ -43,9 +47,7 @@ from autodiscovery_jobs.gcs import (
     list_user_jobs,
 )
 from autodiscovery_jobs.run_details import get_run_details
-from autodiscovery_jobs.user_profile import get_user_granted_credits
-
-DEFAULT_CREDITS_GRANTED = 1000
+from utils.credits import DEFAULT_CREDITS_GRANTED, get_user_credits
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,43 +78,43 @@ def get_user_stats(
             credits_used (int)
             daily (dict[str, int], only when include_daily=True)
     """
-    custom_credits = get_user_granted_credits(userid, config)
-    credits_granted = custom_credits if custom_credits is not None else DEFAULT_CREDITS_GRANTED
+    user_credits = get_user_credits(userid, config)
+    credits_granted = user_credits.granted
+    credits_used = user_credits.consumed
 
-    job_ids = list_user_jobs(userid=userid, config=config)
-
-    total_consumed = 0
     daily: dict[str, int] = defaultdict(int)
 
-    def _scan_job(job_id: str) -> tuple[int, str | None] | None:
-        """Return (experiments_completed, YYYY-MM-DD date) for one job.
+    if include_daily:
+        job_ids = list_user_jobs(userid=userid, config=config)
 
-        Returns None when the job should be excluded from counts (e.g. not
-        yet started, or an error occurred).
-        """
-        try:
-            run_details = get_run_details(userid=userid, runid=job_id, config=config)
-            if run_details is None or run_details.status == "CREATED":
+        def _scan_job(job_id: str) -> tuple[int, str | None] | None:
+            """Return (experiments_completed, YYYY-MM-DD date) for one job.
+
+            Returns None when the job should be excluded from counts (e.g. not
+            yet started, or an error occurred).
+            """
+            try:
+                run_details = get_run_details(userid=userid, runid=job_id, config=config)
+                if run_details is None or run_details.status == "CREATED":
+                    return None
+                completed = count_experiment_results(userid=userid, jobid=job_id, config=config)
+                date = run_details.created_at[:10] if run_details.created_at else None
+                return (completed, date)
+            except Exception:
                 return None
-            completed = count_experiment_results(userid=userid, jobid=job_id, config=config)
-            date = run_details.created_at[:10] if run_details.created_at else None
-            return (completed, date)
-        except Exception:
-            return None
 
-    if job_ids:
-        max_workers = min(16, len(job_ids))
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for result in executor.map(_scan_job, job_ids):
-                if result is not None:
-                    completed, date = result
-                    total_consumed += completed
-                    if include_daily and date:
-                        daily[date] += completed
+        if job_ids:
+            max_workers = min(16, len(job_ids))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for result in executor.map(_scan_job, job_ids):
+                    if result is not None:
+                        completed, date = result
+                        if date:
+                            daily[date] += completed
 
     stats: dict = {
         "credits_granted": credits_granted,
-        "credits_used": total_consumed,
+        "credits_used": credits_used,
     }
     if include_daily:
         stats["daily"] = dict(daily)

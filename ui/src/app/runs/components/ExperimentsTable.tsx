@@ -317,85 +317,88 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
 
     return (
         <>
-        <GlobalStyles
-            styles={(theme: any) => ({
-                // Column header menus
-                '.MuiDataGrid-menu .MuiPaper-root': {
-                    backgroundColor: theme.color['teal-100'].hex,
-                    color: theme.color['cream-100'].hex,
-                },
-                '.MuiDataGrid-menu .MuiMenuItem-root:hover': {
-                    backgroundColor: theme.color['cream-10'].rgba.toString(),
-                },
-                '.MuiDataGrid-menu .MuiListItemIcon-root, .MuiDataGrid-menu .MuiSvgIcon-root': {
-                    color: theme.color['green-100'].hex,
-                },
-                // Filter panel
-                '.MuiDataGrid-panel .MuiDataGrid-paper': {
-                    backgroundColor: theme.color['teal-100'].hex,
-                    color: theme.color['cream-100'].hex,
-                },
-                '.MuiDataGrid-panel .MuiInputLabel-root, .MuiDataGrid-panel .MuiInputBase-input, .MuiDataGrid-panel .MuiSelect-select': {
-                    color: theme.color['cream-100'].hex,
-                },
-                '.MuiDataGrid-panel .MuiOutlinedInput-notchedOutline': {
-                    borderColor: theme.color['cream-20'].rgba.toString(),
-                },
-                '.MuiDataGrid-panel .MuiSvgIcon-root': {
-                    color: theme.color['cream-100'].hex,
-                },
-                '.MuiDataGrid-panel .MuiButton-root': {
-                    color: theme.color['green-100'].hex,
-                },
-                '.MuiDataGrid-panel .MuiInputLabel-root.Mui-focused': {
-                    color: theme.color['green-100'].hex,
-                },
-                '.MuiDataGrid-panel .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: theme.color['green-100'].hex,
-                },
-                // Column control panel
-                '.MuiDataGrid-panel .MuiDataGrid-columnsManagementHeader, .MuiDataGrid-panel .MuiDataGrid-columnsManagementFooter': {
-                    borderColor: theme.color['cream-20'].rgba.toString(),
-                },
-                '.MuiDataGrid-panel .MuiButton-root.Mui-disabled': {
-                    color: theme.color['cream-100'].hex,
-                },
-            })}
-        />
-        <Wrapper>
-            {lastError && (
-                <Alert severity="error" sx={{ m: 1 }}>
-                    {lastError}
-                </Alert>
-            )}
-            <StyledDataGrid
-                rows={rows}
-                columns={columns}
-                loading={!runStats?.pendingExperiments && !experiments.length}
-                paginationModel={paginationModel}
-                onPaginationModelChange={handlePaginationModelChange}
-                initialState={{
-                    sorting: {
-                        sortModel:
-                            runStats?.completedExperiments === runStats?.requestedExperiments
-                                ? [{ field: 'surprisal', sort: 'desc' }]
-                                : [],
+            <GlobalStyles
+                styles={(theme: any) => ({
+                    // Column header menus
+                    '.MuiDataGrid-menu .MuiPaper-root': {
+                        backgroundColor: theme.color['teal-100'].hex,
+                        color: theme.color['cream-100'].hex,
                     },
-                }}
-                pageSizeOptions={[5, 10, 25, 50, 100, { value: -1, label: 'All' }]}
-                sx={{ border: 0 }}
-                onRowClick={handleRowClick}
-                sortModel={sortModel}
-                onSortModelChange={handleSortModelChange}
-                getRowHeight={() => 'auto'}
-                rowSelectionModel={rowSelectionModel}
-                slotProps={{
-                    row: mkExperimentRowAttrs(),
-                }}
-                showToolbar={true}
-                hideFooter={true}
+                    '.MuiDataGrid-menu .MuiMenuItem-root:hover': {
+                        backgroundColor: theme.color['cream-10'].rgba.toString(),
+                    },
+                    '.MuiDataGrid-menu .MuiListItemIcon-root, .MuiDataGrid-menu .MuiSvgIcon-root': {
+                        color: theme.color['green-100'].hex,
+                    },
+                    // Filter panel
+                    '.MuiDataGrid-panel .MuiDataGrid-paper': {
+                        backgroundColor: theme.color['teal-100'].hex,
+                        color: theme.color['cream-100'].hex,
+                    },
+                    '.MuiDataGrid-panel .MuiInputLabel-root, .MuiDataGrid-panel .MuiInputBase-input, .MuiDataGrid-panel .MuiSelect-select':
+                        {
+                            color: theme.color['cream-100'].hex,
+                        },
+                    '.MuiDataGrid-panel .MuiOutlinedInput-notchedOutline': {
+                        borderColor: theme.color['cream-20'].rgba.toString(),
+                    },
+                    '.MuiDataGrid-panel .MuiSvgIcon-root': {
+                        color: theme.color['cream-100'].hex,
+                    },
+                    '.MuiDataGrid-panel .MuiButton-root': {
+                        color: theme.color['green-100'].hex,
+                    },
+                    '.MuiDataGrid-panel .MuiInputLabel-root.Mui-focused': {
+                        color: theme.color['green-100'].hex,
+                    },
+                    '.MuiDataGrid-panel .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline':
+                        {
+                            borderColor: theme.color['green-100'].hex,
+                        },
+                    // Column control panel
+                    '.MuiDataGrid-panel .MuiDataGrid-columnsManagementHeader, .MuiDataGrid-panel .MuiDataGrid-columnsManagementFooter':
+                        {
+                            borderColor: theme.color['cream-20'].rgba.toString(),
+                        },
+                    '.MuiDataGrid-panel .MuiButton-root.Mui-disabled': {
+                        color: theme.color['cream-100'].hex,
+                    },
+                })}
             />
-        </Wrapper>
+            <Wrapper>
+                {lastError && (
+                    <Alert severity="error" sx={{ m: 1 }}>
+                        {lastError}
+                    </Alert>
+                )}
+                <StyledDataGrid
+                    rows={rows}
+                    columns={columns}
+                    loading={!runStats?.pendingExperiments && !experiments.length}
+                    paginationModel={paginationModel}
+                    onPaginationModelChange={handlePaginationModelChange}
+                    initialState={{
+                        sorting: {
+                            sortModel:
+                                runStats?.completedExperiments === runStats?.requestedExperiments
+                                    ? [{ field: 'surprisal', sort: 'desc' }]
+                                    : [],
+                        },
+                    }}
+                    pageSizeOptions={[5, 10, 25, 50, 100, { value: -1, label: 'All' }]}
+                    sx={{ border: 0 }}
+                    onRowClick={handleRowClick}
+                    sortModel={sortModel}
+                    onSortModelChange={handleSortModelChange}
+                    getRowHeight={() => 'auto'}
+                    rowSelectionModel={rowSelectionModel}
+                    slotProps={{
+                        row: mkExperimentRowAttrs(),
+                    }}
+                    showToolbar={true}
+                    hideFooter={true}
+                />
+            </Wrapper>
         </>
     );
 }
@@ -465,10 +468,10 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
         },
     },
 
-    '.MuiDataGrid-columnHeader:has(+ .MuiDataGrid-filler) .MuiDataGrid-columnSeparator, .MuiDataGrid-columnHeader:has(+ .MuiDataGrid-scrollbarFiller) .MuiDataGrid-columnSeparator': {
-        display: 'none',
-    },
-
+    '.MuiDataGrid-columnHeader:has(+ .MuiDataGrid-filler) .MuiDataGrid-columnSeparator, .MuiDataGrid-columnHeader:has(+ .MuiDataGrid-scrollbarFiller) .MuiDataGrid-columnSeparator':
+        {
+            display: 'none',
+        },
 
     '.MuiDataGrid-toolbar .MuiInputBase-input': {
         color: theme.color['cream-100'].hex,

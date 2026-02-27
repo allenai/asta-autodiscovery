@@ -55,13 +55,12 @@ export default function CreditsChip() {
                             <strong>Exchange Rate:</strong> 1 Credit = 1 Experiment.
                         </li>
                         <li>
-                            <strong>Budget Protection:</strong> We recommend starting with a small
-                            budget ({'<'}10) to learn how the system works. Once you're familiar
-                            with the output, you can confidently scale up to 5-100 experiments per
-                            session.
+                            <strong>Budget:</strong> We recommend starting with a small budget (
+                            {'<'}10) to learn how the system works. Once you're familiar with the
+                            output, you can confidently scale up to 5-100 experiments per session.
                         </li>
                         <li>
-                            <strong>Early User Benefit:</strong> If you signed up before Feb 28,
+                            <strong>Early User Benefit:</strong> If you signed up before Feb 26,
                             2026 and still have more than 500 credits remaining, you keep your full
                             balance. That's your reward for being here early.
                         </li>

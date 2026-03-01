@@ -73,19 +73,23 @@ def create() -> Blueprint:
         """Get the number of credits for the authenticated user."""
         user_id = request.user.get("sub")
 
-        job_manager = get_job_manager()
-        user_credits = get_user_credits(userid=user_id, config=job_manager.config)
+        try:
+            job_manager = get_job_manager()
+            user_credits = get_user_credits(userid=user_id, config=job_manager.config)
 
-        return jsonify(
-            {
-                "credits": {
-                    "granted": user_credits.granted,
-                    "consumed": user_credits.consumed,
-                    "pending": user_credits.pending,
-                    "available": user_credits.available,
+            return jsonify(
+                {
+                    "credits": {
+                        "granted": user_credits.granted,
+                        "consumed": user_credits.consumed,
+                        "pending": user_credits.pending,
+                        "available": user_credits.available,
+                    }
                 }
-            }
-        ), 200
+            ), 200
+        except Exception as e:
+            current_app.logger.error(f"Failed to fetch credits for user {user_id}: {str(e)}")
+            return jsonify({"error": f"Failed to fetch credits: {str(e)}"}), 500
 
     # Example protected endpoint - requires special permission
     @api.route("/me/enrollment-status")

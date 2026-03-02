@@ -1,3 +1,5 @@
+import { GenericError, MissingRefreshTokenError } from '@auth0/auth0-spa-js';
+
 import { auth0Client } from '@/auth/Auth0Client';
 
 const DEFAULT_HEADERS = {
@@ -36,12 +38,11 @@ export class BaseApi {
             console.error('Error getting token: ', error);
             // Session is unrecoverable — send the user back through login, preserving their
             // current location so they land back where they were after re-authenticating.
-            const message = error instanceof Error ? error.message : String(error);
-            if (
-                message.includes('Missing Refresh Token') ||
-                message.includes('login_required') ||
-                message.includes('consent_required')
-            ) {
+            const isLoginRequired =
+                error instanceof MissingRefreshTokenError ||
+                (error instanceof GenericError &&
+                    (error.error === 'login_required' || error.error === 'consent_required'));
+            if (isLoginRequired) {
                 client.loginWithRedirect({
                     appState: { returnTo: window.location.pathname + window.location.search },
                 });

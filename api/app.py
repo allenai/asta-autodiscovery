@@ -7,7 +7,7 @@ from metrics import metrics_api
 from root import root_api
 from runs import runs_api
 from user import user_api
-from utils import error, glog
+from utils import error, glog, userid_logging
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,6 +20,7 @@ def create_app() -> ProxyFix:
     logging.basicConfig(level=level, handlers=handlers)
 
     app = Flask("api")
+    userid_logging.instrument(app, logging.root)
     app.register_blueprint(root_api.create(), url_prefix="/")
     app.register_blueprint(user_api.create(), url_prefix="/api/user")
     app.register_blueprint(runs_api.create(), url_prefix="/api/runs")

@@ -5,8 +5,10 @@ from functools import wraps
 
 import jwt
 import requests
-from flask import jsonify, request
+from flask import g, jsonify, request
 from jwt.algorithms import RSAAlgorithm
+
+from utils.userid_logging import set_userid
 
 # Cache for Auth0 public keys
 _jwks_cache = {}
@@ -101,6 +103,7 @@ def requires_auth(
                 if masquerade_user:
                     payload["sub"] = masquerade_user
                 request.user = payload
+                g._userid_logging_token = set_userid(payload.get("sub"))
 
                 # Permissions are typically in the "permissions" claim as an array
                 permissions = payload.get("permissions", [])
@@ -181,6 +184,7 @@ def optional_enrollment(f):
             if masquerade_user:
                 payload["sub"] = masquerade_user
             request.user = payload
+            g._userid_logging_token = set_userid(payload.get("sub"))
         except ValueError:
             # Invalid token - treat as unauthenticated
             request.user = {}

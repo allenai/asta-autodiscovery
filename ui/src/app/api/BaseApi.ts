@@ -31,7 +31,8 @@ export class BaseApi {
             return DEFAULT_HEADERS;
         }
 
-        const token = await auth0Client.getTokenSilently().catch((error: unknown) => {
+        const client = auth0Client;
+        const token = await client.getTokenSilently().catch((error: unknown) => {
             console.error('Error getting token: ', error);
             // Session is unrecoverable — send the user back through login, preserving their
             // current location so they land back where they were after re-authenticating.
@@ -41,7 +42,7 @@ export class BaseApi {
                 message.includes('login_required') ||
                 message.includes('consent_required')
             ) {
-                auth0Client.loginWithRedirect({
+                client.loginWithRedirect({
                     appState: { returnTo: window.location.pathname + window.location.search },
                 });
             }

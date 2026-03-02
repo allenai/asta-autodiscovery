@@ -1,5 +1,3 @@
-import { GenericError, MissingRefreshTokenError } from '@auth0/auth0-spa-js';
-
 import { auth0Client } from '@/auth/Auth0Client';
 
 const DEFAULT_HEADERS = {
@@ -43,18 +41,7 @@ export class BaseApi {
         }
 
         const token = await client.getTokenSilently().catch((error: unknown) => {
-            console.error('Error getting token: ', error);
-            // Session is unrecoverable — send the user back through login, preserving their
-            // current location so they land back where they were after re-authenticating.
-            const isSessionExpired =
-                error instanceof MissingRefreshTokenError ||
-                (error instanceof GenericError &&
-                    (error.error === 'login_required' || error.error === 'consent_required'));
-            if (isSessionExpired) {
-                client.loginWithRedirect({
-                    appState: { returnTo: window.location.pathname + window.location.search },
-                });
-            }
+            console.error('Error getting token silently: ', error);
             return undefined;
         });
 
@@ -118,6 +105,20 @@ export class BaseApi {
         }
 
         const resp = await fetch(url, init);
+
+        // A 401 means the server rejected our credentials. If the user has a cached
+        // profile they were previously authenticated — redirect through login to renew
+        // their session. Anonymous visitors browsing public pages never get a 401 from
+        // the API, so they are unaffected.
+        if (resp.status === 401 && auth0Client) {
+            const user = await auth0Client.getUser();
+            if (user) {
+                auth0Client.loginWithRedirect({
+                    appState: { returnTo: window.location.pathname + window.location.search },
+                });
+            }
+        }
+
         if (!resp.ok) {
             const errorMsg: string | null = await resp
                 .json()

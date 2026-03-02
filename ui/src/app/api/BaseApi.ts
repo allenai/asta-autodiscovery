@@ -33,6 +33,18 @@ export class BaseApi {
 
         const token = await auth0Client.getTokenSilently().catch((error: unknown) => {
             console.error('Error getting token: ', error);
+            // Session is unrecoverable — send the user back through login, preserving their
+            // current location so they land back where they were after re-authenticating.
+            const message = error instanceof Error ? error.message : String(error);
+            if (
+                message.includes('Missing Refresh Token') ||
+                message.includes('login_required') ||
+                message.includes('consent_required')
+            ) {
+                auth0Client.loginWithRedirect({
+                    appState: { returnTo: window.location.pathname + window.location.search },
+                });
+            }
             return undefined;
         });
 

@@ -16,6 +16,7 @@ export const auth0Client =
               clientId: auth0Config.clientId,
               cacheLocation: 'localstorage',
               useRefreshTokens: true,
+              useRefreshTokensFallback: true,
               authorizationParams: {
                   redirect_uri: window.location.origin,
                   audience: auth0Config.audience,

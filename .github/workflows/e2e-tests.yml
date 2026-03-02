@@ -1,6 +1,8 @@
 name: "E2E Tests"
 
 on:
+  check_run:
+    types: [completed]
   workflow_dispatch:
     inputs:
       base_url:
@@ -11,6 +13,10 @@ on:
 
 jobs:
   e2e:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.check_run.name == 'adhoc-asta-autodiscovery-deploy-dev (example-shared-project)' &&
+       github.event.check_run.conclusion == 'success')
     runs-on: ubuntu-latest
 
     defaults:
@@ -48,3 +54,14 @@ jobs:
           name: playwright-report
           path: ui/playwright-report/
           retention-days: 14
+
+      - name: Notify Slack on failure
+        if: failure() && github.event_name == 'check_run'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 E2E Tests failed on main\nAuthor: ${{ github.actor }}\nCommit: ${{ github.event.head_commit.message }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

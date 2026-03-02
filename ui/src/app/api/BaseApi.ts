@@ -34,15 +34,23 @@ export class BaseApi {
         }
 
         const client = auth0Client;
+
+        // No cached user profile means the visitor never logged in — skip token fetch
+        // entirely so public pages work without auth.
+        const user = await client.getUser();
+        if (!user) {
+            return DEFAULT_HEADERS;
+        }
+
         const token = await client.getTokenSilently().catch((error: unknown) => {
             console.error('Error getting token: ', error);
             // Session is unrecoverable — send the user back through login, preserving their
             // current location so they land back where they were after re-authenticating.
-            const isLoginRequired =
+            const isSessionExpired =
                 error instanceof MissingRefreshTokenError ||
                 (error instanceof GenericError &&
                     (error.error === 'login_required' || error.error === 'consent_required'));
-            if (isLoginRequired) {
+            if (isSessionExpired) {
                 client.loginWithRedirect({
                     appState: { returnTo: window.location.pathname + window.location.search },
                 });

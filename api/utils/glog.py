@@ -11,6 +11,9 @@ class Formatter(jsonlogger.JsonFormatter):
     def add_fields(self, log_record, record, message_dict):
         super().add_fields(log_record, record, message_dict)
         log_record["severity"] = record.levelname
+        userid = getattr(record, "userid", None)
+        if userid:
+            log_record.setdefault("logging.googleapis.com/labels", {})["userid"] = userid
 
 
 class Handler(logging.StreamHandler):

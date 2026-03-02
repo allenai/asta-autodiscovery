@@ -78,4 +78,6 @@ def instrument(app, logger: logging.Logger) -> None:
         if token is not None:
             clear_userid(token)
 
-    logger.addFilter(UserIdFilter())
+    userid_filter = UserIdFilter()
+    for handler in logger.handlers:
+        handler.addFilter(userid_filter)

@@ -3,6 +3,7 @@ import debounce from 'lodash.debounce';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
+import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
@@ -82,6 +83,7 @@ interface FieldErrors {
 export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
     const { updateViewerRun, viewerRuns } = useViewerRuns();
+    const { addErrorToast } = useToasts();
     const api = getRunsApi();
 
     const creditsAvailable = credits?.available ?? 0;
@@ -608,7 +610,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         if (hasValidationErrors) {
             setFieldErrors(errors);
-            setFormError('Please fill in all required fields');
         }
 
         return hasValidationErrors;
@@ -622,6 +623,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         debouncedSaveDatasetMetadata.flush();
 
         if (isFormInvalid()) {
+            addErrorToast('Please complete the highlighted required fields.');
             setIsSubmitting(false);
             return;
         }
@@ -633,7 +635,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             );
 
             if (pendingUploads.length > 0) {
-                setFormError('Please wait for all uploads to complete');
+                addErrorToast(
+                    `Please wait for ${pendingUploads.length} ${pendingUploads.length === 1 ? 'file' : 'files'} to finish uploading.`
+                );
                 setIsSubmitting(false);
                 return;
             }

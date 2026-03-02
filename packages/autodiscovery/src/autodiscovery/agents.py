@@ -7,7 +7,11 @@ from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
 from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
 
-from autodiscovery.llm_retry import apply_openai_client_vertex_token_refresh, call_with_backoff
+from autodiscovery.llm_retry import (
+    apply_openai_client_backoff_retry,
+    apply_openai_client_vertex_token_refresh,
+    call_with_backoff,
+)
 from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER, UsageTracker
 from autodiscovery.structured_outputs import (
     Experiment,
@@ -499,6 +503,9 @@ def get_openai_config(
     Returns:
         Configuration dict for the Autogen LLM client.
     """
+    # Apply retry policy for AG2 OpenAI-compatible client calls.
+    apply_openai_client_backoff_retry()
+
     # Check if this is a Gemini model
     is_gemini = is_gemini_model(model_name)
 
@@ -513,7 +520,8 @@ def get_openai_config(
             "timeout": timeout,
             "api_key": get_vertex_access_token(),
             "base_url": base_url,
-            "max_retries": 3,
+            # Retries are handled by apply_openai_client_backoff_retry().
+            "max_retries": 0,
             "cache_seed": None,
         }
         if temperature is not None:
@@ -525,7 +533,8 @@ def get_openai_config(
             "model": model_name,
             "timeout": timeout,
             "api_key": api_key,
-            "max_retries": 3,
+            # Retries are handled by apply_openai_client_backoff_retry().
+            "max_retries": 0,
             "cache_seed": None,  # Disabling caching also addresses this bug: https://github.com/ag2ai/ag2/issues/1103
         }
         if temperature is not None:

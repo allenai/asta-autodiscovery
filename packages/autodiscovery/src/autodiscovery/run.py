@@ -467,6 +467,18 @@ def run_mcts(
             + math.ceil(remaining_after_warmstart / batch_size)
         )
         n_sampled = 0
+        node_mutation_locks: dict[str, threading.Lock] = {}
+        node_mutation_locks_guard = threading.Lock()
+
+        def _get_node_mutation_lock(node_obj: MCTSNode) -> threading.Lock:
+            """Return a per-node lock used to serialize mutable node state updates."""
+            node_key = node_obj.id or f"node_obj_{id(node_obj)}"
+            with node_mutation_locks_guard:
+                lock = node_mutation_locks.get(node_key)
+                if lock is None:
+                    lock = threading.Lock()
+                    node_mutation_locks[node_key] = lock
+            return lock
 
         for iteration_idx in range(n_iterations):
             # MCTS SELECTION, EXPANSION, and EXECUTION
@@ -486,7 +498,6 @@ def run_mcts(
                 f"{len(next_nodes)} NODE(S) FOR EXPANSION: "
                 f"{[f'{node.level}_{node.node_idx}' for node in next_nodes]}\n"
             )
-            n_sampled += len(next_nodes)
 
             def _expand_node(
                 inbatch_idx,
@@ -505,46 +516,53 @@ def run_mcts(
 
                 experiment_generator = agent_objs["experiment_generator"]
                 user_proxy_local = agent_objs["user_proxy"]
+                parent_node = node
+                parent_lock = _get_node_mutation_lock(parent_node)
+                created_node = None
+                node_committed = False
 
-                # Fetch or generate the next experiment from the selected node (retries built in)
-                new_experiment, new_query = node.get_next_experiment(
-                    experiment_generator=experiment_generator
-                )
+                try:
+                    # Fetch/generate experiments and attach a new child atomically per parent node.
+                    with parent_lock:
+                        new_experiment, new_query = parent_node.get_next_experiment(
+                            experiment_generator=experiment_generator
+                        )
+                        if new_query is None:
+                            print(
+                                f"No new experiment generated for node {parent_node.level}_{parent_node.node_idx}. "
+                                "Skipping this iteration."
+                            )
+                            return None
 
-                if new_query is None:
-                    print(
-                        f"No new experiment generated for node {node.level}_{node.node_idx}. "
-                        "Skipping this iteration."
-                    )
-                    return None
+                        new_level = parent_node.level + 1
+                        new_node_idx = get_node_idx(new_level)
+                        created_node = MCTSNode(
+                            level=new_level,
+                            node_idx=new_node_idx,
+                            hypothesis=new_experiment["hypothesis"],
+                            experiment_plan=new_experiment["experiment_plan"],
+                            query=new_query,
+                            parent=parent_node,
+                            allow_generate_experiments=allow_generate_experiments and new_level > 0,
+                            untried_experiments=_warmstart_experiments if new_level == 1 else None,
+                        )
+                    node = created_node
 
-                # Create a new node for the next experiment
-                new_level = node.level + 1
-                new_node_idx = get_node_idx(new_level)
-                node = MCTSNode(
-                    level=new_level,
-                    node_idx=new_node_idx,
-                    hypothesis=new_experiment["hypothesis"],
-                    experiment_plan=new_experiment["experiment_plan"],
-                    query=new_query,
-                    parent=node,
-                    allow_generate_experiments=allow_generate_experiments and new_level > 0,
-                    untried_experiments=_warmstart_experiments if new_level == 1 else None,
-                )
+                    # Update logger state
+                    logger_obj.level = node.level
+                    logger_obj.node_idx = node.node_idx
 
-                # Update logger state
-                logger_obj.level = node.level
-                logger_obj.node_idx = node.node_idx
+                    # Load previous explorations (make sure the root is always included)
+                    node_context = []
+                    if node.level > 1:
+                        if root.children:
+                            root_context = root.children[0].get_context(include_code_output=True)
+                            if root_context is not None:
+                                node_context.append(root_context)
+                        path_context = node.get_path_context(k=k_parents - 1, skip_root=True) or []
+                        node_context.extend(context for context in path_context if context is not None)
 
-                # Load previous explorations (make sure the root is always included)
-                node_context = []
-                if node.level > 1:
-                    node_context = [
-                        root.children[0].get_context(include_code_output=True)
-                    ] + node.get_path_context(k=k_parents - 1, skip_root=True)
-                node_messages = []
-                if node_context is not None:
-                    node_messages += [
+                    node_messages = [
                         {
                             "name": "user_proxy",
                             "role": "user",
@@ -552,132 +570,144 @@ def run_mcts(
                         }
                         for n in node_context
                     ]
-                node_messages += [
-                    {
-                        "name": "user_proxy",
-                        "role": "user",
-                        "content": node.query
-                        + (
-                            "\n\nNote for the programmer: Dataset files are present one level above the current "
-                            "working directory."
-                            if is_threaded
-                            else ""
-                        ),
-                    }
-                ]
+                    node_messages += [
+                        {
+                            "name": "user_proxy",
+                            "role": "user",
+                            "content": node.query
+                            + (
+                                "\n\nNote for the programmer: Dataset files are present one level above the current "
+                                "working directory."
+                                if is_threaded
+                                else ""
+                            ),
+                        }
+                    ]
 
-                # Set up the group chat
-                groupchat, chat_manager = setup_group_chat(agent_objs, max_rounds)
-                _, last_message = chat_manager.resume(messages=node_messages)
-                agent_usage_before = None
-                if agent_usage_mode == "summary_delta":
-                    agent_usage_before = snapshot_agents_actual_usage(agent_objs)
-                _set_executor_usage_context(agent_objs["code_executor"], node.id)
-                if agent_usage_mode == "per_response":
-                    set_ag2_usage_context(node_id=node.id, component="agents.chat")
+                    # Set up the group chat
+                    groupchat, chat_manager = setup_group_chat(agent_objs, max_rounds)
+                    _, last_message = chat_manager.resume(messages=node_messages)
+                    agent_usage_before = None
+                    if agent_usage_mode == "summary_delta":
+                        agent_usage_before = snapshot_agents_actual_usage(agent_objs)
+                    _set_executor_usage_context(agent_objs["code_executor"], node.id)
+                    if agent_usage_mode == "per_response":
+                        set_ag2_usage_context(node_id=node.id, component="agents.chat")
 
-                # Track time per node
-                _node_start_time = time()
+                    # Track time per node
+                    _node_start_time = time()
 
-                # Execute current experiment and generate new experiments
-                try:
-                    user_proxy_local.initiate_chat(
-                        recipient=chat_manager, message=last_message, clear_history=False
+                    # Execute current experiment and generate new experiments
+                    try:
+                        user_proxy_local.initiate_chat(
+                            recipient=chat_manager,
+                            message=last_message,
+                            clear_history=False,
+                        )
+                    finally:
+                        if agent_usage_mode == "per_response":
+                            clear_ag2_usage_context()
+
+                    if agent_usage_mode == "summary_delta":
+                        assert agent_usage_before is not None
+                        agent_usage_after = snapshot_agents_actual_usage(agent_objs)
+                        usage_tracker.record_agent_usage_deltas(
+                            agent_usage_before,
+                            agent_usage_after,
+                            node_id=node.id,
+                            component="agents.chat",
+                        )
+
+                    # Store the raw message logs for the node
+                    logger_obj.log_node(
+                        node.level, node.node_idx, chat_manager.messages_to_string(groupchat.messages)
                     )
-                finally:
+
+                    # Get messages starting from the current query and update the node
+                    node.messages = get_msgs_from_latest_query(groupchat.messages)
+                    node.read_experiment_from_messages(
+                        store_new_experiments=False
+                        if node.level == 1 and _warmstart_experiments is not None
+                        else True
+                    )
+                    if node.code_output:
+                        image_usage_entries, cleaned_output = extract_local_image_usage_markers(
+                            node.code_output
+                        )
+                        for usage_entry in image_usage_entries:
+                            usage_tracker.record_event(
+                                source=usage_entry.get("source", "openai"),
+                                component=usage_entry.get("component", "image_analysis.local"),
+                                model=usage_entry.get("model"),
+                                prompt_tokens=usage_entry.get("prompt_tokens", 0),
+                                completion_tokens=usage_entry.get("completion_tokens", 0),
+                                total_tokens=usage_entry.get("total_tokens"),
+                                agent_name=usage_entry.get("agent_name", "code_executor"),
+                                node_id=node.id,
+                            )
+                        node.code_output = cleaned_output
+                    rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
+                    _write_rich_outputs(node.level, node.node_idx, rich_outputs)
+
+                    # Calculate beliefs and rewards
+                    if node.success and node.level > 1:
+                        compute_and_store_reward(
+                            node,
+                            belief_model_name,
+                            belief_temperature,
+                            belief_reasoning_effort,
+                            n_belief_samples,
+                            implicit_bayes_posterior,
+                            surprisal_width,
+                            belief_mode,
+                            use_binary_reward,
+                            all_surprisals,
+                            use_online_beliefs=use_online_beliefs,
+                            evidence_weight=evidence_weight,
+                            kl_scale=kl_scale,
+                            reward_mode=reward_mode,
+                            TEMP_LOG=TEMP_LOG,
+                            usage_tracker=usage_tracker,
+                        )
+
+                        if node.success:  # i.e., reward was computed successfully
+                            # Print debug information
+                            print_node_info(node)
+
+                            # TEMPORARY LOGGING
+                            if TEMP_LOG:
+                                temp_log_file = os.path.join(log_dirname, "temp_log.json")
+                                with open(temp_log_file, "w") as f:
+                                    json.dump(TEMP_LOG, f, indent=2)
+                                print(f"Temporary log saved to {temp_log_file}")
+
+                    # End time tracking for the node
+                    _node_end_time = time()
+                    node.time_elapsed = round(_node_end_time - _node_start_time, 2)
+
+                    def _backprop_and_save():
+                        # MCTS BACKPROPAGATION
+                        node.update_counts(visits=1, reward=node.self_value)
+                        # Save the new node and its parents' updated counts to JSON files
+                        save_mcts_node(node, log_dirname, to_root=True)
+                        usage_tracker.save_events(log_dirname)
+
+                    if update_mcts_lock is not None:
+                        with update_mcts_lock:
+                            _backprop_and_save()
+                    else:
+                        _backprop_and_save()
+                    node_committed = True
+                    return node
+                except Exception:
                     if agent_usage_mode == "per_response":
                         clear_ag2_usage_context()
-                if agent_usage_mode == "summary_delta":
-                    assert agent_usage_before is not None
-                    agent_usage_after = snapshot_agents_actual_usage(agent_objs)
-                    usage_tracker.record_agent_usage_deltas(
-                        agent_usage_before,
-                        agent_usage_after,
-                        node_id=node.id,
-                        component="agents.chat",
-                    )
-
-                # Store the raw message logs for the node
-                logger_obj.log_node(
-                    node.level, node.node_idx, chat_manager.messages_to_string(groupchat.messages)
-                )
-
-                # Get messages starting from the current query and update the node
-                node.messages = get_msgs_from_latest_query(groupchat.messages)
-                node.read_experiment_from_messages(
-                    store_new_experiments=False
-                    if node.level == 1 and _warmstart_experiments is not None
-                    else True
-                )
-                if node.code_output:
-                    image_usage_entries, cleaned_output = extract_local_image_usage_markers(
-                        node.code_output
-                    )
-                    for usage_entry in image_usage_entries:
-                        usage_tracker.record_event(
-                            source=usage_entry.get("source", "openai"),
-                            component=usage_entry.get("component", "image_analysis.local"),
-                            model=usage_entry.get("model"),
-                            prompt_tokens=usage_entry.get("prompt_tokens", 0),
-                            completion_tokens=usage_entry.get("completion_tokens", 0),
-                            total_tokens=usage_entry.get("total_tokens"),
-                            agent_name=usage_entry.get("agent_name", "code_executor"),
-                            node_id=node.id,
-                        )
-                    node.code_output = cleaned_output
-                rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
-                _write_rich_outputs(node.level, node.node_idx, rich_outputs)
-
-                # Calculate beliefs and rewards
-                if node.success and node.level > 1:
-                    compute_and_store_reward(
-                        node,
-                        belief_model_name,
-                        belief_temperature,
-                        belief_reasoning_effort,
-                        n_belief_samples,
-                        implicit_bayes_posterior,
-                        surprisal_width,
-                        belief_mode,
-                        use_binary_reward,
-                        all_surprisals,
-                        use_online_beliefs=use_online_beliefs,
-                        evidence_weight=evidence_weight,
-                        kl_scale=kl_scale,
-                        reward_mode=reward_mode,
-                        TEMP_LOG=TEMP_LOG,
-                        usage_tracker=usage_tracker,
-                    )
-
-                    if node.success:  # i.e., reward was computed successfully
-                        # Print debug information
-                        print_node_info(node)
-
-                        # TEMPORARY LOGGING
-                        if TEMP_LOG:
-                            temp_log_file = os.path.join(log_dirname, "temp_log.json")
-                            with open(temp_log_file, "w") as f:
-                                json.dump(TEMP_LOG, f, indent=2)
-                            print(f"Temporary log saved to {temp_log_file}")
-
-                # End time tracking for the node
-                _node_end_time = time()
-                node.time_elapsed = round(_node_end_time - _node_start_time, 2)
-
-                def _backprop_and_save():
-                    # MCTS BACKPROPAGATION
-                    node.update_counts(visits=1, reward=node.self_value)
-                    # Save the new node and its parents' updated counts to JSON files
-                    save_mcts_node(node, log_dirname, to_root=True)
-                    usage_tracker.save_events(log_dirname)
-
-                if update_mcts_lock is not None:
-                    with update_mcts_lock:
-                        _backprop_and_save()
-                else:
-                    _backprop_and_save()
-
-                return node
+                    # Roll back partially-created nodes so selection logic does not keep revisiting them.
+                    if created_node is not None and not node_committed:
+                        with parent_lock:
+                            if created_node in parent_node.children:
+                                parent_node.children.remove(created_node)
+                    raise
 
             if n_threads > 1 and len(next_nodes) > 1:
                 # Parallel expansion of nodes
@@ -727,6 +757,14 @@ def run_mcts(
                         is_threaded=True,
                     )
 
+                def _on_expand_error(node_id: str, exc: Exception) -> None:
+                    # Keep exploration running when one node expansion fails.
+                    print(
+                        f"[run_mcts] Failed expanding node {node_id}: "
+                        f"{exc.__class__.__name__}: {exc}"
+                    )
+                    traceback.print_exception(type(exc), exc, exc.__traceback__)
+
                 expanded_nodes = []
                 with ThreadPoolExecutor(max_workers=n_threads) as executor:
                     future_labels = {
@@ -735,14 +773,6 @@ def run_mcts(
                         )
                         for inbatch_idx, node in enumerate(next_nodes)
                     }
-
-                    def _on_expand_error(node_id: str, exc: Exception) -> None:
-                        # Keep exploration running when one node expansion fails.
-                        print(
-                            f"[run_mcts] Failed expanding node {node_id}: "
-                            f"{exc.__class__.__name__}: {exc}"
-                        )
-                        traceback.print_exception(type(exc), exc, exc.__traceback__)
 
                     expanded_nodes = gather_completed_futures(
                         future_labels,
@@ -778,15 +808,28 @@ def run_mcts(
 
                 expanded_nodes = []
                 for inbatch_idx, node in enumerate(next_nodes):
-                    new_node = _expand_node(
-                        inbatch_idx,
-                        node,
-                        base_agent_objs,
-                        logger,
-                        _get_node_idx,
-                    )
+                    node_id = f"{node.level}_{node.node_idx}"
+                    try:
+                        new_node = _expand_node(
+                            inbatch_idx,
+                            node,
+                            base_agent_objs,
+                            logger,
+                            _get_node_idx,
+                        )
+                    except Exception as exc:
+                        # Align sequential behavior with threaded mode by continuing after per-node failures.
+                        print(
+                            f"[run_mcts] Failed expanding node {node_id}: "
+                            f"{exc.__class__.__name__}: {exc}"
+                        )
+                        traceback.print_exception(type(exc), exc, exc.__traceback__)
+                        continue
                     if new_node is not None:
                         expanded_nodes.append(new_node)
+
+            # Count only successful expansions toward experiment budget.
+            n_sampled += len(expanded_nodes)
 
             # Add expanded nodes to the tree
             expanded_nodes.sort(key=lambda n: (n.level, n.node_idx))

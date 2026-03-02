@@ -12,6 +12,8 @@ class DailyMetrics(BaseModel):
 
     date: str = Field(..., description="Date in YYYY-MM-DD format")
     runs_started: int = Field(0)
+    unique_users_started: int = Field(0)
+    hypotheses_conducted: int = Field(0)
     runs_succeeded: int = Field(0)
     runs_failed: int = Field(0)
     llm_cost_usd: float = Field(0.0)

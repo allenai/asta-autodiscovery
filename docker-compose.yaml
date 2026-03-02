@@ -45,7 +45,7 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "localhost:3000"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000"]
       interval: 3s
       timeout: 5s
       retries: 10

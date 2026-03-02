@@ -26,6 +26,7 @@ Example usage:
     print(f"Available: {credits.available}")
 """
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, NamedTuple
 
@@ -39,8 +40,10 @@ from autodiscovery_jobs.gcs import (
 from autodiscovery_jobs.run_details import get_run_details
 from autodiscovery_jobs.user_profile import get_user_granted_credits
 
+logger = logging.getLogger(__name__)
+
 # Credit configuration
-DEFAULT_CREDITS_GRANTED = 1000
+DEFAULT_CREDITS_GRANTED = 500
 
 # Max number of experiments that can run in a single job
 DEFAULT_EXPERIMENT_LIMIT = 500
@@ -241,7 +244,12 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
     total_pending = 0
 
     # Get all jobs for the user
-    job_ids = list_user_jobs(userid=userid, config=config)
+    try:
+        job_ids = list_user_jobs(userid=userid, config=config)
+    except Exception as e:
+        logger.warning(f"Failed to list jobs for user {userid}: {e}")
+        # If we can't list jobs, return credits with zero usage
+        job_ids = []
 
     def _get_job_credit_contribution(job_id: str) -> tuple[int, int] | None:
         try:
@@ -253,18 +261,24 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
             if run_status not in ["PENDING", "QUEUED", "RUNNING"]:
                 pending = 0
             return (consumed, pending)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to get credit contribution for job {job_id} (user {userid}): {e}")
             return None
 
     # Aggregate credits across all jobs in parallel
     if job_ids:
         max_workers = min(16, len(job_ids))
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for result in executor.map(_get_job_credit_contribution, job_ids):
-                if result is not None:
-                    consumed, pending = result
-                    total_consumed += consumed
-                    total_pending += pending
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for result in executor.map(_get_job_credit_contribution, job_ids):
+                    if result is not None:
+                        consumed, pending = result
+                        total_consumed += consumed
+                        total_pending += pending
+        except Exception as e:
+            logger.error(f"ThreadPoolExecutor failed for user {userid}: {e}")
+            # If executor fails, continue with zero usage
+            pass
 
     # Get credits granted for this user
     credits_granted = get_user_credits_granted(userid)

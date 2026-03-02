@@ -1,13 +1,16 @@
 import { Button, styled } from '@mui/material';
 import Link from 'next/link';
 
+import { TEST_ID_ABOUT_BUTTON } from '@/testIds';
+
 export const AboutButton = () => {
     return (
         <Link
             href="https://allenai.org/blog/autodiscovery"
             passHref
             target="_blank"
-            rel="noopener noreferrer">
+            rel="noopener noreferrer"
+            data-test-id={TEST_ID_ABOUT_BUTTON}>
             <StyledButton variant="outlined">
                 About<DesktopOnly>&nbsp;AutoDiscovery</DesktopOnly>
             </StyledButton>

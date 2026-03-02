@@ -16,6 +16,7 @@ import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetail
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
+import { TEST_ID_EXPERIMENTS_TABLE } from '@/testIds';
 
 const DEFAULT_PAGE_SIZE = -1;
 
@@ -365,7 +366,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                     },
                 })}
             />
-            <Wrapper>
+            <Wrapper data-test-id={TEST_ID_EXPERIMENTS_TABLE}>
                 {lastError && (
                     <Alert severity="error" sx={{ m: 1 }}>
                         {lastError}

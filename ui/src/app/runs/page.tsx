@@ -4,6 +4,7 @@ import { Box, CircularProgress, styled, Typography } from '@mui/material';
 import Image from 'next/image';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { TEST_ID_AI2_LOGO_LINK, TEST_ID_ASTA_LABS_LOGO_LINK } from '@/testIds';
 import { IntroBox } from '@/runs/components/IntroBox';
 import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
 import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
@@ -41,7 +42,8 @@ export default function RunsPage() {
                             <Ai2LogoWrapper
                                 href="https://allenai.org"
                                 target="_blank"
-                                rel="noopener noreferrer">
+                                rel="noopener noreferrer"
+                                data-test-id={TEST_ID_AI2_LOGO_LINK}>
                                 <Image
                                     src="/ai2-logo.svg"
                                     alt="Ai2"
@@ -54,7 +56,8 @@ export default function RunsPage() {
                             <AstaLabsLogoWrapper
                                 href="https://asta.example.com"
                                 target="_blank"
-                                rel="noopener noreferrer">
+                                rel="noopener noreferrer"
+                                data-test-id={TEST_ID_ASTA_LABS_LOGO_LINK}>
                                 <Image
                                     src="/astalabs-logo.svg"
                                     alt="AstaLabs"

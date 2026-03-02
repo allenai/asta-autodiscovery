@@ -2,6 +2,7 @@ import { Box, CircularProgress, Typography, styled } from '@mui/material';
 
 import { RunSummary } from '@/runs/components/RunSummary';
 import { useExampleRuns } from '@/contexts/ExampleRunsContext';
+import { TEST_ID_EXAMPLE_SESSION_ITEM } from '@/testIds';
 
 export const ExamplesRunsBox = () => {
     const { exampleRuns, isExampleRunsLoading } = useExampleRuns();
@@ -11,7 +12,7 @@ export const ExamplesRunsBox = () => {
             {exampleRuns && exampleRuns.length > 0 && (
                 <Wrapper>
                     {exampleRuns.map((run) => (
-                        <RunItem key={run.id}>
+                        <RunItem key={run.id} data-test-id={TEST_ID_EXAMPLE_SESSION_ITEM}>
                             <RunSummary run={run} />
                         </RunItem>
                     ))}

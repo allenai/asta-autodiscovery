@@ -10,6 +10,7 @@ import { AboutButton } from '@/components/AboutButton';
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { filterTransientProps } from '@/utils/styledProps';
+import { TEST_ID_BACK_BUTTON, TEST_ID_CREDITS_CHIP } from '@/testIds';
 
 // Smart component — reads hooks, computes props, delegates rendering
 export function Header() {
@@ -44,12 +45,16 @@ export function HeaderView({
     return (
         <StyledHeader $isSharedSamples={isSharedSamples}>
             {showBackButton && (
-                <BackButton onClick={onBack} variant="outlined" startIcon={<ArrowBackIcon />}>
+                <BackButton
+                    onClick={onBack}
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    data-test-id={TEST_ID_BACK_BUTTON}>
                     Back
                 </BackButton>
             )}
             {showCredits && (
-                <LeftAlignedCredits>
+                <LeftAlignedCredits data-test-id={TEST_ID_CREDITS_CHIP}>
                     <CreditsChip />
                 </LeftAlignedCredits>
             )}

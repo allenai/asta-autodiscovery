@@ -31,8 +31,17 @@ export class BaseApi {
             return DEFAULT_HEADERS;
         }
 
-        const token = await auth0Client.getTokenSilently().catch((error: unknown) => {
-            console.error('Error getting token: ', error);
+        const client = auth0Client;
+
+        // No cached user profile means the visitor never logged in — skip token fetch
+        // entirely so public pages work without auth.
+        const user = await client.getUser();
+        if (!user) {
+            return DEFAULT_HEADERS;
+        }
+
+        const token = await client.getTokenSilently().catch((error: unknown) => {
+            console.error('Error getting token silently: ', error);
             return undefined;
         });
 
@@ -96,6 +105,20 @@ export class BaseApi {
         }
 
         const resp = await fetch(url, init);
+
+        // A 401 means the server rejected our credentials. If the user has a cached
+        // profile they were previously authenticated — redirect through login to renew
+        // their session. Anonymous visitors browsing public pages never get a 401 from
+        // the API, so they are unaffected.
+        if (resp.status === 401 && auth0Client) {
+            const user = await auth0Client.getUser();
+            if (user) {
+                auth0Client.loginWithRedirect({
+                    appState: { returnTo: window.location.pathname + window.location.search },
+                });
+            }
+        }
+
         if (!resp.ok) {
             const errorMsg: string | null = await resp
                 .json()

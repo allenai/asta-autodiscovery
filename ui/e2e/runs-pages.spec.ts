@@ -209,24 +209,37 @@ for (const url of RUN_URLS) {
         test('table search for "significant" returns between 1 and total rows', async ({ page }) => {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
 
+            // Wait for job completion — same signal used by the sort test. Without this the
+            // search fires while rows are still loading, leaving only skeletons in the viewport.
+            const surprisalHeader = table.locator(
+                '.MuiDataGrid-columnHeader[data-field="surprisal"]'
+            );
+            await expect(surprisalHeader).toHaveAttribute('aria-sort', 'descending', {
+                timeout: 30000,
+            });
+
+            // Read row count from the grid's aria-rowcount attribute rather than counting DOM
+            // nodes. With getRowHeight="auto" the rows are tall and MUI DataGrid virtualises
+            // them, so only ~2 are in the DOM at any time regardless of the total dataset size.
+            // aria-rowcount is always kept accurate for the full (possibly filtered) dataset.
+            const grid = table.locator('[role="grid"]');
+            const totalCount = parseInt((await grid.getAttribute('aria-rowcount')) ?? '0');
+            expect(totalCount).toBeGreaterThan(0);
+
             // Use quick filter search
             const searchInput = table.locator('.MuiDataGrid-toolbar input');
             await searchInput.fill('significant');
-
-            // Wait for filtering to apply
             await page.waitForTimeout(500);
 
-            const filteredRows = page.locator('.MuiDataGrid-row:not([data-id^="skeleton"])');
-            const filteredCount = await filteredRows.count();
+            const filteredCount = parseInt((await grid.getAttribute('aria-rowcount')) ?? '0');
             expect(filteredCount).toBeGreaterThan(0);
+            expect(filteredCount).toBeLessThan(totalCount);
 
-            // Clear search and verify more rows come back
+            // Clear search and verify full row count is restored
             await searchInput.clear();
             await page.waitForTimeout(500);
-            const clearedCount = await page
-                .locator('.MuiDataGrid-row:not([data-id^="skeleton"])')
-                .count();
-            expect(clearedCount).toBeGreaterThan(filteredCount);
+            const clearedCount = parseInt((await grid.getAttribute('aria-rowcount')) ?? '0');
+            expect(clearedCount).toEqual(totalCount);
         });
 
         test('table sorts by ID ascending then descending', async ({ page }) => {

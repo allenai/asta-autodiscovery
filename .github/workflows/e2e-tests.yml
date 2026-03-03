@@ -18,6 +18,8 @@ jobs:
       (github.event.check_run.name == 'adhoc-asta-autodiscovery-deploy-dev (example-shared-project)' &&
        github.event.check_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    permissions:
+      statuses: write
 
     defaults:
       run:
@@ -55,13 +57,28 @@ jobs:
           path: ui/playwright-report/
           retention-days: 14
 
+      - name: Report commit status
+        if: always() && github.event_name == 'check_run'
+        run: |
+          case "${{ job.status }}" in
+            success) state="success" ;;
+            *) state="failure" ;;
+          esac
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.check_run.head_sha }} \
+            -f state="$state" \
+            -f context="E2E Tests" \
+            -f description="Playwright e2e suite" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Notify Slack on failure
         if: failure() && github.event_name == 'check_run'
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
             {
-              "text": "🚨 E2E Tests failed on main\nAuthor: ${{ github.actor }}\nCommit: ${{ github.event.head_commit.message }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "🚨 E2E Tests failed on main\nAuthor: ${{ github.actor }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

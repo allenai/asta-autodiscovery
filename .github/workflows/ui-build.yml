@@ -40,7 +40,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚨 CI: UI Build failed\nAuthor: ${{ github.actor }}\nCommit: ${{ github.event.head_commit.message }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "🚨 CI: UI Build failed\nAuthor: ${{ github.actor }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -30,6 +30,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set commit status to pending
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.check_run.head_sha || github.sha }} \
+            -f state="pending" \
+            -f context="E2E Tests" \
+            -f description="Playwright e2e suite" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -59,13 +69,13 @@ jobs:
           retention-days: 14
 
       - name: Report commit status
-        if: always() && github.event_name == 'check_run'
+        if: always()
         run: |
           case "${{ job.status }}" in
             success) state="success" ;;
             *) state="failure" ;;
           esac
-          gh api repos/${{ github.repository }}/statuses/${{ github.event.check_run.head_sha }} \
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.check_run.head_sha || github.sha }} \
             -f state="$state" \
             -f context="E2E Tests" \
             -f description="Playwright e2e suite" \

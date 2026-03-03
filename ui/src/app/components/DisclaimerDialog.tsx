@@ -1,6 +1,7 @@
 import { Link, Typography } from '@mui/material';
 
 import { BulletList, DialogBase } from '@/shared/DialogBase';
+import { TEST_ID_DISCLAIMER_DIALOG } from '@/testIds';
 
 type DisclaimerDialogProps = {
     isOpen: boolean;
@@ -9,7 +10,11 @@ type DisclaimerDialogProps = {
 
 export const DisclaimerDialog = ({ isOpen, onClose }: DisclaimerDialogProps) => {
     return (
-        <DialogBase isOpen={isOpen} onClose={onClose} title="Disclaimer">
+        <DialogBase
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Disclaimer"
+            testId={TEST_ID_DISCLAIMER_DIALOG}>
             <Typography variant="body1" sx={{ mb: 2 }}>
                 Asta supports scientific workflows by retrieving and synthesizing findings from the
                 scholarly literature and, when provided, running exploratory analyses on user&apos;s

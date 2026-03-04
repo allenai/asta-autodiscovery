@@ -5,7 +5,6 @@ services:
     depends_on:
       - api
       - ui
-      - autods-viz
       - proxy
   api:
     build:
@@ -49,31 +48,12 @@ services:
       interval: 3s
       timeout: 5s
       retries: 10
-  autods-viz:
-    build: ./autods-viz
-    volumes:
-      - ./autods-viz/server.js:/app/server.js
-      - ./autods-viz/public:/app/public
-      - ./autods-viz/results:/app/results
-    environment:
-      - PORT=3001
-      - BASE_PATH=/autods-viz
-      - NODE_ENV=development
-    ports:
-      - "3001:3001"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "localhost:3001/api/health"]
-      interval: 3s
-      timeout: 5s
-      retries: 10
   proxy:
     build: ./proxy
     ports:
       - "8080:8080"
     depends_on:
       ui:
-        condition: service_healthy
-      autods-viz:
         condition: service_healthy
       api:
         condition: service_started

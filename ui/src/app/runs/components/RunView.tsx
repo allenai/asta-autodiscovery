@@ -47,7 +47,6 @@ import {
     RunPanel,
     ExperimentPanel,
     ExperimentPanelBackdrop,
-    ExperimentActions,
     ExperimentActionButton,
     LargeScreenAction,
     PanelDragHandle,
@@ -253,9 +252,7 @@ function RunViewContent({
         async (event: React.MouseEvent<HTMLButtonElement>) => {
             event.preventDefault();
 
-            const shareUrl = selectedExperiment
-                ? `${window.location.origin}/runs/shared/${run.id}?exp=${selectedExperiment.idInRun}`
-                : `${window.location.origin}/runs/shared/${run.id}`;
+            const shareUrl = `${window.location.origin}/runs/shared/${run.id}`;
             const sharePromise = navigator.clipboard.writeText(shareUrl);
 
             const apiPromise = runsApi.shareRun({
@@ -265,15 +262,36 @@ function RunViewContent({
 
             try {
                 await sharePromise;
-                addSuccessToast('Share URL copied to clipboard.', shareUrl);
+                addSuccessToast('Session URL copied to clipboard.', shareUrl);
                 await apiPromise;
             } catch (err) {
                 addErrorToast('Error sharing run.');
                 console.error('Error sharing run:', err);
             }
         },
-        [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]
+        [run.id, runsApi, addSuccessToast, addErrorToast]
     );
+
+    const onShareExperimentClick = useCallback(async () => {
+        if (!selectedExperiment) return;
+
+        const shareUrl = `${window.location.origin}/runs/shared/${run.id}?exp=${selectedExperiment.idInRun}`;
+        const sharePromise = navigator.clipboard.writeText(shareUrl);
+
+        const apiPromise = runsApi.shareRun({
+            runId: run.id,
+            isShared: true,
+        });
+
+        try {
+            await sharePromise;
+            addSuccessToast('Experiment URL copied to clipboard.', shareUrl);
+            await apiPromise;
+        } catch (err) {
+            addErrorToast('Error sharing experiment.');
+            console.error('Error sharing experiment:', err);
+        }
+    }, [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]);
 
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
@@ -328,11 +346,12 @@ function RunViewContent({
                         } as React.CSSProperties
                     }>
                     <RunHeader>
-                        <Box>
+                        <Box sx={{ flex: '1 1 auto' }}>
                             <RunHeaderName>
                                 {isRunBookmarksEnabled && (
                                     <BookmarkButton
                                         size="small"
+                                        $isBookmarked={checkRunBookmarked(run.id)}
                                         onClick={() =>
                                             updateRunBookmark(run.id, {
                                                 isBookmarked: !checkRunBookmarked(run.id),
@@ -351,20 +370,6 @@ function RunViewContent({
                                 )}
                                 {run.name}
                             </RunHeaderName>
-                            <RunHeaderSubtitle>
-                                <StyledListItem>
-                                    {getRunStatusString(run.details, experiments)}
-                                </StyledListItem>
-
-                                <StyledListItem>
-                                    <StatusChip
-                                        label={toSentenceCase(run.details.status)}
-                                        size="small"
-                                        $status={run.details.status}
-                                    />
-                                </StyledListItem>
-                            </RunHeaderSubtitle>
-
                             {isRunning && (
                                 <>
                                     <Typography variant="caption">
@@ -394,7 +399,30 @@ function RunViewContent({
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
+                        {isRunBookmarksEnabled && (
+                            <RunHeaderActions>
+                                <ShareSessionButton
+                                    onClick={onShareClick}
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<ShareOutlinedIcon />}>
+                                    Share session
+                                </ShareSessionButton>
+                            </RunHeaderActions>
+                        )}
                     </RunHeader>
+                    <RunHeaderSubtitle>
+                        <StyledListItem>
+                            <StatusChip
+                                label={toSentenceCase(run.details.status)}
+                                size="small"
+                                $status={run.details.status}
+                            />
+                        </StyledListItem>
+                        <StyledListItem>
+                            {getRunStatusString(run.details, experiments)}
+                        </StyledListItem>
+                    </RunHeaderSubtitle>
 
                     <RunContent>
                         <TopSurprisalsList />
@@ -415,21 +443,13 @@ function RunViewContent({
                             )}
                             <RunToolbarButtons>
                                 <ParametersButton
-                                    variant="outlined"
+                                    variant="text"
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}
                                     data-test-id={TEST_ID_SESSION_CONFIG_BUTTON}
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
-                                    Session Configuration
+                                    Session configuration
                                 </ParametersButton>
-                                {isRunBookmarksEnabled && (
-                                    <ParametersButton
-                                        variant="outlined"
-                                        startIcon={<ShareOutlinedIcon />}
-                                        onClick={onShareClick}>
-                                        Share
-                                    </ParametersButton>
-                                )}
                                 {canStop && (
                                     <StopButton
                                         variant="outlined"
@@ -477,28 +497,45 @@ function RunViewContent({
                                     : '500px',
                             } as React.CSSProperties
                         }>
-                        <ExperimentActions>
-                            <LargeScreenAction>
-                                <ExperimentActionButton
-                                    onClick={() => setIsExpPanelExpanded(!isExpPanelExpanded)}
-                                    size="small">
-                                    {isExpPanelExpanded ? (
-                                        <CloseFullscreenOutlinedIcon />
-                                    ) : (
-                                        <OpenInFullOutlinedIcon />
-                                    )}
-                                </ExperimentActionButton>
-                            </LargeScreenAction>
-                            <ExperimentActionButton
-                                onClick={handleClosePanel}
-                                size="small"
-                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
-                                {...mkCloseExperimentDetailsPanelAttrs({ runId: run.id })}>
-                                <CloseIcon />
-                            </ExperimentActionButton>
-                        </ExperimentActions>
                         {selectedExperiment && (
-                            <ExperimentDetails experiment={selectedExperiment} />
+                            <ExperimentDetails
+                                experiment={selectedExperiment}
+                                actions={
+                                    <>
+                                        <ShareExperimentButton
+                                            onClick={onShareExperimentClick}
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<ShareOutlinedIcon />}>
+                                            Share experiment
+                                        </ShareExperimentButton>
+                                        <LargeScreenAction>
+                                            <ExperimentActionButton
+                                                onClick={() =>
+                                                    setIsExpPanelExpanded(
+                                                        !isExpPanelExpanded
+                                                    )
+                                                }
+                                                size="small">
+                                                {isExpPanelExpanded ? (
+                                                    <CloseFullscreenOutlinedIcon fontSize="small" />
+                                                ) : (
+                                                    <OpenInFullOutlinedIcon fontSize="small" />
+                                                )}
+                                            </ExperimentActionButton>
+                                        </LargeScreenAction>
+                                        <ExperimentActionButton
+                                            onClick={handleClosePanel}
+                                            size="small"
+                                            data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
+                                            {...mkCloseExperimentDetailsPanelAttrs({
+                                                runId: run.id,
+                                            })}>
+                                            <CloseIcon />
+                                        </ExperimentActionButton>
+                                    </>
+                                }
+                            />
                         )}
                         {!isExpPanelExpanded && isDragEnabled && (
                             <PanelDragHandle
@@ -541,12 +578,25 @@ const RunToolbarButtons = styled('div')`
     gap: ${({ theme }) => theme.spacing(1)};
 `;
 
-const ParametersButton = styled(Button)`
+const ShareExperimentButton = styled(Button)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    border-radius: 4px;
     color: ${({ theme }) => theme.color['cream-100'].hex};
+    height: 32px;
+    white-space: nowrap;
 
     &:hover {
         border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
+`;
+
+const ParametersButton = styled(Button)`
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    cursor: pointer;
+
+    &:hover {
+        color: ${({ theme }) => theme.color['green-100'].hex};
+        background-color: transparent;
     }
 `;
 
@@ -554,8 +604,31 @@ const RunHeader = styled('div')`
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
+    gap: 12px;
     padding: ${({ theme }) => theme.spacing(3)};
+`;
+
+const RunHeaderActions = styled('div')`
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: ${({ theme }) => theme.spacing(1)};
+    margin-left: auto;
+`;
+
+const ShareSessionButton = styled(Button)`
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    height: 32px;
+    white-space: nowrap;
+
+    &:hover {
+        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
 `;
 
 const RunHeaderName = styled('h1')`
@@ -570,13 +643,15 @@ const RunHeaderName = styled('h1')`
     flex: 1 1 auto;
 `;
 
-const BookmarkButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['green-100'].hex};
+const BookmarkButton = styled(IconButton)<{ $isBookmarked?: boolean }>`
+    color: ${({ theme, $isBookmarked }) =>
+        $isBookmarked ? theme.color['green-100'].hex : theme.color['gray-50'].hex};
     padding: 0;
     transition: color 0.2s ease-in-out;
 
     &:hover {
-        color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+        color: ${({ theme, $isBookmarked }) =>
+            $isBookmarked ? theme.color['green-40'].rgba.toString() : theme.color['gray-30'].hex};
     }
 `;
 
@@ -606,17 +681,17 @@ const ExperimentCount = styled('div')`
 
 const RunHeaderSubtitle = styled(List)`
     align-items: center;
+    border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
     flex-direction: row;
     font-weight: normal;
     gap: ${({ theme }) => theme.spacing(1)};
-    padding: 0;
+    padding: ${({ theme }) => theme.spacing(1.5, 3)};
 
     @media (max-width: 600px) {
         flex-direction: column;
         align-items: flex-start;
-        padding-top: 12px;
     }
 `;
 
@@ -624,16 +699,6 @@ const StyledListItem = styled(ListItem)`
     display: inline-flex;
     padding: 0;
     width: auto;
-
-    &:not(:last-child)::after {
-        content: '•';
-        margin-left: ${({ theme }) => theme.spacing(1)};
-        color: ${({ theme }) => theme.color['cream-100'].hex};
-
-        @media (max-width: 600px) {
-            content: none;
-        }
-    }
 `;
 
 const RunToolbar = styled('div')`

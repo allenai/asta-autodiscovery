@@ -370,33 +370,6 @@ function RunViewContent({
                                 )}
                                 {run.name}
                             </RunHeaderName>
-                            {isRunning && (
-                                <>
-                                    <Typography variant="caption">
-                                        AutoDiscovery is running. New findings will populate the
-                                        table below automatically. You can click on any hypothesis
-                                        to review the details while the run continues.
-                                    </Typography>
-                                    <br />
-                                    <Typography variant="caption">
-                                        Feel free to navigate away; your results will be here when
-                                        the analysis is complete.
-                                    </Typography>
-                                </>
-                            )}
-                            {run.details.status === 'FAILED' && (
-                                <Typography variant="caption">
-                                    AutoDiscovery failed. We weren't able to finish this analysis.
-                                    You might want to try again. If you keep seeing this message,
-                                    please share your feedback with us{' '}
-                                    <Link
-                                        href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
-                                        rel="noopener noreferrer"
-                                        target="_blank">
-                                        via this form.
-                                    </Link>
-                                </Typography>
-                            )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         {isRunBookmarksEnabled && (
@@ -410,6 +383,35 @@ function RunViewContent({
                                 </ShareSessionButton>
                             </RunHeaderActions>
                         )}
+                        {isRunning && (
+                            <RunHeaderMessage>
+                                <Typography variant="caption">
+                                    AutoDiscovery is running. New findings will populate the
+                                    table below automatically. You can click on any hypothesis
+                                    to review the details while the run continues.
+                                </Typography>
+                                <br />
+                                <Typography variant="caption">
+                                    Feel free to navigate away; your results will be here when
+                                    the analysis is complete.
+                                </Typography>
+                            </RunHeaderMessage>
+                        )}
+                        {run.details.status === 'FAILED' && (
+                            <RunHeaderMessage>
+                                <Typography variant="caption">
+                                    AutoDiscovery failed. We weren't able to finish this analysis.
+                                    You might want to try again. If you keep seeing this message,
+                                    please share your feedback with us{' '}
+                                    <Link
+                                        href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
+                                        rel="noopener noreferrer"
+                                        target="_blank">
+                                        via this form.
+                                    </Link>
+                                </Typography>
+                            </RunHeaderMessage>
+                        )}
                     </RunHeader>
                     <RunHeaderSubtitle>
                         <StyledListItem>
@@ -422,6 +424,21 @@ function RunViewContent({
                         <StyledListItem>
                             {getRunStatusString(run.details, experiments)}
                         </StyledListItem>
+                        {canStop && (
+                            <StopButton
+                                variant="text"
+                                startIcon={
+                                    cancelling ? (
+                                        <CircularProgress size={16} />
+                                    ) : (
+                                        <StopCircleOutlinedIcon />
+                                    )
+                                }
+                                onClick={handleStop}
+                                disabled={cancelling}>
+                                {cancelling ? 'Stopping...' : 'Stop run'}
+                            </StopButton>
+                        )}
                     </RunHeaderSubtitle>
 
                     <RunContent>
@@ -450,21 +467,6 @@ function RunViewContent({
                                     {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session configuration
                                 </ParametersButton>
-                                {canStop && (
-                                    <StopButton
-                                        variant="outlined"
-                                        startIcon={
-                                            cancelling ? (
-                                                <CircularProgress size={16} />
-                                            ) : (
-                                                <StopCircleOutlinedIcon />
-                                            )
-                                        }
-                                        onClick={handleStop}
-                                        disabled={cancelling}>
-                                        {cancelling ? 'Stopping...' : 'Stop run'}
-                                    </StopButton>
-                                )}
                             </RunToolbarButtons>
                         </RunToolbar>
 
@@ -565,8 +567,8 @@ const Container = styled('div')`
 `;
 
 const StopButton = styled(Button)`
-    border: 1px solid ${({ theme }) => theme.color['error-red-60'].rgba.toString()};
     color: ${({ theme }) => theme.color['error-red-100'].hex};
+    margin-left: auto;
 
     &.Mui-disabled {
         color: ${({ theme }) => theme.color['error-red-60'].hex};
@@ -609,6 +611,10 @@ const RunHeader = styled('div')`
     justify-content: space-between;
     gap: 12px;
     padding: ${({ theme }) => theme.spacing(3)};
+`;
+
+const RunHeaderMessage = styled('div')`
+    flex-basis: 100%;
 `;
 
 const RunHeaderActions = styled('div')`

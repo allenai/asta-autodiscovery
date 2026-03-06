@@ -267,4 +267,3 @@ const StyledMarkdown = styled(Markdown)`
         margin-top: 0;
     }
 `;
-

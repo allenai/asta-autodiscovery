@@ -290,7 +290,6 @@ export const ExperimentActionButton = styled(IconButton)`
     }
 `;
 
-
 export const LargeScreenAction = styled('div')`
     @container panel-container (width < 1000px) {
         display: none;

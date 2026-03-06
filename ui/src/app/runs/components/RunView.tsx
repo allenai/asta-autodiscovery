@@ -386,14 +386,14 @@ function RunViewContent({
                         {isRunning && (
                             <RunHeaderMessage>
                                 <Typography variant="caption">
-                                    AutoDiscovery is running. New findings will populate the
-                                    table below automatically. You can click on any hypothesis
-                                    to review the details while the run continues.
+                                    AutoDiscovery is running. New findings will populate the table
+                                    below automatically. You can click on any hypothesis to review
+                                    the details while the run continues.
                                 </Typography>
                                 <br />
                                 <Typography variant="caption">
-                                    Feel free to navigate away; your results will be here when
-                                    the analysis is complete.
+                                    Feel free to navigate away; your results will be here when the
+                                    analysis is complete.
                                 </Typography>
                             </RunHeaderMessage>
                         )}
@@ -514,9 +514,7 @@ function RunViewContent({
                                         <LargeScreenAction>
                                             <ExperimentActionButton
                                                 onClick={() =>
-                                                    setIsExpPanelExpanded(
-                                                        !isExpPanelExpanded
-                                                    )
+                                                    setIsExpPanelExpanded(!isExpPanelExpanded)
                                                 }
                                                 size="small">
                                                 {isExpPanelExpanded ? (

@@ -185,7 +185,7 @@ export const RunPanel = styled('div')`
     flex: 0 1 auto;
     min-width: 0;
     width: var(--run-panel-width, 700px);
-    background-color: #163638f3;
+    background-color: #163638f9;
     border-radius: 12px;
     display: flex;
     flex-direction: column;
@@ -213,7 +213,7 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $isClosing?
     flex: 0 1 auto;
     max-width: ${({ $isExpanded }) =>
         $isExpanded ? 'initial' : 'var(--experiment-panel-width, 500px)'};
-    background-color: #163638f3;
+    background-color: #163638f9;
     border-radius: 12px;
     position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
     overflow-y: auto;
@@ -273,14 +273,21 @@ export const ExperimentPanelBackdrop = styled('div')<{ $isVisible: boolean }>`
 
 export const ExperimentActions = styled('div')`
     display: flex;
+    align-items: center;
     gap: ${({ theme }) => theme.spacing(1)};
-    position: absolute;
-    top: ${({ theme }) => theme.spacing(2)};
-    right: ${({ theme }) => theme.spacing(2)};
 `;
 
 export const ExperimentActionButton = styled(IconButton)`
-    color: ${({ theme }) => theme.color['cream-50'].rgba.toString()};
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+
+    &:hover {
+        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
 `;
 
 export const LargeScreenAction = styled('div')`

@@ -61,19 +61,21 @@ export const TopSurprisalsListImpl = () => {
                         <Bookmark>
                             <ExperimentBookmarkControl experiment={experiment} />
                         </Bookmark>
-                        <Description>
-                            <Belief>
-                                It's{' '}
-                                <BeliefLabel>
-                                    {getPriorAndPosteriorLabel(experiment.posterior)}
-                                </BeliefLabel>{' '}
-                                that:{' '}
-                            </Belief>
-                            <Hypothesis>{experiment.hypothesis}</Hypothesis>
-                        </Description>
-                        <Link className="view-details">
-                            View details <ArrowForwardIcon fontSize="small" />
-                        </Link>
+                        <ItemContent>
+                            <Description>
+                                <Belief>
+                                    It's{' '}
+                                    <BeliefLabel>
+                                        {getPriorAndPosteriorLabel(experiment.posterior)}
+                                    </BeliefLabel>{' '}
+                                    that:{' '}
+                                </Belief>
+                                <Hypothesis>{experiment.hypothesis}</Hypothesis>
+                            </Description>
+                            <Link className="view-details">
+                                View details <ArrowForwardIcon fontSize="small" />
+                            </Link>
+                        </ItemContent>
                     </Item>
                 ))}
             </List>
@@ -121,7 +123,8 @@ const List = styled('ul')`
 `;
 
 const Item = styled('li')<{ $isSelected?: boolean }>`
-    padding: 14px 16px 12px 16px;
+    display: flex;
+    align-items: stretch;
     background-color: ${({ theme }) => theme.color['cream-100'].hex}0C;
     border: 1px solid ${({ theme }) => theme.color['cream-100'].hex}2F;
     border-radius: 4px;
@@ -151,9 +154,15 @@ const Item = styled('li')<{ $isSelected?: boolean }>`
 `;
 
 const Bookmark = styled('div')`
-    position: absolute;
-    bottom: 0px;
-    right: 0px;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 8px;
+    padding-left: 6px;
+`;
+
+const ItemContent = styled('div')`
+    flex: 1;
+    padding: 14px 16px 12px 0;
 `;
 
 const Description = styled('div')``;
@@ -178,11 +187,12 @@ const Link = styled('div')`
 
 const ExpandListButton = styled(Button)`
     margin-top: ${({ theme }) => theme.spacing(1)};
-    color: ${({ theme }) => theme.color['green-30'].hex};
-    border-color: ${({ theme }) => theme.color['green-30'].hex}CC;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    border-color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    cursor: pointer;
 
     &:hover {
-        color: ${({ theme }) => theme.color['green-100'].hex};
-        border-color: ${({ theme }) => theme.color['green-100'].hex};
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+        border-color: ${({ theme }) => theme.color['cream-40'].rgba.toString()};
     }
 `;

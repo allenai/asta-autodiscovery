@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, ReactNode } from 'react';
 import { styled, Typography, Box, Stack } from '@mui/material';
 import { Markdown } from '@allenai/varnish2/components';
 
@@ -17,10 +17,12 @@ import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
+    actions?: ReactNode;
 };
 
 export const ExperimentDetails = memo(function ExperimentDetails({
     experiment,
+    actions,
 }: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
@@ -29,10 +31,11 @@ export const ExperimentDetails = memo(function ExperimentDetails({
     return (
         <DetailsWrapper spacing={0}>
             <TitleWrapper>
-                <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
                 <Bookmark>
                     <ExperimentBookmarkControl experiment={experiment} />
                 </Bookmark>
+                <ExperimentName>Experiment ID: {experiment.idInRun}</ExperimentName>
+                {actions && <TitleActions>{actions}</TitleActions>}
             </TitleWrapper>
             <ContentWrapper spacing={2}>
                 {experiment.status !== 'SUCCEEDED' && (
@@ -167,7 +170,11 @@ const DetailsWrapper = styled(Stack)`
 `;
 
 const TitleWrapper = styled('div')`
-    padding: ${({ theme }) => theme.spacing(3)};
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 12px;
+    padding: 24px;
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
 `;
 
@@ -186,9 +193,21 @@ const ExperimentName = styled('h2')`
     vertical-align: middle;
 `;
 
+const TitleActions = styled('div')`
+    display: flex;
+    align-items: center;
+    gap: ${({ theme }) => theme.spacing(1)};
+    margin-left: auto;
+`;
+
 const Bookmark = styled('div')`
     display: inline-block;
     vertical-align: middle;
+    margin-left: -12px;
+
+    .MuiIconButton-root {
+        padding: 0px 8px 1px 8px;
+    }
 `;
 
 const SectionHeader = styled(Typography)`

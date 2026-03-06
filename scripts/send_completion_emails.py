@@ -138,15 +138,13 @@ def count_high_surprisal(
     userid: str,
     runid: str,
     config: JobConfig,
-    threshold: float,
 ) -> tuple[int, int] | None:
-    """Count experiments with surprisal above threshold.
+    """Count experiments flagged as surprising by the algorithm.
 
     Args:
         userid: User identifier
         runid: Run/job identifier
         config: Job configuration
-        threshold: Surprisal threshold (surprisal_width from run parameters)
 
     Returns:
         Tuple of (high_surprisal_count, total_experiments), or None if loading fails
@@ -157,13 +155,12 @@ def count_high_surprisal(
         total = len(filenames)
         high_count = 0
 
-        # Count experiments with high surprisal
+        # Count experiments with high surprisal, using the same `surprising`
+        # boolean flag the UI uses (set by the algorithm via belief_change >= width).
         for filename in filenames:
             node_data = read_experiment_node(userid, runid, filename, config)
-            if node_data:
-                surprisal = node_data.get("normalized_surprisal")
-                if surprisal is not None and surprisal > threshold:
-                    high_count += 1
+            if node_data and node_data.get("surprising"):
+                high_count += 1
 
         return (high_count, total)
     except Exception as e:
@@ -311,10 +308,9 @@ def send_completion_emails(
                 surprisal_width = None
                 if status == "SUCCEEDED" and metadata:
                     surprisal_width = metadata.get("surprisal_width")
-                    if surprisal_width is not None:
-                        result = count_high_surprisal(userid, runid, config, surprisal_width)
-                        if result:
-                            high_surprisal_count, total_experiments = result
+                    result = count_high_surprisal(userid, runid, config)
+                    if result:
+                        high_surprisal_count, total_experiments = result
 
                 # Build email content
                 subject = build_email_subject(status, run_name)

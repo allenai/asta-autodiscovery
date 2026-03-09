@@ -100,7 +100,6 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                     if (params.row.isSkeleton) {
                         return <StyledSkeleton variant="text" width="100%" />;
                     }
-                    const isVisited = params.row.isVisited;
                     return (
                         <HypothesisCell>
                             <HypothesisText>

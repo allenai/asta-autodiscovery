@@ -31,11 +31,27 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         lastError,
         selectExperiment,
         selectedExperiment,
+        runid,
         hasJobCompleted,
         shouldScrollToSelected,
     } = useRunExperiments();
+    const storageKey = runid ? `visited_hypotheses_${runid}` : 'visited_hypotheses_default';
     const { isExperimentBookmarksEnabled, bookmarkedExperimentIds } = useExperimentBookmarks();
-    const [visitedIds, setVisitedIds] = useState<Set<string | number>>(new Set());
+    const [visitedIds, setVisitedIds] = useState<Set<number>>(() => {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                return new Set(JSON.parse(saved));
+            } catch (e) {
+                return new Set();
+            }
+        }
+        return new Set();
+    });
+    useEffect(() => {
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(visitedIds)));
+    }, [visitedIds, storageKey]);
+
     useEffect(() => {
         if (selectedExperiment?.idInRun) {
             setVisitedIds((prev) => {

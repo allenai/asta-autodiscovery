@@ -20,7 +20,6 @@ import { TEST_ID_EXPERIMENTS_TABLE } from '@/testIds';
 
 const DEFAULT_PAGE_SIZE = -1;
 
-
 interface ExperimentsTableProps {
     runStats?: RunStats | null;
 }
@@ -102,9 +101,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                     }
                     return (
                         <HypothesisCell>
-                            <HypothesisText>
-                                {params.value}
-                            </HypothesisText>
+                            <HypothesisText>{params.value}</HypothesisText>
                         </HypothesisCell>
                     );
                 },

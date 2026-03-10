@@ -36,7 +36,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     } = useRunExperiments();
     const storageKey = runid ? `visited_hypotheses_${runid}` : 'visited_hypotheses_default';
     const { isExperimentBookmarksEnabled, bookmarkedExperimentIds } = useExperimentBookmarks();
-    const [visitedIds, setVisitedIds] = useState<Set<number>>(() => {
+    const [visitedIds, setVisitedIds] = useState<Set<string | number>>(() => {
         const saved = localStorage.getItem(storageKey);
         if (saved) {
             try {

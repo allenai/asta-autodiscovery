@@ -458,15 +458,8 @@ def run_mcts(
         TEMP_LOG = []
 
         total_to_sample = max_iterations
-        n_root_iteration = 1 if len(nodes_by_level[1]) == 0 else 0
-        warmstart_remaining = max(0, n_warmstart - len(nodes_by_level[2]))
-        remaining_after_warmstart = max(0, total_to_sample - n_root_iteration - warmstart_remaining)
-        n_iterations = (
-            n_root_iteration
-            + math.ceil(warmstart_remaining / batch_size)
-            + math.ceil(remaining_after_warmstart / batch_size)
-        )
         n_sampled = 0
+        iteration_idx = 0
         node_mutation_locks: dict[str, threading.Lock] = {}
         node_mutation_locks_guard = threading.Lock()
 
@@ -480,17 +473,19 @@ def run_mcts(
                     node_mutation_locks[node_key] = lock
             return lock
 
-        for iteration_idx in range(n_iterations):
+        while n_sampled < total_to_sample:
+            iteration_idx += 1
             # MCTS SELECTION, EXPANSION, and EXECUTION
-            print(f"\n\n######### ITERATION {iteration_idx + 1} / {n_iterations} #########\n")
+            print(f"\n\n######### ITERATION {iteration_idx} #########\n")
 
+            remaining_budget = total_to_sample - n_sampled
             next_nodes = select_nodes(
                 selection_method,
                 root,
                 nodes_by_level,
                 n_warmstart,
-                return_n=batch_size,
-            )[: total_to_sample - n_sampled]
+                return_n=min(batch_size, remaining_budget),
+            )[:remaining_budget]
             if not next_nodes:
                 break
             print(
@@ -528,6 +523,8 @@ def run_mcts(
                             experiment_generator=experiment_generator
                         )
                         if new_query is None:
+                            if not parent_node.untried_experiments:
+                                parent_node.allow_generate_experiments = False
                             print(
                                 f"No new experiment generated for node {parent_node.level}_{parent_node.node_idx}. "
                                 "Skipping this iteration."

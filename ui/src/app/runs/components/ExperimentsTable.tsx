@@ -20,134 +20,6 @@ import { TEST_ID_EXPERIMENTS_TABLE } from '@/testIds';
 
 const DEFAULT_PAGE_SIZE = -1;
 
-const DEFAULT_COLUMNS: GridColDef[] = [
-    {
-        field: 'isBookmarked',
-        headerName: '',
-        width: 40,
-        minWidth: 40,
-        align: 'center',
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
-        resizable: false,
-        headerClassName: 'bookmark-column-header',
-        renderCell: (params: GridRenderCellParams) => {
-            return <ExperimentBookmarkControl experiment={params.row.experiment} />;
-        },
-    },
-    {
-        field: 'id',
-        headerName: 'ID',
-        align: 'left',
-        width: 45,
-        minWidth: 45,
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="90%" />;
-            }
-            return params.value;
-        },
-    },
-    {
-        field: 'hypothesis',
-        headerName: 'Experiment Hypothesis',
-        flex: 3,
-        minWidth: 0,
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="100%" />;
-            }
-            return (
-                <HypothesisCell>
-                    <HypothesisText>{params.value}</HypothesisText>
-                </HypothesisCell>
-            );
-        },
-    },
-    {
-        field: 'surprisal',
-        headerName: 'Surprisal',
-        flex: 1,
-        minWidth: 70,
-        maxWidth: 90,
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="70%" />;
-            }
-            const isSurprising = params.row.isSurprising;
-            return (
-                <Box
-                    sx={(theme) => ({
-                        color: isSurprising
-                            ? theme.color['warning-orange-100'].hex
-                            : theme.color['cream-100'].hex,
-                        fontWeight: isSurprising ? 700 : 'normal',
-                        textAlign: 'right',
-                    })}>
-                    {params.value?.toFixed(3) ?? 'N/A'}
-                </Box>
-            );
-        },
-    },
-    {
-        field: 'prior',
-        headerName: 'Belief Before',
-        align: 'center',
-        flex: 1,
-        minWidth: 80,
-        maxWidth: 120,
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="80%" />;
-            }
-            const value = params.row.priorValue;
-            const label = params.value;
-            return (
-                <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
-                    <BeliefValue sx={{ cursor: 'pointer' }}>{label}</BeliefValue>
-                </Tooltip>
-            );
-        },
-    },
-    {
-        field: 'posterior',
-        headerName: 'Belief After',
-        align: 'center',
-        flex: 1,
-        minWidth: 80,
-        maxWidth: 120,
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="80%" />;
-            }
-            const value = params.row.posteriorValue;
-            const label = params.value;
-            return (
-                <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
-                    <BeliefValue sx={{ cursor: 'pointer' }}>{label}</BeliefValue>
-                </Tooltip>
-            );
-        },
-    },
-    {
-        field: 'direction',
-        headerName: 'Direction',
-        align: 'center',
-        flex: 1,
-        minWidth: 50,
-        maxWidth: 120,
-        resizable: false,
-        renderCell: (params: GridRenderCellParams) => {
-            if (params.row.isSkeleton) {
-                return <StyledSkeleton variant="text" width="60%" />;
-            }
-            const direction = params.value;
-            return <Box>{direction ?? 'N/A'}</Box>;
-        },
-    },
-];
-
 interface ExperimentsTableProps {
     runStats?: RunStats | null;
 }
@@ -158,18 +30,169 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         lastError,
         selectExperiment,
         selectedExperiment,
+        runid,
         hasJobCompleted,
         shouldScrollToSelected,
     } = useRunExperiments();
+    const storageKey = runid ? `visited_hypotheses_${runid}` : 'visited_hypotheses_default';
     const { isExperimentBookmarksEnabled, bookmarkedExperimentIds } = useExperimentBookmarks();
+    const [visitedIds, setVisitedIds] = useState<Set<string | number>>(() => {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                return new Set(JSON.parse(saved));
+            } catch (e) {
+                return new Set();
+            }
+        }
+        return new Set();
+    });
+    useEffect(() => {
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(visitedIds)));
+    }, [visitedIds, storageKey]);
+
+    useEffect(() => {
+        if (selectedExperiment?.idInRun) {
+            setVisitedIds((prev) => {
+                if (prev.has(selectedExperiment.idInRun)) return prev;
+                return new Set(prev).add(selectedExperiment.idInRun);
+            });
+        }
+    }, [selectedExperiment?.idInRun]);
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
-    const columns = useMemo(
-        () =>
-            isExperimentBookmarksEnabled
-                ? DEFAULT_COLUMNS
-                : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked'),
-        [isExperimentBookmarksEnabled]
-    );
+    const columns = useMemo(() => {
+        const DEFAULT_COLUMNS: GridColDef[] = [
+            {
+                field: 'isBookmarked',
+                headerName: '',
+                width: 40,
+                minWidth: 40,
+                align: 'center',
+                sortable: false,
+                filterable: false,
+                disableColumnMenu: true,
+                resizable: false,
+                headerClassName: 'bookmark-column-header',
+                renderCell: (params: GridRenderCellParams) => {
+                    return <ExperimentBookmarkControl experiment={params.row.experiment} />;
+                },
+            },
+            {
+                field: 'id',
+                headerName: 'ID',
+                align: 'left',
+                width: 45,
+                minWidth: 45,
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) {
+                        return <StyledSkeleton variant="text" width="90%" />;
+                    }
+                    return params.value;
+                },
+            },
+            {
+                field: 'hypothesis',
+                headerName: 'Experiment Hypothesis',
+                flex: 3,
+                minWidth: 0,
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) {
+                        return <StyledSkeleton variant="text" width="100%" />;
+                    }
+                    return (
+                        <HypothesisCell>
+                            <HypothesisText>{params.value}</HypothesisText>
+                        </HypothesisCell>
+                    );
+                },
+            },
+            {
+                field: 'surprisal',
+                headerName: 'Surprisal',
+                flex: 1,
+                minWidth: 70,
+                maxWidth: 90,
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) {
+                        return <StyledSkeleton variant="text" width="70%" />;
+                    }
+                    const isSurprising = params.row.isSurprising;
+                    return (
+                        <Box
+                            sx={(theme) => ({
+                                color: isSurprising
+                                    ? theme.color['warning-orange-100'].hex
+                                    : theme.color['cream-100'].hex,
+                                fontWeight: isSurprising ? 700 : 'normal',
+                                textAlign: 'right',
+                            })}>
+                            {params.value?.toFixed(3) ?? 'N/A'}
+                        </Box>
+                    );
+                },
+            },
+            {
+                field: 'prior',
+                headerName: 'Belief Before',
+                align: 'center',
+                flex: 1,
+                minWidth: 80,
+                maxWidth: 120,
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) {
+                        return <StyledSkeleton variant="text" width="80%" />;
+                    }
+                    const value = params.row.priorValue;
+                    const label = params.value;
+                    return (
+                        <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
+                            <BeliefValue sx={{ cursor: 'pointer' }}>{label}</BeliefValue>
+                        </Tooltip>
+                    );
+                },
+            },
+            {
+                field: 'posterior',
+                headerName: 'Belief After',
+                align: 'center',
+                flex: 1,
+                minWidth: 80,
+                maxWidth: 120,
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) {
+                        return <StyledSkeleton variant="text" width="80%" />;
+                    }
+                    const value = params.row.posteriorValue;
+                    const label = params.value;
+                    return (
+                        <Tooltip title={value?.toFixed(3) ?? 'N/A'} arrow>
+                            <BeliefValue sx={{ cursor: 'pointer' }}>{label}</BeliefValue>
+                        </Tooltip>
+                    );
+                },
+            },
+            {
+                field: 'direction',
+                headerName: 'Direction',
+                align: 'center',
+                flex: 1,
+                minWidth: 50,
+                maxWidth: 120,
+                resizable: false,
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) {
+                        return <StyledSkeleton variant="text" width="60%" />;
+                    }
+                    const direction = params.value;
+                    return <Box>{direction ?? 'N/A'}</Box>;
+                },
+            },
+        ];
+        return isExperimentBookmarksEnabled
+            ? DEFAULT_COLUMNS
+            : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked');
+    }, [isExperimentBookmarksEnabled, visitedIds]);
+
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
     const [paginationModel, setPaginationModel] = useState(() => {
@@ -289,9 +312,10 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
     const handleRowClick = useCallback(
         (params: any) => {
             // Don't allow clicking on skeleton rows
-            if (params.row.isSkeleton) {
-                return;
-            }
+            if (params.row.isSkeleton) return;
+
+            setVisitedIds((prev) => new Set(prev).add(params.id));
+
             const exp = experiments.find((exp) => exp.idInRun === params.id);
             if (exp) {
                 selectExperiment(exp, { scroll: false });
@@ -388,6 +412,10 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                     }}
                     pageSizeOptions={[5, 10, 25, 50, 100, { value: -1, label: 'All' }]}
                     sx={{ border: 0 }}
+                    getRowClassName={(params) => {
+                        if (params.row.isSkeleton) return '';
+                        return visitedIds.has(params.id) ? 'row-visited' : 'row-unvisited';
+                    }}
                     onRowClick={handleRowClick}
                     sortModel={sortModel}
                     onSortModelChange={handleSortModelChange}
@@ -495,6 +523,13 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
             outline: 'none',
         },
     },
+    '.row-unvisited .MuiDataGrid-cell[data-field="hypothesis"]': {
+        fontWeight: 700,
+    },
+
+    '.row-visited .MuiDataGrid-cell[data-field="hypothesis"]': {
+        fontWeight: 400,
+    },
 
     '.MuiDataGrid-row:nth-of-type(even)': {
         backgroundColor: theme.color['cream-4'].rgba.toString(),
@@ -557,7 +592,7 @@ const HypothesisCell = styled(Box)`
     container: hypothesis-cell / inline-size;
 `;
 
-const HypothesisText = styled('div')`
+const HypothesisText = styled(Box)`
     display: -webkit-box;
     line-height: 1.4;
     overflow: hidden;

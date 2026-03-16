@@ -169,8 +169,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                     justifyContent: 'center',
                     alignItems: 'center',
                     p: 3,
-                }}
-            >
+                }}>
                 <CircularProgress />
             </Box>
         );
@@ -345,8 +344,7 @@ function RunViewContent({
                         {
                             '--run-panel-width': runPanelWidthPx ? `${runPanelWidthPx}px` : '700px',
                         } as React.CSSProperties
-                    }
-                >
+                    }>
                     <RunHeader>
                         <Box sx={{ flex: '1 1 auto' }}>
                             <RunHeaderName>
@@ -362,8 +360,7 @@ function RunViewContent({
                                         {...mkBookmarkRunBtnAttrs({
                                             runId: run.id,
                                             isBookmarked: !checkRunBookmarked(run.id),
-                                        })}
-                                    >
+                                        })}>
                                         {checkRunBookmarked(run.id) ? (
                                             <BookmarkIcon />
                                         ) : (
@@ -381,8 +378,7 @@ function RunViewContent({
                                     onClick={onShareClick}
                                     size="small"
                                     variant="outlined"
-                                    startIcon={<ShareOutlinedIcon />}
-                                >
+                                    startIcon={<ShareOutlinedIcon />}>
                                     Share session
                                 </ShareSessionButton>
                             </RunHeaderActions>
@@ -410,8 +406,7 @@ function RunViewContent({
                                     <Link
                                         href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
                                         rel="noopener noreferrer"
-                                        target="_blank"
-                                    >
+                                        target="_blank">
                                         via this form.
                                     </Link>
                                 </Typography>
@@ -440,8 +435,7 @@ function RunViewContent({
                                     )
                                 }
                                 onClick={handleStop}
-                                disabled={cancelling}
-                            >
+                                disabled={cancelling}>
                                 {cancelling ? 'Stopping...' : 'Stop run'}
                             </StopButton>
                         )}
@@ -470,8 +464,7 @@ function RunViewContent({
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}
                                     data-test-id={TEST_ID_SESSION_CONFIG_BUTTON}
-                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}
-                                >
+                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session configuration
                                 </ParametersButton>
                             </RunToolbarButtons>
@@ -479,8 +472,7 @@ function RunViewContent({
 
                         <ExperimentsTable
                             runStats={run.stats}
-                            surprisalWidth={run.metadata?.surprisalWidth}
-                        />
+                            surprisalWidth={run.metadata?.surprisalWidth} />
                     </RunContent>
                     {isDragEnabled && (
                         <PanelDragHandle
@@ -508,8 +500,7 @@ function RunViewContent({
                                     ? `${expPanelWidthPx}px`
                                     : '500px',
                             } as React.CSSProperties
-                        }
-                    >
+                        }>
                         {selectedExperiment && (
                             <ExperimentDetails
                                 experiment={selectedExperiment}
@@ -519,8 +510,7 @@ function RunViewContent({
                                             onClick={onShareExperimentClick}
                                             size="small"
                                             variant="outlined"
-                                            startIcon={<ShareOutlinedIcon />}
-                                        >
+                                            startIcon={<ShareOutlinedIcon />}>
                                             Share experiment
                                         </ShareExperimentButton>
                                         <LargeScreenAction>
@@ -528,8 +518,7 @@ function RunViewContent({
                                                 onClick={() =>
                                                     setIsExpPanelExpanded(!isExpPanelExpanded)
                                                 }
-                                                size="small"
-                                            >
+                                                size="small">
                                                 {isExpPanelExpanded ? (
                                                     <CloseFullscreenOutlinedIcon fontSize="small" />
                                                 ) : (
@@ -543,8 +532,7 @@ function RunViewContent({
                                             data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
                                             {...mkCloseExperimentDetailsPanelAttrs({
                                                 runId: run.id,
-                                            })}
-                                        >
+                                            })}>
                                             <CloseIcon />
                                         </ExperimentActionButton>
                                     </>

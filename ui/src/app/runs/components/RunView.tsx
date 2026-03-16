@@ -470,7 +470,10 @@ function RunViewContent({
                             </RunToolbarButtons>
                         </RunToolbar>
 
-                        <ExperimentsTable runStats={run.stats} />
+                        <ExperimentsTable
+                            runStats={run.stats}
+                            surprisalWidth={run.metadata?.surprisalWidth}
+                        />
                     </RunContent>
                     {isDragEnabled && (
                         <PanelDragHandle

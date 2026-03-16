@@ -22,9 +22,10 @@ const DEFAULT_PAGE_SIZE = -1;
 
 interface ExperimentsTableProps {
     runStats?: RunStats | null;
+    surprisalWidth?: number | null;
 }
 
-export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
+export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableProps) {
     const {
         experiments,
         lastError,
@@ -278,7 +279,11 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
                     : experiment.surprise
                       ? Math.abs(experiment.surprise)
                       : experiment.surprise,
-                isSurprising: isInconclusiveOrFailed ? false : experiment.isSurprising,
+                isSurprising: isInconclusiveOrFailed
+                    ? false
+                    : surprisalWidth != null
+                      ? Math.abs(experiment.surprise ?? 0) >= surprisalWidth
+                      : experiment.isSurprising,
                 direction: isInconclusiveOrFailed
                     ? 'N/A'
                     : getSurprisalDirection(experiment.surprise),
@@ -293,7 +298,7 @@ export function ExperimentsTable({ runStats }: ExperimentsTableProps) {
         // Add skeleton rows for pending experiments if job is not completed
         const skeletonRows = createSkeletonRows();
         return [...experimentRows, ...skeletonRows];
-    }, [experiments, runStats, hasJobCompleted, bookmarkedExperimentIds]);
+    }, [experiments, runStats, hasJobCompleted, bookmarkedExperimentIds, surprisalWidth]);
 
     // Set up row selection based on selectedExperiment
     const rowSelectionModel: GridRowSelectionModel = useMemo(() => {

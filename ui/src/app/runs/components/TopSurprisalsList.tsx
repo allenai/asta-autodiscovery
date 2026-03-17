@@ -125,6 +125,7 @@ const List = styled('ul')`
 const Item = styled('li')<{ $isSelected?: boolean }>`
     display: flex;
     align-items: stretch;
+    padding-left: 14px;
     background-color: ${({ theme }) => theme.color['cream-100'].hex}0C;
     border: 1px solid ${({ theme }) => theme.color['cream-100'].hex}2F;
     border-radius: 4px;
@@ -157,7 +158,10 @@ const Bookmark = styled('div')`
     display: flex;
     align-items: flex-start;
     padding-top: 8px;
-    padding-left: 6px;
+
+    .MuiIconButton-root {
+        padding-left: 0;
+    }
 `;
 
 const ItemContent = styled('div')`

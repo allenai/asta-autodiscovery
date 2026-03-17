@@ -84,6 +84,10 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                 align: 'left',
                 width: 45,
                 minWidth: 45,
+                cellClassName: isExperimentBookmarksEnabled ? undefined : 'id-cell-no-bookmark',
+                headerClassName: isExperimentBookmarksEnabled
+                    ? undefined
+                    : 'id-header-no-bookmark',
                 renderCell: (params: GridRenderCellParams) => {
                     if (params.row.isSkeleton) {
                         return <StyledSkeleton variant="text" width="90%" />;
@@ -490,6 +494,10 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
 
     '.MuiDataGrid-cell[data-field="isBookmarked"]': {
         padding: 0,
+    },
+
+    '.id-cell-no-bookmark, .id-header-no-bookmark': {
+        paddingLeft: '12px',
     },
 
     '.MuiDataGrid-columnSeparator': {

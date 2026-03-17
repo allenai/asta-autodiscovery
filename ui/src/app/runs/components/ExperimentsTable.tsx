@@ -85,9 +85,7 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                 width: 45,
                 minWidth: 45,
                 cellClassName: isExperimentBookmarksEnabled ? undefined : 'id-cell-no-bookmark',
-                headerClassName: isExperimentBookmarksEnabled
-                    ? undefined
-                    : 'id-header-no-bookmark',
+                headerClassName: isExperimentBookmarksEnabled ? undefined : 'id-header-no-bookmark',
                 renderCell: (params: GridRenderCellParams) => {
                     if (params.row.isSkeleton) {
                         return <StyledSkeleton variant="text" width="90%" />;

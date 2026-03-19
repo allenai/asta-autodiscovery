@@ -48,7 +48,7 @@ export CLOUDSDK_CORE_PROJECT=example-gcp-project
 gcloud run jobs create autodiscovery-replay-dev \
   --image us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:dev \
   --region us-west1 \
-  --service-account example-gcp-project@example-gcp-project.iam.gserviceaccount.com \
+  --service-account example-gcp-project-sa@example-gcp-project.iam.gserviceaccount.com \
   --max-retries 0 \
   --task-timeout 30m
 ```
@@ -58,7 +58,7 @@ gcloud run jobs create autodiscovery-replay-dev \
 gcloud run jobs create autodiscovery-replay-prod \
   --image us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:prod \
   --region us-west1 \
-  --service-account example-gcp-project@example-gcp-project.iam.gserviceaccount.com \
+  --service-account example-gcp-project-sa@example-gcp-project.iam.gserviceaccount.com \
   --max-retries 0 \
   --task-timeout 30m
 ```

@@ -19,7 +19,6 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
         ? description.split('.')[0] + '.'
         : description;
 
-
     // If the run belongs to a different user, use the /shared route
     const isSharedRun = authUser?.sub !== userid;
     const href = isSharedRun ? `/shared/${userid}/${id}` : `/runs/${id}`;

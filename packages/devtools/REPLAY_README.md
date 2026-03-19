@@ -81,7 +81,7 @@ execution_id = manager.run_job(userid, jobid, n_experiments=100)
 execution_id = manager.run_job(
     userid, jobid,
     test_mode=True,
-    replay_source="gs://example-gcp-project/users/template/jobs/melanoma/output",
+    replay_source="gs://example-bucket/users/template/jobs/melanoma/output",
     time_scale=0.1  # 10x faster for testing
 )
 ```
@@ -93,8 +93,8 @@ execution_id = manager.run_job(
 from autodiscovery.replay import replay_autodiscovery
 
 replay_autodiscovery(
-    source_path="gs://example-gcp-project/users/alice/jobs/melanoma/output",
-    target_path="gs://example-gcp-project/users/alice/jobs/test-run-123/output",
+    source_path="gs://example-bucket/users/alice/jobs/melanoma/output",
+    target_path="gs://example-bucket/users/alice/jobs/test-run-123/output",
     time_scale=0.1,  # 10x faster
     verbose=True
 )
@@ -104,8 +104,8 @@ replay_autodiscovery(
 
 ```
 Replay AutoDiscovery Run
-  Source: gs://example-gcp-project/users/alice/jobs/melanoma/output
-  Target: gs://example-gcp-project/users/bob/jobs/test-123/output
+  Source: gs://example-bucket/users/alice/jobs/melanoma/output
+  Target: gs://example-bucket/users/bob/jobs/test-123/output
   Files: 206
   Time scale: 0.1x
 

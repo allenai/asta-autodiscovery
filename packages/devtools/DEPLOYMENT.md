@@ -29,26 +29,26 @@ IMAGE_TAG=prod make push-replay-image
 ```bash
 # Build for linux/amd64 (required for Cloud Run)
 docker build --platform linux/amd64 \
-  -t us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay:dev \
+  -t us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:dev \
   -f packages/devtools/Dockerfile .
 
 # Push to Artifact Registry
-docker push us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay:dev
+docker push us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:dev
 ```
 
 ## Create Cloud Run Job
 
 ```bash
 # Set project
-export CLOUDSDK_CORE_PROJECT=example-legacy-project
+export CLOUDSDK_CORE_PROJECT=example-gcp-project
 ```
 
 **Development environment:**
 ```bash
 gcloud run jobs create autodiscovery-replay-dev \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay:dev \
+  --image us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:dev \
   --region us-west1 \
-  --service-account example-gcp-project@example-legacy-project.iam.gserviceaccount.com \
+  --service-account example-gcp-project@example-gcp-project.iam.gserviceaccount.com \
   --max-retries 0 \
   --task-timeout 30m
 ```
@@ -56,9 +56,9 @@ gcloud run jobs create autodiscovery-replay-dev \
 **Production environment:**
 ```bash
 gcloud run jobs create autodiscovery-replay-prod \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay:prod \
+  --image us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:prod \
   --region us-west1 \
-  --service-account example-gcp-project@example-legacy-project.iam.gserviceaccount.com \
+  --service-account example-gcp-project@example-gcp-project.iam.gserviceaccount.com \
   --max-retries 0 \
   --task-timeout 30m
 ```
@@ -69,8 +69,8 @@ gcloud run jobs create autodiscovery-replay-prod \
 ```bash
 gcloud run jobs execute autodiscovery-replay-dev \
   --region us-west1 \
-  --args="--source=gs://example-gcp-project/users/test/jobs/melanoma/output" \
-  --args="--target=gs://example-gcp-project/users/alice/jobs/test-123/output" \
+  --args="--source=gs://example-bucket/users/test/jobs/melanoma/output" \
+  --args="--target=gs://example-bucket/users/alice/jobs/test-123/output" \
   --args="--time-scale=0.1"
 ```
 
@@ -78,8 +78,8 @@ gcloud run jobs execute autodiscovery-replay-dev \
 ```bash
 gcloud run jobs execute autodiscovery-replay-prod \
   --region us-west1 \
-  --args="--source=gs://example-gcp-project/users/test/jobs/melanoma/output" \
-  --args="--target=gs://example-gcp-project/users/alice/jobs/test-123/output" \
+  --args="--source=gs://example-bucket/users/test/jobs/melanoma/output" \
+  --args="--target=gs://example-bucket/users/alice/jobs/test-123/output" \
   --args="--time-scale=0.1"
 ```
 
@@ -90,14 +90,14 @@ After a new image is pushed, update the Cloud Run Job to force it to pull the la
 **Development environment:**
 ```bash
 gcloud run jobs update autodiscovery-replay-dev \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay:dev \
+  --image us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:dev \
   --region us-west1
 ```
 
 **Production environment:**
 ```bash
 gcloud run jobs update autodiscovery-replay-prod \
-  --image us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay:prod \
+  --image us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay:prod \
   --region us-west1
 ```
 

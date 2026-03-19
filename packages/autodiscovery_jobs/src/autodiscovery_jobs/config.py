@@ -11,7 +11,7 @@ class JobConfig:
     """Configuration for Cloud Run job management."""
 
     # GCS Configuration
-    bucket: str = "example-gcp-project"
+    bucket: str = "autodiscovery"
     project_id: str | None = None  # Auto-detect from gcloud if None
 
     # Cloud Run Configuration

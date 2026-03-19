@@ -15,7 +15,7 @@ def test_manager_default_config():
     """Test JobManager with default config."""
     manager = JobManager()
     assert manager.config is not None
-    assert manager.config.bucket == "example-gcp-project"
+    assert manager.config.bucket == "autodiscovery"
 
 
 def test_get_user_path(mock_config):

@@ -14,7 +14,7 @@ def main() -> None:
     """Run a basic sandbox execution and list the dataset mount."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     app_name = os.environ.get("MODAL_APP_NAME", "asta-autodiscovery")
-    bucket = os.environ.get("GCS_BUCKET", "example-gcp-project")
+    bucket = os.environ.get("GCS_BUCKET", "autodiscovery")
     key_prefix = os.environ.get("GCS_PREFIX", "samples/")
     read_only = os.environ.get("GCS_READ_ONLY", "true").lower() == "true"
     bucket_endpoint_url = os.environ.get("GCS_ENDPOINT_URL", "https://storage.googleapis.com")

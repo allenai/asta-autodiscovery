@@ -15,6 +15,9 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
     const { user: authUser } = useAuth0();
     const { id, userid, name, description } = run;
     const status = run.details?.status ?? RunStatus.UNKNOWN;
+    const shortDescription = description?.includes('.')
+        ? description.split('.')[0] + '.'
+        : description;
 
     // If the run belongs to a different user, use the /shared route
     const isSharedRun = authUser?.sub !== userid;
@@ -30,7 +33,7 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
                 </LayoutIcon>
                 <LayoutContent>
                     <Title className="run-title">{name}</Title>
-                    {description && <Description>{description}</Description>}
+                    {description && <Description>{shortDescription}</Description>}
                     {run.stats &&
                         (run.stats.numSurprisingExperiments > 0 ||
                             run.stats.completedExperiments > 0 ||

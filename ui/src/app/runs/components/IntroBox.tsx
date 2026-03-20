@@ -13,15 +13,17 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
         <Wrapper $showLogin={showLogin}>
             <Title>AutoDiscovery</Title>
             <Subtitle>Uncover surprising insights hidden in your data.</Subtitle>
-            <Description>
-                AutoDiscovery uses <strong>Bayesian surprise</strong> to autonomously explore your
-                datasets. It identifies discoveries that genuinely change what we know, challenging
-                assumptions to inspire entirely new lines of inquiry.
-            </Description>
             {showLogin && (
-                <LoginButton onClick={onLoginClick} variant="contained" endIcon={<LoginIcon />}>
-                    Sign in to get started
-                </LoginButton>
+                <>
+                    <Description>
+                        AutoDiscovery uses <strong>Bayesian surprise</strong> to autonomously
+                        explore your datasets. It identifies discoveries that genuinely change what
+                        we know, challenging assumptions to inspire entirely new lines of inquiry.
+                    </Description>
+                    <LoginButton onClick={onLoginClick} variant="contained" endIcon={<LoginIcon />}>
+                        Sign in to get started
+                    </LoginButton>
+                </>
             )}
         </Wrapper>
     );
@@ -30,15 +32,18 @@ export const IntroBox = ({ showLogin = false, onLoginClick }: IntroBoxProps) => 
 const Wrapper = styled(Box, {
     shouldForwardProp: filterTransientProps,
 })<{ $showLogin: boolean }>(({ theme, $showLogin }) => ({
-    background: `radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%), #162D31`,
-    border: '1px solid rgba(250, 242, 233, 0.30)',
-    borderColor:
-        'radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%);',
-    borderRadius: theme.spacing(1.5),
+    background: $showLogin
+        ? `radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%), #162D31`
+        : 'none',
+    border: $showLogin ? '1px solid rgba(250, 242, 233, 0.30)' : 'none',
+    borderColor: $showLogin
+        ? 'radial-gradient(155.14% 72.67% at 50% 100%, rgba(36, 84, 85, 0.4) 0%, rgba(36, 84, 85, 0.00) 100%), linear-gradient(93deg, rgba(15, 203, 140, 0.10) -26.7%, rgba(15, 203, 140, 0.00) 114.84%);'
+        : 'transparent',
+    borderRadius: $showLogin ? theme.spacing(1.5) : 0,
     color: theme.color['cream-100'].hex,
     fontSize: '1.125rem',
     marginTop: $showLogin ? '72px' : 'initial',
-    padding: theme.spacing(4.5),
+    padding: $showLogin ? theme.spacing(4.5) : 0,
     container: 'intro-box / inline-size',
 
     '@media (max-width: 600px)': {

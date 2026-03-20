@@ -351,6 +351,11 @@ function RunViewContent({
                                 {isRunBookmarksEnabled && (
                                     <BookmarkButton
                                         size="small"
+                                        aria-label={
+                                            checkRunBookmarked(run.id)
+                                                ? 'Remove bookmark'
+                                                : 'Bookmark this session'
+                                        }
                                         $isBookmarked={checkRunBookmarked(run.id)}
                                         onClick={() =>
                                             updateRunBookmark(run.id, {
@@ -516,6 +521,11 @@ function RunViewContent({
                                         </ShareExperimentButton>
                                         <LargeScreenAction>
                                             <ExperimentActionButton
+                                                aria-label={
+                                                    isExpPanelExpanded
+                                                        ? 'Collapse panel'
+                                                        : 'Expand panel'
+                                                }
                                                 onClick={() =>
                                                     setIsExpPanelExpanded(!isExpPanelExpanded)
                                                 }
@@ -528,6 +538,7 @@ function RunViewContent({
                                             </ExperimentActionButton>
                                         </LargeScreenAction>
                                         <ExperimentActionButton
+                                            aria-label="Close experiment details"
                                             onClick={handleClosePanel}
                                             size="small"
                                             data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}

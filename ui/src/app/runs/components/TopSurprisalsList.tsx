@@ -51,13 +51,22 @@ export const TopSurprisalsListImpl = () => {
                     <Item
                         key={experiment.experimentId}
                         data-test-id={TEST_ID_TOP_SURPRISALS_ITEM}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View experiment: ${experiment.hypothesis}`}
                         $isSelected={selectedExperiment?.experimentId === experiment.experimentId}
                         data-selected={
                             selectedExperiment?.experimentId === experiment.experimentId
                                 ? 'true'
                                 : undefined
                         }
-                        onClick={() => selectExperiment(experiment, { scroll: false })}>
+                        onClick={() => selectExperiment(experiment, { scroll: false })}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                selectExperiment(experiment, { scroll: false });
+                            }
+                        }}>
                         <Bookmark>
                             <ExperimentBookmarkControl experiment={experiment} />
                         </Bookmark>

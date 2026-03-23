@@ -26,7 +26,7 @@ def run_replay_job(
         userid: User identifier
         jobid: Job identifier
         source_path: Source GCS path containing template run files (e.g., gs://bucket/users/test/jobs/melanoma/output)
-        target_bucket: Target GCS bucket name (e.g., "example-gcp-project")
+        target_bucket: Target GCS bucket name (e.g., "autodiscovery")
         time_scale: Time multiplier (0.1 = 10x faster, default=0.1)
         project_id: GCP project ID (auto-detected from environment if None)
         region: GCP region (default: us-west1)
@@ -41,8 +41,8 @@ def run_replay_job(
         >>> execution_id = run_replay_job(
         ...     userid="alice",
         ...     jobid="test-123",
-        ...     source_path="gs://example-gcp-project/users/test/jobs/melanoma/output",
-        ...     target_bucket="example-gcp-project",
+        ...     source_path="gs://example-bucket/users/test/jobs/melanoma/output",
+        ...     target_bucket="autodiscovery",
         ...     time_scale=0.1
         ... )
     """

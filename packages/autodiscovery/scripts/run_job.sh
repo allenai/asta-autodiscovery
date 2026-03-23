@@ -14,19 +14,19 @@
 # After the job completes, view and download results:
 #
 #   # List all output files
-#   gsutil ls gs://example-gcp-project/users/user123/jobs/job1/output/
+#   gsutil ls gs://example-bucket/users/user123/jobs/job1/output/
 #
 #   # List output files recursively
-#   gsutil ls -r gs://example-gcp-project/users/user123/jobs/job1/output/
+#   gsutil ls -r gs://example-bucket/users/user123/jobs/job1/output/
 #
 #   # Download all outputs to local directory
-#   gsutil -m cp -r gs://example-gcp-project/users/user123/jobs/job1/output/ ./local_output/
+#   gsutil -m cp -r gs://example-bucket/users/user123/jobs/job1/output/ ./local_output/
 #
 #   # Download a specific file
-#   gsutil cp gs://example-gcp-project/users/user123/jobs/job1/output/results.json ./results.json
+#   gsutil cp gs://example-bucket/users/user123/jobs/job1/output/results.json ./results.json
 #
 #   # View a specific file without downloading
-#   gsutil cat gs://example-gcp-project/users/user123/jobs/job1/output/log.txt
+#   gsutil cat gs://example-bucket/users/user123/jobs/job1/output/log.txt
 #
 # View job execution logs:
 #   gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=autodiscovery-job" --limit 50

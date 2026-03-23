@@ -20,7 +20,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  IMAGE_NAME: us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery
+  IMAGE_NAME: us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery
 
 jobs:
   build-and-push:

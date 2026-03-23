@@ -319,7 +319,7 @@ manager.run_job(
 The package creates and manages the following structure:
 
 ```
-gs://example-gcp-project/
+gs://example-bucket/
 └── users/
     └── {userid}/
         └── jobs/

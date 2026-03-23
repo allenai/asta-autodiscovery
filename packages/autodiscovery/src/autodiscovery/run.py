@@ -354,7 +354,7 @@ def run_mcts(
         reward_mode: Mode for reward calculation (belief, kl, or belief_and_kl).
         warmstart_experiments: Path to JSON file with warmstart experiments to run after data loading but before MCTS selection.
         use_modal_sandbox: Whether to use ModalSandboxIPythonBackend for code execution.
-        bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-gcp-project/discoverybench/).
+        bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/).
         vision_model: Model used for image analysis in code execution.
         batch_size: Number of nodes to select and expand per iteration.
         n_threads: Number of threads to use for parallel node expansion.

@@ -730,7 +730,7 @@ def install(package):
 
         # Calculate the working directory for the dataset
         # The bucket_path already points to the dataset directory
-        # e.g., gs://example-gcp-project/discoverybench/nls_ses
+        # e.g., gs://example-bucket/discoverybench/nls_ses
         # When mounted at /data, files are directly at /data/
         modal_mount_path = "/data"
         modal_working_dir = modal_mount_path

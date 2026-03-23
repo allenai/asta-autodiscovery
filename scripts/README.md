@@ -34,7 +34,7 @@ See [INFRASTRUCTURE.md](../INFRASTRUCTURE.md) for Cloud Run job and scheduler cr
 Deletes user-uploaded dataset files older than 7 days from GCS to comply with data retention policies.
 
 **What it deletes:**
-- Files matching: `gs://example-gcp-project/users/*/jobs/*/data/*`
+- Files matching: `gs://example-bucket/users/*/jobs/*/data/*`
 - Older than 7 days (based on GCS creation time)
 
 ### Local Usage
@@ -56,7 +56,7 @@ See [INFRASTRUCTURE.md](../INFRASTRUCTURE.md) for Cloud Run job and scheduler cr
 
 ## Docker Images
 
-All scripts are packaged into a single container image: `us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts`
+All scripts are packaged into a single container image: `us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-scripts`
 
 ### Image Tagging Strategy
 
@@ -90,8 +90,8 @@ IMAGE_TAG=my-tag make push-scripts-image
 
 Using Docker directly:
 ```bash
-docker build --platform linux/amd64 -t us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev -f scripts/Dockerfile .
-docker push us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts:dev
+docker build --platform linux/amd64 -t us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-scripts:dev -f scripts/Dockerfile .
+docker push us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-scripts:dev
 ```
 
 Note: `--platform linux/amd64` is required for Cloud Run compatibility (especially when building on Apple Silicon).

@@ -59,9 +59,9 @@ build-ui:
 
 # Image build/push targets
 IMAGE_TAG ?= dev
-SCRIPTS_IMAGE = us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-scripts
-REPLAY_IMAGE = us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery-replay
-AUTODISCOVERY_IMAGE = us-west1-docker.pkg.dev/example-legacy-project/autodiscovery/autodiscovery
+SCRIPTS_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-scripts
+REPLAY_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay
+AUTODISCOVERY_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery
 
 build-scripts-image:
 	docker build \
@@ -79,20 +79,20 @@ update-scripts-jobs:
 		gcloud run jobs update autodiscovery-send-emails-dev \
 			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project && \
+			--project example-gcp-project && \
 		gcloud run jobs update autodiscovery-dataset-cleanup-dev \
 			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project; \
+			--project example-gcp-project; \
 	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
 		gcloud run jobs update autodiscovery-send-emails-prod \
 			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project && \
+			--project example-gcp-project && \
 		gcloud run jobs update autodiscovery-dataset-cleanup-prod \
 			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project; \
+			--project example-gcp-project; \
 	else \
 		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
 		exit 1; \
@@ -114,12 +114,12 @@ update-replay-job:
 		gcloud run jobs update autodiscovery-replay-dev \
 			--image $(REPLAY_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project; \
+			--project example-gcp-project; \
 	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
 		gcloud run jobs update autodiscovery-replay-prod \
 			--image $(REPLAY_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project; \
+			--project example-gcp-project; \
 	else \
 		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
 		exit 1; \
@@ -149,12 +149,12 @@ update-autodiscovery-job:
 		gcloud run jobs update autodiscovery-job-dev \
 			--image $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project; \
+			--project example-gcp-project; \
 	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
 		gcloud run jobs update autodiscovery-job-prod \
 			--image $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
-			--project example-legacy-project; \
+			--project example-gcp-project; \
 	else \
 		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
 		exit 1; \

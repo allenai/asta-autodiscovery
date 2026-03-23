@@ -15,7 +15,7 @@ wheels/
 .coverage
 
 # Environment variables
-.envrc
+.envrc*
 
 # Google ADK
 .adk/

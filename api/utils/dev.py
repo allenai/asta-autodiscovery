@@ -5,7 +5,7 @@ from devtools.cloudrun import run_replay_job
 # Source path for simulated runs - template files to replay
 # This should be a real run because the replay is based on the file creation times,
 # and also then the data shape will be realistic.
-REPLAY_SOURCE_PATH = "gs://example-gcp-project/users/samples/jobs/nls_bmi/output"
+REPLAY_SOURCE_PATH = "gs://example-bucket/users/samples/jobs/nls_bmi/output"
 
 # Time scale for replay (0.1 = 10x faster than original)
 REPLAY_TIME_SCALE = 0.1

@@ -216,7 +216,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--bucket_path",
             type=str,
-            help="GCS bucket path for Modal sandbox (e.g., gs://example-gcp-project/discoverybench/)",
+            help="GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/)",
         )
         self.add_argument(
             "--run_eda",

@@ -943,7 +943,7 @@ def generate_upload_url(
         >>> result['upload_url']
         'https://storage.googleapis.com/...'
         >>> result['gcs_path']
-        'gs://example-gcp-project/users/user123/jobs/job456/data/data.csv'
+        'gs://example-bucket/users/user123/jobs/job456/data/data.csv'
     """
     from datetime import timedelta
 

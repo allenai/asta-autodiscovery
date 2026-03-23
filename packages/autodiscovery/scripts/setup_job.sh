@@ -20,7 +20,7 @@
 #   ./scripts/setup_job.sh exampleuser job2 ./discoverybench/real/test/nls_ses/nls_ses_processed.csv ./discoverybench/real/test/nls_ses/metadata.json
 #
 # This creates the following structure in GCS:
-#   gs://example-gcp-project/users/exampleuser/jobs/job1/
+#   gs://example-bucket/users/exampleuser/jobs/job1/
 #   ├── data/                    # Dataset files (mounted in Modal sandbox)
 #   │   ├── nls_ses_processed.csv
 #   │   └── ...

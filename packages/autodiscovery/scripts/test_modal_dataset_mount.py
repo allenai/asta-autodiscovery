@@ -11,13 +11,13 @@ def test_mount():
     """Test mounting a specific dataset directory."""
     # Configuration
     app_name = os.environ.get("MODAL_APP_NAME", "asta-autodiscovery")
-    bucket = "example-gcp-project"
+    bucket = "autodiscovery"
     secret_name = os.environ.get("MODAL_BUCKET_SECRET", "example-bucket-secret")
     bucket_endpoint_url = os.environ.get("GCS_ENDPOINT_URL", "https://storage.googleapis.com")
 
     # Test case: nls_ses dataset
     # Local path: discoverybench/real/test/nls_ses/nls_ses_processed.csv
-    # We want to mount: gs://example-gcp-project/discoverybench/real/test/ at /data
+    # We want to mount: gs://example-bucket/discoverybench/real/test/ at /data
     # So files will be at: /data/nls_ses/nls_ses_processed.csv
 
     key_prefix = "discoverybench/"

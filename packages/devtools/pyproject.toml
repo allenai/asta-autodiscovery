@@ -9,7 +9,6 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "google-cloud-storage",
-    "google-cloud-run",
 ]
 
 [project.optional-dependencies]

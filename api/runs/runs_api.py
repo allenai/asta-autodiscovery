@@ -87,9 +87,6 @@ try:
 except ImportError:
     JOBS_AVAILABLE = False
 
-# Trigger phrase in intent field that activates simulated run mode
-SIMULATE_RUN_TRIGGER = "%asta.simulate_run%"
-
 # Max size of files that can be uploaded
 UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
 UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = 100 * 1024 * 1024 * 1024  # 100GB for users with higher upload limit permission
@@ -764,53 +761,36 @@ def create() -> Blueprint:
             intent = metadata.get("intent", "")
             n_experiments = metadata.get("n_experiments")
 
-            # Check if this is a simulated run (replay mode)
-            is_simulated = SIMULATE_RUN_TRIGGER in intent
+            if n_experiments is None:
+                raise BadRequest("Number of Experiments is required in metadata")
 
-            if is_simulated:
-                # Run replay job instead of actual AutoDiscovery job
-                current_app.logger.info(f"Running replay job for {req.userid}/{req.runid}")
+            # Validate experiment count and sufficient credits before submission
+            check_experiment_limits(
+                n_experiments=n_experiments, userid=req.userid, config=manager.config
+            )
 
-                from utils.dev import run_simulated_job
+            # Build job parameters from metadata
+            job_params = {
+                "n_experiments": n_experiments,
+                "user_query": intent,
+            }
 
-                execution_id = run_simulated_job(
-                    userid=req.userid,
-                    jobid=req.runid,
-                    bucket=manager.config.bucket,
-                    project_id=manager.config.project_id,
-                    region=manager.config.region,
-                )
-            else:
-                if n_experiments is None:
-                    raise BadRequest("Number of Experiments is required in metadata")
+            # Add optional parameters if present in metadata
+            # Filter out None and empty strings, but allow 0 and other valid values
+            optional_params = [
+                "exploration_weight",
+                "mcts_selection",
+                "surprisal_width",
+                "evidence_weight",
+                "warmstart_experiments",
+                "n_warmstart",
+            ]
+            for param in optional_params:
+                value = metadata.get(param)
+                if value is not None and value != "":
+                    job_params[param] = value
 
-                # Validate experiment count and sufficient credits before submission
-                check_experiment_limits(
-                    n_experiments=n_experiments, userid=req.userid, config=manager.config
-                )
-
-                # Build job parameters from metadata
-                job_params = {
-                    "n_experiments": n_experiments,
-                    "user_query": intent,
-                }
-
-                # Add optional parameters if present in metadata
-                # Filter out None and empty strings, but allow 0 and other valid values
-                optional_params = [
-                    "exploration_weight",
-                    "mcts_selection",
-                    "surprisal_width",
-                    "evidence_weight",
-                    "warmstart_experiments",
-                    "n_warmstart",
-                ]
-                for param in optional_params:
-                    value = metadata.get(param)
-                    if value is not None and value != "":
-                        job_params[param] = value
-
-                execution_id = manager.run_job(req.userid, req.runid, **job_params)
+            execution_id = manager.run_job(req.userid, req.runid, **job_params)
 
             # Capture origin URL for email links (e.g., localhost vs production)
             origin_url = request.headers.get("Origin")

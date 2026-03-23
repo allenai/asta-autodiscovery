@@ -1,6 +1,5 @@
 .PHONY: test test-modal test-all lint format type-check modal-deploy sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
-        build-replay-image push-replay-image update-replay-job \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery
 
 # Test targets
@@ -60,7 +59,6 @@ build-ui:
 # Image build/push targets
 IMAGE_TAG ?= dev
 SCRIPTS_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-scripts
-REPLAY_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-replay
 AUTODISCOVERY_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery
 
 build-scripts-image:
@@ -91,33 +89,6 @@ update-scripts-jobs:
 			--project example-gcp-project && \
 		gcloud run jobs update autodiscovery-dataset-cleanup-prod \
 			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project; \
-	else \
-		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
-		exit 1; \
-	fi
-
-build-replay-image:
-	docker build \
-		--platform linux/amd64 \
-		-t $(REPLAY_IMAGE):$(IMAGE_TAG) \
-		-f packages/devtools/Dockerfile \
-		.
-
-push-replay-image: build-replay-image
-	docker push $(REPLAY_IMAGE):$(IMAGE_TAG)
-
-update-replay-job:
-	@echo "Updating Cloud Run job to use $(REPLAY_IMAGE):$(IMAGE_TAG)..."
-	@if [ "$(IMAGE_TAG)" = "dev" ]; then \
-		gcloud run jobs update autodiscovery-replay-dev \
-			--image $(REPLAY_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project; \
-	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
-		gcloud run jobs update autodiscovery-replay-prod \
-			--image $(REPLAY_IMAGE):$(IMAGE_TAG) \
 			--region us-west1 \
 			--project example-gcp-project; \
 	else \

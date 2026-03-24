@@ -775,7 +775,6 @@ name = "devtools"
 version = "0.1.0"
 source = { editable = "packages/devtools" }
 dependencies = [
-    { name = "google-cloud-run" },
     { name = "google-cloud-storage" },
 ]
 
@@ -787,7 +786,6 @@ cli = [
 [package.metadata]
 requires-dist = [
     { name = "code-execution", marker = "extra == 'cli'", editable = "packages/code_execution" },
-    { name = "google-cloud-run" },
     { name = "google-cloud-storage" },
 ]
 provides-extras = ["cli"]

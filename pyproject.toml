@@ -43,6 +43,7 @@ markers = [
 
 [tool.uv.workspace]
 members = [
+    "api",
     "packages/code_execution",
     "packages/agents",
     "packages/autodiscovery",

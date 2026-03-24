@@ -3,13 +3,13 @@ name = "api"
 version = "0.0.1"
 requires-python = ">=3.13"
 dependencies = [
-    "flask",
-    "gunicorn",
+    "flask==2.3.2",
+    "gunicorn==23.0.0",
     "python-json-logger>=2,<4",
-    "pyjwt",
-    "cryptography",
-    "requests",
-    "pydantic",
+    "pyjwt==2.8.0",
+    "cryptography==46.0.5",
+    "requests>=2.31.0",
+    "pydantic==2.12.5",
     "autodiscovery-jobs",
 ]
 

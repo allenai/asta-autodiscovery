@@ -11,7 +11,7 @@ dependencies = [
     "autodiscovery-modal",
     "code-execution",
     "google-adk>=1.21.0",
-    "litellm"
+    "litellm==1.80.11"
 ]
 
 [build-system]

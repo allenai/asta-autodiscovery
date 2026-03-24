@@ -1210,6 +1210,12 @@ def create() -> Blueprint:
             # Write back
             manager.upload_metadata(req.userid, req.runid, metadata_dict)
 
+            # Keep shared-run index in sync
+            if req.is_shared:
+                manager.write_shared_run_index(req.runid, req.userid)
+            else:
+                manager.delete_shared_run_index(req.runid)
+
             resp = ShareRunResponseModel(
                 is_shared=req.is_shared,
                 message="Run shared successfully" if req.is_shared else "Run unshared successfully",

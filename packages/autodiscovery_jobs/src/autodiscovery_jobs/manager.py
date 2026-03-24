@@ -281,6 +281,10 @@ class JobManager:
     def get_shared_run_owner(self, runid: str) -> str | None:
         """Get the owner userid for a shared run.
 
+        Uses a GCS index for O(1) lookups on warm paths. Falls back to a full
+        glob scan on index misses, and lazily populates the index when a shared
+        run is found so subsequent requests hit the fast path.
+
         Args:
             runid: Run identifier
 
@@ -291,9 +295,13 @@ class JobManager:
             Returns None for runs that don't exist OR exist but are not shared.
             This prevents information leakage about run existence.
         """
-        # Find who owns this run using existing GCS function
-        userid = gcs.get_userid_for_job(runid, self.config)
+        # Fast path: check the shared-run index
+        userid = gcs.get_shared_run_index(runid, self.config)
+        if userid is not None:
+            return userid
 
+        # Slow path: full glob scan across all users
+        userid = gcs.get_userid_for_job(runid, self.config)
         if userid is None:
             return None
 
@@ -301,12 +309,30 @@ class JobManager:
         try:
             metadata = self.get_metadata(userid, runid)
             if metadata and metadata.get("is_shared") is True:
+                # Lazily populate the index for next time
+                gcs.write_shared_run_index(runid, userid, self.config)
                 return userid
         except Exception:
-            # If we can't read metadata, treat as not shared
             pass
 
         return None
+
+    def write_shared_run_index(self, runid: str, userid: str) -> None:
+        """Write a shared run index entry.
+
+        Args:
+            runid: Run identifier
+            userid: User ID of the run owner
+        """
+        gcs.write_shared_run_index(runid, userid, self.config)
+
+    def delete_shared_run_index(self, runid: str) -> None:
+        """Remove a shared run index entry.
+
+        Args:
+            runid: Run identifier
+        """
+        gcs.delete_shared_run_index(runid, self.config)
 
     # Job execution
 

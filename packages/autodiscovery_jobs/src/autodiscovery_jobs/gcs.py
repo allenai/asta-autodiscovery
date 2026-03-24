@@ -181,6 +181,61 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
         raise GCSError(f"Failed to find user for job {jobid}: {e}")
 
 
+def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | None:
+    """Look up the owner of a shared run from the index.
+
+    Args:
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        User ID if an index entry exists, None otherwise
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    blob = bucket.blob(f"index/shared-runs/{jobid}")
+    try:
+        return blob.download_as_text()
+    except Exception:
+        return None
+
+
+def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = None) -> None:
+    """Write an index entry mapping a shared run to its owner.
+
+    Args:
+        jobid: Job identifier
+        userid: User ID of the run owner
+        config: Configuration (uses default if None)
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    blob = bucket.blob(f"index/shared-runs/{jobid}")
+    try:
+        blob.upload_from_string(userid)
+    except Exception:
+        pass  # Best-effort; the glob fallback covers misses
+
+
+def delete_shared_run_index(jobid: str, config: JobConfig | None = None) -> None:
+    """Remove a shared run index entry.
+
+    Args:
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    blob = bucket.blob(f"index/shared-runs/{jobid}")
+    try:
+        blob.delete()
+    except Exception:
+        pass  # Best-effort; entry may not exist
+
+
 def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool:
     """Check if a job directory exists.
 
@@ -279,6 +334,8 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
     except Exception as e:
         raise GCSError(f"Failed to delete job directory: {e}")
 
+    delete_shared_run_index(jobid, config)
+
 
 def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
     """Soft delete a job by removing user data but preserving results and metadata.
@@ -349,6 +406,8 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
             },
             config,
         )
+
+        delete_shared_run_index(jobid, config)
 
         return {
             "deleted_files": deleted_files,

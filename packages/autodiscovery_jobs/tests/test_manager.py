@@ -99,14 +99,28 @@ def test_upload_metadata(mock_config):
         mock_upload.assert_called_once_with("testuser", "job1", metadata, mock_config)
 
 
-def test_get_shared_run_owner_success(mock_config):
-    """Test get_shared_run_owner returns userid when run is shared."""
-    with patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata:
-        # Mock finding the owner
-        mock_get_userid.return_value = "testuser"
+def test_get_shared_run_owner_index_hit(mock_config):
+    """Test get_shared_run_owner returns userid immediately on index hit (fast path)."""
+    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid:
+        mock_index.return_value = "testuser"
 
-        # Mock metadata with is_shared=True
+        manager = JobManager(mock_config)
+        userid = manager.get_shared_run_owner("shared-run-123")
+
+        assert userid == "testuser"
+        mock_index.assert_called_once_with("shared-run-123", mock_config)
+        mock_get_userid.assert_not_called()
+
+
+def test_get_shared_run_owner_success(mock_config):
+    """Test get_shared_run_owner falls back to glob scan on index miss and lazily populates index."""
+    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
+         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata, \
+         patch("autodiscovery_jobs.gcs.write_shared_run_index") as mock_write_index:
+        mock_index.return_value = None  # index miss
+        mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"is_shared": True, "name": "Test Run"}
 
         manager = JobManager(mock_config)
@@ -115,30 +129,32 @@ def test_get_shared_run_owner_success(mock_config):
         assert userid == "testuser"
         mock_get_userid.assert_called_once_with("shared-run-123", mock_config)
         mock_get_metadata.assert_called_once_with("testuser", "shared-run-123", mock_config)
+        # Should lazily populate the index
+        mock_write_index.assert_called_once_with("shared-run-123", "testuser", mock_config)
 
 
 def test_get_shared_run_owner_not_shared(mock_config):
     """Test get_shared_run_owner returns None when run is not shared."""
-    with patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata:
-        # Mock finding the owner
+    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
+         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata, \
+         patch("autodiscovery_jobs.gcs.write_shared_run_index") as mock_write_index:
+        mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
-
-        # Mock metadata with is_shared=False
         mock_get_metadata.return_value = {"is_shared": False, "name": "Private Run"}
 
         manager = JobManager(mock_config)
         userid = manager.get_shared_run_owner("private-run-456")
 
         assert userid is None
-        mock_get_userid.assert_called_once()
-        mock_get_metadata.assert_called_once()
+        mock_write_index.assert_not_called()
 
 
 def test_get_shared_run_owner_not_found(mock_config):
     """Test get_shared_run_owner returns None when run doesn't exist."""
-    with patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid:
-        # Mock run not found
+    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid:
+        mock_index.return_value = None
         mock_get_userid.return_value = None
 
         manager = JobManager(mock_config)
@@ -150,12 +166,11 @@ def test_get_shared_run_owner_not_found(mock_config):
 
 def test_get_shared_run_owner_metadata_missing_is_shared(mock_config):
     """Test get_shared_run_owner returns None when metadata lacks is_shared."""
-    with patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
+    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
          patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata:
-        # Mock finding the owner
+        mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
-
-        # Mock metadata without is_shared field
         mock_get_metadata.return_value = {"name": "Old Run"}
 
         manager = JobManager(mock_config)
@@ -166,18 +181,16 @@ def test_get_shared_run_owner_metadata_missing_is_shared(mock_config):
 
 def test_get_shared_run_owner_metadata_error(mock_config):
     """Test get_shared_run_owner returns None when metadata read fails."""
-    with patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
+    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
          patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata:
-        # Mock finding the owner
+        mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
-
-        # Mock metadata read failing
         mock_get_metadata.side_effect = Exception("GCS error")
 
         manager = JobManager(mock_config)
         userid = manager.get_shared_run_owner("error-run-999")
 
-        # Should return None on error (safe default)
         assert userid is None
 
 

@@ -57,6 +57,9 @@ export interface RunFromApi {
     execution_status?: Record<string, unknown>;
     run_metadata?: RunMetadataFromApi;
     max_file_size?: string;
+    parent_run_id?: string | null;
+    parent_run_name?: string | null;
+    dataset_expires_at?: string | null;
 }
 
 export interface UploadDatasetResponseBody {

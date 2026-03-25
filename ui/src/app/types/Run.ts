@@ -25,6 +25,12 @@ export type Run = {
     executionStatus?: Record<string, unknown> | null;
     metadata?: Metadata | null;
     maxFileSize?: string | null;
+    /** ID of the parent run this was forked from, if any */
+    parentRunId?: string | null;
+    /** Name of the parent run (for display without an extra fetch) */
+    parentRunName?: string | null;
+    /** ISO date when the dataset will be deleted (typically 7 days after run creation) */
+    datasetExpiresAt?: string | null;
 };
 
 export type RunStats = {
@@ -121,6 +127,9 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         executionStatus: runFromApi.execution_status || null,
         metadata: getMetadataFromApi(runFromApi.run_metadata) || null,
         maxFileSize: runFromApi.max_file_size || null,
+        parentRunId: runFromApi.parent_run_id ?? null,
+        parentRunName: runFromApi.parent_run_name ?? null,
+        datasetExpiresAt: runFromApi.dataset_expires_at ?? null,
     };
 };
 

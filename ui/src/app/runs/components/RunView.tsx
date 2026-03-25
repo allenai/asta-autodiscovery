@@ -12,12 +12,18 @@ import {
     ListItem,
     Menu,
     MenuItem,
+    ListItemIcon,
+    ListItemText,
+    Tooltip,
     useMediaQuery,
     Link,
     IconButton,
 } from '@mui/material';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutlined';
@@ -61,7 +67,6 @@ import {
     RunPanel,
     ExperimentPanel,
     ExperimentPanelBackdrop,
-    ExperimentActionButton,
     LargeScreenAction,
     PanelDragHandle,
     usePanelWidthPx,
@@ -77,6 +82,22 @@ import {
 
 const toSentenceCase = (str: string): string => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
+const getDatasetExpiryLabel = (expiresAt: string | null | undefined): string | null => {
+    if (!expiresAt) return null;
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    if (expiry <= now) return 'Dataset expired';
+    const diffMs = expiry.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 1) return 'Dataset expires tomorrow';
+    return `Dataset available for ${diffDays} days`;
+};
+
+const isDatasetExpired = (expiresAt: string | null | undefined): boolean => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt) <= new Date();
 };
 
 interface RunViewProps {
@@ -239,9 +260,23 @@ function RunViewContent({
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
     const [downloadAnchorEl, setDownloadAnchorEl] = useState<null | HTMLElement>(null);
+    const [overflowAnchorEl, setOverflowAnchorEl] = useState<null | HTMLElement>(null);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
     const isDragEnabled = useMediaQuery('(min-width:1200px)');
+    const showCompactActions = useMediaQuery('(max-width:799px)');
     const { addSuccessToast, addErrorToast } = useToasts();
+
+    // TODO: Remove fallback once API returns dataset_expires_at
+    const datasetExpiresAt =
+        run.datasetExpiresAt ??
+        (run.details.createdAt
+            ? new Date(
+                  new Date(run.details.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000
+              ).toISOString()
+            : null);
+    const datasetExpired = isDatasetExpired(datasetExpiresAt);
+    const datasetExpiryLabel = getDatasetExpiryLabel(datasetExpiresAt);
+    const canFork = !datasetExpired;
 
     const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
     const [expPanelWidthPx, setExpPanelWidthPx] = usePanelWidthPx('expPanelWidthPx', 500);
@@ -424,41 +459,147 @@ function RunViewContent({
                                 )}
                                 {run.name}
                             </RunHeaderName>
+                            {run.parentRunId && (
+                                <ParentRunLink href={`/runs/${run.parentRunId}`} underline="hover">
+                                    Parent: {run.parentRunName || run.parentRunId}
+                                </ParentRunLink>
+                            )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
                         {isRunBookmarksEnabled && isComplete && (
                             <RunHeaderActions>
-                                <DownloadButton
-                                    {...mkDownloadBtnAttrs({ runId: run.id })}
-                                    onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<FileDownloadOutlinedIcon />}
-                                    disabled={experiments.length === 0}>
-                                    Download
-                                </DownloadButton>
-                                <DownloadMenu
-                                    anchorEl={downloadAnchorEl}
-                                    open={!!downloadAnchorEl}
-                                    onClose={() => setDownloadAnchorEl(null)}>
-                                    <MenuItem
-                                        {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
-                                        onClick={() => handleDownload('csv')}>
-                                        CSV
-                                    </MenuItem>
-                                    <MenuItem
-                                        {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
-                                        onClick={() => handleDownload('json')}>
-                                        JSON
-                                    </MenuItem>
-                                </DownloadMenu>
-                                <ShareSessionButton
-                                    onClick={onShareClick}
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<ShareOutlinedIcon />}>
-                                    Share session
-                                </ShareSessionButton>
+                                {showCompactActions ? (
+                                    <>
+                                        <OverflowButton
+                                            size="small"
+                                            aria-label="More actions"
+                                            onClick={(e) => setOverflowAnchorEl(e.currentTarget)}>
+                                            <MoreVertIcon />
+                                        </OverflowButton>
+                                        <OverflowMenu
+                                            anchorEl={overflowAnchorEl}
+                                            open={!!overflowAnchorEl}
+                                            onClose={() => setOverflowAnchorEl(null)}>
+                                            <MenuItem
+                                                onClick={(e: React.MouseEvent<HTMLLIElement>) => {
+                                                    setOverflowAnchorEl(null);
+                                                    onShareClick(
+                                                        e as unknown as React.MouseEvent<HTMLButtonElement>
+                                                    );
+                                                }}>
+                                                <ListItemIcon>
+                                                    <ShareOutlinedIcon fontSize="small" />
+                                                </ListItemIcon>
+                                                <ListItemText>Share session</ListItemText>
+                                            </MenuItem>
+                                            <MenuItem
+                                                disabled={experiments.length === 0}
+                                                onClick={(e) => {
+                                                    setOverflowAnchorEl(null);
+                                                    setDownloadAnchorEl(e.currentTarget);
+                                                }}>
+                                                <ListItemIcon>
+                                                    <FileDownloadOutlinedIcon fontSize="small" />
+                                                </ListItemIcon>
+                                                <ListItemText>Download</ListItemText>
+                                            </MenuItem>
+                                            <Tooltip
+                                                title={datasetExpiryLabel || ''}
+                                                placement="left">
+                                                <span>
+                                                    <MenuItem
+                                                        disabled={!canFork}
+                                                        onClick={() => {
+                                                            setOverflowAnchorEl(null);
+                                                            handleFork();
+                                                        }}>
+                                                        <ListItemIcon>
+                                                            <RestartAltIcon fontSize="small" />
+                                                        </ListItemIcon>
+                                                        <ListItemText>
+                                                            New run from session
+                                                        </ListItemText>
+                                                    </MenuItem>
+                                                </span>
+                                            </Tooltip>
+                                        </OverflowMenu>
+                                        <DownloadMenu
+                                            anchorEl={downloadAnchorEl}
+                                            open={!!downloadAnchorEl}
+                                            onClose={() => setDownloadAnchorEl(null)}>
+                                            <MenuItem
+                                                {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
+                                                onClick={() => handleDownload('csv')}>
+                                                CSV
+                                            </MenuItem>
+                                            <MenuItem
+                                                {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
+                                                onClick={() => handleDownload('json')}>
+                                                JSON
+                                            </MenuItem>
+                                        </DownloadMenu>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Tooltip
+                                            title={datasetExpiryLabel || 'New run from session'}
+                                            placement="bottom">
+                                            <span>
+                                                <ExpandingActionButton
+                                                    onClick={handleFork}
+                                                    disabled={!canFork}
+                                                    size="small"
+                                                    variant="outlined">
+                                                    <RestartAltIcon fontSize="small" />
+                                                    <ButtonLabel className="button-label">
+                                                        New run from session
+                                                    </ButtonLabel>
+                                                </ExpandingActionButton>
+                                            </span>
+                                        </Tooltip>
+                                        <Tooltip title="Download" placement="bottom">
+                                            <span>
+                                                <ExpandingActionButton
+                                                    {...mkDownloadBtnAttrs({ runId: run.id })}
+                                                    onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
+                                                    disabled={experiments.length === 0}
+                                                    size="small"
+                                                    variant="outlined">
+                                                    <FileDownloadOutlinedIcon fontSize="small" />
+                                                    <ButtonLabel className="button-label">
+                                                        Download
+                                                    </ButtonLabel>
+                                                </ExpandingActionButton>
+                                            </span>
+                                        </Tooltip>
+                                        <DownloadMenu
+                                            anchorEl={downloadAnchorEl}
+                                            open={!!downloadAnchorEl}
+                                            onClose={() => setDownloadAnchorEl(null)}>
+                                            <MenuItem
+                                                {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
+                                                onClick={() => handleDownload('csv')}>
+                                                CSV
+                                            </MenuItem>
+                                            <MenuItem
+                                                {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
+                                                onClick={() => handleDownload('json')}>
+                                                JSON
+                                            </MenuItem>
+                                        </DownloadMenu>
+                                        <Tooltip title="Share session" placement="bottom">
+                                            <ExpandingActionButton
+                                                onClick={onShareClick}
+                                                size="small"
+                                                variant="outlined">
+                                                <ShareOutlinedIcon fontSize="small" />
+                                                <ButtonLabel className="button-label">
+                                                    Share session
+                                                </ButtonLabel>
+                                            </ExpandingActionButton>
+                                        </Tooltip>
+                                    </>
+                                )}
                             </RunHeaderActions>
                         )}
                         {isRunning && (
@@ -585,41 +726,59 @@ function RunViewContent({
                                 experiment={selectedExperiment}
                                 actions={
                                     <>
-                                        <ShareExperimentButton
-                                            onClick={onShareExperimentClick}
-                                            size="small"
-                                            variant="outlined"
-                                            startIcon={<ShareOutlinedIcon />}>
-                                            Share experiment
-                                        </ShareExperimentButton>
+                                        <Tooltip title="Share experiment" placement="bottom">
+                                            <ExpandingActionButton
+                                                onClick={onShareExperimentClick}
+                                                size="small"
+                                                variant="outlined">
+                                                <ShareOutlinedIcon fontSize="small" />
+                                                <ButtonLabel className="button-label">
+                                                    Share experiment
+                                                </ButtonLabel>
+                                            </ExpandingActionButton>
+                                        </Tooltip>
                                         <LargeScreenAction>
-                                            <ExperimentActionButton
-                                                aria-label={
-                                                    isExpPanelExpanded
-                                                        ? 'Collapse panel'
-                                                        : 'Expand panel'
-                                                }
-                                                onClick={() =>
-                                                    setIsExpPanelExpanded(!isExpPanelExpanded)
-                                                }
-                                                size="small">
-                                                {isExpPanelExpanded ? (
-                                                    <CloseFullscreenOutlinedIcon fontSize="small" />
-                                                ) : (
-                                                    <OpenInFullOutlinedIcon fontSize="small" />
-                                                )}
-                                            </ExperimentActionButton>
+                                            <Tooltip
+                                                title={isExpPanelExpanded ? 'Collapse' : 'Expand'}
+                                                placement="bottom">
+                                                <ExpandingActionButton
+                                                    aria-label={
+                                                        isExpPanelExpanded
+                                                            ? 'Collapse panel'
+                                                            : 'Expand panel'
+                                                    }
+                                                    onClick={() =>
+                                                        setIsExpPanelExpanded(!isExpPanelExpanded)
+                                                    }
+                                                    size="small"
+                                                    variant="outlined">
+                                                    {isExpPanelExpanded ? (
+                                                        <CloseFullscreenOutlinedIcon fontSize="small" />
+                                                    ) : (
+                                                        <OpenInFullOutlinedIcon fontSize="small" />
+                                                    )}
+                                                    <ButtonLabel className="button-label">
+                                                        {isExpPanelExpanded ? 'Collapse' : 'Expand'}
+                                                    </ButtonLabel>
+                                                </ExpandingActionButton>
+                                            </Tooltip>
                                         </LargeScreenAction>
-                                        <ExperimentActionButton
-                                            aria-label="Close experiment details"
-                                            onClick={handleClosePanel}
-                                            size="small"
-                                            data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
-                                            {...mkCloseExperimentDetailsPanelAttrs({
-                                                runId: run.id,
-                                            })}>
-                                            <CloseIcon />
-                                        </ExperimentActionButton>
+                                        <Tooltip title="Close" placement="bottom">
+                                            <ExpandingActionButton
+                                                aria-label="Close experiment details"
+                                                onClick={handleClosePanel}
+                                                size="small"
+                                                variant="outlined"
+                                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
+                                                {...mkCloseExperimentDetailsPanelAttrs({
+                                                    runId: run.id,
+                                                })}>
+                                                <CloseIcon fontSize="small" />
+                                                <ButtonLabel className="button-label">
+                                                    Close
+                                                </ButtonLabel>
+                                            </ExpandingActionButton>
+                                        </Tooltip>
                                     </>
                                 }
                             />
@@ -641,6 +800,11 @@ function RunViewContent({
                 onClose={() => setIsParametersModalOpen(false)}
                 metadata={run.metadata}
                 testId={TEST_ID_SESSION_CONFIG_MODAL}
+                canFork={canFork}
+                forkTooltip={datasetExpiryLabel || undefined}
+                onFork={() => {
+                    // TODO: Engineer to implement fork navigation
+                }}
             />
         </Container>
     );
@@ -663,18 +827,6 @@ const StopButton = styled(Button)`
 const RunToolbarButtons = styled('div')`
     display: flex;
     gap: ${({ theme }) => theme.spacing(1)};
-`;
-
-const ShareExperimentButton = styled(Button)`
-    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
-    border-radius: 4px;
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    height: 32px;
-    white-space: nowrap;
-
-    &:hover {
-        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
-    }
 `;
 
 const ParametersButton = styled(Button)`
@@ -706,25 +858,9 @@ const RunHeaderActions = styled('div')`
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    justify-content: flex-end;
     gap: ${({ theme }) => theme.spacing(1)};
     margin-left: auto;
-`;
-
-const DownloadButton = styled(Button)`
-    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
-    border-radius: 4px;
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    height: 32px;
-    white-space: nowrap;
-
-    &:hover {
-        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
-    }
-
-    &.Mui-disabled {
-        border: 1px solid ${({ theme }) => theme.color['gray-40'].rgba.toString()};
-        color: ${({ theme }) => theme.color['gray-40'].rgba.toString()};
-    }
 `;
 
 const DownloadMenu = styled(Menu)`
@@ -738,16 +874,91 @@ const DownloadMenu = styled(Menu)`
     }
 `;
 
-const ShareSessionButton = styled(Button)`
+const ExpandingActionButton = styled(Button)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
     border-radius: 4px;
     color: ${({ theme }) => theme.color['cream-100'].hex};
     height: 32px;
+    min-width: 32px;
+    padding: 0 7px;
+    overflow: hidden;
+    transition:
+        max-width 0.25s ease-in-out,
+        padding 0.25s ease-in-out;
+    max-width: 32px;
+
+    &:hover {
+        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+        max-width: 250px;
+        padding: 0 12px;
+
+        .button-label {
+            max-width: 200px;
+            opacity: 1;
+            margin-left: 6px;
+        }
+    }
+
+    &.Mui-disabled {
+        border: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+        color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    }
+
+    .MuiButton-startIcon {
+        margin: 0;
+    }
+`;
+
+const ButtonLabel = styled('span')`
     white-space: nowrap;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    margin-left: 0;
+    transition:
+        max-width 0.25s ease-in-out,
+        opacity 0.2s ease-in-out,
+        margin-left 0.25s ease-in-out;
+`;
+
+const OverflowButton = styled(IconButton)`
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    width: 32px;
+    height: 32px;
 
     &:hover {
         border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
     }
+`;
+
+const OverflowMenu = styled(Menu)`
+    .MuiPaper-root {
+        background-color: ${({ theme }) => theme.color['teal-100'].hex};
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+    }
+
+    .MuiMenuItem-root:hover {
+        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
+
+    .MuiListItemIcon-root {
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+    }
+
+    .MuiMenuItem-root.Mui-disabled {
+        opacity: 0.5;
+    }
+`;
+
+const ParentRunLink = styled(Link)`
+    color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+    font-size: 0.8125rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
 `;
 
 const RunHeaderName = styled('h1')`

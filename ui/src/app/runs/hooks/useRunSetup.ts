@@ -7,7 +7,7 @@ import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
-import {PRELOADED_DATASETS, PreloadedDataset} from "@/runs/utils/preloadedDatasets";
+import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 export const MCTS_SELECTION = {
     UCB1_RECURSIVE: { value: 'ucb1_recursive', label: 'UCB1 Recursive' },
@@ -91,12 +91,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const [preloadedDescs, setPreloadedDescs] = useState<Record<string, string>>({});
     const selectedPreloadedDatasets = useMemo(() => {
         if (!hasAi1Permission) return [];
-        return PRELOADED_DATASETS
-            .filter((d) => selectedIds.has(d.id))
-            .map((d) => ({
-                ...d,
-                description: preloadedDescs[d.id] ?? d.description,
-            }));
+        return PRELOADED_DATASETS.filter((d) => selectedIds.has(d.id)).map((d) => ({
+            ...d,
+            description: preloadedDescs[d.id] ?? d.description,
+        }));
     }, [selectedIds, preloadedDescs, hasAi1Permission]);
 
     const creditsAvailable = credits?.available ?? 0;
@@ -629,7 +627,11 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         }
 
         // Check Experiment Budget
-        if (!settings.nExperiments || settings.nExperiments < 1 || settings.nExperiments > creditsAvailable) {
+        if (
+            !settings.nExperiments ||
+            settings.nExperiments < 1 ||
+            settings.nExperiments > creditsAvailable
+        ) {
             errors.nExperiments = `Must be between 1 and ${creditsAvailable}`;
         }
 

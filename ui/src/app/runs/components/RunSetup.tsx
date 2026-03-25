@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
     Box,
     TextField,
@@ -78,7 +77,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         retryUpload,
         hasAi1Permission,
         selectedDatasetIds,
-        selectedPreloadedDatasets,
         togglePreloadedDataset,
         updatePreloadedDescription,
     } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
@@ -169,94 +167,108 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         disabled={isFormDisabled}
                     />
                 </FormControl>
-                    <FormControl fullWidth>
-                        <StyledFormLabel error={!!datasetErrors}>Source files</StyledFormLabel>
-                        <HelperText>
-                            {hasAi1Permission
-                                ? "Select preloaded datasets and/or upload source files."
-                                : "Upload source files for your discovery session."}
-                        </HelperText>
+                <FormControl fullWidth>
+                    <StyledFormLabel error={!!datasetErrors}>Source files</StyledFormLabel>
+                    <HelperText>
+                        {hasAi1Permission
+                            ? 'Select preloaded datasets and/or upload source files.'
+                            : 'Upload source files for your discovery session.'}
+                    </HelperText>
 
-                        {hasAi1Permission && (
-                            <>
-                                <Box sx={{ display: 'flex', gap: 1, mb: 1, width: '100%' }}>
-                                    {PRELOADED_DATASETS.map((dataset) => (
-                                        <PreloadedDatasetLabel
-                                            key={dataset.id}
-                                            selected={selectedDatasetIds.has(dataset.id)}>
-                                            <Checkbox
-                                                checked={selectedDatasetIds.has(dataset.id)}
-                                                onChange={() => togglePreloadedDataset(dataset.id)}
-                                                disabled={isFormDisabled}
-                                                size="small"
-                                                icon={<CheckBoxOutlineBlankIcon fontSize="small" />}
-                                                checkedIcon={<CheckedIcon />}
-                                                sx={{ p: 0 }}
-                                            />
-                                            {dataset.label}
-                                        </PreloadedDatasetLabel>
-                                    ))}
-                                </Box>
+                    {hasAi1Permission && (
+                        <>
+                            <Box sx={{ display: 'flex', gap: 1, mb: 1, width: '100%' }}>
+                                {PRELOADED_DATASETS.map((dataset) => (
+                                    <PreloadedDatasetLabel
+                                        key={dataset.id}
+                                        selected={selectedDatasetIds.has(dataset.id)}>
+                                        <Checkbox
+                                            checked={selectedDatasetIds.has(dataset.id)}
+                                            onChange={() => togglePreloadedDataset(dataset.id)}
+                                            disabled={isFormDisabled}
+                                            size="small"
+                                            icon={<CheckBoxOutlineBlankIcon fontSize="small" />}
+                                            checkedIcon={<CheckedIcon />}
+                                            sx={{ p: 0 }}
+                                        />
+                                        {dataset.label}
+                                    </PreloadedDatasetLabel>
+                                ))}
+                            </Box>
 
-                                <Box
-                                    sx={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 1,
-                                        mb: selectedDatasetIds.size > 0 ? 2 : 0,
-                                    }}>
-                                    {PRELOADED_DATASETS.map((dataset) => (
-                                        <Collapse
-                                            key={dataset.id}
-                                            in={selectedDatasetIds.has(dataset.id)}
-                                            unmountOnExit>
-                                            <FileCard>
-                                                <FileHeader>
-                                                    <DescriptionOutlinedIcon />
-                                                    <FileHeaderFilename>{dataset.filename}</FileHeaderFilename>
-                                                    <FileHeaderFileMeta>Preloaded dataset</FileHeaderFileMeta>
-                                                    <FileHeaderActions>
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={() => togglePreloadedDataset(dataset.id)}
-                                                            disabled={isFormDisabled}
-                                                            sx={{ ml: 'auto' }}
-                                                            title="Remove dataset">
-                                                            <CloseIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </FileHeaderActions>
-                                                </FileHeader>
-                                                <FileDescription>
-                                                    <DatasetSchemaTitle>Dataset Schema (Optional)</DatasetSchemaTitle>
-                                                    Feel free to edit or add additional context to help guide the analysis.
-                                                    <TextField
-                                                        multiline
-                                                        maxRows={3}
-                                                        fullWidth
-                                                        defaultValue={dataset.description}
-                                                        onChange={(e) => updatePreloadedDescription(dataset.id, e.target.value)}
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                    mb: selectedDatasetIds.size > 0 ? 2 : 0,
+                                }}>
+                                {PRELOADED_DATASETS.map((dataset) => (
+                                    <Collapse
+                                        key={dataset.id}
+                                        in={selectedDatasetIds.has(dataset.id)}
+                                        unmountOnExit>
+                                        <FileCard>
+                                            <FileHeader>
+                                                <DescriptionOutlinedIcon />
+                                                <FileHeaderFilename>
+                                                    {dataset.filename}
+                                                </FileHeaderFilename>
+                                                <FileHeaderFileMeta>
+                                                    Preloaded dataset
+                                                </FileHeaderFileMeta>
+                                                <FileHeaderActions>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() =>
+                                                            togglePreloadedDataset(dataset.id)
+                                                        }
                                                         disabled={isFormDisabled}
-                                                        sx={{ mt: 1 }}
-                                                    />
-                                                </FileDescription>
-                                            </FileCard>
-                                        </Collapse>
-                                    ))}
-                                </Box>
-                            </>
-                        )}
-                        <DatasetUpload
-                            fileUploads={fileUploads}
-                            maxFileSize={maxFileSize}
-                            onFileSelect={handleFileSelect}
-                            onRemoveFileUpload={handleRemoveFileUpload}
-                            onDescriptionChange={handleFileDescriptionChange}
-                            onCancelUpload={cancelUpload}
-                            onRetryUpload={retryUpload}
-                            disabled={isFormDisabled}
-                            error={datasetErrors}
-                        />
-                    </FormControl>
+                                                        sx={{ ml: 'auto' }}
+                                                        title="Remove dataset">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                </FileHeaderActions>
+                                            </FileHeader>
+                                            <FileDescription>
+                                                <DatasetSchemaTitle>
+                                                    Dataset Schema (Optional)
+                                                </DatasetSchemaTitle>
+                                                Feel free to edit or add additional context to help
+                                                guide the analysis.
+                                                <TextField
+                                                    multiline
+                                                    maxRows={3}
+                                                    fullWidth
+                                                    defaultValue={dataset.description}
+                                                    onChange={(e) =>
+                                                        updatePreloadedDescription(
+                                                            dataset.id,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    disabled={isFormDisabled}
+                                                    sx={{ mt: 1 }}
+                                                />
+                                            </FileDescription>
+                                        </FileCard>
+                                    </Collapse>
+                                ))}
+                            </Box>
+                        </>
+                    )}
+                    <DatasetUpload
+                        fileUploads={fileUploads}
+                        maxFileSize={maxFileSize}
+                        onFileSelect={handleFileSelect}
+                        onRemoveFileUpload={handleRemoveFileUpload}
+                        onDescriptionChange={handleFileDescriptionChange}
+                        onCancelUpload={cancelUpload}
+                        onRetryUpload={retryUpload}
+                        disabled={isFormDisabled}
+                        error={datasetErrors}
+                    />
+                </FormControl>
             </ConfigurationBox>
 
             <SectionHeader sx={{ mt: 3 }}>

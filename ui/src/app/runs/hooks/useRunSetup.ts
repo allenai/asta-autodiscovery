@@ -274,11 +274,15 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 description: upload.description || '',
                 content_type: upload.file.type || 'application/octet-stream',
                 file_size_bytes: upload.file.size,
+                url: null,
+                is_preloaded: false,
             }));
 
         const preloaded = selectedPreloadedRef.current.map((ds) => ({
             name: ds.filename, // This MUST match the filename the agent expects
             description: ds.description,
+            content_type: 'application/octet-stream',
+            file_size_bytes: 0,
             url: ds.url,
             is_preloaded: true,
         }));

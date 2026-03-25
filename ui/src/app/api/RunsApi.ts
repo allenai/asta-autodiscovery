@@ -27,6 +27,8 @@ export interface RunMetadataFromApi {
         description: string | null;
         content_type: string | null;
         file_size_bytes: number | null;
+        url?: string | null;
+        is_preloaded?: boolean;
     }[];
     // Sharing
     is_shared?: boolean | null;
@@ -119,6 +121,8 @@ export interface MetadataDatasetFromApi {
     description: string | null;
     content_type: string | null;
     file_size_bytes: number | null;
+    url?: string | null;
+    is_preloaded?: boolean;
 }
 
 export interface MetadataFromApi {

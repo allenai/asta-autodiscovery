@@ -9,6 +9,10 @@ import tempfile
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+import boto3
+from google.cloud import storage
+from urllib.parse import urlparse
+
 
 from flask import Blueprint, current_app, jsonify, request
 from utils.auth import (
@@ -98,6 +102,28 @@ UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 # Users whose runs are publicly accessible (can be queried by anyone)
 PUBLIC_USERS = {"samples"}
 
+def sync_preloaded_dataset(s3_url, gcs_bucket_name, gcs_dest_path):
+    """Copies a file from S3 to GCS with better error reporting."""
+    try:
+        s3_client = boto3.client('s3')
+        gcs_client = storage.Client()
+
+        parsed_url = urlparse(s3_url)
+        s3_bucket = parsed_url.netloc
+        s3_key = parsed_url.path.lstrip('/')
+
+        print(f"FETCHING FROM S3: bucket={s3_bucket}, key={s3_key}")
+        s3_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
+
+        dest_bucket = gcs_client.bucket(gcs_bucket_name)
+        blob = dest_bucket.blob(gcs_dest_path)
+
+        print(f"UPLOADING TO GCS: gs://{gcs_bucket_name}/{gcs_dest_path}")
+        blob.upload_from_file(s3_obj['Body'], content_type='application/octet-stream')
+        print("SYNC COMPLETE")
+    except Exception as e:
+        print(f"SYNC ERROR: {str(e)}")
+        raise e
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -353,6 +379,7 @@ def create() -> Blueprint:
 
     @api.route("/<userid>/<runid>")
     @optional_enrollment
+    @requires_auth(check_permissions=[PermissionType.AI1_DATASETS])
     def get_run(userid: str, runid: str):
         """Get details for a specific run.
 
@@ -424,6 +451,9 @@ def create() -> Blueprint:
             has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
             max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
 
+            # Check if user has AI1_DATASETS permission for dataset access in the UI
+            has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
+
             run_model = RunModel(
                 runid=req.runid,
                 userid=req.userid,
@@ -436,6 +466,7 @@ def create() -> Blueprint:
                 run_metadata=run_metadata_model,
                 execution_status={},
                 max_file_size=max_file_size,
+                can_view_datasets=has_ai1_datasets,
             )
 
             return jsonify(run_model.model_dump()), 200
@@ -722,6 +753,7 @@ def create() -> Blueprint:
 
     @api.route("/submit", methods=["POST"])
     @requires_enrollment
+    @requires_auth(check_permissions=[PermissionType.AI1_DATASETS])
     def submit_run():
         """Submit a run for execution.
 
@@ -748,6 +780,10 @@ def create() -> Blueprint:
         if not runid_data:
             raise BadRequest("runid is required")
 
+        # Check if user has AI1_DATASETS permission for dataset access in the UI
+        permissions = request.user.get("permissions", [])
+        has_ai1_permission = PermissionType.AI1_DATASETS.value in permissions
+
         req = SubmitRunRequestModel(runid=runid_data, userid=userid)
 
         try:
@@ -757,6 +793,27 @@ def create() -> Blueprint:
             metadata = manager.get_metadata(req.userid, req.runid)
             if not metadata:
                 raise BadRequest("Run metadata not found. Please save run configuration first.")
+
+            datasets = metadata.get("datasets", [])
+            for ds in datasets:
+                # If the dataset has a URL, it's an S3 preloaded file
+                if ds.get("url") and ds.get("url").startswith("s3://"):
+                    if not has_ai1_permission:
+                        return jsonify({"error": "Permission denied for preloaded datasets"}), 403
+                    filename = ds.get("name")
+                    s3_url = ds.get("url")
+
+                    gcs_dest_path = f"users/{req.userid}/jobs/{req.runid}/data/{filename}"
+                    print(f"PRELOAD SYNC: Starting {filename} to {gcs_dest_path}")
+                    try:
+                        sync_preloaded_dataset(
+                            s3_url=s3_url,
+                            gcs_bucket_name=manager.config.bucket,
+                            gcs_dest_path=gcs_dest_path
+                        )
+                    except Exception as e:
+                        current_app.logger.error(f"Failed to sync preloaded dataset {filename}: {e}")
+                        return jsonify({"error": f"Failed to prepare preloaded dataset: {str(e)}"}), 500
 
             intent = metadata.get("intent", "")
             n_experiments = metadata.get("n_experiments")

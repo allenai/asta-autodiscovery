@@ -70,7 +70,9 @@ export interface GenerateUploadUrlResponseBody {
     expires_at_unix: number;
 }
 
-export interface RunResponseBody extends RunFromApi {}
+export interface RunResponseBody extends RunFromApi {
+    can_view_datasets: boolean;
+}
 
 export interface GetViewerRunsResponseBody {
     runs: RunFromApi[];

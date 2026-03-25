@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -103,6 +103,8 @@ class MetadataDatasetModel(BaseModel):
     description: str | None = Field(None, description="Description of the dataset")
     content_type: str | None = Field(None, description="MIME type of the dataset file")
     file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
+    url: Optional[str] = None
+    is_preloaded: Optional[bool] = False
 
 
 class RunArgsModel(BaseModel):
@@ -177,6 +179,9 @@ class MetadataModel(BaseModel):
                 description=ds.get("description"),
                 content_type=ds.get("content_type"),
                 file_size_bytes=ds.get("file_size_bytes"),
+                url=ds.get("url"),
+                is_preloaded=ds.get("is_preloaded")
+
             )
             for ds in datasets_data
         ]
@@ -217,6 +222,7 @@ class RunModel(BaseModel):
     execution_status: dict[str, Any] | None = Field(None, description="Execution status of the run")
     run_metadata: MetadataModel | None = Field(None, description="Metadata associated with the run")
     max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
+    can_view_datasets: bool = Field(False, description="Bool flag determining if AI1 datasets are visible")
 
 
 class GetRunMetadataRequestModel(BaseModel):

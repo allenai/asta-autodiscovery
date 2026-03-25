@@ -1,0 +1,7 @@
+Flask==2.3.2
+gunicorn==23.0.0
+python-json-logger==2.0.2
+PyJWT==2.8.0
+cryptography==46.0.5
+requests==2.31.0
+pydantic==2.12.5

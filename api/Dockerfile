@@ -1,20 +1,24 @@
 FROM python:3.13-slim
 
-WORKDIR /app
+# Uncomment the following lines to enable GPU support.
+# See https://***REMOVED***/gpu.html for more details.
+#
+# ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+# ENV NVIDIA_VISIBLE_DEVICES all
+# ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+WORKDIR /api
 
-# Copy workspace files needed for uv sync
-COPY pyproject.toml uv.lock ./
-COPY packages/ packages/
-COPY api/ api/
+# Copy and install autodiscovery_jobs package
+COPY packages/autodiscovery_jobs /tmp/autodiscovery_jobs
+RUN pip install /tmp/autodiscovery_jobs
 
-# Install Python dependencies using the lock file
-RUN uv sync --frozen --package api --no-dev
+# Install Python dependencies
+COPY api/requirements.txt .
+RUN pip install -r requirements.txt
 
-ENV PATH="/app/.venv/bin:${PATH}"
-ENV PYTHONUNBUFFERED=1
+# Copy over the source code
+COPY api/ .
 
-WORKDIR /app/api
-ENTRYPOINT ["/app/api/dev.sh"]
+# Kick things off
+ENTRYPOINT [ "/api/dev.sh" ]

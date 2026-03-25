@@ -229,7 +229,6 @@ dependencies = [
     { name = "pyjwt" },
     { name = "python-json-logger" },
     { name = "requests" },
-    { name = "werkzeug" },
 ]
 
 [package.metadata]
@@ -242,7 +241,6 @@ requires-dist = [
     { name = "pyjwt", specifier = "==2.8.0" },
     { name = "python-json-logger", specifier = ">=2,<4" },
     { name = "requests", specifier = ">=2.31.0" },
-    { name = "werkzeug", specifier = "<3" },
 ]
 
 [[package]]
@@ -4534,14 +4532,14 @@ wheels = [
 
 [[package]]
 name = "werkzeug"
-version = "2.3.8"
+version = "3.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markupsafe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/4b/d746f1000782c89d6c97df9df43ba8f4d126038608843d3560ae88d201b5/werkzeug-2.3.8.tar.gz", hash = "sha256:554b257c74bbeb7a0d254160a4f8ffe185243f52a52035060b761ca62d977f03", size = 819747 }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/43/76ded108b296a49f52de6bac5192ca1c4be84e886f9b5c9ba8427d9694fd/werkzeug-3.1.7.tar.gz", hash = "sha256:fb8c01fe6ab13b9b7cdb46892b99b1d66754e1d7ab8e542e865ec13f526b5351", size = 875700 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/21/0a674dfe66e9df9072c46269c882e9f901d36d987d8ea50ead033a9c1e01/werkzeug-2.3.8-py3-none-any.whl", hash = "sha256:bba1f19f8ec89d4d607a3bd62f1904bd2e609472d93cd85e9d4e178f472c3748", size = 242332 },
+    { url = "https://files.pythonhosted.org/packages/7f/b2/0bba9bbb4596d2d2f285a16c2ab04118f6b957d8441566e1abb892e6a6b2/werkzeug-3.1.7-py3-none-any.whl", hash = "sha256:4b314d81163a3e1a169b6a0be2a000a0e204e8873c5de6586f453c55688d422f", size = 226295 },
 ]
 
 [[package]]

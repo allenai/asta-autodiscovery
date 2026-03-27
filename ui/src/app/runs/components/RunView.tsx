@@ -266,16 +266,8 @@ function RunViewContent({
     const showCompactActions = useMediaQuery('(max-width:799px)');
     const { addSuccessToast, addErrorToast } = useToasts();
 
-    // TODO: Remove fallback once API returns dataset_expires_at
-    const datasetExpiresAt =
-        run.datasetExpiresAt ??
-        (run.details.createdAt
-            ? new Date(
-                  new Date(run.details.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000
-              ).toISOString()
-            : null);
-    const datasetExpired = isDatasetExpired(datasetExpiresAt);
-    const datasetExpiryLabel = getDatasetExpiryLabel(datasetExpiresAt);
+    const datasetExpired = isDatasetExpired(run.datasetExpiresAt);
+    const datasetExpiryLabel = getDatasetExpiryLabel(run.datasetExpiresAt);
     const canFork = !datasetExpired;
 
     const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
@@ -460,9 +452,14 @@ function RunViewContent({
                                 {run.name}
                             </RunHeaderName>
                             {run.parentRunId && (
-                                <ParentRunLink href={`/runs/${run.parentRunId}`} underline="hover">
-                                    Parent: {run.parentRunName || run.parentRunId}
-                                </ParentRunLink>
+                                <ParentRunInfo>
+                                    Parent:{' '}
+                                    <ParentRunLink
+                                        href={`/runs/${run.parentRunId}`}
+                                        underline="hover">
+                                        {run.parentRunName || run.parentRunId}
+                                    </ParentRunLink>
+                                </ParentRunInfo>
                             )}
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
@@ -952,13 +949,18 @@ const OverflowMenu = styled(Menu)`
     }
 `;
 
-const ParentRunLink = styled(Link)`
-    color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+const ParentRunInfo = styled('span')`
+    color: ${({ theme }) => theme.color['cream-60'].hex};
     font-size: 0.8125rem;
     display: flex;
     align-items: center;
     gap: 4px;
     margin-top: 4px;
+    margin-left: 28px;
+`;
+
+const ParentRunLink = styled(Link)`
+    color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
 `;
 
 const RunHeaderName = styled('h1')`

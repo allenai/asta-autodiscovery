@@ -53,20 +53,20 @@ export const PRELOADED_DATASETS: PreloadedDataset[] = [
         label: 'Tabula Sapiens - Heart',
         filename: 'heart.h5ad',
         description: datasetDescription,
-        url: 'gs://example-bucket/users/preloads/heart.h5ad',
+        url: 'gs://example-bucket/ai1/CELLxGENE/heart.h5ad',
     },
     {
         id: 'tabula-sapiens-kidney',
         label: 'Tabula Sapiens - Kidney',
         filename: 'kidney.h5ad',
         description: datasetDescription,
-        url: 'gs://example-bucket/users/preloads/kidney.h5ad',
+        url: 'gs://example-bucket/ai1/CELLxGENE/kidney.h5ad',
     },
     {
         id: 'tabula-sapiens-lung',
         label: 'Tabula Sapiens - Lung',
         filename: 'lung.h5ad',
         description: datasetDescription,
-        url: 'gs://example-bucket/users/preloads/lung.h5ad',
+        url: 'gs://example-bucket/ai1/CELLxGENE/lung.h5ad',
     },
 ];

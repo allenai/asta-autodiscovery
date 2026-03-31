@@ -430,6 +430,10 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                     rowSelectionModel={rowSelectionModel}
                     slotProps={{
                         row: mkExperimentRowAttrs(),
+                        toolbar: {
+                            csvOptions: { disableToolbarButton: true },
+                            printOptions: { disableToolbarButton: true },
+                        },
                     }}
                     showToolbar={true}
                     hideFooter={true}

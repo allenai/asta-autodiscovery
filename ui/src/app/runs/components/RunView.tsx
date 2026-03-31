@@ -10,6 +10,8 @@ import {
     styled,
     List,
     ListItem,
+    Menu,
+    MenuItem,
     useMediaQuery,
     Link,
     IconButton,
@@ -22,6 +24,7 @@ import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutl
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
@@ -36,8 +39,11 @@ import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
 import {
     mkCloseExperimentDetailsPanelAttrs,
+    mkDownloadBtnAttrs,
+    mkDownloadCsvMenuItemAttrs,
     mkSessionConfigBtnAttrs,
 } from '@/analytics/runDetails';
+import { downloadCsv, generateRunCsv } from '@/utils/csvExport';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
 import { useRunBookmarks } from '@/contexts/RunBookmarksContext';
@@ -224,6 +230,7 @@ function RunViewContent({
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
+    const [downloadAnchorEl, setDownloadAnchorEl] = useState<null | HTMLElement>(null);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
     const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const { addSuccessToast, addErrorToast } = useToasts();
@@ -292,6 +299,23 @@ function RunViewContent({
             console.error('Error sharing experiment:', err);
         }
     }, [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]);
+
+    const handleCsvDownload = useCallback(() => {
+        setDownloadAnchorEl(null);
+
+        try {
+            const sanitizedName = run.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `${sanitizedName}_${timestamp}.csv`;
+
+            const csvContent = generateRunCsv(experiments);
+
+            downloadCsv(csvContent, filename);
+        } catch (error) {
+            console.error('Failed to download CSV:', error);
+            addErrorToast('Failed to download CSV');
+        }
+    }, [run.name, run.id, run.details.status, run.details.createdAt, experiments, addErrorToast]);
 
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
@@ -379,6 +403,24 @@ function RunViewContent({
                         </Box>
                         {isRunBookmarksEnabled && (
                             <RunHeaderActions>
+                                <DownloadButton
+                                    {...mkDownloadBtnAttrs({ runId: run.id })}
+                                    onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<FileDownloadOutlinedIcon />}>
+                                    Download
+                                </DownloadButton>
+                                <DownloadMenu
+                                    anchorEl={downloadAnchorEl}
+                                    open={!!downloadAnchorEl}
+                                    onClose={() => setDownloadAnchorEl(null)}>
+                                    <MenuItem
+                                        {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
+                                        onClick={handleCsvDownload}>
+                                        CSV
+                                    </MenuItem>
+                                </DownloadMenu>
                                 <ShareSessionButton
                                     onClick={onShareClick}
                                     size="small"
@@ -635,6 +677,29 @@ const RunHeaderActions = styled('div')`
     flex-shrink: 0;
     gap: ${({ theme }) => theme.spacing(1)};
     margin-left: auto;
+`;
+
+const DownloadButton = styled(Button)`
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    height: 32px;
+    white-space: nowrap;
+
+    &:hover {
+        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
+`;
+
+const DownloadMenu = styled(Menu)`
+    .MuiPaper-root {
+        background-color: ${({ theme }) => theme.color['teal-100'].hex};
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+    }
+
+    .MuiMenuItem-root:hover {
+        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
 `;
 
 const ShareSessionButton = styled(Button)`

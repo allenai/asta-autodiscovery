@@ -192,18 +192,9 @@ for (const url of RUN_URLS) {
             expect(await rows.count()).toBeGreaterThan(0);
         });
 
-        test('table CSV download can be triggered', async ({ page }) => {
-            const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
-
-            // Open export menu
-            const exportBtn = table.getByRole('button', { name: /export/i });
-            await exportBtn.click();
-
-            // Click CSV download option
-            const downloadPromise = page.waitForEvent('download');
-            await page.getByRole('menuitem', { name: /download as csv/i }).click();
-            const download = await downloadPromise;
-            expect(download.suggestedFilename()).toMatch(/\.csv$/);
+        test('header does not show download button on shared runs', async ({ page }) => {
+            const downloadBtn = page.getByRole('button', { name: /download/i });
+            await expect(downloadBtn).toHaveCount(0);
         });
 
         test('table search for "significant" returns between 1 and total rows', async ({ page }) => {

@@ -8,6 +8,7 @@ from datetime import datetime
 # Source: https://cloud.google.com/vertex-ai/generative-ai/pricing
 LLM_PRICING: dict[str, dict[str, float]] = {
     # Google Gemini models
+    "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00},
     "gemini-3-pro-preview": {"input": 2.00, "output": 12.00},
     "gemini-3-flash-preview": {"input": 0.50, "output": 3.00},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
@@ -25,7 +26,7 @@ LLM_PRICING: dict[str, dict[str, float]] = {
     "o3-mini": {"input": 1.10, "output": 4.40},
 }
 
-# Fallback pricing for unknown models (conservative: uses gemini-3-pro rates)
+# Fallback pricing for unknown models (conservative: uses gemini-3.1-pro rates)
 _FALLBACK_PRICING = {"input": 2.00, "output": 12.00}
 
 
@@ -34,7 +35,7 @@ def _lookup_pricing(model_name: str) -> dict[str, float]:
     if model_name in LLM_PRICING:
         return LLM_PRICING[model_name]
 
-    # Strip provider prefix (e.g., "google/gemini-3-pro-preview" -> "gemini-3-pro-preview")
+    # Strip provider prefix (e.g., "google/gemini-3.1-pro-preview" -> "gemini-3.1-pro-preview")
     stripped = model_name.split("/")[-1] if "/" in model_name else model_name
     if stripped in LLM_PRICING:
         return LLM_PRICING[stripped]

@@ -12,7 +12,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="gemini-3-pro-preview",
+            default="gemini-3.1-pro-preview",
             help="LLM to use for all agents (except belief distribution agent).",
         )
         self.add_argument(
@@ -24,7 +24,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--vision_model",
             type=str,
-            default="gemini-3-pro-preview",
+            default="gemini-3.1-pro-preview",
             help="Model to use for image analysis during code execution.",
         )
         self.add_argument(

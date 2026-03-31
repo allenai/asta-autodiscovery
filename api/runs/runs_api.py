@@ -9,9 +9,9 @@ import tempfile
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import boto3
 from google.cloud import storage
 from urllib.parse import urlparse
+import logging
 
 
 from flask import Blueprint, current_app, jsonify, request
@@ -102,28 +102,33 @@ UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 # Users whose runs are publicly accessible (can be queried by anyone)
 PUBLIC_USERS = {"samples"}
 
-def sync_preloaded_dataset(s3_url, gcs_bucket_name, gcs_dest_path):
-    """Copies a file from S3 to GCS with better error reporting."""
-    try:
-        s3_client = boto3.client('s3')
-        gcs_client = storage.Client()
+def sync_preloaded_dataset(source_gs_url, dest_bucket_name, dest_path):
+    """Efficiently copies a file between GCS buckets."""
+    storage_client = storage.Client()
 
-        parsed_url = urlparse(s3_url)
-        s3_bucket = parsed_url.netloc
-        s3_key = parsed_url.path.lstrip('/')
+    # Parse the source URL (gs://source-bucket/path/to/file)
+    parsed_url = urlparse(source_gs_url)
+    source_bucket_name = parsed_url.netloc
+    source_blob_name = parsed_url.path.lstrip('/')
 
-        print(f"FETCHING FROM S3: bucket={s3_bucket}, key={s3_key}")
-        s3_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
+    source_bucket = storage_client.bucket(source_bucket_name)
+    source_blob = source_bucket.blob(source_blob_name)
 
-        dest_bucket = gcs_client.bucket(gcs_bucket_name)
-        blob = dest_bucket.blob(gcs_dest_path)
+    dest_bucket = storage_client.bucket(dest_bucket_name)
+    dest_blob = dest_bucket.blob(dest_path)
 
-        print(f"UPLOADING TO GCS: gs://{gcs_bucket_name}/{gcs_dest_path}")
-        blob.upload_from_file(s3_obj['Body'], content_type='application/octet-stream')
-        print("SYNC COMPLETE")
-    except Exception as e:
-        print(f"SYNC ERROR: {str(e)}")
-        raise e
+    log.debug(f"GCS SYNC: {source_gs_url} -> gs://{dest_bucket_name}/{dest_path}")
+
+    # Use rewrite instead of download/upload for maximum speed
+    rewrite_token = None
+    while True:
+        rewrite_token, bytes_rewritten, total_bytes = dest_blob.rewrite(
+            source_blob, token=rewrite_token
+        )
+        if rewrite_token is None:
+            break
+
+    log.debug(f"GCS SYNC COMPLETE: {dest_path}")
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -797,19 +802,18 @@ def create() -> Blueprint:
             datasets = metadata.get("datasets", [])
             for ds in datasets:
                 # If the dataset has a URL, it's an S3 preloaded file
-                if ds.get("url") and ds.get("url").startswith("s3://"):
+                if ds.get("url") and ds.get("url").startswith("gs://"):
                     if not has_ai1_permission:
                         return jsonify({"error": "Permission denied for preloaded datasets"}), 403
                     filename = ds.get("name")
-                    s3_url = ds.get("url")
+                    source_url = ds.get("url")
 
                     gcs_dest_path = f"users/{req.userid}/jobs/{req.runid}/data/{filename}"
-                    print(f"PRELOAD SYNC: Starting {filename} to {gcs_dest_path}")
                     try:
                         sync_preloaded_dataset(
-                            s3_url=s3_url,
-                            gcs_bucket_name=manager.config.bucket,
-                            gcs_dest_path=gcs_dest_path
+                            source_gs_url=source_url,
+                            dest_bucket_name=manager.config.bucket,
+                            dest_path=gcs_dest_path
                         )
                     except Exception as e:
                         current_app.logger.error(f"Failed to sync preloaded dataset {filename}: {e}")

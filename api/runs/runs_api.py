@@ -117,7 +117,7 @@ def sync_preloaded_dataset(source_gs_url, dest_bucket_name, dest_path):
     dest_bucket = storage_client.bucket(dest_bucket_name)
     dest_blob = dest_bucket.blob(dest_path)
 
-    log.debug(f"GCS SYNC: {source_gs_url} -> gs://{dest_bucket_name}/{dest_path}")
+    logging.debug(f"GCS SYNC: {source_gs_url} -> gs://{dest_bucket_name}/{dest_path}")
 
     # Use rewrite instead of download/upload for maximum speed
     rewrite_token = None
@@ -128,7 +128,7 @@ def sync_preloaded_dataset(source_gs_url, dest_bucket_name, dest_path):
         if rewrite_token is None:
             break
 
-    log.debug(f"GCS SYNC COMPLETE: {dest_path}")
+    logging.debug(f"GCS SYNC COMPLETE: {dest_path}")
 
 def create() -> Blueprint:
     """Create the runs API blueprint.

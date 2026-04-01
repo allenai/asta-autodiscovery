@@ -104,7 +104,7 @@ class MetadataDatasetModel(BaseModel):
     content_type: str | None = Field(None, description="MIME type of the dataset file")
     file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
     url: Optional[str] = None
-    is_preloaded: Optional[bool] = False
+    is_preloaded: bool = Field(False, description="Whether this is a preloaded dataset")
 
 
 class RunArgsModel(BaseModel):
@@ -180,7 +180,7 @@ class MetadataModel(BaseModel):
                 content_type=ds.get("content_type"),
                 file_size_bytes=ds.get("file_size_bytes"),
                 url=ds.get("url"),
-                is_preloaded=ds.get("is_preloaded")
+                is_preloaded=ds.get("is_preloaded", False)
 
             )
             for ds in datasets_data
@@ -473,3 +473,7 @@ class GetSharedRunOwnerResponseModel(BaseModel):
 
     runid: str = Field(..., description="Identifier of the run")
     userid: str = Field(..., description="User ID of the run owner")
+
+MetadataDatasetModel.model_rebuild()
+MetadataModel.model_rebuild()
+RunModel.model_rebuild()

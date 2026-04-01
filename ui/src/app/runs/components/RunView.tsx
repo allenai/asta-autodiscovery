@@ -41,9 +41,17 @@ import {
     mkCloseExperimentDetailsPanelAttrs,
     mkDownloadBtnAttrs,
     mkDownloadCsvMenuItemAttrs,
+    mkDownloadJsonMenuItemAttrs,
     mkSessionConfigBtnAttrs,
 } from '@/analytics/runDetails';
-import { downloadCsv, generateRunCsv } from '@/utils/csvExport';
+import {
+    downloadCsv,
+    downloadJson,
+    ExportFormat,
+    generateFilename,
+    generateRunCsv,
+    generateRunJson,
+} from '@/utils/exportUtils';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
 import { useRunBookmarks } from '@/contexts/RunBookmarksContext';
@@ -300,22 +308,34 @@ function RunViewContent({
         }
     }, [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]);
 
-    const handleCsvDownload = useCallback(() => {
-        setDownloadAnchorEl(null);
+    const handleDownload = useCallback(
+        (format: ExportFormat) => {
+            setDownloadAnchorEl(null);
 
-        try {
-            const sanitizedName = run.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-            const timestamp = new Date().toISOString().split('T')[0];
-            const filename = `${sanitizedName}_${timestamp}.csv`;
+            try {
+                const filename = generateFilename(run.name, format);
 
-            const csvContent = generateRunCsv(experiments);
-
-            downloadCsv(csvContent, filename);
-        } catch (error) {
-            console.error('Failed to download CSV:', error);
-            addErrorToast('Failed to download CSV');
-        }
-    }, [run.name, run.id, run.details.status, run.details.createdAt, experiments, addErrorToast]);
+                switch (format) {
+                    case 'json': {
+                        const content = generateRunJson(experiments);
+                        downloadJson(content, filename);
+                        break;
+                    }
+                    case 'csv': {
+                        const content = generateRunCsv(experiments);
+                        downloadCsv(content, filename);
+                        break;
+                    }
+                    default:
+                        throw new Error(`Unsupported export format: ${format}`);
+                }
+            } catch (error) {
+                console.error(`Failed to download ${format.toUpperCase()}:`, error);
+                addErrorToast(`Failed to download ${format.toUpperCase()}`);
+            }
+        },
+        [run.name, experiments, addErrorToast]
+    );
 
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
@@ -417,8 +437,13 @@ function RunViewContent({
                                     onClose={() => setDownloadAnchorEl(null)}>
                                     <MenuItem
                                         {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
-                                        onClick={handleCsvDownload}>
+                                        onClick={() => handleDownload('csv')}>
                                         CSV
+                                    </MenuItem>
+                                    <MenuItem
+                                        {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
+                                        onClick={() => handleDownload('json')}>
+                                        JSON
                                     </MenuItem>
                                 </DownloadMenu>
                                 <ShareSessionButton

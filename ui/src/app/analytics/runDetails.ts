@@ -24,3 +24,7 @@ export const mkDownloadBtnAttrs = (props: { runId: string }) =>
 // Download CSV menu item click
 export const mkDownloadCsvMenuItemAttrs = (props: { runId: string }) =>
     mkTrackAttrs(`${RUN_DETAILS}__download_csv`, props);
+
+// Download JSON menu item click
+export const mkDownloadJsonMenuItemAttrs = (props: { runId: string }) =>
+    mkTrackAttrs(`${RUN_DETAILS}__download_json`, props);

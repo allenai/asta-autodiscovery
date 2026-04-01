@@ -1,6 +1,27 @@
 import { Experiment } from '@/types/Run';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
+export type ExportFormat = 'csv' | 'json';
+
+export function generateFilename(runName: string, format: ExportFormat): string {
+    const sanitizedName = runName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const timestamp = new Date().toISOString().split('T')[0];
+    return `${sanitizedName}_${timestamp}.${format}`;
+}
+
+function downloadFile(content: string, filename: string, mimeType: string): void {
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
 const CSV_HEADERS = [
     'ID',
     'Hypothesis',
@@ -82,14 +103,56 @@ export function generateRunCsv(experiments: Experiment[]): string {
 
 export function downloadCsv(content: string, filename: string): void {
     const BOM = '\uFEFF';
-    const blob = new Blob([BOM + content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    downloadFile(BOM + content, filename, 'text/csv');
+}
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+interface ExperimentExport {
+    id: number;
+    status: string;
+    hypothesis: string | null;
+    surprisal: number | null;
+    isSurprising: boolean;
+    prior: number | null;
+    posterior: number | null;
+    priorBelief: Experiment['priorBelief'];
+    posteriorBelief: Experiment['posteriorBelief'];
+    analysis: string | null;
+    review: string | null;
+    experimentPlan: Experiment['experimentPlan'];
+    code: string | null;
+    codeOutput: string | null;
+    richOutputs: Experiment['richOutputs'];
+    runtimeMs: number | null;
+    createdAt: string | null;
+}
+
+function transformExperimentForExport(exp: Experiment): ExperimentExport {
+    return {
+        id: exp.idInRun,
+        status: exp.status,
+        hypothesis: exp.hypothesis,
+        surprisal: exp.surprise,
+        isSurprising: exp.isSurprising,
+        prior: exp.prior,
+        posterior: exp.posterior,
+        priorBelief: exp.priorBelief,
+        posteriorBelief: exp.posteriorBelief,
+        analysis: exp.analysis,
+        review: exp.review,
+        experimentPlan: exp.experimentPlan,
+        code: exp.code,
+        codeOutput: exp.codeOutput,
+        richOutputs: exp.richOutputs,
+        runtimeMs: exp.runtimeMs,
+        createdAt: exp.createdAt ?? null,
+    };
+}
+
+export function generateRunJson(experiments: Experiment[]): string {
+    const exportData = experiments.map(transformExperimentForExport);
+    return JSON.stringify(exportData, null, 2);
+}
+
+export function downloadJson(content: string, filename: string): void {
+    downloadFile(content, filename, 'application/json');
 }

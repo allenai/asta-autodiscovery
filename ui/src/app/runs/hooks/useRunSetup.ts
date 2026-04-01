@@ -7,6 +7,7 @@ import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
+import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 export const MCTS_SELECTION = {
     UCB1_RECURSIVE: { value: 'ucb1_recursive', label: 'UCB1 Recursive' },
@@ -85,6 +86,16 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const { updateViewerRun, viewerRuns } = useViewerRuns();
     const { addErrorToast } = useToasts();
     const api = getRunsApi();
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [hasAi1Permission, setHasAi1Permission] = useState(false);
+    const [preloadedDescs, setPreloadedDescs] = useState<Record<string, string>>({});
+    const selectedPreloadedDatasets = useMemo(() => {
+        if (!hasAi1Permission) return [];
+        return PRELOADED_DATASETS.filter((d) => selectedIds.has(d.id)).map((d) => ({
+            ...d,
+            description: preloadedDescs[d.id] ?? d.description,
+        }));
+    }, [selectedIds, preloadedDescs, hasAi1Permission]);
 
     const creditsAvailable = credits?.available ?? 0;
 
@@ -129,6 +140,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             try {
                 // No userid needed - API will use authenticated user
                 const { data } = await api.getRun({ runId: runid });
+                setHasAi1Permission(data.can_view_datasets ?? false);
                 const { metadata } = getRunFromApi(data);
 
                 if (metadata) {
@@ -214,6 +226,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     // Keep refs to latest state for saveDatasetMetadata to avoid stale closures
     const fileUploadsRef = useRef(fileUploads);
     const settingsRef = useRef(settings);
+    const selectedPreloadedRef = useRef(selectedPreloadedDatasets);
 
     useEffect(() => {
         fileUploadsRef.current = fileUploads;
@@ -222,6 +235,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     useEffect(() => {
         settingsRef.current = settings;
     }, [settings]);
+
+    useEffect(() => {
+        selectedPreloadedRef.current = selectedPreloadedDatasets;
+    }, [selectedPreloadedDatasets]);
 
     useEffect(() => {
         fileUploads.forEach((upload, index) => {
@@ -249,6 +266,30 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         );
     };
 
+    const getCombinedDatasets = () => {
+        const uploads = fileUploadsRef.current
+            .filter((upload) => upload.status === UploadStatus.COMPLETED)
+            .map((upload) => ({
+                name: upload.file.name,
+                description: upload.description || '',
+                content_type: upload.file.type || 'application/octet-stream',
+                file_size_bytes: upload.file.size,
+                url: null,
+                is_preloaded: false,
+            }));
+
+        const preloaded = selectedPreloadedRef.current.map((ds) => ({
+            name: ds.filename, // This MUST match the filename the agent expects
+            description: ds.description,
+            content_type: 'application/octet-stream',
+            file_size_bytes: 0,
+            url: ds.url,
+            is_preloaded: true,
+        }));
+
+        return [...uploads, ...preloaded];
+    };
+
     const saveDatasetMetadata = useCallback(async () => {
         // Prevent concurrent saves
         if (isSavingMetadata.current) {
@@ -261,18 +302,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         try {
             isSavingMetadata.current = true;
 
-            // Build datasets array from current fileUploads state (via ref to get latest)
-            // Only include COMPLETED uploads (not PENDING/UPLOADING/ERROR)
-            const datasets = fileUploadsRef.current
-                .filter((upload) => upload.status === UploadStatus.COMPLETED)
-                .map((upload) => ({
-                    name: upload.file.name,
-                    description: upload.description || '',
-                    content_type: upload.file.type || 'application/octet-stream',
-                    file_size_bytes: upload.file.size,
-                }));
-
-            // Build metadata from current settings (via ref to get latest)
+            const datasets = getCombinedDatasets();
             const currentSettings = settingsRef.current;
             const metadata = {
                 // Descriptive metadata
@@ -499,7 +529,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         try {
             // Use refs to get latest state
             const currentSettings = settingsRef.current;
-            const currentFileUploads = fileUploadsRef.current;
+            const datasets = getCombinedDatasets();
 
             const metadata = {
                 // Descriptive metadata
@@ -507,12 +537,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 description: currentSettings.datasetsDescription.trim(),
                 domain: currentSettings.domain.trim(),
                 intent: currentSettings.intent.trim(),
-                datasets: currentFileUploads.map((upload) => ({
-                    name: upload.file.name,
-                    description: upload.description,
-                    content_type: upload.file.type || 'application/octet-stream',
-                    file_size_bytes: upload.file.size,
-                })),
+                datasets,
                 // Job configuration parameters
                 n_experiments: currentSettings.nExperiments,
                 exploration_weight: currentSettings.explorationWeight,
@@ -586,9 +611,17 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     };
 
     const isFormInvalid = () => {
-        // Validate all required fields
         const errors: FieldErrors = {};
 
+        // Check Files/Preloaded
+        const hasNoFiles = fileUploads.length === 0;
+        const hasNoPreloaded = selectedIds.size === 0;
+
+        if (hasNoFiles && hasNoPreloaded) {
+            errors.datasets = 'Please upload at least one file or select a preloaded dataset';
+        }
+
+        // Check Name & Description
         if (!settings.name.trim()) {
             errors.name = 'Run name is required';
         }
@@ -597,22 +630,25 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             errors.datasetsDescription = 'Description for datasets is required';
         }
 
-        if (!fileUploads.length) {
-            errors.datasets = 'Please upload at least one dataset';
+        // Check Experiment Budget
+        if (
+            !settings.nExperiments ||
+            settings.nExperiments < 1 ||
+            settings.nExperiments > creditsAvailable
+        ) {
+            errors.nExperiments = `Must be between 1 and ${creditsAvailable}`;
         }
 
-        // Validate file descriptions
-        const hasValidationErrors = Object.values(errors).length > 0;
+        // Check the object keys directly
+        const hasErrors = Object.keys(errors).length > 0;
 
-        if (settings.nExperiments < 1 || settings.nExperiments > creditsAvailable) {
-            errors.nExperiments = `Number of experiments must be between 1 and ${creditsAvailable}`;
-        }
-
-        if (hasValidationErrors) {
+        if (hasErrors) {
             setFieldErrors(errors);
+        } else {
+            setFieldErrors({});
         }
 
-        return hasValidationErrors;
+        return hasErrors;
     };
 
     const handleSubmit = async () => {
@@ -672,6 +708,21 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         }
     };
 
+    const togglePreloadedDataset = (id: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+        debouncedSaveMetadata(); // Auto-save when selection changes
+    };
+
+    const updatePreloadedDescription = (id: string, desc: string) => {
+        setPreloadedDescs((prev) => ({ ...prev, [id]: desc }));
+        debouncedSaveMetadata(); // Auto-save when description changes
+    };
+
     return {
         // Computed values
         creditsAvailable,
@@ -710,5 +761,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         retryUpload,
         handleExperimentsChange,
         handleSubmit,
+        hasAi1Permission,
+        selectedPreloadedDatasets,
+        selectedDatasetIds: selectedIds,
+        togglePreloadedDataset,
+        updatePreloadedDescription,
     };
 }

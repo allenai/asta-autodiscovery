@@ -27,6 +27,8 @@ export interface RunMetadataFromApi {
         description: string | null;
         content_type: string | null;
         file_size_bytes: number | null;
+        url?: string | null;
+        is_preloaded?: boolean;
     }[];
     // Sharing
     is_shared?: boolean | null;
@@ -70,7 +72,9 @@ export interface GenerateUploadUrlResponseBody {
     expires_at_unix: number;
 }
 
-export interface RunResponseBody extends RunFromApi {}
+export interface RunResponseBody extends RunFromApi {
+    can_view_datasets: boolean;
+}
 
 export interface GetViewerRunsResponseBody {
     runs: RunFromApi[];
@@ -117,6 +121,8 @@ export interface MetadataDatasetFromApi {
     description: string | null;
     content_type: string | null;
     file_size_bytes: number | null;
+    url?: string | null;
+    is_preloaded?: boolean;
 }
 
 export interface MetadataFromApi {

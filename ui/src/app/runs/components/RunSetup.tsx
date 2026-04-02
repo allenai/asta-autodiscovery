@@ -17,13 +17,28 @@ import {
     AccordionSummary,
     Slider,
     Fade,
+    Checkbox,
+    IconButton,
+    Collapse,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
-import DatasetUpload from '@/runs/components/DatasetUpload';
+import DatasetUpload, {
+    File as FileCard,
+    FileHeader,
+    FileHeaderFilename,
+    FileHeaderFileMeta,
+    FileHeaderActions,
+    FileDescription,
+    DatasetSchemaTitle,
+} from '@/runs/components/DatasetUpload';
 import { mkExpandAdvancedSettingsTrackAttrs, mkSubmitRunBtnTrackAttrs } from '@/analytics/runSetup';
+import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 const DEBOUNCE_SAVE_MS = 3000;
 
@@ -60,6 +75,10 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         handleSubmit,
         cancelUpload,
         retryUpload,
+        hasAi1Permission,
+        selectedDatasetIds,
+        togglePreloadedDataset,
+        updatePreloadedDescription,
     } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
 
     const isFormDisabled = isSubmitting || isLoading;
@@ -148,9 +167,96 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         disabled={isFormDisabled}
                     />
                 </FormControl>
-
                 <FormControl fullWidth>
-                    <StyledFormLabel error={!!datasetErrors}>Upload source files</StyledFormLabel>
+                    <StyledFormLabel error={!!datasetErrors}>Source files</StyledFormLabel>
+                    <HelperText>
+                        {hasAi1Permission
+                            ? 'Select preloaded datasets and/or upload source files.'
+                            : 'Upload source files for your discovery session.'}
+                    </HelperText>
+
+                    {hasAi1Permission && (
+                        <>
+                            <Box sx={{ display: 'flex', gap: 1, mb: 1, width: '100%' }}>
+                                {PRELOADED_DATASETS.map((dataset) => (
+                                    <PreloadedDatasetLabel
+                                        key={dataset.id}
+                                        selected={selectedDatasetIds.has(dataset.id)}>
+                                        <Checkbox
+                                            checked={selectedDatasetIds.has(dataset.id)}
+                                            onChange={() => togglePreloadedDataset(dataset.id)}
+                                            disabled={isFormDisabled}
+                                            size="small"
+                                            icon={<CheckBoxOutlineBlankIcon fontSize="small" />}
+                                            checkedIcon={<CheckedIcon />}
+                                            sx={{ p: 0 }}
+                                        />
+                                        {dataset.label}
+                                    </PreloadedDatasetLabel>
+                                ))}
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                    mb: selectedDatasetIds.size > 0 ? 2 : 0,
+                                }}>
+                                {PRELOADED_DATASETS.map((dataset) => (
+                                    <Collapse
+                                        key={dataset.id}
+                                        in={selectedDatasetIds.has(dataset.id)}
+                                        unmountOnExit>
+                                        <FileCard>
+                                            <FileHeader>
+                                                <DescriptionOutlinedIcon />
+                                                <FileHeaderFilename>
+                                                    {dataset.filename}
+                                                </FileHeaderFilename>
+                                                <FileHeaderFileMeta>
+                                                    Preloaded dataset
+                                                </FileHeaderFileMeta>
+                                                <FileHeaderActions>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() =>
+                                                            togglePreloadedDataset(dataset.id)
+                                                        }
+                                                        disabled={isFormDisabled}
+                                                        sx={{ ml: 'auto' }}
+                                                        title="Remove dataset">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                </FileHeaderActions>
+                                            </FileHeader>
+                                            <FileDescription>
+                                                <DatasetSchemaTitle>
+                                                    Dataset Schema (Optional)
+                                                </DatasetSchemaTitle>
+                                                Feel free to edit or add additional context to help
+                                                guide the analysis.
+                                                <TextField
+                                                    multiline
+                                                    maxRows={3}
+                                                    fullWidth
+                                                    defaultValue={dataset.description}
+                                                    onChange={(e) =>
+                                                        updatePreloadedDescription(
+                                                            dataset.id,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    disabled={isFormDisabled}
+                                                    sx={{ mt: 1 }}
+                                                />
+                                            </FileDescription>
+                                        </FileCard>
+                                    </Collapse>
+                                ))}
+                            </Box>
+                        </>
+                    )}
                     <DatasetUpload
                         fileUploads={fileUploads}
                         maxFileSize={maxFileSize}
@@ -409,6 +515,9 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
 const StyledFormLabel = styled(FormLabel)(({ theme }) => ({
     color: theme.color['green-40'].hex,
     fontWeight: 700,
+    '&.Mui-focused': {
+        color: theme.color['green-40'].hex,
+    },
     '&.Mui-error': {
         color: theme.color['error-red-100'].hex,
     },
@@ -422,6 +531,57 @@ const HelperText = styled(FormHelperText)(({ theme }) => ({
 const OptionalText = styled('span')({
     fontWeight: 400,
 });
+
+const PreloadedDatasetLabel = styled('label')<{ selected: boolean }>(({ theme, selected }) => ({
+    flex: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: theme.spacing(1),
+    padding: theme.spacing(1),
+    borderRadius: theme.shape.borderRadius + 'px',
+    border: '1px solid ' + (selected ? 'transparent' : theme.color['cream-20'].rgba.toString()),
+    backgroundColor: selected ? theme.color['teal-100'].hex : 'transparent',
+    color: selected ? '#fff' : theme.color['cream-100'].hex,
+    fontWeight: 600,
+    fontSize: '0.875rem',
+    cursor: 'pointer',
+    transition: 'all 200ms ease-in-out',
+    userSelect: 'none',
+
+    '&:hover': {
+        borderColor: theme.color['green-100'].hex,
+    },
+
+    '& .MuiCheckbox-root': {
+        color: selected ? '#fff' : theme.color['cream-20'].rgba.toString(),
+    },
+}));
+
+const StyledCheckedIcon = styled('svg')(({ theme }) => ({
+    '& .check-bg': {
+        fill: theme.color['green-100'].hex,
+    },
+    '& .check-mark': {
+        fill: theme.color['dark-teal-100'].hex,
+    },
+}));
+
+function CheckedIcon() {
+    return (
+        <StyledCheckedIcon
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <rect className="check-bg" x="2" y="2" width="20" height="20" rx="3" />
+            <path
+                className="check-mark"
+                d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"
+            />
+        </StyledCheckedIcon>
+    );
+}
 
 const SubmitButton = styled(Button)(({ theme }) => ({
     '&.MuiButton-root': {

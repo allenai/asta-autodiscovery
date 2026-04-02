@@ -17,6 +17,7 @@ _jwks_cache = {}
 class PermissionType(Enum):
     ADMIN = "enroll:autodiscovery_admin"
     HIGHER_UPLOAD_LIMIT = "enroll:higher_upload_limit"
+    AI1_DATASETS = "enroll:ai1_datasets"
 
 
 def get_public_key(auth0_domain, kid):

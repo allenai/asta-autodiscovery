@@ -16,3 +16,15 @@ export const mkCloseExperimentDetailsPanelAttrs = (props: { runId: string }) =>
 
 // Sort column event name
 export const sortColumnEventName = `${RUN_DETAILS}__sort_column` as const;
+
+// Download button click
+export const mkDownloadBtnAttrs = (props: { runId: string }) =>
+    mkTrackAttrs(`${RUN_DETAILS}__download_btn`, props);
+
+// Download CSV menu item click
+export const mkDownloadCsvMenuItemAttrs = (props: { runId: string }) =>
+    mkTrackAttrs(`${RUN_DETAILS}__download_csv`, props);
+
+// Download JSON menu item click
+export const mkDownloadJsonMenuItemAttrs = (props: { runId: string }) =>
+    mkTrackAttrs(`${RUN_DETAILS}__download_json`, props);

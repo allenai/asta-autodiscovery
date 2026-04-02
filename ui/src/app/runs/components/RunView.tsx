@@ -10,6 +10,8 @@ import {
     styled,
     List,
     ListItem,
+    Menu,
+    MenuItem,
     useMediaQuery,
     Link,
     IconButton,
@@ -22,6 +24,7 @@ import CloseFullscreenOutlinedIcon from '@mui/icons-material/CloseFullscreenOutl
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
@@ -36,8 +39,19 @@ import { StatusChip } from '@/runs/components/StatusChip';
 import { RunParametersModal } from '@/runs/components/RunParametersModal';
 import {
     mkCloseExperimentDetailsPanelAttrs,
+    mkDownloadBtnAttrs,
+    mkDownloadCsvMenuItemAttrs,
+    mkDownloadJsonMenuItemAttrs,
     mkSessionConfigBtnAttrs,
 } from '@/analytics/runDetails';
+import {
+    downloadCsv,
+    downloadJson,
+    ExportFormat,
+    generateFilename,
+    generateRunCsv,
+    generateRunJson,
+} from '@/utils/exportUtils';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
 import { useRunBookmarks } from '@/contexts/RunBookmarksContext';
@@ -224,6 +238,7 @@ function RunViewContent({
     } = useRunExperiments();
     const [isParametersModalOpen, setIsParametersModalOpen] = useState(false);
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
+    const [downloadAnchorEl, setDownloadAnchorEl] = useState<null | HTMLElement>(null);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
     const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const { addSuccessToast, addErrorToast } = useToasts();
@@ -293,6 +308,35 @@ function RunViewContent({
         }
     }, [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]);
 
+    const handleDownload = useCallback(
+        (format: ExportFormat) => {
+            setDownloadAnchorEl(null);
+
+            try {
+                const filename = generateFilename(run.name, format);
+
+                switch (format) {
+                    case 'json': {
+                        const content = generateRunJson(experiments);
+                        downloadJson(content, filename);
+                        break;
+                    }
+                    case 'csv': {
+                        const content = generateRunCsv(experiments);
+                        downloadCsv(content, filename);
+                        break;
+                    }
+                    default:
+                        throw new Error(`Unsupported export format: ${format}`);
+                }
+            } catch (error) {
+                console.error(`Failed to download ${format.toUpperCase()}:`, error);
+                addErrorToast(`Failed to download ${format.toUpperCase()}`);
+            }
+        },
+        [run.name, experiments, addErrorToast]
+    );
+
     // Read from URL: Initial selection when exp param is present
     useEffect(() => {
         if (hasInitiallySelected.current || !expParam) return;
@@ -351,6 +395,11 @@ function RunViewContent({
                                 {isRunBookmarksEnabled && (
                                     <BookmarkButton
                                         size="small"
+                                        aria-label={
+                                            checkRunBookmarked(run.id)
+                                                ? 'Remove bookmark'
+                                                : 'Bookmark this session'
+                                        }
                                         $isBookmarked={checkRunBookmarked(run.id)}
                                         onClick={() =>
                                             updateRunBookmark(run.id, {
@@ -374,6 +423,29 @@ function RunViewContent({
                         </Box>
                         {isRunBookmarksEnabled && (
                             <RunHeaderActions>
+                                <DownloadButton
+                                    {...mkDownloadBtnAttrs({ runId: run.id })}
+                                    onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<FileDownloadOutlinedIcon />}>
+                                    Download
+                                </DownloadButton>
+                                <DownloadMenu
+                                    anchorEl={downloadAnchorEl}
+                                    open={!!downloadAnchorEl}
+                                    onClose={() => setDownloadAnchorEl(null)}>
+                                    <MenuItem
+                                        {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
+                                        onClick={() => handleDownload('csv')}>
+                                        CSV
+                                    </MenuItem>
+                                    <MenuItem
+                                        {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
+                                        onClick={() => handleDownload('json')}>
+                                        JSON
+                                    </MenuItem>
+                                </DownloadMenu>
                                 <ShareSessionButton
                                     onClick={onShareClick}
                                     size="small"
@@ -516,6 +588,11 @@ function RunViewContent({
                                         </ShareExperimentButton>
                                         <LargeScreenAction>
                                             <ExperimentActionButton
+                                                aria-label={
+                                                    isExpPanelExpanded
+                                                        ? 'Collapse panel'
+                                                        : 'Expand panel'
+                                                }
                                                 onClick={() =>
                                                     setIsExpPanelExpanded(!isExpPanelExpanded)
                                                 }
@@ -528,6 +605,7 @@ function RunViewContent({
                                             </ExperimentActionButton>
                                         </LargeScreenAction>
                                         <ExperimentActionButton
+                                            aria-label="Close experiment details"
                                             onClick={handleClosePanel}
                                             size="small"
                                             data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
@@ -624,6 +702,29 @@ const RunHeaderActions = styled('div')`
     flex-shrink: 0;
     gap: ${({ theme }) => theme.spacing(1)};
     margin-left: auto;
+`;
+
+const DownloadButton = styled(Button)`
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    height: 32px;
+    white-space: nowrap;
+
+    &:hover {
+        border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
+`;
+
+const DownloadMenu = styled(Menu)`
+    .MuiPaper-root {
+        background-color: ${({ theme }) => theme.color['teal-100'].hex};
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+    }
+
+    .MuiMenuItem-root:hover {
+        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
 `;
 
 const ShareSessionButton = styled(Button)`

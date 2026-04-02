@@ -12,6 +12,7 @@ import {
     LinearProgress,
     Alert,
     Button,
+    Collapse,
 } from '@mui/material';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
@@ -178,113 +179,118 @@ export default function DatasetUpload({
                         const friendlyType = getFriendlyMimeType(fileType);
 
                         return (
-                            <File key={`upload-${index}`}>
-                                <FileHeader>
-                                    <DescriptionOutlinedIcon />
-                                    <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
-                                    <FileHeaderFileMeta>
-                                        {friendlyType} • {prettyBytes(upload.totalBytes)}
-                                    </FileHeaderFileMeta>
-                                    <FileHeaderActions>
-                                        {/* Status indicators */}
-                                        {upload.status === UploadStatus.COMPLETED && (
-                                            <CheckCircleIcon
-                                                sx={{ color: 'success.main', mr: 1 }}
-                                                titleAccess="Upload completed"
-                                            />
-                                        )}
-                                        {upload.status === UploadStatus.ERROR && (
-                                            <ErrorIcon
-                                                sx={{ color: 'error.main', mr: 1 }}
-                                                titleAccess="Upload failed"
-                                            />
-                                        )}
+                            <Collapse key={`upload-${index}`} in appear>
+                                <File>
+                                    <FileHeader>
+                                        <DescriptionOutlinedIcon />
+                                        <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
+                                        <FileHeaderFileMeta>
+                                            {friendlyType} • {prettyBytes(upload.totalBytes)}
+                                        </FileHeaderFileMeta>
+                                        <FileHeaderActions>
+                                            {/* Status indicators */}
+                                            {upload.status === UploadStatus.COMPLETED && (
+                                                <CheckCircleIcon
+                                                    sx={{ color: 'success.main', mr: 1 }}
+                                                    titleAccess="Upload completed"
+                                                />
+                                            )}
+                                            {upload.status === UploadStatus.ERROR && (
+                                                <ErrorIcon
+                                                    sx={{ color: 'error.main', mr: 1 }}
+                                                    titleAccess="Upload failed"
+                                                />
+                                            )}
 
-                                        {upload.status === UploadStatus.PENDING && (
-                                            <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                                sx={{ mr: 1 }}>
-                                                Starting...
-                                            </Typography>
-                                        )}
+                                            {upload.status === UploadStatus.PENDING && (
+                                                <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                    sx={{ mr: 1 }}>
+                                                    Starting...
+                                                </Typography>
+                                            )}
 
-                                        {/* Cancel button */}
-                                        {upload.status === UploadStatus.UPLOADING && (
-                                            <Button
-                                                size="small"
-                                                onClick={() => onCancelUpload(index)}
-                                                disabled={disabled}
-                                                sx={{ ml: 'auto' }}
-                                                startIcon={
-                                                    <StopCircleOutlinedIcon color="error" />
-                                                }>
-                                                Cancel
-                                            </Button>
-                                        )}
+                                            {/* Cancel button */}
+                                            {upload.status === UploadStatus.UPLOADING && (
+                                                <Button
+                                                    size="small"
+                                                    onClick={() => onCancelUpload(index)}
+                                                    disabled={disabled}
+                                                    sx={{ ml: 'auto' }}
+                                                    startIcon={
+                                                        <StopCircleOutlinedIcon color="error" />
+                                                    }>
+                                                    Cancel
+                                                </Button>
+                                            )}
 
-                                        {/* Remove button */}
-                                        {upload.status !== UploadStatus.UPLOADING && (
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => onRemoveFileUpload(index)}
-                                                disabled={disabled}
-                                                sx={{ ml: 'auto' }}
-                                                title="Remove file">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        )}
-                                    </FileHeaderActions>
-                                </FileHeader>
+                                            {/* Remove button */}
+                                            {upload.status !== UploadStatus.UPLOADING && (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => onRemoveFileUpload(index)}
+                                                    disabled={disabled}
+                                                    sx={{ ml: 'auto' }}
+                                                    title="Remove file">
+                                                    <CloseIcon fontSize="small" />
+                                                </IconButton>
+                                            )}
+                                        </FileHeaderActions>
+                                    </FileHeader>
 
-                                {/* Progress bar - only show during upload */}
-                                {upload.status === UploadStatus.UPLOADING && (
-                                    <Box sx={{ px: 2, py: 1 }}>
-                                        <UploadProgress upload={upload} />
-                                    </Box>
-                                )}
+                                    {/* Progress bar - only show during upload */}
+                                    {upload.status === UploadStatus.UPLOADING && (
+                                        <Box sx={{ px: 2, py: 1 }}>
+                                            <UploadProgress upload={upload} />
+                                        </Box>
+                                    )}
 
-                                {/* Error message with retry button */}
-                                {upload.status === UploadStatus.ERROR && (
-                                    <Alert
-                                        severity="error"
-                                        sx={{ mx: 2, mt: 1 }}
-                                        action={
-                                            <Button
-                                                size="small"
-                                                onClick={() => onRetryUpload(index)}
-                                                sx={{ ml: 1 }}>
-                                                Retry
-                                            </Button>
-                                        }>
-                                        {upload.error || 'Upload failed'}
-                                    </Alert>
-                                )}
+                                    {/* Error message with retry button */}
+                                    {upload.status === UploadStatus.ERROR && (
+                                        <Alert
+                                            severity="error"
+                                            sx={{ mx: 2, mt: 1 }}
+                                            action={
+                                                <Button
+                                                    size="small"
+                                                    onClick={() => onRetryUpload(index)}
+                                                    sx={{ ml: 1 }}>
+                                                    Retry
+                                                </Button>
+                                            }>
+                                            {upload.error || 'Upload failed'}
+                                        </Alert>
+                                    )}
 
-                                {/* Description field */}
-                                <FileDescription>
-                                    <DatasetSchemaTitle>
-                                        Dataset Schema (Optional)
-                                    </DatasetSchemaTitle>
-                                    Help us interpret your data accurately. Our system will analyze
-                                    your files automatically. For the best results, please use this
-                                    space to clarify any abbreviations, complex structures, or
-                                    similar or unclear variables (e.g., column names).
-                                    <TextField
-                                        multiline
-                                        maxRows={3}
-                                        fullWidth
-                                        value={upload.description}
-                                        onChange={(e) => onDescriptionChange(index, e.target.value)}
-                                        disabled={disabled}
-                                        sx={{ mt: 1 }}
-                                        placeholder='e.g.,
+                                    {/* Description field */}
+                                    <FileDescription>
+                                        <DatasetSchemaTitle>
+                                            Dataset Schema (Optional)
+                                        </DatasetSchemaTitle>
+                                        Help us interpret your data accurately. Our system will
+                                        analyze your files automatically. For the best results,
+                                        please use this space to clarify any abbreviations, complex
+                                        structures, or similar or unclear variables (e.g., column
+                                        names).
+                                        <TextField
+                                            multiline
+                                            maxRows={3}
+                                            fullWidth
+                                            value={upload.description}
+                                            onChange={(e) =>
+                                                onDescriptionChange(index, e.target.value)
+                                            }
+                                            disabled={disabled}
+                                            sx={{ mt: 1 }}
+                                            placeholder='e.g.,
 1. "n" - count of non-native plant species introductions in each time period,
 2. "final_choice_new" - “participants final choice in the treatment condition”
 3. Each row in this file represents a time-series'
-                                    />
-                                </FileDescription>
-                            </File>
+                                        />
+                                    </FileDescription>
+                                </File>
+                            </Collapse>
                         );
                     })}
                 </FilesContainer>
@@ -315,29 +321,27 @@ const DropZone = styled(Box, {
         color: theme.color['cream-100'].hex,
 
         '&:hover': {
-            backgroundColor: disabled
-                ? 'transparent'
-                : alpha(theme.color['cream-10'].rgba.toString(), 0.5),
+            backgroundColor: disabled ? 'transparent' : alpha(theme.color['teal-100'].hex, 0.1),
             borderColor: disabled
                 ? theme.color['cream-20'].rgba.toString()
-                : theme.color['green-40'].hex,
+                : theme.color['teal-100'].hex,
         },
     })
 );
 
-const FilesContainer = styled(Stack)(({ theme }) => ({
+export const FilesContainer = styled(Stack)(({ theme }) => ({
     flexDirection: 'column',
     gap: theme.spacing(1),
-    marginTop: theme.spacing(2),
+    marginTop: theme.spacing(1),
 }));
 
-const File = styled(Box)(({ theme }) => ({
+export const File = styled(Box)(({ theme }) => ({
     backgroundColor: theme.color['cream-10'].rgba.toString(),
     borderRadius: theme.shape.borderRadius,
     color: theme.color['cream-100'].hex,
 }));
 
-const FileHeader = styled(Box)(({ theme }) => ({
+export const FileHeader = styled(Box)(({ theme }) => ({
     alignItems: 'center',
     borderBottom: `1px solid ${theme.color['cream-10'].rgba.toString()}`,
     color: theme.color['cream-60'].rgba.toString(),
@@ -363,13 +367,13 @@ const FileHeader = styled(Box)(({ theme }) => ({
     },
 }));
 
-const FileHeaderActions = styled(Box)(() => ({
+export const FileHeaderActions = styled(Box)(() => ({
     display: 'flex',
     alignItems: 'center',
     marginLeft: 'auto',
 }));
 
-const FileHeaderFilename = styled(Typography)(({ theme }) => ({
+export const FileHeaderFilename = styled(Typography)(({ theme }) => ({
     fontWeight: 'bold',
     color: theme.color['cream-100'].hex,
     overflow: 'hidden',
@@ -377,7 +381,7 @@ const FileHeaderFilename = styled(Typography)(({ theme }) => ({
     whiteSpace: 'nowrap',
 }));
 
-const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
+export const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
     flex: '0 0 auto',
     alignItems: 'end',
     marginLeft: theme.spacing(1),
@@ -385,13 +389,13 @@ const FileHeaderFileMeta = styled(Typography)(({ theme }) => ({
     opacity: 0.6,
 }));
 
-const FileDescription = styled(Box)(({ theme }) => ({
+export const FileDescription = styled(Box)(({ theme }) => ({
     color: theme.color['cream-100'].hex,
     fontSize: '0.875rem',
     padding: theme.spacing(2),
 }));
 
-const DatasetSchemaTitle = styled(Typography)(({ theme }) => ({
+export const DatasetSchemaTitle = styled(Typography)(({ theme }) => ({
     color: theme.color['green-40'].hex,
     fontWeight: 'bold',
 }));

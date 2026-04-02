@@ -1,7 +1,10 @@
 """High-level interface for managing Cloud Run jobs."""
 
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from . import cloudrun, gcs
 from .config import JobConfig
@@ -313,7 +316,8 @@ class JobManager:
                 gcs.write_shared_run_index(runid, userid, self.config)
                 return userid
         except Exception:
-            pass
+            # If we can't read metadata, treat as not shared
+            logger.warning("Failed to read metadata for run %s (user %s)", runid, userid, exc_info=True)
 
         return None
 

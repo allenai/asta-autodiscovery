@@ -181,6 +181,13 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
         raise GCSError(f"Failed to find user for job {jobid}: {e}")
 
 
+def _shared_run_index_blob(jobid: str, config: JobConfig) -> storage.Blob:
+    """Return the GCS blob for a shared run index entry."""
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    return bucket.blob(f"index/shared-runs/{jobid}")
+
+
 def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | None:
     """Look up the owner of a shared run from the index.
 
@@ -192,9 +199,7 @@ def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | N
         User ID if an index entry exists, None otherwise
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
-    blob = bucket.blob(f"index/shared-runs/{jobid}")
+    blob = _shared_run_index_blob(jobid, config)
     try:
         data = json.loads(blob.download_as_text())
         return data["userid"]
@@ -211,9 +216,7 @@ def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = N
         config: Configuration (uses default if None)
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
-    blob = bucket.blob(f"index/shared-runs/{jobid}")
+    blob = _shared_run_index_blob(jobid, config)
     try:
         blob.upload_from_string(json.dumps({"runid": jobid, "userid": userid}))
     except Exception:
@@ -228,9 +231,7 @@ def delete_shared_run_index(jobid: str, config: JobConfig | None = None) -> None
         config: Configuration (uses default if None)
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
-    blob = bucket.blob(f"index/shared-runs/{jobid}")
+    blob = _shared_run_index_blob(jobid, config)
     try:
         blob.delete()
     except Exception:

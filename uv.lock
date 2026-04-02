@@ -70,7 +70,7 @@ requires-dist = [
     { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
     { name = "code-execution", editable = "packages/code_execution" },
     { name = "google-adk", specifier = ">=1.21.0" },
-    { name = "litellm" },
+    { name = "litellm", specifier = "==1.80.11" },
 ]
 
 [[package]]

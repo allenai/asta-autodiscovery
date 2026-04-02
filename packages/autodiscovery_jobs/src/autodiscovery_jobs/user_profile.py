@@ -15,6 +15,7 @@ from typing import Any
 
 from google.cloud import storage
 from google.api_core import retry as google_retry
+from google.cloud.exceptions import NotFound
 
 from .config import JobConfig
 
@@ -137,11 +138,14 @@ def get_user_profile(
     blob = bucket.blob(blob_path)
 
     try:
-        content = blob.download_as_text(timeout=2, retry=None)
+        content = blob.download_as_text(retry=None)
         data = json.loads(content)
         return UserProfile.from_dict(data)
+    except NotFound:
+        logger.debug(f"User profile not found for {userid} (expected behavior)")
+        return None
     except Exception as e:
-        logger.debug(f"Could not load user profile for {userid}: {e}")
+        logger.debug(f"Unexpected error loading user profile for {userid}: {e}")
         return None
 
 

@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from google.cloud import storage
+from google.api_core import retry as google_retry
 
 from .config import JobConfig
 
@@ -136,7 +137,7 @@ def get_user_profile(
     blob = bucket.blob(blob_path)
 
     try:
-        content = blob.download_as_text()
+        content = blob.download_as_text(timeout=2, retry=None)
         data = json.loads(content)
         return UserProfile.from_dict(data)
     except Exception as e:

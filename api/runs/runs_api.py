@@ -384,7 +384,6 @@ def create() -> Blueprint:
 
     @api.route("/<userid>/<runid>")
     @optional_enrollment
-    @requires_auth(check_permissions=[PermissionType.AI1_DATASETS])
     def get_run(userid: str, runid: str):
         """Get details for a specific run.
 
@@ -758,7 +757,6 @@ def create() -> Blueprint:
 
     @api.route("/submit", methods=["POST"])
     @requires_enrollment
-    @requires_auth(check_permissions=[PermissionType.AI1_DATASETS])
     def submit_run():
         """Submit a run for execution.
 

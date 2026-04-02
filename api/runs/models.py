@@ -179,7 +179,7 @@ class MetadataModel(BaseModel):
                 description=ds.get("description"),
                 content_type=ds.get("content_type"),
                 file_size_bytes=ds.get("file_size_bytes"),
-                url=ds.get("url"),
+                url=ds.get("url", None),
                 is_preloaded=ds.get("is_preloaded", False)
 
             )

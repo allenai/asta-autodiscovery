@@ -336,8 +336,6 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
     except Exception as e:
         raise GCSError(f"Failed to delete job directory: {e}")
 
-    delete_shared_run_index(jobid, config)
-
 
 def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
     """Soft delete a job by removing user data but preserving results and metadata.
@@ -408,8 +406,6 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
             },
             config,
         )
-
-        delete_shared_run_index(jobid, config)
 
         return {
             "deleted_files": deleted_files,

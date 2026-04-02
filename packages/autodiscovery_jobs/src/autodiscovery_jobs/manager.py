@@ -100,6 +100,7 @@ class JobManager:
             jobid: Job identifier
         """
         gcs.delete_job_directory(userid, jobid, self.config)
+        gcs.delete_shared_run_index(jobid, self.config)
 
     def soft_delete_job(self, userid: str, jobid: str) -> dict[str, Any]:
         """Soft delete a job by stopping execution and removing user data.
@@ -147,6 +148,8 @@ class JobManager:
         # Perform soft delete
         result = gcs.soft_delete_job(userid, jobid, self.config)
         result["cancelled_execution"] = cancelled_execution
+
+        gcs.delete_shared_run_index(jobid, self.config)
 
         return result
 
@@ -321,22 +324,22 @@ class JobManager:
 
         return None
 
-    def write_shared_run_index(self, runid: str, userid: str) -> None:
-        """Write a shared run index entry.
+    def set_run_shared(self, runid: str, userid: str, is_shared: bool) -> None:
+        """Update a run's shared state in metadata and keep the index in sync.
 
         Args:
             runid: Run identifier
             userid: User ID of the run owner
+            is_shared: True to share, False to unshare
         """
-        gcs.write_shared_run_index(runid, userid, self.config)
+        metadata = self.get_metadata(userid, runid) or {}
+        metadata["is_shared"] = is_shared
+        self.upload_metadata(userid, runid, metadata)
 
-    def delete_shared_run_index(self, runid: str) -> None:
-        """Remove a shared run index entry.
-
-        Args:
-            runid: Run identifier
-        """
-        gcs.delete_shared_run_index(runid, self.config)
+        if is_shared:
+            gcs.write_shared_run_index(runid, userid, self.config)
+        else:
+            gcs.delete_shared_run_index(runid, self.config)
 
     # Job execution
 

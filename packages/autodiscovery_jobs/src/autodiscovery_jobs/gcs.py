@@ -196,7 +196,8 @@ def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | N
     bucket = client.bucket(config.bucket)
     blob = bucket.blob(f"index/shared-runs/{jobid}")
     try:
-        return blob.download_as_text()
+        data = json.loads(blob.download_as_text())
+        return data["userid"]
     except Exception:
         return None
 
@@ -214,7 +215,7 @@ def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = N
     bucket = client.bucket(config.bucket)
     blob = bucket.blob(f"index/shared-runs/{jobid}")
     try:
-        blob.upload_from_string(userid)
+        blob.upload_from_string(json.dumps({"runid": jobid, "userid": userid}))
     except Exception:
         pass  # Best-effort; the glob fallback covers misses
 

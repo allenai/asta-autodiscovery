@@ -473,7 +473,3 @@ class GetSharedRunOwnerResponseModel(BaseModel):
 
     runid: str = Field(..., description="Identifier of the run")
     userid: str = Field(..., description="User ID of the run owner")
-
-MetadataDatasetModel.model_rebuild()
-MetadataModel.model_rebuild()
-RunModel.model_rebuild()

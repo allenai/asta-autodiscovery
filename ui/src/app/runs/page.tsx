@@ -92,6 +92,7 @@ export default function RunsPage() {
             <Section>
                 <ExamplesRunsBox />
             </Section>
+            <AstaAdBanner />
         </Layout>
     );
 }

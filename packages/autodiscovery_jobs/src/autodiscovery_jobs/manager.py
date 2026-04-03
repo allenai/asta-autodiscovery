@@ -314,7 +314,7 @@ class JobManager:
         # Verify the run is marked as shared
         try:
             metadata = self.get_metadata(userid, runid)
-            if metadata and metadata.get("is_shared"):
+            if metadata.get("is_shared"):
                 # Lazily populate the index for next time
                 gcs.write_shared_run_index(runid, userid, self.config)
                 return userid

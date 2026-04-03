@@ -303,18 +303,18 @@ class JobManager:
         """
         # Fast path: check the shared-run index
         userid = gcs.get_shared_run_index(runid, self.config)
-        if userid is not None:
+        if userid:
             return userid
 
         # Slow path: full glob scan across all users
         userid = gcs.get_userid_for_job(runid, self.config)
-        if userid is None:
+        if not userid:
             return None
 
         # Verify the run is marked as shared
         try:
             metadata = self.get_metadata(userid, runid)
-            if metadata and metadata.get("is_shared") is True:
+            if metadata and metadata.get("is_shared"):
                 # Lazily populate the index for next time
                 gcs.write_shared_run_index(runid, userid, self.config)
                 return userid

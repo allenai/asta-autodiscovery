@@ -20,7 +20,8 @@ interface SharedRunPageProps {
  */
 export default function SharedRunPage({ params }: SharedRunPageProps) {
     const { isLoading } = useAuth0();
-    const { userid, runid } = params;
+    const userid = decodeURIComponent(params.userid);
+    const runid = decodeURIComponent(params.runid);
 
     if (isLoading) {
         return <LoadingSpinner />;

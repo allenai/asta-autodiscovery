@@ -1258,16 +1258,7 @@ def create() -> Blueprint:
         try:
             manager = get_job_manager()
 
-            # Read current metadata
-            metadata_dict = manager.get_metadata(req.userid, req.runid)
-            if metadata_dict is None:
-                metadata_dict = {}
-
-            # Update is_shared
-            metadata_dict["is_shared"] = req.is_shared
-
-            # Write back
-            manager.upload_metadata(req.userid, req.runid, metadata_dict)
+            manager.set_run_shared(req.runid, req.userid, req.is_shared)
 
             resp = ShareRunResponseModel(
                 is_shared=req.is_shared,

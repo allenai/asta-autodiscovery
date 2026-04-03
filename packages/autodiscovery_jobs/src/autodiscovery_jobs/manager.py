@@ -1,7 +1,10 @@
 """High-level interface for managing Cloud Run jobs."""
 
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from . import cloudrun, gcs
 from .config import JobConfig
@@ -97,6 +100,7 @@ class JobManager:
             jobid: Job identifier
         """
         gcs.delete_job_directory(userid, jobid, self.config)
+        gcs.delete_shared_run_index(jobid, self.config)
 
     def soft_delete_job(self, userid: str, jobid: str) -> dict[str, Any]:
         """Soft delete a job by stopping execution and removing user data.
@@ -144,6 +148,8 @@ class JobManager:
         # Perform soft delete
         result = gcs.soft_delete_job(userid, jobid, self.config)
         result["cancelled_execution"] = cancelled_execution
+
+        gcs.delete_shared_run_index(jobid, self.config)
 
         return result
 
@@ -281,6 +287,10 @@ class JobManager:
     def get_shared_run_owner(self, runid: str) -> str | None:
         """Get the owner userid for a shared run.
 
+        Uses a GCS index for O(1) lookups on warm paths. Falls back to a full
+        glob scan on index misses, and lazily populates the index when a shared
+        run is found so subsequent requests hit the fast path.
+
         Args:
             runid: Run identifier
 
@@ -291,22 +301,45 @@ class JobManager:
             Returns None for runs that don't exist OR exist but are not shared.
             This prevents information leakage about run existence.
         """
-        # Find who owns this run using existing GCS function
-        userid = gcs.get_userid_for_job(runid, self.config)
+        # Fast path: check the shared-run index
+        userid = gcs.get_shared_run_index(runid, self.config)
+        if userid:
+            return userid
 
-        if userid is None:
+        # Slow path: full glob scan across all users
+        userid = gcs.get_userid_for_job(runid, self.config)
+        if not userid:
             return None
 
         # Verify the run is marked as shared
         try:
             metadata = self.get_metadata(userid, runid)
-            if metadata and metadata.get("is_shared") is True:
+            if metadata.get("is_shared"):
+                # Lazily populate the index for next time
+                gcs.write_shared_run_index(runid, userid, self.config)
                 return userid
         except Exception:
             # If we can't read metadata, treat as not shared
-            pass
+            logger.warning("Failed to read metadata for run %s (user %s)", runid, userid, exc_info=True)
 
         return None
+
+    def set_run_shared(self, runid: str, userid: str, is_shared: bool) -> None:
+        """Update a run's shared state in metadata and keep the index in sync.
+
+        Args:
+            runid: Run identifier
+            userid: User ID of the run owner
+            is_shared: True to share, False to unshare
+        """
+        metadata = self.get_metadata(userid, runid) or {}
+        metadata["is_shared"] = is_shared
+        self.upload_metadata(userid, runid, metadata)
+
+        if is_shared:
+            gcs.write_shared_run_index(runid, userid, self.config)
+        else:
+            gcs.delete_shared_run_index(runid, self.config)
 
     # Job execution
 

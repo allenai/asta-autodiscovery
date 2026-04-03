@@ -181,6 +181,63 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
         raise GCSError(f"Failed to find user for job {jobid}: {e}")
 
 
+def _shared_run_index_blob(jobid: str, config: JobConfig) -> storage.Blob:
+    """Return the GCS blob for a shared run index entry."""
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    return bucket.blob(f"index/shared-runs/{jobid}")
+
+
+def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | None:
+    """Look up the owner of a shared run from the index.
+
+    Args:
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        User ID if an index entry exists, None otherwise
+    """
+    config = config or JobConfig()
+    blob = _shared_run_index_blob(jobid, config)
+    try:
+        data = json.loads(blob.download_as_text())
+        return data["userid"]
+    except Exception:
+        return None
+
+
+def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = None) -> None:
+    """Write an index entry mapping a shared run to its owner.
+
+    Args:
+        jobid: Job identifier
+        userid: User ID of the run owner
+        config: Configuration (uses default if None)
+    """
+    config = config or JobConfig()
+    blob = _shared_run_index_blob(jobid, config)
+    try:
+        blob.upload_from_string(json.dumps({"runid": jobid, "userid": userid}))
+    except Exception:
+        pass  # Best-effort; the glob fallback covers misses
+
+
+def delete_shared_run_index(jobid: str, config: JobConfig | None = None) -> None:
+    """Remove a shared run index entry.
+
+    Args:
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+    """
+    config = config or JobConfig()
+    blob = _shared_run_index_blob(jobid, config)
+    try:
+        blob.delete()
+    except Exception:
+        pass  # Best-effort; entry may not exist
+
+
 def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool:
     """Check if a job directory exists.
 

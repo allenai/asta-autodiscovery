@@ -374,6 +374,11 @@ function RunViewContent({
     }, [selectedExperiment, setSearchParam, deleteSearchParam]);
 
     const isRunning = !!run.stats?.pendingExperiments && run.details.status !== 'FAILED';
+    const isComplete =
+        run.details.status === 'SUCCEEDED' ||
+        run.details.status === 'FAILED' ||
+        run.details.status === 'ERROR' ||
+        run.details.status === 'CANCELLED';
 
     return (
         <Container>
@@ -421,14 +426,15 @@ function RunViewContent({
                             </RunHeaderName>
                             {error && <Alert severity="error">{error}</Alert>}
                         </Box>
-                        {isRunBookmarksEnabled && (
+                        {isRunBookmarksEnabled && isComplete && (
                             <RunHeaderActions>
                                 <DownloadButton
                                     {...mkDownloadBtnAttrs({ runId: run.id })}
                                     onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
                                     size="small"
                                     variant="outlined"
-                                    startIcon={<FileDownloadOutlinedIcon />}>
+                                    startIcon={<FileDownloadOutlinedIcon />}
+                                    disabled={experiments.length === 0}>
                                     Download
                                 </DownloadButton>
                                 <DownloadMenu
@@ -713,6 +719,11 @@ const DownloadButton = styled(Button)`
 
     &:hover {
         border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
+    }
+
+    &.Mui-disabled {
+        border: 1px solid ${({ theme }) => theme.color['gray-40'].rgba.toString()};
+        color: ${({ theme }) => theme.color['gray-40'].rgba.toString()};
     }
 `;
 

@@ -92,6 +92,28 @@ class JobManager:
         """
         return gcs.create_job_directory(userid, jobid, self.config, overwrite)
 
+    def copy_job_data(
+        self,
+        source_userid: str,
+        source_jobid: str,
+        dest_userid: str,
+        dest_jobid: str,
+    ) -> list[str]:
+        """Copy dataset files from one job to another.
+
+        Args:
+            source_userid: User who owns the source job
+            source_jobid: Source job identifier
+            dest_userid: User who owns the destination job
+            dest_jobid: Destination job identifier
+
+        Returns:
+            List of copied filenames
+        """
+        return gcs.copy_job_data_files(
+            source_userid, source_jobid, dest_userid, dest_jobid, self.config
+        )
+
     def delete_job(self, userid: str, jobid: str) -> None:
         """Delete a job directory and all contents.
 

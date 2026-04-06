@@ -306,6 +306,54 @@ def create_job_directory(
         raise GCSError(f"Failed to create job directory: {e}")
 
 
+def copy_job_data_files(
+    source_userid: str,
+    source_jobid: str,
+    dest_userid: str,
+    dest_jobid: str,
+    config: JobConfig | None = None,
+) -> list[str]:
+    """Copy dataset files from one job's data/ directory to another.
+
+    Uses server-side GCS copy (no data flows through the API server).
+
+    Args:
+        source_userid: User who owns the source job
+        source_jobid: Source job identifier
+        dest_userid: User who owns the destination job
+        dest_jobid: Destination job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        List of copied filenames
+
+    Raises:
+        GCSError: If copy fails
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    source_prefix = f"users/{source_userid}/jobs/{source_jobid}/data/"
+    dest_prefix = f"users/{dest_userid}/jobs/{dest_jobid}/data/"
+
+    copied_files: list[str] = []
+
+    try:
+        blobs = bucket.list_blobs(prefix=source_prefix)
+        for blob in blobs:
+            filename = blob.name[len(source_prefix):]
+            if not filename or filename == ".placeholder":
+                continue
+            dest_blob_name = f"{dest_prefix}{filename}"
+            bucket.copy_blob(blob, bucket, dest_blob_name)
+            copied_files.append(filename)
+
+        return copied_files
+    except Exception as e:
+        raise GCSError(f"Failed to copy job data files: {e}")
+
+
 def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = None) -> None:
     """Delete a job directory and all its contents.
 

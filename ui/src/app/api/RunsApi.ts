@@ -182,6 +182,14 @@ export class RunsApi extends BaseApi {
         });
     }
 
+    async forkRun({ parentRunId }: { parentRunId: string }) {
+        return this.request<RunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/fork`,
+            method: 'POST',
+            body: { parent_run_id: parentRunId },
+        });
+    }
+
     async listRuns({ userid, limit }: { userid?: string; limit?: number } = {}) {
         const effectiveUserid = userid ?? (await this.getUserId());
 

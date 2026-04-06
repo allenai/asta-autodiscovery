@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Box,
     Button,
@@ -251,6 +252,8 @@ function RunViewContent({
 }: RunViewContentProps) {
     const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
+    const router = useRouter();
+    const { addViewerRun } = useViewerRuns();
     const {
         experiments,
         selectedExperiment,
@@ -261,6 +264,7 @@ function RunViewContent({
     const [isExpPanelExpanded, setIsExpPanelExpanded] = useState(false);
     const [downloadAnchorEl, setDownloadAnchorEl] = useState<null | HTMLElement>(null);
     const [overflowAnchorEl, setOverflowAnchorEl] = useState<null | HTMLElement>(null);
+    const [isForking, setIsForking] = useState(false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
     const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const showCompactActions = useMediaQuery('(max-width:799px)');
@@ -268,7 +272,22 @@ function RunViewContent({
 
     const datasetExpired = isDatasetExpired(run.datasetExpiresAt);
     const datasetExpiryLabel = getDatasetExpiryLabel(run.datasetExpiresAt);
-    const canFork = !datasetExpired;
+    const canFork = !datasetExpired && !isForking;
+
+    const handleFork = useCallback(async () => {
+        setIsForking(true);
+        try {
+            const { data } = await runsApi.forkRun({ parentRunId: run.id });
+            const newRun = getRunFromApi(data);
+            addViewerRun(newRun);
+            router.push(`/runs/${newRun.id}`);
+        } catch (err) {
+            console.error('Fork error:', err);
+            addErrorToast('Failed to create new run from session.');
+        } finally {
+            setIsForking(false);
+        }
+    }, [run.id, runsApi, addViewerRun, router, addErrorToast]);
 
     const [runPanelWidthPx, setRunPanelWidthPx] = usePanelWidthPx('runPanelWidthPx', 700);
     const [expPanelWidthPx, setExpPanelWidthPx] = usePanelWidthPx('expPanelWidthPx', 500);
@@ -799,9 +818,7 @@ function RunViewContent({
                 testId={TEST_ID_SESSION_CONFIG_MODAL}
                 canFork={canFork}
                 forkTooltip={datasetExpiryLabel || undefined}
-                onFork={() => {
-                    // TODO: Engineer to implement fork navigation
-                }}
+                onFork={handleFork}
             />
         </Container>
     );

@@ -113,6 +113,9 @@ export type Metadata = {
     evidenceWeight?: number | null;
     warmstartExperiments?: string | null;
     nWarmstart?: number | null;
+    // Lineage
+    parentRunId?: string | null;
+    parentRunName?: string | null;
 };
 
 export const getRunFromApi = (runFromApi: RunFromApi): Run => {
@@ -215,5 +218,8 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         evidenceWeight: metadataFromApi.evidence_weight,
         warmstartExperiments: metadataFromApi.warmstart_experiments,
         nWarmstart: metadataFromApi.n_warmstart,
+        // Lineage
+        parentRunId: metadataFromApi.parent_run_id ?? null,
+        parentRunName: metadataFromApi.parent_run_name ?? null,
     };
 };

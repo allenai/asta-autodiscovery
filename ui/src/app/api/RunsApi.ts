@@ -43,6 +43,9 @@ export interface RunMetadataFromApi {
     evidence_weight: number | null;
     warmstart_experiments: string | null;
     n_warmstart: number | null;
+    // Lineage
+    parent_run_id?: string | null;
+    parent_run_name?: string | null;
 }
 
 export interface RunFromApi {
@@ -147,6 +150,9 @@ export interface MetadataFromApi {
     evidence_weight: number | null;
     warmstart_experiments: string | null;
     n_warmstart: number | null;
+    // Lineage
+    parent_run_id?: string | null;
+    parent_run_name?: string | null;
 }
 
 export interface GetRunMetadataResponseBody {

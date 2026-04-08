@@ -836,7 +836,7 @@ function RunViewContent({
                 testId={TEST_ID_SESSION_CONFIG_MODAL}
                 canFork={canFork}
                 forkTooltip={datasetExpiryLabel || undefined}
-                onFork={handleFork}
+                onFork={isRunBookmarksEnabled ? handleFork : undefined}
             />
         </Container>
     );

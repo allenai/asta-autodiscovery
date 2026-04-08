@@ -46,13 +46,13 @@ export const AstaAdBanner = () => {
             onClick={() => window.open('https://asta.example.com?utm_source=AutoDiscovery', '_blank')}
             sx={{
                 position: 'fixed',
-                bottom: showBanner ? '96px' : '-200px',
+                bottom: showBanner ? '0' : '-200px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 maxWidth: '800px',
                 width: 'calc(100% - 32px)',
                 padding: '18px',
-                borderRadius: '4px',
+                borderRadius: '4px 4px 0 0',
                 backgroundColor: (theme) => theme.color['teal-100'].hex,
                 cursor: 'pointer',
                 transition: shouldAnimate
@@ -63,9 +63,7 @@ export const AstaAdBanner = () => {
                 gap: '16px',
                 '@media (max-width: 600px)': {
                     alignItems: 'flex-start',
-                    bottom: showBanner ? '0' : '-200px',
                     width: '100%',
-                    borderRadius: '4px 4px 0 0',
                 },
                 '&:hover': {
                     backgroundColor: (theme) => lighten(theme.color['teal-100'].hex, 0.1),

@@ -440,7 +440,8 @@ function RunViewContent({
                         } as React.CSSProperties
                     }>
                     <RunHeader>
-                        <Box sx={{ flex: '1 1 auto' }}>
+                        <RunHeaderTopRow>
+                        <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
                             <RunHeaderName>
                                 {isRunBookmarksEnabled && (
                                     <BookmarkButton
@@ -617,6 +618,7 @@ function RunViewContent({
                                 )}
                             </RunHeaderActions>
                         )}
+                        </RunHeaderTopRow>
                         {isRunning && (
                             <RunHeaderMessage>
                                 <Typography variant="caption">
@@ -856,15 +858,19 @@ const RunHeader = styled('div')`
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     color: ${({ theme }) => theme.color['cream-100'].hex};
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     gap: 12px;
     padding: ${({ theme }) => theme.spacing(3)};
 `;
 
+const RunHeaderTopRow = styled('div')`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+`;
+
 const RunHeaderMessage = styled('div')`
-    flex-basis: 100%;
 `;
 
 const RunHeaderActions = styled('div')`
@@ -933,6 +939,7 @@ const ButtonLabel = styled('span')`
         opacity 0.2s ease-in-out,
         margin-left 0.25s ease-in-out;
 `;
+
 
 const OverflowButton = styled(IconButton)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};

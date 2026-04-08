@@ -72,7 +72,7 @@ from runs.models import (
 
 # Import autodiscovery_jobs when available
 try:
-    from autodiscovery_jobs import JobConfig, JobManager
+    from autodiscovery_jobs import DATASET_EXPIRY_DAYS, JobConfig, JobManager
     from autodiscovery_jobs.exceptions import (
         CloudRunError,
         GCSError,
@@ -214,9 +214,6 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
 
-    # Dataset expiry: 7 days after run creation
-    DATASET_EXPIRY_DAYS = 7
-
     @api.route("/fork", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def fork_run():
@@ -278,6 +275,19 @@ def create() -> Blueprint:
             # Create the child run
             new_runid = str(uuid.uuid4())
             path = manager.create_job(userid, new_runid)
+
+            # Verify parent data files still exist
+            if not manager.has_data_files(parent_userid, req.parent_run_id):
+                return (
+                    jsonify(
+                        {
+                            "error": "Dataset expired",
+                            "message": "The parent run's dataset has been deleted. "
+                            "To start a new run, please upload your data again.",
+                        }
+                    ),
+                    410,
+                )
 
             # Copy dataset files from parent to child (server-side)
             manager.copy_job_data(
@@ -396,7 +406,12 @@ def create() -> Blueprint:
         return None, None
 
     def _compute_dataset_expires_at(run_details: RunDetails | None) -> str | None:
-        """Compute dataset expiry timestamp (created_at + 7 days)."""
+        """Compute dataset expiry timestamp (created_at + DATASET_EXPIRY_DAYS).
+
+        This is an estimate — the actual cleanup cron may run slightly later,
+        but using the shared DATASET_EXPIRY_DAYS constant keeps the prediction
+        consistent with the deletion threshold.
+        """
         if not run_details or not run_details.created_at:
             return None
         try:

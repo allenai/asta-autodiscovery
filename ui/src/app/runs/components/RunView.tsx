@@ -88,11 +88,24 @@ const getDatasetExpiryLabel = (expiresAt: string | null | undefined): string | n
     if (!expiresAt) return null;
     const now = new Date();
     const expiry = new Date(expiresAt);
-    if (expiry <= now) return 'Dataset expired';
+
+    if (expiry <= now) {
+        return 'Dataset expired';
+    }
+
     const diffMs = expiry.getTime() - now.getTime();
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+    if (diffHours <= 24) {
+        return `Dataset expires in ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
+    }
+
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) return 'Dataset expires tomorrow';
-    return `Dataset available for ${diffDays} days`;
+    const expiryFormatted = expiry.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+    });
+    return `Dataset available until ${expiryFormatted} (${diffDays} day${diffDays === 1 ? '' : 's'})`;
 };
 
 const isDatasetExpired = (expiresAt: string | null | undefined): boolean => {
@@ -282,7 +295,11 @@ function RunViewContent({
             router.push(`/runs/${newRun.id}`);
         } catch (err) {
             console.error('Fork error:', err);
-            addErrorToast('Failed to create new run from session.');
+            const message =
+                err instanceof Error && err.message.includes('410')
+                    ? 'Dataset has expired. Please create a new run and re-upload your data.'
+                    : 'Failed to create new run from session.';
+            addErrorToast(message);
         } finally {
             setIsForking(false);
         }

@@ -354,6 +354,34 @@ def copy_job_data_files(
         raise GCSError(f"Failed to copy job data files: {e}")
 
 
+def has_data_files(
+    userid: str,
+    jobid: str,
+    config: JobConfig | None = None,
+) -> bool:
+    """Check if a job has any non-placeholder data files.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        True if the job's data/ directory contains at least one real file
+    """
+    config = config or JobConfig()
+    client = storage.Client(project=config.project_id)
+    bucket = client.bucket(config.bucket)
+    prefix = f"users/{userid}/jobs/{jobid}/data/"
+
+    blobs = bucket.list_blobs(prefix=prefix, max_results=10)
+    for blob in blobs:
+        filename = blob.name[len(prefix):]
+        if filename and filename != ".placeholder":
+            return True
+    return False
+
+
 def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = None) -> None:
     """Delete a job directory and all its contents.
 

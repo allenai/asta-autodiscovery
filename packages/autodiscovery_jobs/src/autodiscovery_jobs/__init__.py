@@ -24,7 +24,7 @@ from .cloudrun import (
     get_job_status,
     run_job,
 )
-from .config import JobConfig
+from .config import DATASET_EXPIRY_DAYS, JobConfig
 from .exceptions import (
     AutodiscoveryJobError,
     CloudRunError,
@@ -99,6 +99,7 @@ __version__ = "0.1.0"
 __all__ = [
     # Main class
     "JobManager",
+    "DATASET_EXPIRY_DAYS",
     "JobConfig",
     # Exceptions
     "AutodiscoveryJobError",

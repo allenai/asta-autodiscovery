@@ -234,6 +234,10 @@ class JobManager:
             self.config,
         )
 
+    def has_data_files(self, userid: str, jobid: str) -> bool:
+        """Check if a job has any non-placeholder data files."""
+        return gcs.has_data_files(userid, jobid, self.config)
+
     def expire_datasets(
         self,
         userid: str,

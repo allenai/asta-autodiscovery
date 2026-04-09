@@ -217,8 +217,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                     justifyContent: 'center',
                     alignItems: 'center',
                     p: 3,
-                }}
-            >
+                }}>
                 <CircularProgress />
             </Box>
         );
@@ -456,8 +455,7 @@ function RunViewContent({
                         {
                             '--run-panel-width': runPanelWidthPx ? `${runPanelWidthPx}px` : '700px',
                         } as React.CSSProperties
-                    }
-                >
+                    }>
                     <RunHeader>
                         <RunHeaderTopRow>
                             <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
@@ -479,8 +477,7 @@ function RunViewContent({
                                             {...mkBookmarkRunBtnAttrs({
                                                 runId: run.id,
                                                 isBookmarked: !checkRunBookmarked(run.id),
-                                            })}
-                                        >
+                                            })}>
                                             {checkRunBookmarked(run.id) ? (
                                                 <BookmarkIcon />
                                             ) : (
@@ -495,8 +492,7 @@ function RunViewContent({
                                         Parent:{' '}
                                         <ParentRunLink
                                             href={`/runs/${run.parentRunId}`}
-                                            underline="hover"
-                                        >
+                                            underline="hover">
                                             {run.parentRunName || run.parentRunId}
                                         </ParentRunLink>
                                     </ParentRunInfo>
@@ -512,15 +508,13 @@ function RunViewContent({
                                                 aria-label="More actions"
                                                 onClick={(e) =>
                                                     setOverflowAnchorEl(e.currentTarget)
-                                                }
-                                            >
+                                                }>
                                                 <MoreVertIcon />
                                             </OverflowButton>
                                             <OverflowMenu
                                                 anchorEl={overflowAnchorEl}
                                                 open={!!overflowAnchorEl}
-                                                onClose={() => setOverflowAnchorEl(null)}
-                                            >
+                                                onClose={() => setOverflowAnchorEl(null)}>
                                                 <MenuItem
                                                     onClick={(
                                                         e: React.MouseEvent<HTMLLIElement>
@@ -529,8 +523,7 @@ function RunViewContent({
                                                         onShareClick(
                                                             e as unknown as React.MouseEvent<HTMLButtonElement>
                                                         );
-                                                    }}
-                                                >
+                                                    }}>
                                                     <ListItemIcon>
                                                         <ShareOutlinedIcon fontSize="small" />
                                                     </ListItemIcon>
@@ -541,8 +534,7 @@ function RunViewContent({
                                                     onClick={(e) => {
                                                         setOverflowAnchorEl(null);
                                                         setDownloadAnchorEl(e.currentTarget);
-                                                    }}
-                                                >
+                                                    }}>
                                                     <ListItemIcon>
                                                         <FileDownloadOutlinedIcon fontSize="small" />
                                                     </ListItemIcon>
@@ -550,16 +542,14 @@ function RunViewContent({
                                                 </MenuItem>
                                                 <Tooltip
                                                     title={datasetExpiryLabel || ''}
-                                                    placement="left"
-                                                >
+                                                    placement="left">
                                                     <span>
                                                         <MenuItem
                                                             disabled={!canFork}
                                                             onClick={() => {
                                                                 setOverflowAnchorEl(null);
                                                                 handleFork();
-                                                            }}
-                                                        >
+                                                            }}>
                                                             <ListItemIcon>
                                                                 <RestartAltIcon fontSize="small" />
                                                             </ListItemIcon>
@@ -573,22 +563,19 @@ function RunViewContent({
                                             <DownloadMenu
                                                 anchorEl={downloadAnchorEl}
                                                 open={!!downloadAnchorEl}
-                                                onClose={() => setDownloadAnchorEl(null)}
-                                            >
+                                                onClose={() => setDownloadAnchorEl(null)}>
                                                 <MenuItem
                                                     {...mkDownloadCsvMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('csv')}
-                                                >
+                                                    onClick={() => handleDownload('csv')}>
                                                     CSV
                                                 </MenuItem>
                                                 <MenuItem
                                                     {...mkDownloadJsonMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('json')}
-                                                >
+                                                    onClick={() => handleDownload('json')}>
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>
@@ -597,15 +584,13 @@ function RunViewContent({
                                         <>
                                             <Tooltip
                                                 title={datasetExpiryLabel || 'New run from session'}
-                                                placement="bottom"
-                                            >
+                                                placement="bottom">
                                                 <span>
                                                     <ExpandingActionButton
                                                         onClick={handleFork}
                                                         disabled={!canFork}
                                                         size="small"
-                                                        variant="outlined"
-                                                    >
+                                                        variant="outlined">
                                                         <RestartAltIcon fontSize="small" />
                                                         <ButtonLabel className="button-label">
                                                             New run from session
@@ -622,8 +607,7 @@ function RunViewContent({
                                                         }
                                                         disabled={experiments.length === 0}
                                                         size="small"
-                                                        variant="outlined"
-                                                    >
+                                                        variant="outlined">
                                                         <FileDownloadOutlinedIcon fontSize="small" />
                                                         <ButtonLabel className="button-label">
                                                             Download
@@ -634,22 +618,19 @@ function RunViewContent({
                                             <DownloadMenu
                                                 anchorEl={downloadAnchorEl}
                                                 open={!!downloadAnchorEl}
-                                                onClose={() => setDownloadAnchorEl(null)}
-                                            >
+                                                onClose={() => setDownloadAnchorEl(null)}>
                                                 <MenuItem
                                                     {...mkDownloadCsvMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('csv')}
-                                                >
+                                                    onClick={() => handleDownload('csv')}>
                                                     CSV
                                                 </MenuItem>
                                                 <MenuItem
                                                     {...mkDownloadJsonMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('json')}
-                                                >
+                                                    onClick={() => handleDownload('json')}>
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>
@@ -657,8 +638,7 @@ function RunViewContent({
                                                 <ExpandingActionButton
                                                     onClick={onShareClick}
                                                     size="small"
-                                                    variant="outlined"
-                                                >
+                                                    variant="outlined">
                                                     <ShareOutlinedIcon fontSize="small" />
                                                     <ButtonLabel className="button-label">
                                                         Share session
@@ -693,8 +673,7 @@ function RunViewContent({
                                     <Link
                                         href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
                                         rel="noopener noreferrer"
-                                        target="_blank"
-                                    >
+                                        target="_blank">
                                         via this form.
                                     </Link>
                                 </Typography>
@@ -723,8 +702,7 @@ function RunViewContent({
                                     )
                                 }
                                 onClick={handleStop}
-                                disabled={cancelling}
-                            >
+                                disabled={cancelling}>
                                 {cancelling ? 'Stopping...' : 'Stop run'}
                             </StopButton>
                         )}
@@ -753,8 +731,7 @@ function RunViewContent({
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}
                                     data-test-id={TEST_ID_SESSION_CONFIG_BUTTON}
-                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}
-                                >
+                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}>
                                     Session configuration
                                 </ParametersButton>
                             </RunToolbarButtons>
@@ -791,8 +768,7 @@ function RunViewContent({
                                     ? `${expPanelWidthPx}px`
                                     : '500px',
                             } as React.CSSProperties
-                        }
-                    >
+                        }>
                         {selectedExperiment && (
                             <ExperimentDetails
                                 experiment={selectedExperiment}
@@ -802,8 +778,7 @@ function RunViewContent({
                                             <ExpandingActionButton
                                                 onClick={onShareExperimentClick}
                                                 size="small"
-                                                variant="outlined"
-                                            >
+                                                variant="outlined">
                                                 <ShareOutlinedIcon fontSize="small" />
                                                 <ButtonLabel className="button-label">
                                                     Share experiment
@@ -813,8 +788,7 @@ function RunViewContent({
                                         <LargeScreenAction>
                                             <Tooltip
                                                 title={isExpPanelExpanded ? 'Collapse' : 'Expand'}
-                                                placement="bottom"
-                                            >
+                                                placement="bottom">
                                                 <ExpandingActionButton
                                                     aria-label={
                                                         isExpPanelExpanded
@@ -825,8 +799,7 @@ function RunViewContent({
                                                         setIsExpPanelExpanded(!isExpPanelExpanded)
                                                     }
                                                     size="small"
-                                                    variant="outlined"
-                                                >
+                                                    variant="outlined">
                                                     {isExpPanelExpanded ? (
                                                         <CloseFullscreenOutlinedIcon fontSize="small" />
                                                     ) : (
@@ -847,8 +820,7 @@ function RunViewContent({
                                                 data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
                                                 {...mkCloseExperimentDetailsPanelAttrs({
                                                     runId: run.id,
-                                                })}
-                                            >
+                                                })}>
                                                 <CloseIcon fontSize="small" />
                                                 <ButtonLabel className="button-label">
                                                     Close

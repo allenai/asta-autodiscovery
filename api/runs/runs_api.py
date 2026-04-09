@@ -316,8 +316,10 @@ def create() -> Blueprint:
                 ),
                 "n_warmstart": parent_metadata.get("n_warmstart"),
                 # Lineage
-                "parent_run_id": req.parent_run_id,
-                "parent_run_name": parent_name,
+                "lineage": {
+                    "parent_run_id": req.parent_run_id,
+                    "parent_run_name": parent_name,
+                },
                 # Clear per-run state
                 "is_bookmarked": None,
                 "bookmarked_experiment_ids": None,
@@ -886,7 +888,7 @@ def create() -> Blueprint:
 
         try:
             manager = get_job_manager()
-            path = manager.upload_metadata(req.userid, req.runid, req.metadata.model_dump())
+            path = manager.upload_metadata(req.userid, req.runid, req.metadata.to_storage_dict())
             resp = SaveMetadataResponseModel(
                 path=path,
                 message="Metadata saved successfully",

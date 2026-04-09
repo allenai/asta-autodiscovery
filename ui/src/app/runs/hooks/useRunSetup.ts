@@ -329,8 +329,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
                 // Lineage
-                parent_run_id: currentSettings.parentRunId ?? null,
-                parent_run_name: currentSettings.parentRunName ?? null,
+                lineage: {
+                    parent_run_id: currentSettings.parentRunId ?? null,
+                    parent_run_name: currentSettings.parentRunName ?? null,
+                },
             };
 
             await api.saveMetadata(runid, metadata);
@@ -559,8 +561,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
                 // Lineage
-                parent_run_id: currentSettings.parentRunId ?? null,
-                parent_run_name: currentSettings.parentRunName ?? null,
+                lineage: {
+                    parent_run_id: currentSettings.parentRunId ?? null,
+                    parent_run_name: currentSettings.parentRunName ?? null,
+                },
             };
 
             await api.saveMetadata(runid, metadata);

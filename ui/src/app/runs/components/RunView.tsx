@@ -217,7 +217,8 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                     justifyContent: 'center',
                     alignItems: 'center',
                     p: 3,
-                }}>
+                }}
+            >
                 <CircularProgress />
             </Box>
         );
@@ -455,186 +456,219 @@ function RunViewContent({
                         {
                             '--run-panel-width': runPanelWidthPx ? `${runPanelWidthPx}px` : '700px',
                         } as React.CSSProperties
-                    }>
+                    }
+                >
                     <RunHeader>
                         <RunHeaderTopRow>
-                        <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
-                            <RunHeaderName>
-                                {isRunBookmarksEnabled && (
-                                    <BookmarkButton
-                                        size="small"
-                                        aria-label={
-                                            checkRunBookmarked(run.id)
-                                                ? 'Remove bookmark'
-                                                : 'Bookmark this session'
-                                        }
-                                        $isBookmarked={checkRunBookmarked(run.id)}
-                                        onClick={() =>
-                                            updateRunBookmark(run.id, {
-                                                isBookmarked: !checkRunBookmarked(run.id),
-                                            })
-                                        }
-                                        {...mkBookmarkRunBtnAttrs({
-                                            runId: run.id,
-                                            isBookmarked: !checkRunBookmarked(run.id),
-                                        })}>
-                                        {checkRunBookmarked(run.id) ? (
-                                            <BookmarkIcon />
-                                        ) : (
-                                            <BookmarkBorderOutlinedIcon />
-                                        )}
-                                    </BookmarkButton>
-                                )}
-                                {run.name}
-                            </RunHeaderName>
-                            {run.parentRunId && (
-                                <ParentRunInfo>
-                                    Parent:{' '}
-                                    <ParentRunLink
-                                        href={`/runs/${run.parentRunId}`}
-                                        underline="hover">
-                                        {run.parentRunName || run.parentRunId}
-                                    </ParentRunLink>
-                                </ParentRunInfo>
-                            )}
-                            {error && <Alert severity="error">{error}</Alert>}
-                        </Box>
-                        {isRunBookmarksEnabled && isComplete && (
-                            <RunHeaderActions>
-                                {showCompactActions ? (
-                                    <>
-                                        <OverflowButton
+                            <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                                <RunHeaderName>
+                                    {isRunBookmarksEnabled && (
+                                        <BookmarkButton
                                             size="small"
-                                            aria-label="More actions"
-                                            onClick={(e) => setOverflowAnchorEl(e.currentTarget)}>
-                                            <MoreVertIcon />
-                                        </OverflowButton>
-                                        <OverflowMenu
-                                            anchorEl={overflowAnchorEl}
-                                            open={!!overflowAnchorEl}
-                                            onClose={() => setOverflowAnchorEl(null)}>
-                                            <MenuItem
-                                                onClick={(e: React.MouseEvent<HTMLLIElement>) => {
-                                                    setOverflowAnchorEl(null);
-                                                    onShareClick(
-                                                        e as unknown as React.MouseEvent<HTMLButtonElement>
-                                                    );
-                                                }}>
-                                                <ListItemIcon>
-                                                    <ShareOutlinedIcon fontSize="small" />
-                                                </ListItemIcon>
-                                                <ListItemText>Share session</ListItemText>
-                                            </MenuItem>
-                                            <MenuItem
-                                                disabled={experiments.length === 0}
-                                                onClick={(e) => {
-                                                    setOverflowAnchorEl(null);
-                                                    setDownloadAnchorEl(e.currentTarget);
-                                                }}>
-                                                <ListItemIcon>
-                                                    <FileDownloadOutlinedIcon fontSize="small" />
-                                                </ListItemIcon>
-                                                <ListItemText>Download</ListItemText>
-                                            </MenuItem>
+                                            aria-label={
+                                                checkRunBookmarked(run.id)
+                                                    ? 'Remove bookmark'
+                                                    : 'Bookmark this session'
+                                            }
+                                            $isBookmarked={checkRunBookmarked(run.id)}
+                                            onClick={() =>
+                                                updateRunBookmark(run.id, {
+                                                    isBookmarked: !checkRunBookmarked(run.id),
+                                                })
+                                            }
+                                            {...mkBookmarkRunBtnAttrs({
+                                                runId: run.id,
+                                                isBookmarked: !checkRunBookmarked(run.id),
+                                            })}
+                                        >
+                                            {checkRunBookmarked(run.id) ? (
+                                                <BookmarkIcon />
+                                            ) : (
+                                                <BookmarkBorderOutlinedIcon />
+                                            )}
+                                        </BookmarkButton>
+                                    )}
+                                    {run.name}
+                                </RunHeaderName>
+                                {run.parentRunId && (
+                                    <ParentRunInfo>
+                                        Parent:{' '}
+                                        <ParentRunLink
+                                            href={`/runs/${run.parentRunId}`}
+                                            underline="hover"
+                                        >
+                                            {run.parentRunName || run.parentRunId}
+                                        </ParentRunLink>
+                                    </ParentRunInfo>
+                                )}
+                                {error && <Alert severity="error">{error}</Alert>}
+                            </Box>
+                            {isRunBookmarksEnabled && isComplete && (
+                                <RunHeaderActions>
+                                    {showCompactActions ? (
+                                        <>
+                                            <OverflowButton
+                                                size="small"
+                                                aria-label="More actions"
+                                                onClick={(e) =>
+                                                    setOverflowAnchorEl(e.currentTarget)
+                                                }
+                                            >
+                                                <MoreVertIcon />
+                                            </OverflowButton>
+                                            <OverflowMenu
+                                                anchorEl={overflowAnchorEl}
+                                                open={!!overflowAnchorEl}
+                                                onClose={() => setOverflowAnchorEl(null)}
+                                            >
+                                                <MenuItem
+                                                    onClick={(
+                                                        e: React.MouseEvent<HTMLLIElement>
+                                                    ) => {
+                                                        setOverflowAnchorEl(null);
+                                                        onShareClick(
+                                                            e as unknown as React.MouseEvent<HTMLButtonElement>
+                                                        );
+                                                    }}
+                                                >
+                                                    <ListItemIcon>
+                                                        <ShareOutlinedIcon fontSize="small" />
+                                                    </ListItemIcon>
+                                                    <ListItemText>Share session</ListItemText>
+                                                </MenuItem>
+                                                <MenuItem
+                                                    disabled={experiments.length === 0}
+                                                    onClick={(e) => {
+                                                        setOverflowAnchorEl(null);
+                                                        setDownloadAnchorEl(e.currentTarget);
+                                                    }}
+                                                >
+                                                    <ListItemIcon>
+                                                        <FileDownloadOutlinedIcon fontSize="small" />
+                                                    </ListItemIcon>
+                                                    <ListItemText>Download</ListItemText>
+                                                </MenuItem>
+                                                <Tooltip
+                                                    title={datasetExpiryLabel || ''}
+                                                    placement="left"
+                                                >
+                                                    <span>
+                                                        <MenuItem
+                                                            disabled={!canFork}
+                                                            onClick={() => {
+                                                                setOverflowAnchorEl(null);
+                                                                handleFork();
+                                                            }}
+                                                        >
+                                                            <ListItemIcon>
+                                                                <RestartAltIcon fontSize="small" />
+                                                            </ListItemIcon>
+                                                            <ListItemText>
+                                                                New run from session
+                                                            </ListItemText>
+                                                        </MenuItem>
+                                                    </span>
+                                                </Tooltip>
+                                            </OverflowMenu>
+                                            <DownloadMenu
+                                                anchorEl={downloadAnchorEl}
+                                                open={!!downloadAnchorEl}
+                                                onClose={() => setDownloadAnchorEl(null)}
+                                            >
+                                                <MenuItem
+                                                    {...mkDownloadCsvMenuItemAttrs({
+                                                        runId: run.id,
+                                                    })}
+                                                    onClick={() => handleDownload('csv')}
+                                                >
+                                                    CSV
+                                                </MenuItem>
+                                                <MenuItem
+                                                    {...mkDownloadJsonMenuItemAttrs({
+                                                        runId: run.id,
+                                                    })}
+                                                    onClick={() => handleDownload('json')}
+                                                >
+                                                    JSON
+                                                </MenuItem>
+                                            </DownloadMenu>
+                                        </>
+                                    ) : (
+                                        <>
                                             <Tooltip
-                                                title={datasetExpiryLabel || ''}
-                                                placement="left">
+                                                title={datasetExpiryLabel || 'New run from session'}
+                                                placement="bottom"
+                                            >
                                                 <span>
-                                                    <MenuItem
+                                                    <ExpandingActionButton
+                                                        onClick={handleFork}
                                                         disabled={!canFork}
-                                                        onClick={() => {
-                                                            setOverflowAnchorEl(null);
-                                                            handleFork();
-                                                        }}>
-                                                        <ListItemIcon>
-                                                            <RestartAltIcon fontSize="small" />
-                                                        </ListItemIcon>
-                                                        <ListItemText>
+                                                        size="small"
+                                                        variant="outlined"
+                                                    >
+                                                        <RestartAltIcon fontSize="small" />
+                                                        <ButtonLabel className="button-label">
                                                             New run from session
-                                                        </ListItemText>
-                                                    </MenuItem>
+                                                        </ButtonLabel>
+                                                    </ExpandingActionButton>
                                                 </span>
                                             </Tooltip>
-                                        </OverflowMenu>
-                                        <DownloadMenu
-                                            anchorEl={downloadAnchorEl}
-                                            open={!!downloadAnchorEl}
-                                            onClose={() => setDownloadAnchorEl(null)}>
-                                            <MenuItem
-                                                {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
-                                                onClick={() => handleDownload('csv')}>
-                                                CSV
-                                            </MenuItem>
-                                            <MenuItem
-                                                {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
-                                                onClick={() => handleDownload('json')}>
-                                                JSON
-                                            </MenuItem>
-                                        </DownloadMenu>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Tooltip
-                                            title={datasetExpiryLabel || 'New run from session'}
-                                            placement="bottom">
-                                            <span>
+                                            <Tooltip title="Download" placement="bottom">
+                                                <span>
+                                                    <ExpandingActionButton
+                                                        {...mkDownloadBtnAttrs({ runId: run.id })}
+                                                        onClick={(e) =>
+                                                            setDownloadAnchorEl(e.currentTarget)
+                                                        }
+                                                        disabled={experiments.length === 0}
+                                                        size="small"
+                                                        variant="outlined"
+                                                    >
+                                                        <FileDownloadOutlinedIcon fontSize="small" />
+                                                        <ButtonLabel className="button-label">
+                                                            Download
+                                                        </ButtonLabel>
+                                                    </ExpandingActionButton>
+                                                </span>
+                                            </Tooltip>
+                                            <DownloadMenu
+                                                anchorEl={downloadAnchorEl}
+                                                open={!!downloadAnchorEl}
+                                                onClose={() => setDownloadAnchorEl(null)}
+                                            >
+                                                <MenuItem
+                                                    {...mkDownloadCsvMenuItemAttrs({
+                                                        runId: run.id,
+                                                    })}
+                                                    onClick={() => handleDownload('csv')}
+                                                >
+                                                    CSV
+                                                </MenuItem>
+                                                <MenuItem
+                                                    {...mkDownloadJsonMenuItemAttrs({
+                                                        runId: run.id,
+                                                    })}
+                                                    onClick={() => handleDownload('json')}
+                                                >
+                                                    JSON
+                                                </MenuItem>
+                                            </DownloadMenu>
+                                            <Tooltip title="Share session" placement="bottom">
                                                 <ExpandingActionButton
-                                                    onClick={handleFork}
-                                                    disabled={!canFork}
+                                                    onClick={onShareClick}
                                                     size="small"
-                                                    variant="outlined">
-                                                    <RestartAltIcon fontSize="small" />
+                                                    variant="outlined"
+                                                >
+                                                    <ShareOutlinedIcon fontSize="small" />
                                                     <ButtonLabel className="button-label">
-                                                        New run from session
+                                                        Share session
                                                     </ButtonLabel>
                                                 </ExpandingActionButton>
-                                            </span>
-                                        </Tooltip>
-                                        <Tooltip title="Download" placement="bottom">
-                                            <span>
-                                                <ExpandingActionButton
-                                                    {...mkDownloadBtnAttrs({ runId: run.id })}
-                                                    onClick={(e) => setDownloadAnchorEl(e.currentTarget)}
-                                                    disabled={experiments.length === 0}
-                                                    size="small"
-                                                    variant="outlined">
-                                                    <FileDownloadOutlinedIcon fontSize="small" />
-                                                    <ButtonLabel className="button-label">
-                                                        Download
-                                                    </ButtonLabel>
-                                                </ExpandingActionButton>
-                                            </span>
-                                        </Tooltip>
-                                        <DownloadMenu
-                                            anchorEl={downloadAnchorEl}
-                                            open={!!downloadAnchorEl}
-                                            onClose={() => setDownloadAnchorEl(null)}>
-                                            <MenuItem
-                                                {...mkDownloadCsvMenuItemAttrs({ runId: run.id })}
-                                                onClick={() => handleDownload('csv')}>
-                                                CSV
-                                            </MenuItem>
-                                            <MenuItem
-                                                {...mkDownloadJsonMenuItemAttrs({ runId: run.id })}
-                                                onClick={() => handleDownload('json')}>
-                                                JSON
-                                            </MenuItem>
-                                        </DownloadMenu>
-                                        <Tooltip title="Share session" placement="bottom">
-                                            <ExpandingActionButton
-                                                onClick={onShareClick}
-                                                size="small"
-                                                variant="outlined">
-                                                <ShareOutlinedIcon fontSize="small" />
-                                                <ButtonLabel className="button-label">
-                                                    Share session
-                                                </ButtonLabel>
-                                            </ExpandingActionButton>
-                                        </Tooltip>
-                                    </>
-                                )}
-                            </RunHeaderActions>
-                        )}
+                                            </Tooltip>
+                                        </>
+                                    )}
+                                </RunHeaderActions>
+                            )}
                         </RunHeaderTopRow>
                         {isRunning && (
                             <RunHeaderMessage>
@@ -659,7 +693,8 @@ function RunViewContent({
                                     <Link
                                         href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
                                         rel="noopener noreferrer"
-                                        target="_blank">
+                                        target="_blank"
+                                    >
                                         via this form.
                                     </Link>
                                 </Typography>
@@ -688,7 +723,8 @@ function RunViewContent({
                                     )
                                 }
                                 onClick={handleStop}
-                                disabled={cancelling}>
+                                disabled={cancelling}
+                            >
                                 {cancelling ? 'Stopping...' : 'Stop run'}
                             </StopButton>
                         )}
@@ -717,7 +753,8 @@ function RunViewContent({
                                     startIcon={<SettingsOutlinedIcon />}
                                     onClick={() => setIsParametersModalOpen(true)}
                                     data-test-id={TEST_ID_SESSION_CONFIG_BUTTON}
-                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}>
+                                    {...mkSessionConfigBtnAttrs({ runId: run.id })}
+                                >
                                     Session configuration
                                 </ParametersButton>
                             </RunToolbarButtons>
@@ -754,7 +791,8 @@ function RunViewContent({
                                     ? `${expPanelWidthPx}px`
                                     : '500px',
                             } as React.CSSProperties
-                        }>
+                        }
+                    >
                         {selectedExperiment && (
                             <ExperimentDetails
                                 experiment={selectedExperiment}
@@ -764,7 +802,8 @@ function RunViewContent({
                                             <ExpandingActionButton
                                                 onClick={onShareExperimentClick}
                                                 size="small"
-                                                variant="outlined">
+                                                variant="outlined"
+                                            >
                                                 <ShareOutlinedIcon fontSize="small" />
                                                 <ButtonLabel className="button-label">
                                                     Share experiment
@@ -774,7 +813,8 @@ function RunViewContent({
                                         <LargeScreenAction>
                                             <Tooltip
                                                 title={isExpPanelExpanded ? 'Collapse' : 'Expand'}
-                                                placement="bottom">
+                                                placement="bottom"
+                                            >
                                                 <ExpandingActionButton
                                                     aria-label={
                                                         isExpPanelExpanded
@@ -785,7 +825,8 @@ function RunViewContent({
                                                         setIsExpPanelExpanded(!isExpPanelExpanded)
                                                     }
                                                     size="small"
-                                                    variant="outlined">
+                                                    variant="outlined"
+                                                >
                                                     {isExpPanelExpanded ? (
                                                         <CloseFullscreenOutlinedIcon fontSize="small" />
                                                     ) : (
@@ -806,7 +847,8 @@ function RunViewContent({
                                                 data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
                                                 {...mkCloseExperimentDetailsPanelAttrs({
                                                     runId: run.id,
-                                                })}>
+                                                })}
+                                            >
                                                 <CloseIcon fontSize="small" />
                                                 <ButtonLabel className="button-label">
                                                     Close
@@ -887,8 +929,7 @@ const RunHeaderTopRow = styled('div')`
     gap: 12px;
 `;
 
-const RunHeaderMessage = styled('div')`
-`;
+const RunHeaderMessage = styled('div')``;
 
 const RunHeaderActions = styled('div')`
     display: flex;
@@ -956,7 +997,6 @@ const ButtonLabel = styled('span')`
         opacity 0.2s ease-in-out,
         margin-left 0.25s ease-in-out;
 `;
-
 
 const OverflowButton = styled(IconButton)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};

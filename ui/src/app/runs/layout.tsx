@@ -30,6 +30,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     };
 
     const isSharedRun = pathname.startsWith('/runs/shared/');
+    const isHomepage = pathname === '/runs';
     const isBookmarksEnabled = isAuthenticated && !isSharedRun;
     const runIdForBookmarks = isSharedRun ? null : selectedRunId;
 
@@ -67,7 +68,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                             <Header />
                             <ScrollArea>
                                 <ScrollContainer>
-                                    <ScrollContent>
+                                    <ScrollContent $isHomepage={isHomepage}>
                                         {children}
                                         {isAuthenticated && (
                                             <MobileFooter>
@@ -179,10 +180,15 @@ const ScrollContainer = styled('div')`
     inset: 0;
 `;
 
-const ScrollContent = styled('div')`
+const ScrollContent = styled('div')<{ $isHomepage?: boolean }>`
     height: 100%;
     overflow: auto;
+    padding-bottom: ${({ $isHomepage }) => ($isHomepage ? '30px' : '0')};
     ${({ theme }) => scrollbarStyles(theme)}
+
+    @media (max-width: 600px) {
+        padding-bottom: ${({ $isHomepage }) => ($isHomepage ? '90px' : '0')};
+    }
 `;
 
 const SidebarFooter = styled('div')`

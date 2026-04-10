@@ -76,7 +76,7 @@ export default function RunsPage() {
                         <ToS />
                     </FooterWrapper>
                 </LoggedOutLayout>
-                <AstaAdBanner />
+                <AstaAdBanner isFullWidth />
             </>
         );
     }

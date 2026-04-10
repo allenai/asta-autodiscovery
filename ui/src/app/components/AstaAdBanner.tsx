@@ -7,7 +7,11 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CloseIcon from '@mui/icons-material/Close';
 import Image from 'next/image';
 
-export const AstaAdBanner = () => {
+type AstaAdBannerProps = {
+    isFullWidth?: boolean;
+};
+
+export const AstaAdBanner = ({ isFullWidth = false }: AstaAdBannerProps) => {
     const [showBanner, setShowBanner] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(true);
 
@@ -49,10 +53,10 @@ export const AstaAdBanner = () => {
                 bottom: showBanner ? '0' : '-200px',
                 left: '50%',
                 transform: 'translateX(-50%)',
-                maxWidth: '800px',
-                width: 'calc(100% - 32px)',
+                maxWidth: isFullWidth ? 'none' : '800px',
+                width: isFullWidth ? '100%' : 'calc(100% - 32px)',
                 padding: '18px',
-                borderRadius: '4px 4px 0 0',
+                borderRadius: isFullWidth ? '0' : '4px 4px 0 0',
                 backgroundColor: (theme) => theme.color['teal-100'].hex,
                 cursor: 'pointer',
                 transition: shouldAnimate

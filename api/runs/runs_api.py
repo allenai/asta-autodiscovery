@@ -262,74 +262,8 @@ def create() -> Blueprint:
             if error_resp:
                 return error_resp, status_code
 
-            # Read parent metadata
-            parent_metadata = manager.get_metadata(
-                parent_userid, req.parent_run_id
-            )
-            if not parent_metadata:
-                return (
-                    jsonify({"error": "Parent run has no metadata"}),
-                    400,
-                )
-
-            # Create the child run
-            new_runid = str(uuid.uuid4())
-            path = manager.create_job(userid, new_runid)
-
-            # Verify parent data files still exist
-            if not manager.has_data_files(parent_userid, req.parent_run_id):
-                return (
-                    jsonify(
-                        {
-                            "error": "Dataset expired",
-                            "message": "The parent run's dataset has been deleted. "
-                            "To start a new run, please upload your data again.",
-                        }
-                    ),
-                    410,
-                )
-
-            # Copy dataset files from parent to child (server-side)
-            manager.copy_job_data(
-                parent_userid, req.parent_run_id, userid, new_runid
-            )
-
-            # Build child metadata from parent
-            parent_name = parent_metadata.get("name", "Untitled")
-            child_metadata = {
-                # Descriptive fields from parent
-                "name": f"Fork of {parent_name}",
-                "description": parent_metadata.get("description", ""),
-                "domain": parent_metadata.get("domain", ""),
-                "intent": parent_metadata.get("intent", ""),
-                "datasets": parent_metadata.get("datasets", []),
-                # Advanced settings from parent
-                "n_experiments": parent_metadata.get("n_experiments"),
-                "exploration_weight": parent_metadata.get(
-                    "exploration_weight"
-                ),
-                "mcts_selection": parent_metadata.get("mcts_selection"),
-                "surprisal_width": parent_metadata.get("surprisal_width"),
-                "evidence_weight": parent_metadata.get("evidence_weight"),
-                "warmstart_experiments": parent_metadata.get(
-                    "warmstart_experiments"
-                ),
-                "n_warmstart": parent_metadata.get("n_warmstart"),
-                # Lineage
-                "lineage": {
-                    "parent_run_id": req.parent_run_id,
-                    "parent_run_name": parent_name,
-                },
-                # Clear per-run state
-                "is_bookmarked": None,
-                "bookmarked_experiment_ids": None,
-                "is_shared": None,
-            }
-
-            manager.upload_metadata(userid, new_runid, child_metadata)
-
-            # Create run_details.json
-            run_details = create_run_details(userid, new_runid)
+            # Delegate business logic to JobManager
+            result = manager.fork_job(req.parent_run_id, parent_userid, userid)
 
             # Check upload limit
             has_higher_upload_limit = getattr(
@@ -342,16 +276,24 @@ def create() -> Blueprint:
             )
 
             resp = CreateRunResponseModel(
-                runid=new_runid,
-                path=path,
+                runid=result.new_run_id,
+                path=result.path,
                 message="Run forked successfully",
                 run_details=RunDetailsModel(
-                    **run_details.to_dict()
+                    **result.run_details.to_dict()
                 ),
                 max_file_size=max_file_size,
             )
             return jsonify(resp.model_dump()), 200
 
+        except ValueError as e:
+            error_msg = str(e)
+            if "dataset" in error_msg.lower():
+                return (
+                    jsonify({"error": "Dataset expired", "message": error_msg}),
+                    410,
+                )
+            return jsonify({"error": error_msg}), 400
         except GCSError as e:
             current_app.logger.error(f"GCS error forking run: {e}")
             return jsonify({"error": str(e)}), 500

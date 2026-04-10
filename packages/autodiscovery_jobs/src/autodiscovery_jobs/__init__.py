@@ -50,7 +50,7 @@ from .gcs import (
     upload_dataset,
     upload_metadata,
 )
-from .manager import JobManager
+from .manager import ForkResult, JobManager
 
 # Run details management
 from .run_details import (
@@ -99,6 +99,7 @@ __version__ = "0.1.0"
 __all__ = [
     # Main class
     "JobManager",
+    "ForkResult",
     "DATASET_EXPIRY_DAYS",
     "JobConfig",
     # Exceptions

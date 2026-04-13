@@ -599,9 +599,7 @@ function RunViewContent({
                                                 </span>
                                             </Tooltip>
                                             <ExpandingActionButton
-                                                className={
-                                                    downloadAnchorEl ? 'expanded' : ''
-                                                }
+                                                className={downloadAnchorEl ? 'expanded' : ''}
                                                 {...mkDownloadBtnAttrs({ runId: run.id })}
                                                 onClick={(e) =>
                                                     setDownloadAnchorEl(e.currentTarget)
@@ -969,7 +967,6 @@ const ButtonLabel = styled('span')`
         opacity 0.2s ease-in-out,
         margin-left 0.25s ease-in-out;
 `;
-
 
 const OverflowButton = styled(IconButton)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};

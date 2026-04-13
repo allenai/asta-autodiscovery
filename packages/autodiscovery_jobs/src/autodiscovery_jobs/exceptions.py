@@ -29,3 +29,9 @@ class CloudRunError(AutodiscoveryJobError):
     """Raised when Cloud Run operations fail."""
 
     pass
+
+
+class DatasetExpiredError(AutodiscoveryJobError):
+    """Raised when a run's dataset files have been deleted or expired."""
+
+    pass

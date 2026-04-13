@@ -75,6 +75,7 @@ try:
     from autodiscovery_jobs import DATASET_EXPIRY_DAYS, JobConfig, JobManager
     from autodiscovery_jobs.exceptions import (
         CloudRunError,
+        DatasetExpiredError,
         GCSError,
         JobAlreadyExistsError,
         JobNotFoundError,
@@ -286,14 +287,13 @@ def create() -> Blueprint:
             )
             return jsonify(resp.model_dump()), 200
 
+        except DatasetExpiredError as e:
+            return (
+                jsonify({"error": "Dataset expired", "message": str(e)}),
+                410,
+            )
         except ValueError as e:
-            error_msg = str(e)
-            if "dataset" in error_msg.lower():
-                return (
-                    jsonify({"error": "Dataset expired", "message": error_msg}),
-                    410,
-                )
-            return jsonify({"error": error_msg}), 400
+            return jsonify({"error": str(e)}), 400
         except GCSError as e:
             current_app.logger.error(f"GCS error forking run: {e}")
             return jsonify({"error": str(e)}), 500

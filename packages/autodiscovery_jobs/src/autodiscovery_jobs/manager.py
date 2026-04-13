@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from . import cloudrun, gcs
 from .config import JobConfig
+from .exceptions import DatasetExpiredError
 from .run_details import RunDetails, create_run_details, get_run_details
 
 
@@ -159,7 +160,7 @@ class JobManager:
 
         # Verify parent data files still exist
         if not self.has_data_files(parent_userid, parent_run_id):
-            raise ValueError(
+            raise DatasetExpiredError(
                 "The parent run's dataset has been deleted. "
                 "To start a new run, please upload your data again."
             )

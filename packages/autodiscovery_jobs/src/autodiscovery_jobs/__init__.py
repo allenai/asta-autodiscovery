@@ -28,6 +28,7 @@ from .config import DATASET_EXPIRY_DAYS, JobConfig
 from .exceptions import (
     AutodiscoveryJobError,
     CloudRunError,
+    DatasetExpiredError,
     GCSError,
     JobAlreadyExistsError,
     JobNotFoundError,
@@ -108,6 +109,7 @@ __all__ = [
     "JobAlreadyExistsError",
     "GCSError",
     "CloudRunError",
+    "DatasetExpiredError",
     "Auth0Error",
     # GCS functions
     "parse_gcs_path",

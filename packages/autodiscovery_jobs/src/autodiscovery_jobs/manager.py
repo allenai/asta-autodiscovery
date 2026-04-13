@@ -1,6 +1,8 @@
 """High-level interface for managing Cloud Run jobs."""
 
 import logging
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +10,17 @@ logger = logging.getLogger(__name__)
 
 from . import cloudrun, gcs
 from .config import JobConfig
-from .run_details import get_run_details
+from .exceptions import DatasetExpiredError
+from .run_details import RunDetails, create_run_details, get_run_details
+
+
+@dataclass
+class ForkResult:
+    """Result of forking a job."""
+
+    new_run_id: str
+    path: str
+    run_details: RunDetails
 
 
 class JobManager:
@@ -91,6 +103,115 @@ class JobManager:
             GCS path to created job directory
         """
         return gcs.create_job_directory(userid, jobid, self.config, overwrite)
+
+    def copy_job_data(
+        self,
+        source_userid: str,
+        source_jobid: str,
+        dest_userid: str,
+        dest_jobid: str,
+    ) -> list[str]:
+        """Copy dataset files from one job to another.
+
+        Args:
+            source_userid: User who owns the source job
+            source_jobid: Source job identifier
+            dest_userid: User who owns the destination job
+            dest_jobid: Destination job identifier
+
+        Returns:
+            List of copied filenames
+        """
+        return gcs.copy_job_data_files(
+            source_userid, source_jobid, dest_userid, dest_jobid, self.config
+        )
+
+    def fork_job(
+        self, parent_run_id: str, parent_userid: str, user_id: str
+    ) -> ForkResult:
+        """Fork an existing run, copying its configuration and dataset files.
+
+        Creates a new run pre-populated with the parent run's metadata
+        and a server-side copy of the parent's dataset files.
+
+        Permission checks are NOT performed here; callers are responsible
+        for verifying access before calling this method.
+
+        Args:
+            parent_run_id: ID of the run to fork from
+            parent_userid: User ID of the parent run's owner
+            user_id: User ID of the user who will own the new run
+
+        Returns:
+            ForkResult with new_run_id, GCS path, and RunDetails
+
+        Raises:
+            ValueError: If parent run has no metadata or dataset files are gone
+            GCSError: If any GCS operation fails
+        """
+        # Read parent metadata
+        parent_metadata = self.get_metadata(parent_userid, parent_run_id)
+        if not parent_metadata:
+            raise ValueError(f"Parent run has no metadata: {parent_run_id}")
+
+        # Create the child run
+        new_run_id = str(uuid.uuid4())
+        path = self.create_job(user_id, new_run_id)
+
+        # Verify parent data files still exist
+        if not self.has_data_files(parent_userid, parent_run_id):
+            raise DatasetExpiredError(
+                "The parent run's dataset has been deleted. "
+                "To start a new run, please upload your data again."
+            )
+
+        # Copy dataset files from parent to child (server-side)
+        self.copy_job_data(parent_userid, parent_run_id, user_id, new_run_id)
+
+        # Build and upload child metadata
+        child_metadata = self._build_fork_metadata(parent_metadata, parent_run_id)
+        self.upload_metadata(user_id, new_run_id, child_metadata)
+
+        # Create run_details.json
+        run_details = create_run_details(user_id, new_run_id, self.config)
+
+        return ForkResult(
+            new_run_id=new_run_id,
+            path=path,
+            run_details=run_details,
+        )
+
+    @staticmethod
+    def _build_fork_metadata(
+        parent_metadata: dict[str, Any], parent_run_id: str
+    ) -> dict[str, Any]:
+        """Build child metadata from parent metadata for a fork operation."""
+        parent_name = parent_metadata.get("name", "Untitled")
+        return {
+            # Descriptive fields from parent
+            "name": f"Fork of {parent_name}",
+            "description": parent_metadata.get("description", ""),
+            "domain": parent_metadata.get("domain", ""),
+            "intent": parent_metadata.get("intent", ""),
+            "datasets": parent_metadata.get("datasets", []),
+            # Advanced settings from parent
+            "n_experiments": parent_metadata.get("n_experiments"),
+            "exploration_weight": parent_metadata.get("exploration_weight"),
+            "mcts_selection": parent_metadata.get("mcts_selection"),
+            "surprisal_width": parent_metadata.get("surprisal_width"),
+            "evidence_weight": parent_metadata.get("evidence_weight"),
+            "warmstart_experiments": parent_metadata.get("warmstart_experiments"),
+            "n_warmstart": parent_metadata.get("n_warmstart"),
+            # Lineage
+            "lineage": {
+                "parent_run_id": parent_run_id,
+                "parent_run_name": parent_name,
+            },
+            # Clear per-run state
+            "is_bookmarked": None,
+            "bookmarked_experiment_ids": None,
+            "is_shared": None,
+        }
 
     def delete_job(self, userid: str, jobid: str) -> None:
         """Delete a job directory and all contents.
@@ -211,6 +332,10 @@ class JobManager:
             expiration_seconds,
             self.config,
         )
+
+    def has_data_files(self, userid: str, jobid: str) -> bool:
+        """Check if a job has any non-placeholder data files."""
+        return gcs.has_data_files(userid, jobid, self.config)
 
     def expire_datasets(
         self,

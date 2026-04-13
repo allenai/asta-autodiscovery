@@ -42,6 +42,7 @@ from runs.models import (
     DeleteRunRequestModel,
     DeleteRunResponseModel,
     ExperimentModel,
+    ForkRunRequestModel,
     GenerateUploadUrlRequestModel,
     GenerateUploadUrlResponseModel,
     GetExperimentStatusResponseModel,
@@ -52,6 +53,8 @@ from runs.models import (
     GetRunRequestModel,
     GetRunStatusRequestModel,
     GetRunStatusResponseModel,
+    GetSharedRunOwnerRequestModel,
+    GetSharedRunOwnerResponseModel,
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
     MetadataModel,
@@ -62,8 +65,6 @@ from runs.models import (
     SaveMetadataResponseModel,
     ShareRunRequestModel,
     ShareRunResponseModel,
-    GetSharedRunOwnerRequestModel,
-    GetSharedRunOwnerResponseModel,
     SubmitRunRequestModel,
     SubmitRunResponseModel,
     UploadDatasetResponseModel,
@@ -71,14 +72,15 @@ from runs.models import (
 
 # Import autodiscovery_jobs when available
 try:
-    from autodiscovery_jobs import JobConfig, JobManager
+    from autodiscovery_jobs import DATASET_EXPIRY_DAYS, JobConfig, JobManager
     from autodiscovery_jobs.exceptions import (
         CloudRunError,
+        DatasetExpiredError,
         GCSError,
         JobAlreadyExistsError,
         JobNotFoundError,
     )
-    from autodiscovery_jobs.gcs import read_rich_outputs
+    from autodiscovery_jobs.gcs import get_userid_for_job, read_rich_outputs
     from autodiscovery_jobs.run_details import (
         RunDetails,
         create_run_details,
@@ -213,6 +215,92 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create run: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @api.route("/fork", methods=["POST"])
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
+    def fork_run():
+        """Fork an existing run, copying its configuration and dataset files.
+
+        Creates a new run pre-populated with the parent run's metadata
+        and a server-side copy of the parent's dataset files.
+
+        Request body:
+            parent_run_id: ID of the run to fork from
+
+        Returns:
+            JSON response with new runid and GCS path.
+        """
+        userid = request.user.get("sub")
+        if not userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        body = request.get_json(silent=True) or {}
+        try:
+            req = ForkRunRequestModel(**body)
+        except Exception as e:
+            return jsonify({"error": f"Invalid request: {e}"}), 400
+
+        try:
+            manager = get_job_manager()
+
+            # Find the parent run's owner
+            parent_userid = get_userid_for_job(
+                req.parent_run_id, manager.config
+            )
+            if not parent_userid:
+                return jsonify({"error": "Parent run not found"}), 404
+
+            # Verify the requesting user can read the parent run
+            if not _can_read_run(userid, parent_userid, req.parent_run_id):
+                return (
+                    jsonify({"error": "Cannot access parent run"}),
+                    403,
+                )
+
+            # Check parent is not deleted
+            error_resp, status_code = _check_run_not_deleted(
+                parent_userid, req.parent_run_id
+            )
+            if error_resp:
+                return error_resp, status_code
+
+            # Delegate business logic to JobManager
+            result = manager.fork_job(req.parent_run_id, parent_userid, userid)
+
+            # Check upload limit
+            has_higher_upload_limit = getattr(
+                request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False
+            )
+            max_file_size = (
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR
+                if has_higher_upload_limit
+                else None
+            )
+
+            resp = CreateRunResponseModel(
+                runid=result.new_run_id,
+                path=result.path,
+                message="Run forked successfully",
+                run_details=RunDetailsModel(
+                    **result.run_details.to_dict()
+                ),
+                max_file_size=max_file_size,
+            )
+            return jsonify(resp.model_dump()), 200
+
+        except DatasetExpiredError as e:
+            return (
+                jsonify({"error": "Dataset expired", "message": str(e)}),
+                410,
+            )
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        except GCSError as e:
+            current_app.logger.error(f"GCS error forking run: {e}")
+            return jsonify({"error": str(e)}), 500
+        except Exception as e:
+            current_app.logger.error(f"Failed to fork run: {e}")
+            return jsonify({"error": str(e)}), 500
+
     def _get_userid_for_read() -> tuple[str | None, tuple | None]:
         """Get the authenticated user's ID from JWT token.
 
@@ -260,6 +348,22 @@ def create() -> Blueprint:
             # If we can't get run details, let the endpoint handle it
             pass
         return None, None
+
+    def _compute_dataset_expires_at(run_details: RunDetails | None) -> str | None:
+        """Compute dataset expiry timestamp (created_at + DATASET_EXPIRY_DAYS).
+
+        This is an estimate — the actual cleanup cron may run slightly later,
+        but using the shared DATASET_EXPIRY_DAYS constant keeps the prediction
+        consistent with the deletion threshold.
+        """
+        if not run_details or not run_details.created_at:
+            return None
+        try:
+            created = datetime.fromisoformat(run_details.created_at)
+            expires = created + timedelta(days=DATASET_EXPIRY_DAYS)
+            return expires.isoformat()
+        except (ValueError, TypeError):
+            return None
 
     @api.route("/<userid>/list", methods=["GET"])
     @optional_enrollment
@@ -341,6 +445,10 @@ def create() -> Blueprint:
                 num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
             ) if job_stats else None
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
+
+            # Compute dataset expiry
+            dataset_expires_at = _compute_dataset_expires_at(run_details)
+
             return RunModel(
                 runid=run_id,
                 userid=req.userid,
@@ -355,6 +463,13 @@ def create() -> Blueprint:
                 run_metadata=run_metadata_model,
                 execution_status={},
                 max_file_size=max_file_size,
+                parent_run_id=(
+                    run_metadata_model.parent_run_id if run_metadata_model else None
+                ),
+                parent_run_name=(
+                    run_metadata_model.parent_run_name if run_metadata_model else None
+                ),
+                dataset_expires_at=dataset_expires_at,
             )
 
         if sliced_run_ids:
@@ -458,6 +573,9 @@ def create() -> Blueprint:
             # Check if user has AI1_DATASETS permission for dataset access in the UI
             has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
 
+            # Compute dataset expiry
+            dataset_expires_at = _compute_dataset_expires_at(run_details)
+
             run_model = RunModel(
                 runid=req.runid,
                 userid=req.userid,
@@ -471,6 +589,13 @@ def create() -> Blueprint:
                 execution_status={},
                 max_file_size=max_file_size,
                 can_view_datasets=has_ai1_datasets,
+                parent_run_id=(
+                    run_metadata_model.parent_run_id if run_metadata_model else None
+                ),
+                parent_run_name=(
+                    run_metadata_model.parent_run_name if run_metadata_model else None
+                ),
+                dataset_expires_at=dataset_expires_at,
             )
 
             return jsonify(run_model.model_dump()), 200
@@ -705,7 +830,7 @@ def create() -> Blueprint:
 
         try:
             manager = get_job_manager()
-            path = manager.upload_metadata(req.userid, req.runid, req.metadata.model_dump())
+            path = manager.upload_metadata(req.userid, req.runid, req.metadata.to_storage_dict())
             resp = SaveMetadataResponseModel(
                 path=path,
                 message="Metadata saved successfully",

@@ -1,7 +1,9 @@
 'use client';
 
 import {
+    Button,
     Dialog,
+    DialogActions,
     DialogTitle,
     DialogContent,
     IconButton,
@@ -11,6 +13,7 @@ import {
     styled,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import prettyBytes from 'pretty-bytes';
 
 import { Metadata } from '@/types/Run';
@@ -21,6 +24,12 @@ interface RunParametersModalProps {
     onClose: () => void;
     metadata: Metadata | null | undefined;
     testId?: string;
+    /** Whether the dataset is still available for forking */
+    canFork?: boolean;
+    /** Tooltip text for the fork button (e.g., expiry info) */
+    forkTooltip?: string;
+    /** Called when the user clicks "New run from session" */
+    onFork?: () => void;
 }
 
 /**
@@ -28,7 +37,15 @@ interface RunParametersModalProps {
  * Shows metadata (name, description, datasets, domain, intent) and
  * run arguments (experiments, exploration weight, etc.) - all from metadata.
  */
-export function RunParametersModal({ open, onClose, metadata, testId }: RunParametersModalProps) {
+export function RunParametersModal({
+    open,
+    onClose,
+    metadata,
+    testId,
+    canFork,
+    forkTooltip,
+    onFork,
+}: RunParametersModalProps) {
     const getMctsSelectionLabel = (value: string | null) => {
         if (!value) return 'Not set';
         const option = Object.values(MCTS_SELECTION).find((opt) => opt.value === value);
@@ -44,7 +61,7 @@ export function RunParametersModal({ open, onClose, metadata, testId }: RunParam
                 {
                     sx: {
                         width: '90%',
-                        maxWidth: '600px',
+                        maxWidth: '800px',
                         borderRadius: '24px',
                     },
                     ...(testId ? { 'data-test-id': testId } : {}),
@@ -173,6 +190,23 @@ export function RunParametersModal({ open, onClose, metadata, testId }: RunParam
                     </FieldRow>
                 </Section>
             </StyledDialogContent>
+            {onFork && (
+                <StyledDialogActions>
+                    {forkTooltip && (
+                        <DatasetExpiryLabel $isExpired={!canFork}>{forkTooltip}</DatasetExpiryLabel>
+                    )}
+                    <ForkButton
+                        variant="outlined"
+                        disabled={!canFork}
+                        startIcon={<RestartAltIcon />}
+                        onClick={() => {
+                            onClose();
+                            onFork();
+                        }}>
+                        New run from session
+                    </ForkButton>
+                </StyledDialogActions>
+            )}
         </Dialog>
     );
 }
@@ -198,6 +232,37 @@ const StyledDialogContent = styled(DialogContent)`
     background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
     color: ${({ theme }) => theme.color['cream-100'].hex};
     padding: ${({ theme }) => theme.spacing(3)} !important;
+`;
+
+const StyledDialogActions = styled(DialogActions)`
+    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    border-top: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    align-items: center;
+    gap: ${({ theme }) => theme.spacing(1.5)};
+    padding: ${({ theme }) => theme.spacing(2, 3)};
+`;
+
+const DatasetExpiryLabel = styled('span')<{ $isExpired: boolean }>`
+    color: ${({ theme, $isExpired }) =>
+        $isExpired ? theme.color['error-red-100'].hex : theme.color['cream-60'].hex};
+    font-size: 0.875rem;
+`;
+
+const ForkButton = styled(Button)`
+    border-color: ${({ theme }) => theme.color['green-100'].hex};
+    color: ${({ theme }) => theme.color['green-100'].hex};
+    text-transform: none;
+    white-space: nowrap;
+
+    &:hover {
+        border-color: ${({ theme }) => theme.color['green-80'].hex};
+        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    }
+
+    &.Mui-disabled {
+        border-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+        color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+    }
 `;
 
 const Section = styled(Box)`

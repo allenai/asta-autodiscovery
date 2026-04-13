@@ -2,7 +2,11 @@
 
 from unittest.mock import patch
 
+import pytest
 from autodiscovery_jobs import JobManager
+from autodiscovery_jobs.exceptions import DatasetExpiredError
+from autodiscovery_jobs.manager import ForkResult
+from autodiscovery_jobs.run_details import RunDetails
 
 
 def test_manager_initialization(mock_config):
@@ -302,3 +306,132 @@ def test_setup_and_run(mock_config, tmp_path):
         mock_upload_data.assert_called_once()
         mock_upload_meta.assert_called_once()
         mock_run.assert_called_once()
+
+
+PARENT_METADATA = {
+    "name": "My Experiment",
+    "description": "Testing hypothesis X",
+    "domain": "biology",
+    "intent": "Discover Y",
+    "datasets": [{"name": "data.csv", "size": 1024}],
+    "n_experiments": 8,
+    "exploration_weight": 0.5,
+    "mcts_selection": "ucb1",
+    "surprisal_width": 2.0,
+    "evidence_weight": 0.3,
+    "warmstart_experiments": True,
+    "n_warmstart": 3,
+    "is_bookmarked": True,
+    "bookmarked_experiment_ids": ["exp-1", "exp-2"],
+    "is_shared": True,
+}
+
+
+def test_fork_job_success(mock_config):
+    """Test fork_job happy path: copies data, transforms metadata, returns ForkResult."""
+    mock_run_details = RunDetails(
+        execution_id=None,
+        created_at="2026-04-13T00:00:00Z",
+        status="CREATED",
+    )
+
+    with (
+        patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta,
+        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.gcs.has_data_files") as mock_has_data,
+        patch("autodiscovery_jobs.gcs.copy_job_data_files") as mock_copy,
+        patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload,
+        patch("autodiscovery_jobs.manager.create_run_details") as mock_create_details,
+    ):
+        mock_get_meta.return_value = PARENT_METADATA
+        mock_create.return_value = "gs://test-bucket/users/forking-user/jobs/new-id/"
+        mock_has_data.return_value = True
+        mock_copy.return_value = ["data.csv"]
+        mock_create_details.return_value = mock_run_details
+
+        manager = JobManager(mock_config)
+        result = manager.fork_job("parent-run-id", "parent-owner", "forking-user")
+
+        assert isinstance(result, ForkResult)
+        assert result.new_run_id  # UUID was generated
+        assert result.run_details == mock_run_details
+
+        # create_job_directory called with the forking user, not the parent owner
+        mock_create.assert_called_once()
+        create_args = mock_create.call_args
+        assert create_args[0][0] == "forking-user"
+
+        # copy called with correct source and destination
+        mock_copy.assert_called_once()
+        copy_args = mock_copy.call_args[0]
+        assert copy_args[0] == "parent-owner"
+        assert copy_args[1] == "parent-run-id"
+        assert copy_args[2] == "forking-user"
+
+        # upload_metadata called with transformed child metadata
+        mock_upload.assert_called_once()
+        child_metadata = mock_upload.call_args[0][2]
+        assert child_metadata["name"] == "Fork of My Experiment"
+        assert child_metadata["lineage"]["parent_run_id"] == "parent-run-id"
+        assert child_metadata["lineage"]["parent_run_name"] == "My Experiment"
+        assert child_metadata["is_bookmarked"] is None
+        assert child_metadata["bookmarked_experiment_ids"] is None
+        assert child_metadata["is_shared"] is None
+
+
+def test_fork_job_no_parent_metadata(mock_config):
+    """Test fork_job raises ValueError when parent has no metadata."""
+    with patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta:
+        mock_get_meta.return_value = None
+
+        manager = JobManager(mock_config)
+        with pytest.raises(ValueError, match="no metadata"):
+            manager.fork_job("parent-run-id", "parent-owner", "forking-user")
+
+
+def test_fork_job_dataset_expired(mock_config):
+    """Test fork_job raises DatasetExpiredError when parent data files are gone."""
+    with (
+        patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta,
+        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.gcs.has_data_files") as mock_has_data,
+    ):
+        mock_get_meta.return_value = PARENT_METADATA
+        mock_create.return_value = "gs://test-bucket/users/forking-user/jobs/new-id/"
+        mock_has_data.return_value = False
+
+        manager = JobManager(mock_config)
+        with pytest.raises(DatasetExpiredError, match="dataset"):
+            manager.fork_job("parent-run-id", "parent-owner", "forking-user")
+
+
+def test_build_fork_metadata():
+    """Test _build_fork_metadata transforms parent metadata correctly."""
+    result = JobManager._build_fork_metadata(PARENT_METADATA, "parent-run-id")
+
+    # Name is prefixed
+    assert result["name"] == "Fork of My Experiment"
+
+    # Descriptive fields preserved
+    assert result["description"] == "Testing hypothesis X"
+    assert result["domain"] == "biology"
+    assert result["intent"] == "Discover Y"
+    assert result["datasets"] == [{"name": "data.csv", "size": 1024}]
+
+    # Advanced settings preserved
+    assert result["n_experiments"] == 8
+    assert result["exploration_weight"] == 0.5
+    assert result["mcts_selection"] == "ucb1"
+    assert result["surprisal_width"] == 2.0
+    assert result["evidence_weight"] == 0.3
+    assert result["warmstart_experiments"] is True
+    assert result["n_warmstart"] == 3
+
+    # Lineage set
+    assert result["lineage"]["parent_run_id"] == "parent-run-id"
+    assert result["lineage"]["parent_run_name"] == "My Experiment"
+
+    # Per-run state cleared
+    assert result["is_bookmarked"] is None
+    assert result["bookmarked_experiment_ids"] is None
+    assert result["is_shared"] is None

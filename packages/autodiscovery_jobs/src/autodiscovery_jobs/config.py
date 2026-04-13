@@ -5,6 +5,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+# How many days uploaded datasets are retained before the cleanup cron deletes
+# them from GCS.  Both the cleanup script and the API's expiry estimate read
+# this value so they stay in sync.
+DATASET_EXPIRY_DAYS: int = 7
+
 
 @dataclass
 class JobConfig:

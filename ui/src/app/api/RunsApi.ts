@@ -43,6 +43,9 @@ export interface RunMetadataFromApi {
     evidence_weight: number | null;
     warmstart_experiments: string | null;
     n_warmstart: number | null;
+    // Lineage
+    parent_run_id?: string | null;
+    parent_run_name?: string | null;
 }
 
 export interface RunFromApi {
@@ -57,6 +60,9 @@ export interface RunFromApi {
     execution_status?: Record<string, unknown>;
     run_metadata?: RunMetadataFromApi;
     max_file_size?: string;
+    parent_run_id?: string | null;
+    parent_run_name?: string | null;
+    dataset_expires_at?: string | null;
 }
 
 export interface UploadDatasetResponseBody {
@@ -144,6 +150,9 @@ export interface MetadataFromApi {
     evidence_weight: number | null;
     warmstart_experiments: string | null;
     n_warmstart: number | null;
+    // Lineage
+    parent_run_id?: string | null;
+    parent_run_name?: string | null;
 }
 
 export interface GetRunMetadataResponseBody {
@@ -176,6 +185,14 @@ export class RunsApi extends BaseApi {
         return this.request<RunResponseBody>({
             url: `${RUNS_URL_PREFIX}/create`,
             method: 'POST',
+        });
+    }
+
+    async forkRun({ parentRunId }: { parentRunId: string }) {
+        return this.request<RunResponseBody>({
+            url: `${RUNS_URL_PREFIX}/fork`,
+            method: 'POST',
+            body: { parent_run_id: parentRunId },
         });
     }
 

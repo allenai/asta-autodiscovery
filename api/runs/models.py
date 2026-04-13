@@ -160,6 +160,14 @@ class MetadataModel(BaseModel):
         None, description="Whether the run is shared (viewable by anyone). Missing means not shared."
     )
 
+    # Lineage (nested under "lineage" key in metadata.json)
+    parent_run_id: str | None = Field(
+        None, description="ID of the parent run this was forked from"
+    )
+    parent_run_name: str | None = Field(
+        None, description="Name of the parent run (denormalized at fork time)"
+    )
+
     # Job configuration parameters
     n_experiments: int | None = Field(None, description="Number of experiments to run")
     exploration_weight: float | None = Field(None, description="Weight for exploration in MCTS")
@@ -194,6 +202,14 @@ class MetadataModel(BaseModel):
             is_shared=data.get("is_shared"),
             is_bookmarked=data.get("is_bookmarked"),
             bookmarked_experiment_ids=data.get("bookmarked_experiment_ids"),
+            parent_run_id=(
+                (data.get("lineage") or {}).get("parent_run_id")
+                or data.get("parent_run_id")
+            ),
+            parent_run_name=(
+                (data.get("lineage") or {}).get("parent_run_name")
+                or data.get("parent_run_name")
+            ),
             n_experiments=data.get("n_experiments"),
             exploration_weight=data.get("exploration_weight"),
             mcts_selection=data.get("mcts_selection"),
@@ -202,6 +218,18 @@ class MetadataModel(BaseModel):
             warmstart_experiments=data.get("warmstart_experiments"),
             n_warmstart=data.get("n_warmstart"),
         )
+
+    def to_storage_dict(self) -> dict[str, Any]:
+        """Serialize for metadata.json storage with nested lineage."""
+        d = self.model_dump()
+        parent_run_id = d.pop("parent_run_id", None)
+        parent_run_name = d.pop("parent_run_name", None)
+        if parent_run_id or parent_run_name:
+            d["lineage"] = {
+                "parent_run_id": parent_run_id,
+                "parent_run_name": parent_run_name,
+            }
+        return d
 
 
 class RunModel(BaseModel):
@@ -223,6 +251,11 @@ class RunModel(BaseModel):
     run_metadata: MetadataModel | None = Field(None, description="Metadata associated with the run")
     max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
     can_view_datasets: bool = Field(False, description="Bool flag determining if AI1 datasets are visible")
+    parent_run_id: str | None = Field(None, description="ID of the parent run this was forked from")
+    parent_run_name: str | None = Field(None, description="Name of the parent run")
+    dataset_expires_at: str | None = Field(
+        None, description="ISO timestamp when the dataset expires"
+    )
 
 
 class GetRunMetadataRequestModel(BaseModel):
@@ -314,6 +347,12 @@ class CreateRunResponseModel(BaseModel):
     message: str = Field(..., description="Success message")
     run_details: RunDetailsModel = Field(..., description="Initial run details")
     max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
+
+
+class ForkRunRequestModel(BaseModel):
+    """Model for the request to fork a run"""
+
+    parent_run_id: str = Field(..., description="ID of the run to fork from")
 
 
 class GetRunRequestModel(BaseModel):

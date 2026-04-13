@@ -39,6 +39,10 @@ type Settings = {
     evidenceWeight: number;
     warmstartExperiments: string;
     nWarmstart: number;
+
+    // Lineage (read-only, preserved across saves)
+    parentRunId: string | null;
+    parentRunName: string | null;
 };
 
 interface UseRunSetupProps {
@@ -117,6 +121,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         evidenceWeight: 2,
         warmstartExperiments: '',
         nWarmstart: 8,
+        parentRunId: null,
+        parentRunName: null,
     });
 
     // Field validation errors
@@ -141,7 +147,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 // No userid needed - API will use authenticated user
                 const { data } = await api.getRun({ runId: runid });
                 setHasAi1Permission(data.can_view_datasets ?? false);
-                const { metadata } = getRunFromApi(data);
+                const run = getRunFromApi(data);
+                const { metadata } = run;
 
                 if (metadata) {
                     setSettings((prev) => ({
@@ -158,6 +165,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                         warmstartExperiments:
                             metadata.warmstartExperiments ?? prev.warmstartExperiments,
                         nWarmstart: metadata.nWarmstart ?? prev.nWarmstart,
+                        parentRunId: metadata.parentRunId ?? null,
+                        parentRunName: metadata.parentRunName ?? null,
                     }));
 
                     // Populate fileUploads from saved datasets
@@ -273,7 +282,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 name: upload.file.name,
                 description: upload.description || '',
                 content_type: upload.file.type || 'application/octet-stream',
-                file_size_bytes: upload.file.size,
+                file_size_bytes: upload.totalBytes || upload.file.size,
                 url: null,
                 is_preloaded: false,
             }));
@@ -319,6 +328,11 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 evidence_weight: currentSettings.evidenceWeight,
                 warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
+                // Lineage
+                lineage: {
+                    parent_run_id: currentSettings.parentRunId ?? null,
+                    parent_run_name: currentSettings.parentRunName ?? null,
+                },
             };
 
             await api.saveMetadata(runid, metadata);
@@ -546,6 +560,11 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 evidence_weight: currentSettings.evidenceWeight,
                 warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
+                // Lineage
+                lineage: {
+                    parent_run_id: currentSettings.parentRunId ?? null,
+                    parent_run_name: currentSettings.parentRunName ?? null,
+                },
             };
 
             await api.saveMetadata(runid, metadata);

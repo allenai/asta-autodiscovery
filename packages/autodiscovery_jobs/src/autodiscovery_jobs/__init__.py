@@ -24,10 +24,11 @@ from .cloudrun import (
     get_job_status,
     run_job,
 )
-from .config import JobConfig
+from .config import DATASET_EXPIRY_DAYS, JobConfig
 from .exceptions import (
     AutodiscoveryJobError,
     CloudRunError,
+    DatasetExpiredError,
     GCSError,
     JobAlreadyExistsError,
     JobNotFoundError,
@@ -50,7 +51,7 @@ from .gcs import (
     upload_dataset,
     upload_metadata,
 )
-from .manager import JobManager
+from .manager import ForkResult, JobManager
 
 # Run details management
 from .run_details import (
@@ -99,6 +100,8 @@ __version__ = "0.1.0"
 __all__ = [
     # Main class
     "JobManager",
+    "ForkResult",
+    "DATASET_EXPIRY_DAYS",
     "JobConfig",
     # Exceptions
     "AutodiscoveryJobError",
@@ -106,6 +109,7 @@ __all__ = [
     "JobAlreadyExistsError",
     "GCSError",
     "CloudRunError",
+    "DatasetExpiredError",
     "Auth0Error",
     # GCS functions
     "parse_gcs_path",

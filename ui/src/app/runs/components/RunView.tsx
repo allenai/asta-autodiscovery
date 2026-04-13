@@ -598,23 +598,22 @@ function RunViewContent({
                                                     </ExpandingActionButton>
                                                 </span>
                                             </Tooltip>
-                                            <Tooltip title="Download" placement="bottom">
-                                                <span>
-                                                    <ExpandingActionButton
-                                                        {...mkDownloadBtnAttrs({ runId: run.id })}
-                                                        onClick={(e) =>
-                                                            setDownloadAnchorEl(e.currentTarget)
-                                                        }
-                                                        disabled={experiments.length === 0}
-                                                        size="small"
-                                                        variant="outlined">
-                                                        <FileDownloadOutlinedIcon fontSize="small" />
-                                                        <ButtonLabel className="button-label">
-                                                            Download
-                                                        </ButtonLabel>
-                                                    </ExpandingActionButton>
-                                                </span>
-                                            </Tooltip>
+                                            <ExpandingActionButton
+                                                className={
+                                                    downloadAnchorEl ? 'expanded' : ''
+                                                }
+                                                {...mkDownloadBtnAttrs({ runId: run.id })}
+                                                onClick={(e) =>
+                                                    setDownloadAnchorEl(e.currentTarget)
+                                                }
+                                                disabled={experiments.length === 0}
+                                                size="small"
+                                                variant="outlined">
+                                                <FileDownloadOutlinedIcon fontSize="small" />
+                                                <ButtonLabel className="button-label">
+                                                    Download
+                                                </ButtonLabel>
+                                            </ExpandingActionButton>
                                             <DownloadMenu
                                                 anchorEl={downloadAnchorEl}
                                                 open={!!downloadAnchorEl}
@@ -936,7 +935,8 @@ const ExpandingActionButton = styled(Button)`
         padding 0.25s ease-in-out;
     max-width: 32px;
 
-    &:hover {
+    &:hover,
+    &.expanded {
         border: 1px solid ${({ theme }) => theme.color['cream-40'].rgba.toString()};
         max-width: 250px;
         padding: 0 12px;
@@ -969,6 +969,7 @@ const ButtonLabel = styled('span')`
         opacity 0.2s ease-in-out,
         margin-left 0.25s ease-in-out;
 `;
+
 
 const OverflowButton = styled(IconButton)`
     border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};

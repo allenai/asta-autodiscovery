@@ -39,24 +39,46 @@ def get_public_key(auth0_domain, kid):
 
 
 def verify_token(token, auth0_domain, auth0_audience):
-    """Verify JWT token from Auth0"""
+    """Verify JWT token from Auth0.
+
+    Supports tokens from a secondary Auth0 domain/audience (e.g. CLI tokens
+    routed through the gateway) when AUTH0_GATEWAY_DOMAIN and
+    AUTH0_GATEWAY_AUDIENCE environment variables are set.  Both domains must
+    belong to the same Auth0 tenant so the signing keys are identical.
+    """
     try:
         # Decode header to get kid
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header["kid"]
 
-        # Get public key
+        # Get public key (same keys for both domains — same Auth0 tenant)
         public_key = get_public_key(auth0_domain, kid)
 
-        # Verify and decode token
-        payload = jwt.decode(
-            token,
-            public_key,
-            algorithms=["RS256"],
-            audience=auth0_audience,
-            issuer=f"https://{auth0_domain}/",
-        )
-        return payload
+        # Try primary audience/issuer (web UI tokens)
+        try:
+            return jwt.decode(
+                token,
+                public_key,
+                algorithms=["RS256"],
+                audience=auth0_audience,
+                issuer=f"https://{auth0_domain}/",
+            )
+        except (jwt.InvalidAudienceError, jwt.InvalidIssuerError):
+            pass
+
+        # Try gateway audience/issuer (CLI tokens forwarded through gateway)
+        gateway_domain = os.environ.get("AUTH0_GATEWAY_DOMAIN")
+        gateway_audience = os.environ.get("AUTH0_GATEWAY_AUDIENCE")
+        if gateway_domain and gateway_audience:
+            return jwt.decode(
+                token,
+                public_key,
+                algorithms=["RS256"],
+                audience=gateway_audience,
+                issuer=f"https://{gateway_domain}/",
+            )
+
+        raise jwt.InvalidAudienceError("Invalid audience")
     except jwt.ExpiredSignatureError:
         raise ValueError("Token has expired")
     except jwt.InvalidAudienceError:

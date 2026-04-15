@@ -2,8 +2,7 @@
 
 import { styled } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import betaPdf from '@stdlib/stats-base-dists-beta-pdf';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import type { BeliefDistribution } from '@/types/Run';
 
@@ -14,7 +13,7 @@ type BeliefDistributionPlotProps = {
 };
 
 // Encodes the belief-category -> score mapping so we can convert categorical counts
-// into a single beta distribution (alpha/beta).
+// into a single point on the Likely False <-> Likely True axis.
 const SCORE_PER_CATEGORY = {
     definitely_false: 0.0,
     maybe_false: 0.25,
@@ -23,363 +22,314 @@ const SCORE_PER_CATEGORY = {
     definitely_true: 1.0,
 } as const;
 
-// Normalizes missing/invalid values to 0 so partial data doesn't crash the plot.
 const safeNumber = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) ? value : 0;
 
-// Converts a categorical belief payload into beta parameters by distributing each
-// category count across alpha/beta according to its score weight.
-const toBetaParams = (belief: BeliefDistribution | null) => {
-    const priorParams = belief?.prior_params;
-    if (!belief || !priorParams || priorParams.length < 2) {
+// Collapse a categorical belief distribution into a single 0-1 mean on the axis.
+const toMean = (belief: BeliefDistribution | null): number | null => {
+    const params = belief?.prior_params;
+    if (!belief || !params || params.length < 2) {
         return null;
     }
-
-    let alpha = safeNumber(priorParams[0]);
-    let beta = safeNumber(priorParams[1]);
-
-    const scoreEntries = Object.entries(SCORE_PER_CATEGORY) as Array<
-        [keyof typeof SCORE_PER_CATEGORY, number]
-    >;
-
-    scoreEntries.forEach(([key, score]) => {
+    let alpha = safeNumber(params[0]);
+    let beta = safeNumber(params[1]);
+    (
+        Object.entries(SCORE_PER_CATEGORY) as Array<[keyof typeof SCORE_PER_CATEGORY, number]>
+    ).forEach(([key, score]) => {
         const count = safeNumber(belief[key as keyof BeliefDistribution]);
         alpha += count * score;
         beta += count * (1 - score);
     });
-
-    return alpha > 0 && beta > 0 ? { alpha, beta } : null;
+    if (alpha <= 0 || beta <= 0) {
+        return null;
+    }
+    return alpha / (alpha + beta);
 };
 
-// Samples the beta PDF on a fixed grid; epsilon avoids singularities at 0/1 for
-// extreme alpha/beta while keeping the shape visually accurate.
-const buildBetaSeries = (alpha: number, beta: number, points = 200) => {
-    const epsilon = 1e-4;
-    const step = (1 - 2 * epsilon) / (points - 1);
-    const x = Array.from({ length: points }, (_, i) => epsilon + step * i);
-    const y = x.map((value) => betaPdf(value, alpha, beta));
-    return { x, y };
+// Minimum gap between the two labels when they'd otherwise collide.
+const LABEL_GAP_PX = 12;
+
+const clampCenter = (center: number, width: number, bound: number) => {
+    const half = width / 2;
+    if (center - half < 0) return half;
+    if (center + half > bound) return bound - half;
+    return center;
 };
 
-// Wraps trace construction for plot assembly.
-const toTrace = (label: string, params: { alpha: number; beta: number }, color: string) => {
-    const { x, y } = buildBetaSeries(params.alpha, params.beta);
-    return {
-        x,
-        y,
-        type: 'scatter' as const,
-        mode: 'lines' as const,
-        name: label,
-        line: { color, width: 2.5 },
-        hoverinfo: 'skip' as const,
-    };
-};
-
-/**
- * Renders a Plotly beta distribution comparison for prior and posterior beliefs.
- *
- * Args:
- *   prior: Belief distribution payload for the prior update.
- *   posterior: Belief distribution payload for the posterior update.
- */
 export function BeliefDistributionPlot({
     prior,
     posterior,
     isSurprising,
 }: BeliefDistributionPlotProps) {
     const theme = useTheme() as any;
-    const plotContainerRef = useRef<HTMLDivElement | null>(null);
-    const [containerWidth, setContainerWidth] = useState<number | null>(null);
+    const markerId = useId();
 
+    const { priorMean, posteriorMean } = useMemo(
+        () => ({ priorMean: toMean(prior), posteriorMean: toMean(posterior) }),
+        [prior, posterior]
+    );
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const priorLabelRef = useRef<HTMLDivElement>(null);
+    const posteriorLabelRef = useRef<HTMLDivElement>(null);
+    const [labelOffsetsPx, setLabelOffsetsPx] = useState<{ prior: number; posterior: number }>({
+        prior: 0,
+        posterior: 0,
+    });
+
+    const priorPct = priorMean !== null ? priorMean * 100 : null;
+    const posteriorPct = posteriorMean !== null ? posteriorMean * 100 : null;
+
+    // Measure labels and container to resolve collisions and clamp to bounds.
     useEffect(() => {
-        if (!plotContainerRef.current) {
-            return undefined;
-        }
-        const node = plotContainerRef.current;
-        const observer = new ResizeObserver((entries) => {
-            const entry = entries[0];
-            if (entry?.contentRect) {
-                setContainerWidth(entry.contentRect.width);
+        const container = containerRef.current;
+        if (!container) return undefined;
+
+        const recompute = () => {
+            const containerWidth = container.offsetWidth;
+            if (containerWidth === 0) return;
+
+            const priorEl = priorLabelRef.current;
+            const postEl = posteriorLabelRef.current;
+            const priorWidth = priorEl?.offsetWidth ?? 0;
+            const postWidth = postEl?.offsetWidth ?? 0;
+
+            const priorDotX = priorPct !== null ? (priorPct * containerWidth) / 100 : null;
+            const postDotX = posteriorPct !== null ? (posteriorPct * containerWidth) / 100 : null;
+
+            let priorCenter = priorDotX ?? 0;
+            let postCenter = postDotX ?? 0;
+
+            if (priorDotX !== null && postDotX !== null) {
+                const sep = (priorWidth + postWidth) / 2 + LABEL_GAP_PX;
+                const leftIsPrior = priorDotX <= postDotX;
+                const leftWidth = leftIsPrior ? priorWidth : postWidth;
+                const rightWidth = leftIsPrior ? postWidth : priorWidth;
+                const leftDotX = leftIsPrior ? priorDotX : postDotX;
+                const rightDotX = leftIsPrior ? postDotX : priorDotX;
+
+                let leftCenter = leftDotX;
+                let rightCenter = rightDotX;
+
+                // Resolve overlap by pushing outward from the midpoint, then repair
+                // any boundary violations by transferring the deficit to the partner
+                // so the required separation is preserved even when one side is pinned.
+                if (rightCenter - leftCenter < sep) {
+                    const midpoint = (leftDotX + rightDotX) / 2;
+                    leftCenter = midpoint - sep / 2;
+                    rightCenter = midpoint + sep / 2;
+                }
+
+                const leftMin = leftWidth / 2;
+                const rightMax = containerWidth - rightWidth / 2;
+
+                if (leftCenter < leftMin) {
+                    leftCenter = leftMin;
+                    if (rightCenter < leftCenter + sep) {
+                        rightCenter = leftCenter + sep;
+                    }
+                }
+                if (rightCenter > rightMax) {
+                    rightCenter = rightMax;
+                    if (leftCenter > rightCenter - sep) {
+                        leftCenter = rightCenter - sep;
+                    }
+                }
+                // Re-check left in case the right-clamp pushed it off the left edge
+                // (happens only when the container is too narrow to fit both labels).
+                if (leftCenter < leftMin) {
+                    leftCenter = leftMin;
+                }
+
+                priorCenter = leftIsPrior ? leftCenter : rightCenter;
+                postCenter = leftIsPrior ? rightCenter : leftCenter;
+            } else {
+                if (priorDotX !== null) {
+                    priorCenter = clampCenter(priorCenter, priorWidth, containerWidth);
+                }
+                if (postDotX !== null) {
+                    postCenter = clampCenter(postCenter, postWidth, containerWidth);
+                }
             }
-        });
-        observer.observe(node);
+
+            setLabelOffsetsPx({
+                prior: priorDotX !== null ? priorCenter - priorDotX : 0,
+                posterior: postDotX !== null ? postCenter - postDotX : 0,
+            });
+        };
+
+        recompute();
+
+        const observer = new ResizeObserver(() => recompute());
+        observer.observe(container);
         return () => observer.disconnect();
-    }, []);
+    }, [priorPct, posteriorPct, priorMean, posteriorMean]);
 
-    // Memoize to avoid re-sampling beta curves on every render when inputs are unchanged.
-    const plotPayload = useMemo(() => {
-        const priorParams = toBetaParams(prior);
-        const posteriorParams = toBetaParams(posterior);
-        if (!priorParams && !posteriorParams) {
-            return null;
-        }
-
-        const priorMean = priorParams
-            ? priorParams.alpha / (priorParams.alpha + priorParams.beta)
-            : null;
-        const posteriorMean = posteriorParams
-            ? posteriorParams.alpha / (posteriorParams.alpha + posteriorParams.beta)
-            : null;
-
-        // Build only the traces that exist so missing belief payloads still render.
-        const traces = [
-            priorParams
-                ? toTrace('Belief before experiment', priorParams, theme.palette.primary.main)
-                : null,
-            posteriorParams
-                ? toTrace('Belief after experiment', posteriorParams, theme.palette.secondary.main)
-                : null,
-        ].filter(Boolean) as ReturnType<typeof toTrace>[];
-
-        // Use theme-driven colors to keep axes readable against dark backgrounds.
-        const axisColor =
-            theme.color['cream-40']?.rgba?.toString?.() ?? theme.color['cream-100'].hex;
-        const gridColor = theme.color['cream-10']?.rgba?.toString?.() ?? 'rgba(255,255,255,0.08)';
-
-        const verticalGridLines = Array.from({ length: 9 }, (_, idx) => ({
-            type: 'line',
-            xref: 'x',
-            yref: 'paper',
-            x0: (idx + 1) / 10,
-            x1: (idx + 1) / 10,
-            y0: 0,
-            y1: 1,
-            line: { color: gridColor, width: 1 },
-        }));
-
-        const meanLines = [
-            priorMean !== null
-                ? {
-                      type: 'line',
-                      xref: 'x',
-                      yref: 'paper',
-                      x0: priorMean,
-                      x1: priorMean,
-                      y0: 0,
-                      y1: 1,
-                      line: { color: theme.palette.primary.main, width: 1.5, dash: 'dot' },
-                  }
-                : null,
-            posteriorMean !== null
-                ? {
-                      type: 'line',
-                      xref: 'x',
-                      yref: 'paper',
-                      x0: posteriorMean,
-                      x1: posteriorMean,
-                      y0: 0,
-                      y1: 1,
-                      line: { color: theme.palette.secondary.main, width: 1.5, dash: 'dot' },
-                  }
-                : null,
-        ].filter(Boolean);
-
-        const surprisalArrow =
-            priorMean !== null && posteriorMean !== null
-                ? {
-                      x: posteriorMean,
-                      y: -0.16,
-                      ax: priorMean,
-                      ay: -0.16,
-                      xref: 'x',
-                      yref: 'paper',
-                      axref: 'x',
-                      ayref: 'paper',
-                      showarrow: true,
-                      arrowhead: 2,
-                      arrowsize: 1,
-                      arrowwidth: 1.5,
-                      arrowcolor: isSurprising ? '#FFA31C' : axisColor,
-                  }
-                : null;
-
-        const clamp = (value: number, min: number, max: number) =>
-            Math.max(min, Math.min(max, value));
-        const meanOffset = 0.02;
-        // Place labels on opposite sides based on mean ordering to reduce collisions,
-        // and stagger vertically when means are close to keep both readable.
-        const isCompact = (containerWidth ?? 800) < 640;
-        const labelYTop = isCompact ? 1.08 : 1.12;
-        const labelYBottom = isCompact ? 1.02 : 1.04;
-        const meanLabelFontSize = isCompact ? 11 : 12;
-        const axisLabelFontSize = isCompact ? 12 : 13;
-        const meansClose =
-            priorMean !== null && posteriorMean !== null
-                ? Math.abs(priorMean - posteriorMean) < 0.12
-                : false;
-        const priorOnLeft =
-            priorMean !== null && posteriorMean !== null ? priorMean < posteriorMean : true;
-
-        const buildMeanLabel = ({
-            mean,
-            label,
-            color,
-            side,
-            y,
-        }: {
-            mean: number;
-            label: string;
-            color: string;
-            side: 'left' | 'right';
-            y: number;
-        }) => ({
-            x: clamp(mean + (side === 'right' ? meanOffset : -meanOffset), 0.02, 0.98),
-            y,
-            xref: 'x',
-            yref: 'paper',
-            text: `${label}<br>Mean: ${mean.toFixed(2)}`,
-            showarrow: false,
-            xanchor: side === 'right' ? 'left' : 'right',
-            align: side === 'right' ? 'left' : 'right',
-            font: { color, size: meanLabelFontSize },
-        });
-
-        const priorLabel =
-            priorMean !== null
-                ? buildMeanLabel({
-                      mean: priorMean,
-                      label: 'Belief Before',
-                      color: theme.palette.primary.main,
-                      side: priorOnLeft ? 'left' : 'right',
-                      y: meansClose && !priorOnLeft ? labelYBottom : labelYTop,
-                  })
-                : null;
-
-        const posteriorLabel =
-            posteriorMean !== null
-                ? buildMeanLabel({
-                      mean: posteriorMean,
-                      label: 'Belief After',
-                      color: theme.palette.secondary.main,
-                      side: priorOnLeft ? 'right' : 'left',
-                      y: meansClose && priorOnLeft ? labelYBottom : labelYTop,
-                  })
-                : null;
-
-        const annotations = [
-            priorLabel,
-            posteriorLabel,
-            surprisalArrow,
-            {
-                x: 0,
-                y: -0.14,
-                xref: 'x',
-                yref: 'paper',
-                text: 'Likely False',
-                showarrow: false,
-                xanchor: 'left',
-                font: { color: axisColor, size: axisLabelFontSize },
-            },
-            {
-                x: 1,
-                y: -0.14,
-                xref: 'x',
-                yref: 'paper',
-                text: 'Likely True',
-                showarrow: false,
-                xanchor: 'right',
-                font: { color: axisColor, size: axisLabelFontSize },
-            },
-            priorMean !== null && posteriorMean !== null
-                ? {
-                      x: (priorMean + posteriorMean) / 2,
-                      y: -0.28,
-                      xref: 'x',
-                      yref: 'paper',
-                      text: 'Surprisal',
-                      showarrow: false,
-                      xanchor: 'center',
-                      font: { color: axisColor, size: 13 },
-                  }
-                : null,
-        ].filter(Boolean);
-
-        const layout = {
-            autosize: true,
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            margin: {
-                t: isCompact ? 20 : 24,
-                r: isCompact ? 44 : 66,
-                b: isCompact ? 64 : 72,
-                l: isCompact ? 44 : 66,
-            },
-            showlegend: false,
-            hovermode: false,
-            shapes: [...verticalGridLines, ...meanLines],
-            annotations,
-            dragmode: false,
-            xaxis: {
-                range: [0, 1],
-                color: axisColor,
-                gridcolor: gridColor,
-                zeroline: false,
-                showticklabels: false,
-                showline: false,
-                ticklen: 0,
-                ticklabelposition: 'outside',
-                fixedrange: true,
-            },
-            yaxis: {
-                color: axisColor,
-                gridcolor: gridColor,
-                zeroline: false,
-                gridwidth: 1,
-                showticklabels: false,
-                showline: false,
-                fixedrange: true,
-            },
-        };
-
-        const config = {
-            displayModeBar: false,
-            responsive: true,
-            scrollZoom: false,
-            doubleClick: false,
-        };
-
-        return { traces, layout, config };
-    }, [prior, posterior, theme, containerWidth, isSurprising]);
-
-    useEffect(() => {
-        const node = plotContainerRef.current;
-        if (!node || !plotPayload) {
-            return undefined;
-        }
-
-        let plotly: any;
-
-        // Lazy-load Plotly to keep the main bundle smaller and avoid SSR issues.
-        const renderPlot = async () => {
-            const plotlyModule = await import('plotly.js-dist-min');
-            plotly = (plotlyModule as any).default ?? plotlyModule;
-            await plotly.react(node, plotPayload.traces, plotPayload.layout, plotPayload.config);
-        };
-
-        renderPlot();
-
-        return () => {
-            // Clean up the Plotly instance so it doesn't leak DOM handlers.
-            if (plotly?.purge) {
-                plotly.purge(node);
-            }
-        };
-    }, [plotPayload]);
-
-    if (!plotPayload) {
+    if (priorMean === null && posteriorMean === null) {
         return null;
     }
 
+    const pinkColor = theme.color['pink-100'].hex;
+    const greenColor = theme.color['green-100'].hex;
+    const surprisalColor = theme.color['warning-orange-100']?.hex ?? '#FFA31C';
+    const creamColor = theme.color['cream-100'].hex;
+    const axisLineColor = theme.color['cream-20']?.rgba?.toString?.() ?? 'rgba(255,255,255,0.3)';
+    const mutedLabelColor = theme.color['cream-60']?.rgba?.toString?.() ?? 'rgba(255,255,255,0.7)';
+    const arrowColor = isSurprising ? surprisalColor : creamColor;
+
+    const hasArrow =
+        priorPct !== null && posteriorPct !== null && Math.abs(priorPct - posteriorPct) > 0.5;
+    const midpointPct = hasArrow ? ((priorPct as number) + (posteriorPct as number)) / 2 : null;
+    const arrowMarkerId = `belief-arrow-${markerId}`;
+
     return (
-        <PlotContainer
-            ref={plotContainerRef}
-            style={{ minHeight: (containerWidth ?? 800) < 640 ? '260px' : '320px' }}
-        />
+        <PlotContainer ref={containerRef}>
+            <LabelRow>
+                {posteriorPct !== null && posteriorMean !== null && (
+                    <TopLabel
+                        ref={posteriorLabelRef}
+                        style={{
+                            left: `calc(${posteriorPct}% + ${labelOffsetsPx.posterior}px)`,
+                            color: greenColor,
+                        }}>
+                        After ({posteriorMean.toFixed(3)})
+                    </TopLabel>
+                )}
+                {priorPct !== null && priorMean !== null && (
+                    <TopLabel
+                        ref={priorLabelRef}
+                        style={{
+                            left: `calc(${priorPct}% + ${labelOffsetsPx.prior}px)`,
+                            color: pinkColor,
+                        }}>
+                        Before ({priorMean.toFixed(3)})
+                    </TopLabel>
+                )}
+            </LabelRow>
+
+            <AxisTrack>
+                <AxisSvg>
+                    <defs>
+                        <marker
+                            id={arrowMarkerId}
+                            markerWidth="10"
+                            markerHeight="10"
+                            refX="16"
+                            refY="5"
+                            orient="auto"
+                            markerUnits="userSpaceOnUse">
+                            <path
+                                d="M0,0 L9,5 L0,10 z"
+                                fill={arrowColor}
+                                stroke={arrowColor}
+                                strokeWidth="1"
+                                strokeLinejoin="round"
+                            />
+                        </marker>
+                    </defs>
+                    <line
+                        x1="0"
+                        y1="50%"
+                        x2="100%"
+                        y2="50%"
+                        stroke={axisLineColor}
+                        strokeWidth="1"
+                    />
+                    {hasArrow && (
+                        <line
+                            x1={`${priorPct}%`}
+                            y1="50%"
+                            x2={`${posteriorPct}%`}
+                            y2="50%"
+                            stroke={arrowColor}
+                            strokeWidth="1"
+                            markerEnd={`url(#${arrowMarkerId})`}
+                        />
+                    )}
+                </AxisSvg>
+                {priorPct !== null && (
+                    <Dot style={{ left: `${priorPct}%`, backgroundColor: pinkColor }} />
+                )}
+                {posteriorPct !== null && (
+                    <Dot style={{ left: `${posteriorPct}%`, backgroundColor: greenColor }} />
+                )}
+            </AxisTrack>
+
+            <BottomRow>
+                <SideLabel style={{ left: 0, color: mutedLabelColor }}>Likely False</SideLabel>
+                {isSurprising && midpointPct !== null && (
+                    <SurprisalLabel style={{ left: `${midpointPct}%`, color: surprisalColor }}>
+                        Surprisal
+                    </SurprisalLabel>
+                )}
+                <SideLabel style={{ right: 0, color: mutedLabelColor }}>Likely True</SideLabel>
+            </BottomRow>
+        </PlotContainer>
     );
 }
 
-const PlotContainer = styled('div')(({ theme }) => ({
-    marginTop: theme.spacing(2),
+const PlotContainer = styled('div')({
+    margin: '16px 0 24px 0',
     width: '100%',
-    minHeight: '320px',
-}));
+    position: 'relative',
+});
+
+const LabelRow = styled('div')({
+    position: 'relative',
+    height: '20px',
+    marginBottom: '4px',
+});
+
+const TopLabel = styled('div')({
+    position: 'absolute',
+    bottom: 0,
+    transform: 'translateX(-50%)',
+    fontSize: '13px',
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+});
+
+const AxisTrack = styled('div')({
+    position: 'relative',
+    width: '100%',
+    height: '12px',
+});
+
+const AxisSvg = styled('svg')({
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    overflow: 'visible',
+});
+
+const Dot = styled('div')({
+    position: 'absolute',
+    top: '50%',
+    width: '14px',
+    height: '14px',
+    borderRadius: '50%',
+    transform: 'translate(-50%, -50%)',
+});
+
+const BottomRow = styled('div')({
+    position: 'relative',
+    marginTop: '6px',
+    height: '18px',
+});
+
+const SideLabel = styled('span')({
+    position: 'absolute',
+    top: 0,
+    fontSize: '11px',
+    whiteSpace: 'nowrap',
+});
+
+const SurprisalLabel = styled('span')({
+    position: 'absolute',
+    top: 0,
+    transform: 'translateX(-50%)',
+    fontSize: '13px',
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+});

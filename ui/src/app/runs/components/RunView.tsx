@@ -769,6 +769,7 @@ function RunViewContent({
                         {selectedExperiment && (
                             <ExperimentDetails
                                 experiment={selectedExperiment}
+                                surprisalWidth={run.metadata?.surprisalWidth}
                                 actions={
                                     <>
                                         <Tooltip title="Share experiment" placement="bottom">

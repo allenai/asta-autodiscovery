@@ -18,15 +18,25 @@ import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 type ExperimentDetailsProps = {
     experiment: Experiment;
     actions?: ReactNode;
+    surprisalWidth?: number | null;
 };
 
 export const ExperimentDetails = memo(function ExperimentDetails({
     experiment,
     actions,
+    surprisalWidth,
 }: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
+
+    // Mirror the table's threshold logic so the panel and the Surprisal column stay in sync.
+    const isSurprising =
+        experiment.status !== 'SUCCEEDED'
+            ? false
+            : surprisalWidth != null
+              ? Math.abs(experiment.surprise ?? 0) >= surprisalWidth
+              : experiment.isSurprising;
 
     return (
         <DetailsWrapper spacing={0}>
@@ -58,7 +68,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                         <SectionHeader>
                             Belief Shift
                             {experiment.surprise !== null &&
-                                (experiment.isSurprising ? (
+                                (isSurprising ? (
                                     <OrangeText>
                                         : {getSurprisalDirection(experiment.surprise)} (
                                         {experiment.surprise.toFixed(3)})
@@ -74,7 +84,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                             <BeliefDistributionPlot
                                 prior={experiment.priorBelief}
                                 posterior={experiment.posteriorBelief}
-                                isSurprising={experiment.isSurprising}
+                                isSurprising={isSurprising}
                             />
                         )}
                     </Box>

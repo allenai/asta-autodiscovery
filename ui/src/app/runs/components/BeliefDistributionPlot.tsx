@@ -72,10 +72,14 @@ export function BeliefDistributionPlot({
     const containerRef = useRef<HTMLDivElement>(null);
     const priorLabelRef = useRef<HTMLDivElement>(null);
     const posteriorLabelRef = useRef<HTMLDivElement>(null);
+    const surprisalLabelRef = useRef<HTMLSpanElement>(null);
+    const leftSideLabelRef = useRef<HTMLSpanElement>(null);
+    const rightSideLabelRef = useRef<HTMLSpanElement>(null);
     const [labelOffsetsPx, setLabelOffsetsPx] = useState<{ prior: number; posterior: number }>({
         prior: 0,
         posterior: 0,
     });
+    const [surprisalOffsetPx, setSurprisalOffsetPx] = useState(0);
 
     const priorPct = priorMean !== null ? priorMean * 100 : null;
     const posteriorPct = posteriorMean !== null ? posteriorMean * 100 : null;
@@ -156,6 +160,25 @@ export function BeliefDistributionPlot({
                 prior: priorDotX !== null ? priorCenter - priorDotX : 0,
                 posterior: postDotX !== null ? postCenter - postDotX : 0,
             });
+
+            // Clamp the surprisal label so it doesn't collide with the fixed
+            // "Likely False" / "Likely True" end labels. Same spirit as the
+            // before/after collision pass, just with two immovable obstacles.
+            const surpEl = surprisalLabelRef.current;
+            if (surpEl && priorDotX !== null && postDotX !== null) {
+                const surpWidth = surpEl.offsetWidth;
+                const leftSideWidth = leftSideLabelRef.current?.offsetWidth ?? 0;
+                const rightSideWidth = rightSideLabelRef.current?.offsetWidth ?? 0;
+                const midpointX = (priorDotX + postDotX) / 2;
+                const leftBound = leftSideWidth + LABEL_GAP_PX + surpWidth / 2;
+                const rightBound = containerWidth - rightSideWidth - LABEL_GAP_PX - surpWidth / 2;
+                let surpCenter = midpointX;
+                if (surpCenter < leftBound) surpCenter = leftBound;
+                if (surpCenter > rightBound) surpCenter = rightBound;
+                setSurprisalOffsetPx(surpCenter - midpointX);
+            } else {
+                setSurprisalOffsetPx(0);
+            }
         };
 
         recompute();
@@ -163,7 +186,7 @@ export function BeliefDistributionPlot({
         const observer = new ResizeObserver(() => recompute());
         observer.observe(container);
         return () => observer.disconnect();
-    }, [priorPct, posteriorPct, priorMean, posteriorMean]);
+    }, [priorPct, posteriorPct, priorMean, posteriorMean, isSurprising]);
 
     if (priorMean === null && posteriorMean === null) {
         return null;
@@ -256,13 +279,22 @@ export function BeliefDistributionPlot({
             </AxisTrack>
 
             <BottomRow>
-                <SideLabel style={{ left: 0, color: mutedLabelColor }}>Likely False</SideLabel>
+                <SideLabel ref={leftSideLabelRef} style={{ left: 0, color: mutedLabelColor }}>
+                    Likely False
+                </SideLabel>
                 {isSurprising && midpointPct !== null && (
-                    <SurprisalLabel style={{ left: `${midpointPct}%`, color: surprisalColor }}>
+                    <SurprisalLabel
+                        ref={surprisalLabelRef}
+                        style={{
+                            left: `calc(${midpointPct}% + ${surprisalOffsetPx}px)`,
+                            color: surprisalColor,
+                        }}>
                         Surprisal
                     </SurprisalLabel>
                 )}
-                <SideLabel style={{ right: 0, color: mutedLabelColor }}>Likely True</SideLabel>
+                <SideLabel ref={rightSideLabelRef} style={{ right: 0, color: mutedLabelColor }}>
+                    Likely True
+                </SideLabel>
             </BottomRow>
         </PlotContainer>
     );
@@ -329,7 +361,7 @@ const SurprisalLabel = styled('span')({
     position: 'absolute',
     top: 0,
     transform: 'translateX(-50%)',
-    fontSize: '13px',
+    fontSize: '11px',
     fontWeight: 500,
     whiteSpace: 'nowrap',
 });

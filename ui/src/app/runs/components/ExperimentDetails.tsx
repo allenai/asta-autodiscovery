@@ -18,15 +18,25 @@ import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 type ExperimentDetailsProps = {
     experiment: Experiment;
     actions?: ReactNode;
+    surprisalWidth?: number | null;
 };
 
 export const ExperimentDetails = memo(function ExperimentDetails({
     experiment,
     actions,
+    surprisalWidth,
 }: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
+
+    // Mirror the table's threshold logic so the panel and the Surprisal column stay in sync.
+    const isSurprising =
+        experiment.status !== 'SUCCEEDED'
+            ? false
+            : surprisalWidth != null
+              ? Math.abs(experiment.surprise ?? 0) >= surprisalWidth
+              : experiment.isSurprising;
 
     return (
         <DetailsWrapper spacing={0}>
@@ -51,55 +61,68 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                     </Box>
                 )}
 
-                {experiment.surprise !== null && (
+                {(experiment.surprise !== null ||
+                    experiment.priorBelief ||
+                    experiment.posteriorBelief) && (
                     <Box>
-                        <SectionHeader>Surprisal</SectionHeader>
-                        <BeliefChip>
-                            {getSurprisalDirection(experiment.surprise)}{' '}
-                            {experiment.isSurprising ? (
-                                <OrangeText>({experiment.surprise.toFixed(3)})</OrangeText>
-                            ) : (
-                                <strong>({experiment.surprise.toFixed(3)})</strong>
-                            )}
-                        </BeliefChip>
-                    </Box>
-                )}
-
-                {(experiment.priorBelief || experiment.posteriorBelief) && (
-                    <Box>
-                        <SectionHeader>Belief Shift</SectionHeader>
-                        <BeliefDistributionPlot
-                            prior={experiment.priorBelief}
-                            posterior={experiment.posteriorBelief}
-                            isSurprising={experiment.isSurprising}
-                        />
+                        <SectionHeader>
+                            Belief Shift
+                            {experiment.surprise !== null &&
+                                (isSurprising ? (
+                                    <OrangeText>
+                                        : {getSurprisalDirection(experiment.surprise)} (
+                                        {experiment.surprise.toFixed(3)})
+                                    </OrangeText>
+                                ) : (
+                                    <CreamText>
+                                        : {getSurprisalDirection(experiment.surprise)} (
+                                        {experiment.surprise.toFixed(3)})
+                                    </CreamText>
+                                ))}
+                        </SectionHeader>
+                        {(experiment.priorBelief || experiment.posteriorBelief) && (
+                            <BeliefDistributionPlot
+                                prior={experiment.priorBelief}
+                                posterior={experiment.posteriorBelief}
+                                isSurprising={isSurprising}
+                            />
+                        )}
                     </Box>
                 )}
 
                 {experiment.hypothesis && (
                     <Box>
-                        <SectionHeader>Hypothesis</SectionHeader>
-                        <BeliefChip>
-                            Belief before experiment:{' '}
-                            <PinkText>
-                                {getPriorAndPosteriorLabel(experiment.prior)} (
-                                {experiment.prior?.toFixed(3)})
-                            </PinkText>
-                        </BeliefChip>
+                        <SectionHeader>
+                            Hypothesis
+                            {experiment.prior !== null && experiment.prior !== undefined && (
+                                <>
+                                    :{' '}
+                                    <PinkText>
+                                        {getPriorAndPosteriorLabel(experiment.prior)} (
+                                        {experiment.prior.toFixed(3)})
+                                    </PinkText>
+                                </>
+                            )}
+                        </SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.hypothesis)}</StyledMarkdown>
                     </Box>
                 )}
 
                 {experiment.analysis && (
                     <Box>
-                        <SectionHeader>Analysis</SectionHeader>
-                        <BeliefChip>
-                            Belief after experiment:{' '}
-                            <GreenText>
-                                {getPriorAndPosteriorLabel(experiment.posterior)} (
-                                {experiment.posterior?.toFixed(3)})
-                            </GreenText>
-                        </BeliefChip>
+                        <SectionHeader>
+                            Analysis
+                            {experiment.posterior !== null &&
+                                experiment.posterior !== undefined && (
+                                    <>
+                                        :{' '}
+                                        <GreenText>
+                                            {getPriorAndPosteriorLabel(experiment.posterior)} (
+                                            {experiment.posterior.toFixed(3)})
+                                        </GreenText>
+                                    </>
+                                )}
+                        </SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
                     </Box>
                 )}
@@ -215,19 +238,6 @@ const SectionHeader = styled(Typography)`
     font-weight: 700;
 `;
 
-const BeliefChip = styled(Box)`
-    align-items: center;
-    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
-    border-radius: 40px;
-    color: ${({ theme }) => theme.color['cream-100'].hex};
-    display: flex;
-    gap: ${({ theme }) => theme.spacing(0.5)};
-    font-size: 0.875rem;
-    margin: ${({ theme }) => theme.spacing(1)} 0;
-    padding: ${({ theme }) => theme.spacing(0.5, 1)};
-    width: fit-content;
-`;
-
 const PinkText = styled('strong')`
     color: ${({ theme }) => theme.color['pink-100'].hex};
 `;
@@ -238,6 +248,10 @@ const GreenText = styled('strong')`
 
 const OrangeText = styled('strong')`
     color: ${({ theme }) => theme.color['warning-orange-100'].hex};
+`;
+
+const CreamText = styled('strong')`
+    color: ${({ theme }) => theme.color['cream-100'].hex};
 `;
 
 const StyledMarkdown = styled(Markdown)`

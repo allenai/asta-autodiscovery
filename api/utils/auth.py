@@ -39,24 +39,29 @@ def get_public_key(auth0_domain, kid):
 
 
 def verify_token(token, auth0_domain, auth0_audience):
-    """Verify JWT token from Auth0"""
+    """Verify JWT token from Auth0.
+
+    Accepts tokens with the primary audience (AUTH0_AUDIENCE, web UI) or the
+    gateway audience (AUTH0_GATEWAY_AUDIENCE, CLI via gateway).  All tokens
+    share the same issuer since both clients use the same Auth0 custom domain.
+    """
     try:
-        # Decode header to get kid
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header["kid"]
-
-        # Get public key
         public_key = get_public_key(auth0_domain, kid)
 
-        # Verify and decode token
-        payload = jwt.decode(
+        audiences = [auth0_audience]
+        gateway_audience = os.environ.get("AUTH0_GATEWAY_AUDIENCE")
+        if gateway_audience:
+            audiences.append(gateway_audience)
+
+        return jwt.decode(
             token,
             public_key,
             algorithms=["RS256"],
-            audience=auth0_audience,
+            audience=audiences,
             issuer=f"https://{auth0_domain}/",
         )
-        return payload
     except jwt.ExpiredSignatureError:
         raise ValueError("Token has expired")
     except jwt.InvalidAudienceError:

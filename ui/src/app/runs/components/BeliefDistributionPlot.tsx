@@ -206,7 +206,7 @@ export function BeliefDistributionPlot({
     const arrowMarkerId = `belief-arrow-${markerId}`;
 
     return (
-        <PlotContainer ref={containerRef}>
+        <PlotContainer ref={containerRef} data-testid="belief-distribution-plot">
             <LabelRow>
                 {posteriorPct !== null && posteriorMean !== null && (
                     <TopLabel

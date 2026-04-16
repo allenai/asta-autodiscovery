@@ -24,6 +24,6 @@ test.describe('Public shared sample', () => {
         // Click first experiment row and verify Belief Shift chart appears
         await page.locator('[data-track-name="run_details__experiment-row"]').first().click();
         await expect(page.locator('text=Belief Shift')).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('.js-plotly-plot')).toBeVisible();
+        await expect(page.locator('[data-testid="belief-distribution-plot"]')).toBeVisible();
     });
 });

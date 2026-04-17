@@ -127,7 +127,11 @@ class JobManager:
         )
 
     def fork_job(
-        self, parent_run_id: str, parent_userid: str, user_id: str
+        self,
+        parent_run_id: str,
+        parent_userid: str,
+        user_id: str,
+        parent_metadata: dict[str, Any] | None = None,
     ) -> ForkResult:
         """Fork an existing run, copying its configuration and dataset files.
 
@@ -141,6 +145,9 @@ class JobManager:
             parent_run_id: ID of the run to fork from
             parent_userid: User ID of the parent run's owner
             user_id: User ID of the user who will own the new run
+            parent_metadata: Optional pre-fetched metadata for the parent run.
+                When provided, skips the GCS read (useful when the caller
+                already loaded it for a permission check).
 
         Returns:
             ForkResult with new_run_id, GCS path, and RunDetails
@@ -149,8 +156,9 @@ class JobManager:
             ValueError: If parent run has no metadata or dataset files are gone
             GCSError: If any GCS operation fails
         """
-        # Read parent metadata
-        parent_metadata = self.get_metadata(parent_userid, parent_run_id)
+        # Read parent metadata (unless caller already provided it)
+        if parent_metadata is None:
+            parent_metadata = self.get_metadata(parent_userid, parent_run_id)
         if not parent_metadata:
             raise ValueError(f"Parent run has no metadata: {parent_run_id}")
 

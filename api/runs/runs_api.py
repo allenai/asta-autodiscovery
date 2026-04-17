@@ -80,7 +80,11 @@ try:
         JobAlreadyExistsError,
         JobNotFoundError,
     )
-    from autodiscovery_jobs.gcs import get_userid_for_job, read_rich_outputs
+    from autodiscovery_jobs.gcs import (
+        get_shared_run_index,
+        get_userid_for_job,
+        read_rich_outputs,
+    )
     from autodiscovery_jobs.run_details import (
         RunDetails,
         create_run_details,
@@ -242,15 +246,37 @@ def create() -> Blueprint:
         try:
             manager = get_job_manager()
 
-            # Find the parent run's owner
-            parent_userid = get_userid_for_job(
-                req.parent_run_id, manager.config
-            )
+            # Find the parent run's owner.
+            # Fast path: the user is almost always forking their own run, so
+            # check that first. Fall back to the shared-run index, then to a
+            # bucket-wide glob scan (slow) for PUBLIC_USERS or unindexed runs.
+            if manager.job_exists(userid, req.parent_run_id):
+                parent_userid = userid
+            else:
+                parent_userid = get_shared_run_index(
+                    req.parent_run_id, manager.config
+                )
+                if not parent_userid:
+                    parent_userid = get_userid_for_job(
+                        req.parent_run_id, manager.config
+                    )
             if not parent_userid:
                 return jsonify({"error": "Parent run not found"}), 404
 
-            # Verify the requesting user can read the parent run
-            if not _can_read_run(userid, parent_userid, req.parent_run_id):
+            # Read parent metadata once — reused for permission check AND fork
+            parent_metadata = manager.get_metadata(
+                parent_userid, req.parent_run_id
+            )
+            if not parent_metadata:
+                return jsonify({"error": "Parent run not found"}), 404
+
+            # Permission check (inlined to avoid re-reading metadata)
+            can_read = (
+                userid == parent_userid
+                or parent_userid in PUBLIC_USERS
+                or bool(parent_metadata.get("is_shared"))
+            )
+            if not can_read:
                 return (
                     jsonify({"error": "Cannot access parent run"}),
                     403,
@@ -263,8 +289,13 @@ def create() -> Blueprint:
             if error_resp:
                 return error_resp, status_code
 
-            # Delegate business logic to JobManager
-            result = manager.fork_job(req.parent_run_id, parent_userid, userid)
+            # Delegate business logic to JobManager, passing metadata to skip re-read
+            result = manager.fork_job(
+                req.parent_run_id,
+                parent_userid,
+                userid,
+                parent_metadata=parent_metadata,
+            )
 
             # Check upload limit
             has_higher_upload_limit = getattr(

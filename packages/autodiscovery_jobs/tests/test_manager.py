@@ -379,6 +379,43 @@ def test_fork_job_success(mock_config):
         assert child_metadata["is_shared"] is None
 
 
+def test_fork_job_skips_metadata_read_when_provided(mock_config):
+    """When parent_metadata is passed in, fork_job does not re-fetch it from GCS."""
+    mock_run_details = RunDetails(
+        execution_id=None,
+        created_at="2026-04-13T00:00:00Z",
+        status="CREATED",
+    )
+
+    with (
+        patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta,
+        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.gcs.has_data_files") as mock_has_data,
+        patch("autodiscovery_jobs.gcs.copy_job_data_files") as mock_copy,
+        patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload,
+        patch("autodiscovery_jobs.manager.create_run_details") as mock_create_details,
+    ):
+        mock_create.return_value = "gs://test-bucket/users/forking-user/jobs/new-id/"
+        mock_has_data.return_value = True
+        mock_copy.return_value = ["data.csv"]
+        mock_create_details.return_value = mock_run_details
+
+        manager = JobManager(mock_config)
+        result = manager.fork_job(
+            "parent-run-id",
+            "parent-owner",
+            "forking-user",
+            parent_metadata=PARENT_METADATA,
+        )
+
+        assert isinstance(result, ForkResult)
+        # Metadata was passed in, so no GCS read for metadata
+        mock_get_meta.assert_not_called()
+        # Child metadata still built from the provided parent metadata
+        child_metadata = mock_upload.call_args[0][2]
+        assert child_metadata["name"] == "Fork of My Experiment"
+
+
 def test_fork_job_no_parent_metadata(mock_config):
     """Test fork_job raises ValueError when parent has no metadata."""
     with patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta:

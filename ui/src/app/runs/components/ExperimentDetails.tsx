@@ -4,11 +4,7 @@ import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
-import {
-    getPriorAndPosteriorLabel,
-    getSurprisalDirection,
-    escapeMarkdown,
-} from '@/runs/utils/ExperimentUtils';
+import { getSurprisalDirection, escapeMarkdown } from '@/runs/utils/ExperimentUtils';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
@@ -92,37 +88,14 @@ export const ExperimentDetails = memo(function ExperimentDetails({
 
                 {experiment.hypothesis && (
                     <Box>
-                        <SectionHeader>
-                            Hypothesis
-                            {experiment.prior !== null && experiment.prior !== undefined && (
-                                <>
-                                    :{' '}
-                                    <PinkText>
-                                        {getPriorAndPosteriorLabel(experiment.prior)} (
-                                        {experiment.prior.toFixed(3)})
-                                    </PinkText>
-                                </>
-                            )}
-                        </SectionHeader>
+                        <SectionHeader>Hypothesis</SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.hypothesis)}</StyledMarkdown>
                     </Box>
                 )}
 
                 {experiment.analysis && (
                     <Box>
-                        <SectionHeader>
-                            Analysis
-                            {experiment.posterior !== null &&
-                                experiment.posterior !== undefined && (
-                                    <>
-                                        :{' '}
-                                        <GreenText>
-                                            {getPriorAndPosteriorLabel(experiment.posterior)} (
-                                            {experiment.posterior.toFixed(3)})
-                                        </GreenText>
-                                    </>
-                                )}
-                        </SectionHeader>
+                        <SectionHeader>Analysis</SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
                     </Box>
                 )}
@@ -236,14 +209,6 @@ const Bookmark = styled('div')`
 const SectionHeader = styled(Typography)`
     color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
     font-weight: 700;
-`;
-
-const PinkText = styled('strong')`
-    color: ${({ theme }) => theme.color['pink-100'].hex};
-`;
-
-const GreenText = styled('strong')`
-    color: ${({ theme }) => theme.color['green-100'].hex};
 `;
 
 const OrangeText = styled('strong')`

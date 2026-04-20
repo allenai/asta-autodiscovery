@@ -5,6 +5,7 @@ import { useTheme } from '@mui/material/styles';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import type { BeliefDistribution } from '@/types/Run';
+import { getPriorAndPosteriorLabel } from '@/runs/utils/ExperimentUtils';
 
 type BeliefDistributionPlotProps = {
     prior: BeliefDistribution | null;
@@ -215,7 +216,8 @@ export function BeliefDistributionPlot({
                             left: `calc(${posteriorPct}% + ${labelOffsetsPx.posterior}px)`,
                             color: greenColor,
                         }}>
-                        After ({posteriorMean.toFixed(3)})
+                        Belief After: {getPriorAndPosteriorLabel(posteriorMean)} (
+                        {posteriorMean.toFixed(3)})
                     </TopLabel>
                 )}
                 {priorPct !== null && priorMean !== null && (
@@ -225,7 +227,8 @@ export function BeliefDistributionPlot({
                             left: `calc(${priorPct}% + ${labelOffsetsPx.prior}px)`,
                             color: pinkColor,
                         }}>
-                        Before ({priorMean.toFixed(3)})
+                        Belief Before: {getPriorAndPosteriorLabel(priorMean)} (
+                        {priorMean.toFixed(3)})
                     </TopLabel>
                 )}
             </LabelRow>

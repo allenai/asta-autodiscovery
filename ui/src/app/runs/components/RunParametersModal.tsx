@@ -2,6 +2,7 @@
 
 import {
     Button,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogTitle,
@@ -28,8 +29,12 @@ interface RunParametersModalProps {
     canFork?: boolean;
     /** Tooltip text for the fork button (e.g., expiry info) */
     forkTooltip?: string;
-    /** Called when the user clicks "New run from session" */
+    /** Whether the dataset has expired — styles the tooltip as an error */
+    datasetExpired?: boolean;
+    /** Called when the user clicks "Refine in new session" */
     onFork?: () => void;
+    /** Whether a fork request is currently in flight */
+    isForking?: boolean;
 }
 
 /**
@@ -44,7 +49,9 @@ export function RunParametersModal({
     testId,
     canFork,
     forkTooltip,
+    datasetExpired,
     onFork,
+    isForking,
 }: RunParametersModalProps) {
     const getMctsSelectionLabel = (value: string | null) => {
         if (!value) return 'Not set';
@@ -193,17 +200,27 @@ export function RunParametersModal({
             {onFork && (
                 <StyledDialogActions>
                     {forkTooltip && (
-                        <DatasetExpiryLabel $isExpired={!canFork}>{forkTooltip}</DatasetExpiryLabel>
+                        <DatasetExpiryLabel $isExpired={!!datasetExpired}>
+                            {forkTooltip}
+                        </DatasetExpiryLabel>
                     )}
                     <ForkButton
                         variant="outlined"
                         disabled={!canFork}
-                        startIcon={<RestartAltIcon />}
+                        startIcon={
+                            isForking ? (
+                                <CircularProgress
+                                    size={16}
+                                    sx={(theme) => ({ color: theme.color['green-100'].hex })}
+                                />
+                            ) : (
+                                <RestartAltIcon />
+                            )
+                        }
                         onClick={() => {
-                            onClose();
                             onFork();
                         }}>
-                        New run from session
+                        {isForking ? 'Duplicating...' : 'Refine in new session'}
                     </ForkButton>
                 </StyledDialogActions>
             )}
@@ -261,7 +278,7 @@ const ForkButton = styled(Button)`
 
     &.Mui-disabled {
         border-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-        color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+        color: ${({ theme }) => theme.color['cream-80'].rgba.toString()};
     }
 `;
 

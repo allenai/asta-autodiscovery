@@ -4,11 +4,7 @@ import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
-import {
-    getPriorAndPosteriorLabel,
-    getSurprisalDirection,
-    escapeMarkdown,
-} from '@/runs/utils/ExperimentUtils';
+import { getSurprisalDirection, escapeMarkdown } from '@/runs/utils/ExperimentUtils';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
@@ -92,37 +88,14 @@ export const ExperimentDetails = memo(function ExperimentDetails({
 
                 {experiment.hypothesis && (
                     <Box>
-                        <SectionHeader>
-                            Hypothesis
-                            {experiment.prior !== null && experiment.prior !== undefined && (
-                                <>
-                                    :{' '}
-                                    <PinkText>
-                                        {getPriorAndPosteriorLabel(experiment.prior)} (
-                                        {experiment.prior.toFixed(3)})
-                                    </PinkText>
-                                </>
-                            )}
-                        </SectionHeader>
+                        <SectionHeader>Hypothesis</SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.hypothesis)}</StyledMarkdown>
                     </Box>
                 )}
 
                 {experiment.analysis && (
                     <Box>
-                        <SectionHeader>
-                            Analysis
-                            {experiment.posterior !== null &&
-                                experiment.posterior !== undefined && (
-                                    <>
-                                        :{' '}
-                                        <GreenText>
-                                            {getPriorAndPosteriorLabel(experiment.posterior)} (
-                                            {experiment.posterior.toFixed(3)})
-                                        </GreenText>
-                                    </>
-                                )}
-                        </SectionHeader>
+                        <SectionHeader>Analysis</SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
                     </Box>
                 )}
@@ -238,14 +211,6 @@ const SectionHeader = styled(Typography)`
     font-weight: 700;
 `;
 
-const PinkText = styled('strong')`
-    color: ${({ theme }) => theme.color['pink-100'].hex};
-`;
-
-const GreenText = styled('strong')`
-    color: ${({ theme }) => theme.color['green-100'].hex};
-`;
-
 const OrangeText = styled('strong')`
     color: ${({ theme }) => theme.color['warning-orange-100'].hex};
 `;
@@ -279,5 +244,34 @@ const StyledMarkdown = styled(Markdown)`
 
     & p:first-of-type {
         margin-top: 0;
+    }
+
+    /*
+     * Varnish2's Markdown maps every <code> (inline or block) to a block-level
+     * <pre>, which shows single-backtick inline code as a full-width dark block.
+     * Inline code comes out as <p><pre>...</pre></p>; block code as
+     * <span><pre>...</pre></span>. Reset <pre> to inline appearance and keep
+     * block styling only when it's wrapped by varnish2's <span>.
+     */
+    & pre {
+        display: inline;
+        padding: 1px 6px;
+        margin: 0 2px;
+        max-height: none;
+        max-width: fit-content;
+        overflow: visible;
+        font-size: 0.85em;
+        line-height: inherit;
+        vertical-align: baseline;
+    }
+
+    & span > pre {
+        display: block;
+        padding: ${({ theme }) => theme.spacing(2)};
+        margin: ${({ theme }) => theme.spacing(1)} 0;
+        max-width: 100%;
+        overflow: auto;
+        font-size: 0.8125rem;
+        line-height: 1.4;
     }
 `;

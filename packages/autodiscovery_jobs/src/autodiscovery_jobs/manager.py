@@ -197,7 +197,7 @@ class JobManager:
         parent_name = parent_metadata.get("name", "Untitled")
         return {
             # Descriptive fields from parent
-            "name": f"Fork of {parent_name}",
+            "name": f"Refinement of {parent_name}",
             "description": parent_metadata.get("description", ""),
             "domain": parent_metadata.get("domain", ""),
             "intent": parent_metadata.get("intent", ""),

@@ -567,7 +567,7 @@ function RunViewContent({
                                                             <ListItemText>
                                                                 {isForking
                                                                     ? 'Duplicating...'
-                                                                    : 'Duplicate to new session'}
+                                                                    : 'Refine in new session'}
                                                             </ListItemText>
                                                         </MenuItem>
                                                     </span>
@@ -597,11 +597,12 @@ function RunViewContent({
                                         <>
                                             <Tooltip
                                                 title={
-                                                    datasetExpiryLabel || 'Duplicate to new session'
+                                                    datasetExpiryLabel || 'Refine in new session'
                                                 }
                                                 placement="bottom">
                                                 <span>
                                                     <ExpandingActionButton
+                                                        className={isForking ? 'expanded' : ''}
                                                         onClick={handleFork}
                                                         disabled={!canFork}
                                                         size="small"
@@ -620,7 +621,7 @@ function RunViewContent({
                                                         <ButtonLabel className="button-label">
                                                             {isForking
                                                                 ? 'Duplicating...'
-                                                                : 'Duplicate to new session'}
+                                                                : 'Refine in new session'}
                                                         </ButtonLabel>
                                                     </ExpandingActionButton>
                                                 </span>

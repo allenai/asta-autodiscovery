@@ -31,7 +31,7 @@ interface RunParametersModalProps {
     forkTooltip?: string;
     /** Whether the dataset has expired — styles the tooltip as an error */
     datasetExpired?: boolean;
-    /** Called when the user clicks "Duplicate to new session" */
+    /** Called when the user clicks "Refine in new session" */
     onFork?: () => void;
     /** Whether a fork request is currently in flight */
     isForking?: boolean;
@@ -220,7 +220,7 @@ export function RunParametersModal({
                         onClick={() => {
                             onFork();
                         }}>
-                        {isForking ? 'Duplicating...' : 'Duplicate to new session'}
+                        {isForking ? 'Duplicating...' : 'Refine in new session'}
                     </ForkButton>
                 </StyledDialogActions>
             )}

@@ -20,12 +20,14 @@ import {
     Checkbox,
     IconButton,
     Collapse,
+    Link,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayCircleFilledWhiteOutlinedIcon from '@mui/icons-material/PlayCircleFilledWhiteOutlined';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
 import DatasetUpload, {
@@ -107,7 +109,22 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 reveal surprising insights.
             </SectionHeader>
 
-            <ConfigurationBox>
+            <ConfigurationBox className={settings.parentRunId ? 'forked' : ''}>
+                {settings.parentRunId && (
+                    <ForkedFromBanner>
+                        <InfoOutlinedIcon fontSize="small" />
+                        <span>
+                            Duplicated from{' '}
+                            <ForkedFromLink
+                                href={`/runs/${settings.parentRunId}`}
+                                underline="hover">
+                                {settings.parentRunName || settings.parentRunId}
+                            </ForkedFromLink>
+                            . Review the pre-populated fields below.
+                        </span>
+                    </ForkedFromBanner>
+                )}
+
                 <FormControl fullWidth>
                     <StyledFormLabel error={!!fieldErrors.name}>
                         Discovery session name
@@ -275,7 +292,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                 <SectionHeaderTitle>Session settings</SectionHeaderTitle>
                 Define the scope and cost of your discovery session.
             </SectionHeader>
-            <ConfigurationBox>
+            <ConfigurationBox className={settings.parentRunId ? 'forked' : ''}>
                 <FormControl>
                     <StyledFormLabel error={!!fieldErrors.nExperiments}>
                         Experiment budget
@@ -454,6 +471,29 @@ const SectionHeader = styled(Box)(({ theme }) => ({
     margin: theme.spacing(1, 0),
 }));
 
+const ForkedFromBanner = styled(Box)(({ theme }) => ({
+    alignItems: 'flex-start',
+    backgroundColor: theme.color['cream-10'].rgba.toString(),
+    borderRadius: '4px',
+    color: theme.color['cream-100'].hex,
+    display: 'flex',
+    fontSize: '0.875rem',
+    gap: theme.spacing(1),
+    lineHeight: 1.5,
+    padding: theme.spacing(2, 2.5),
+
+    '& .MuiSvgIcon-root': {
+        color: theme.color['green-40'].rgba.toString(),
+        flexShrink: 0,
+        marginTop: '1px',
+    },
+}));
+
+const ForkedFromLink = styled(Link)(({ theme }) => ({
+    color: theme.color['green-40'].rgba.toString(),
+    fontWeight: 600,
+}));
+
 const SectionHeaderTitle = styled(Typography)(({ theme }) => ({
     color: theme.color['green-100'].hex,
     fontSize: '1.25rem',
@@ -479,6 +519,15 @@ const ConfigurationBox = styled(Box)(({ theme }) => ({
             transition: 'all 250ms ease-in-out',
         },
     },
+
+    '&.forked .MuiInputBase-input:not(:placeholder-shown), &.forked .MuiSelect-select': {
+        borderColor: theme.color['cream-80'].rgba.toString(),
+    },
+
+    '&.forked .MuiInputBase-input:hover, &.forked .MuiInputBase-input:focus, &.forked .MuiSelect-select:hover, &.forked .MuiInputBase-root:has(.MuiSelect-select):focus-within .MuiSelect-select':
+        {
+            borderColor: theme.color['green-100'].hex,
+        },
 
     '.MuiInputBase-root.Mui-error .MuiInputBase-input': {
         border: '1px solid ' + theme.color['error-red-60'].hex,

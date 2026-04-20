@@ -371,7 +371,7 @@ def test_fork_job_success(mock_config):
         # upload_metadata called with transformed child metadata
         mock_upload.assert_called_once()
         child_metadata = mock_upload.call_args[0][2]
-        assert child_metadata["name"] == "Fork of My Experiment"
+        assert child_metadata["name"] == "Refinement of My Experiment"
         assert child_metadata["lineage"]["parent_run_id"] == "parent-run-id"
         assert child_metadata["lineage"]["parent_run_name"] == "My Experiment"
         assert child_metadata["is_bookmarked"] is None
@@ -413,7 +413,7 @@ def test_fork_job_skips_metadata_read_when_provided(mock_config):
         mock_get_meta.assert_not_called()
         # Child metadata still built from the provided parent metadata
         child_metadata = mock_upload.call_args[0][2]
-        assert child_metadata["name"] == "Fork of My Experiment"
+        assert child_metadata["name"] == "Refinement of My Experiment"
 
 
 def test_fork_job_no_parent_metadata(mock_config):
@@ -447,7 +447,7 @@ def test_build_fork_metadata():
     result = JobManager._build_fork_metadata(PARENT_METADATA, "parent-run-id")
 
     # Name is prefixed
-    assert result["name"] == "Fork of My Experiment"
+    assert result["name"] == "Refinement of My Experiment"
 
     # Descriptive fields preserved
     assert result["description"] == "Testing hypothesis X"

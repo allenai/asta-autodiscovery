@@ -551,10 +551,23 @@ function RunViewContent({
                                                                 handleFork();
                                                             }}>
                                                             <ListItemIcon>
-                                                                <RestartAltIcon fontSize="small" />
+                                                                {isForking ? (
+                                                                    <CircularProgress
+                                                                        size={16}
+                                                                        sx={(theme) => ({
+                                                                            color: theme.color[
+                                                                                'green-100'
+                                                                            ].hex,
+                                                                        })}
+                                                                    />
+                                                                ) : (
+                                                                    <RestartAltIcon fontSize="small" />
+                                                                )}
                                                             </ListItemIcon>
                                                             <ListItemText>
-                                                                New run from session
+                                                                {isForking
+                                                                    ? 'Duplicating...'
+                                                                    : 'Refine in new session'}
                                                             </ListItemText>
                                                         </MenuItem>
                                                     </span>
@@ -583,17 +596,32 @@ function RunViewContent({
                                     ) : (
                                         <>
                                             <Tooltip
-                                                title={datasetExpiryLabel || 'New run from session'}
+                                                title={
+                                                    datasetExpiryLabel || 'Refine in new session'
+                                                }
                                                 placement="bottom">
                                                 <span>
                                                     <ExpandingActionButton
+                                                        className={isForking ? 'expanded' : ''}
                                                         onClick={handleFork}
                                                         disabled={!canFork}
                                                         size="small"
                                                         variant="outlined">
-                                                        <RestartAltIcon fontSize="small" />
+                                                        {isForking ? (
+                                                            <CircularProgress
+                                                                size={16}
+                                                                sx={(theme) => ({
+                                                                    color: theme.color['green-100']
+                                                                        .hex,
+                                                                })}
+                                                            />
+                                                        ) : (
+                                                            <RestartAltIcon fontSize="small" />
+                                                        )}
                                                         <ButtonLabel className="button-label">
-                                                            New run from session
+                                                            {isForking
+                                                                ? 'Duplicating...'
+                                                                : 'Refine in new session'}
                                                         </ButtonLabel>
                                                     </ExpandingActionButton>
                                                 </span>
@@ -848,7 +876,9 @@ function RunViewContent({
                 testId={TEST_ID_SESSION_CONFIG_MODAL}
                 canFork={canFork}
                 forkTooltip={datasetExpiryLabel || undefined}
+                datasetExpired={datasetExpired}
                 onFork={isRunBookmarksEnabled ? handleFork : undefined}
+                isForking={isForking}
             />
         </Container>
     );
@@ -949,7 +979,7 @@ const ExpandingActionButton = styled(Button)`
 
     &.Mui-disabled {
         border: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
-        color: ${({ theme }) => theme.color['cream-20'].rgba.toString()};
+        color: ${({ theme }) => theme.color['cream-80'].rgba.toString()};
     }
 
     .MuiButton-startIcon {

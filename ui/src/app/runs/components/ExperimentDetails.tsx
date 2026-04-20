@@ -280,4 +280,33 @@ const StyledMarkdown = styled(Markdown)`
     & p:first-of-type {
         margin-top: 0;
     }
+
+    /*
+     * Varnish2's Markdown maps every <code> (inline or block) to a block-level
+     * <pre>, which shows single-backtick inline code as a full-width dark block.
+     * Inline code comes out as <p><pre>...</pre></p>; block code as
+     * <span><pre>...</pre></span>. Reset <pre> to inline appearance and keep
+     * block styling only when it's wrapped by varnish2's <span>.
+     */
+    & pre {
+        display: inline;
+        padding: 1px 6px;
+        margin: 0 2px;
+        max-height: none;
+        max-width: fit-content;
+        overflow: visible;
+        font-size: 0.85em;
+        line-height: inherit;
+        vertical-align: baseline;
+    }
+
+    & span > pre {
+        display: block;
+        padding: ${({ theme }) => theme.spacing(2)};
+        margin: ${({ theme }) => theme.spacing(1)} 0;
+        max-width: 100%;
+        overflow: auto;
+        font-size: 0.8125rem;
+        line-height: 1.4;
+    }
 `;

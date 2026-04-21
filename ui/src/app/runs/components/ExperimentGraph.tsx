@@ -76,14 +76,24 @@ interface ExtendedHierarchyPointNode extends d3.HierarchyPointNode<TreeNode> {
     yPos?: number;
 }
 
+// Mirror the table/details panel threshold logic so node colors stay in sync
+// with the Surprisal column.
+const deriveIsSurprising = (exp: Experiment, surprisalWidth: number | null): boolean => {
+    if (exp.status !== 'SUCCEEDED') return false;
+    if (surprisalWidth != null) {
+        return Math.abs(exp.surprise ?? 0) >= surprisalWidth;
+    }
+    return exp.isSurprising;
+};
+
 // Transform Experiment to D3TreeNode format
-const toD3TreeNode = (exp: Experiment): D3TreeNode => ({
+const toD3TreeNode = (exp: Experiment, surprisalWidth: number | null): D3TreeNode => ({
     id: exp.experimentId,
     parent_id: exp.parentId,
     belief_change: exp.surprise,
     prior: exp.priorBelief,
     posterior: exp.posteriorBelief,
-    isSurprising: exp.isSurprising,
+    isSurprising: deriveIsSurprising(exp, surprisalWidth),
     idInRun: exp.idInRun,
 });
 
@@ -110,7 +120,10 @@ const surprisalColor = (node: D3TreeNode): string => {
 };
 
 // Build tree hierarchy from flat experiment array
-const buildHierarchy = (experiments: Experiment[]): d3.HierarchyNode<TreeNode> | null => {
+const buildHierarchy = (
+    experiments: Experiment[],
+    surprisalWidth: number | null
+): d3.HierarchyNode<TreeNode> | null => {
     if (experiments.length === 0) return null;
 
     const byId = new Map(experiments.map((e) => [e.experimentId, e]));
@@ -160,7 +173,7 @@ const buildHierarchy = (experiments: Experiment[]): d3.HierarchyNode<TreeNode> |
     if (!root) return null;
 
     const toTree = (exp: Experiment): TreeNode => ({
-        data: toD3TreeNode(exp),
+        data: toD3TreeNode(exp, surprisalWidth),
         children: allExperiments
             .filter((e) => e.parentId === exp.experimentId)
             .map(toTree)
@@ -215,7 +228,13 @@ const assignAngularRanges = (
     node.yPos = node.y * Math.sin(node.angle);
 };
 
-export const ExperimentGraph = memo(function ExperimentGraph() {
+type ExperimentGraphProps = {
+    surprisalWidth?: number | null;
+};
+
+export const ExperimentGraph = memo(function ExperimentGraph({
+    surprisalWidth,
+}: ExperimentGraphProps = {}) {
     const { experiments, selectedExperiment, selectExperiment } = useRunExperiments();
     const { bookmarkedExperimentIds } = useExperimentBookmarks();
 
@@ -277,7 +296,7 @@ export const ExperimentGraph = memo(function ExperimentGraph() {
             .attr('fill', '#0A3235');
 
         // Build hierarchy
-        const hierarchy = buildHierarchy(uniqueExperiments);
+        const hierarchy = buildHierarchy(uniqueExperiments, surprisalWidth ?? null);
         if (!hierarchy) return;
 
         // Configure radial tree layout
@@ -633,6 +652,7 @@ export const ExperimentGraph = memo(function ExperimentGraph() {
         selectExperiment,
         hasInteracted,
         bookmarkedExperimentIds,
+        surprisalWidth,
     ]);
 
     // Zoom control handlers

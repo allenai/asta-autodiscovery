@@ -447,7 +447,7 @@ function RunViewContent({
             <PanelGroup>
                 {isTreeVisible && (
                     <Background>
-                        <ExperimentGraph />
+                        <ExperimentGraph surprisalWidth={run.metadata?.surprisalWidth} />
                     </Background>
                 )}
                 <RunPanel

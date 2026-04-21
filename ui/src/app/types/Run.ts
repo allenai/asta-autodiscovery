@@ -14,6 +14,16 @@ export enum RunStatus {
     UNKNOWN = 'UNKNOWN',
 }
 
+// Maps to values derived in api/utils/experiments.py. FAKE_ROOT is UI-only
+// and marks the synthetic root node inserted when experiments share 'node_1_0'
+// as their parent but no node with that ID exists.
+export enum ExperimentStatus {
+    PENDING = 'PENDING',
+    SUCCEEDED = 'SUCCEEDED',
+    FAILED = 'FAILED',
+    FAKE_ROOT = 'FAKE_ROOT',
+}
+
 export type Run = {
     id: string;
     userid: string;
@@ -67,7 +77,7 @@ export type Experiment = {
     childIds: string[] | null;
     creationIdx: number;
     idInRun: number;
-    status: string;
+    status: ExperimentStatus;
     isSurprising: boolean;
     surprise: number | null;
     prior: number | null;
@@ -168,7 +178,7 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         childIds: experimentFromApi.child_ids,
         creationIdx: experimentFromApi.creation_idx,
         idInRun: experimentFromApi.id_in_run,
-        status: experimentFromApi.status,
+        status: experimentFromApi.status as ExperimentStatus,
         isSurprising: experimentFromApi.is_surprising,
         surprise: experimentFromApi.surprise,
         prior: experimentFromApi.prior,

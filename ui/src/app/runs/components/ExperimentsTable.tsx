@@ -8,7 +8,7 @@ import {
 } from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { RunStats } from '@/types/Run';
+import { RunStats, ExperimentStatus } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
@@ -265,7 +265,7 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
     const rows = useMemo(() => {
         const experimentRows = experiments.map((experiment) => {
             // For failed or inconclusive experiments, show N/A in all cells
-            const isInconclusiveOrFailed = experiment.status !== 'SUCCEEDED';
+            const isInconclusiveOrFailed = experiment.status !== ExperimentStatus.SUCCEEDED;
 
             return {
                 id: experiment.idInRun,

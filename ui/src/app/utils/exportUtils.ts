@@ -1,4 +1,4 @@
-import { Experiment } from '@/types/Run';
+import { Experiment, ExperimentStatus } from '@/types/Run';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 
 export type ExportFormat = 'csv' | 'json';
@@ -61,7 +61,7 @@ function escapeCsv(value: string | number | null): string {
 
 export function generateRunCsv(experiments: Experiment[]): string {
     const rows = experiments.map((exp) => {
-        const isInconclusiveOrFailed = exp.status !== 'SUCCEEDED';
+        const isInconclusiveOrFailed = exp.status !== ExperimentStatus.SUCCEEDED;
 
         const objective = stripMarkdown(exp.experimentPlan?.objective || '');
         const steps = exp.experimentPlan?.steps

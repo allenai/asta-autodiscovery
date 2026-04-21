@@ -45,15 +45,13 @@ import * as d3 from 'd3';
 
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
-import { Experiment, BeliefDistribution } from '@/types/Run';
+import { Experiment, BeliefDistribution, ExperimentStatus } from '@/types/Run';
 import {
     TEST_ID_EXPERIMENT_GRAPH,
     TEST_ID_EXPERIMENT_GRAPH_ZOOM_IN,
     TEST_ID_EXPERIMENT_GRAPH_ZOOM_OUT,
     TEST_ID_EXPERIMENT_GRAPH_RESET,
 } from '@/testIds';
-
-const EXPERIMENT_STATUS_SUCCEEDED = 'SUCCEEDED';
 
 // Type definitions for D3 tree nodes
 type D3TreeNode = {
@@ -81,7 +79,7 @@ interface ExtendedHierarchyPointNode extends d3.HierarchyPointNode<TreeNode> {
 // Mirror the table/details panel threshold logic so node colors stay in sync
 // with the Surprisal column.
 const deriveIsSurprising = (exp: Experiment, surprisalWidth: number | null): boolean => {
-    if (exp.status !== EXPERIMENT_STATUS_SUCCEEDED) return false;
+    if (exp.status !== ExperimentStatus.SUCCEEDED) return false;
     if (surprisalWidth != null) {
         return Math.abs(exp.surprise ?? 0) >= surprisalWidth;
     }
@@ -148,7 +146,7 @@ const buildHierarchy = (
                 .map((e) => e.experimentId),
             creationIdx: -1,
             idInRun: 0,
-            status: 'FAKE_ROOT',
+            status: ExperimentStatus.FAKE_ROOT,
             isSurprising: false,
             surprise: null,
             prior: null,

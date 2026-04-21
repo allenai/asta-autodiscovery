@@ -53,6 +53,8 @@ import {
     TEST_ID_EXPERIMENT_GRAPH_RESET,
 } from '@/testIds';
 
+const EXPERIMENT_STATUS_SUCCEEDED = 'SUCCEEDED';
+
 // Type definitions for D3 tree nodes
 type D3TreeNode = {
     id: string;
@@ -79,7 +81,7 @@ interface ExtendedHierarchyPointNode extends d3.HierarchyPointNode<TreeNode> {
 // Mirror the table/details panel threshold logic so node colors stay in sync
 // with the Surprisal column.
 const deriveIsSurprising = (exp: Experiment, surprisalWidth: number | null): boolean => {
-    if (exp.status !== 'SUCCEEDED') return false;
+    if (exp.status !== EXPERIMENT_STATUS_SUCCEEDED) return false;
     if (surprisalWidth != null) {
         return Math.abs(exp.surprise ?? 0) >= surprisalWidth;
     }

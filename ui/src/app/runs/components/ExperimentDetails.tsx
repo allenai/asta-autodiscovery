@@ -2,7 +2,7 @@ import { memo, ReactNode } from 'react';
 import { styled, Typography, Box, Stack } from '@mui/material';
 import { Markdown } from '@allenai/varnish2/components';
 
-import { Experiment } from '@/types/Run';
+import { Experiment, ExperimentStatus } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
 import { getSurprisalDirection, escapeMarkdown } from '@/runs/utils/ExperimentUtils';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
@@ -28,7 +28,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
 
     // Mirror the table's threshold logic so the panel and the Surprisal column stay in sync.
     const isSurprising =
-        experiment.status !== 'SUCCEEDED'
+        experiment.status !== ExperimentStatus.SUCCEEDED
             ? false
             : surprisalWidth != null
               ? Math.abs(experiment.surprise ?? 0) >= surprisalWidth
@@ -44,7 +44,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                 {actions && <TitleActions>{actions}</TitleActions>}
             </TitleWrapper>
             <ContentWrapper spacing={2}>
-                {experiment.status !== 'SUCCEEDED' && (
+                {experiment.status !== ExperimentStatus.SUCCEEDED && (
                     <Box>
                         <SectionHeader>Status</SectionHeader>
                         <Box sx={{ mt: 0.5 }}>

@@ -559,7 +559,7 @@ def get_agents(
     user_query=None,
     experiment_first=False,
     code_timeout=30 * 60,
-    use_modal_sandbox=False,
+    backend="process",
     bucket_path=None,
     dataset_paths=None,
     vision_model: str = "gpt-4o",
@@ -576,7 +576,7 @@ def get_agents(
         user_query: Optional user query injected into generator prompts.
         experiment_first: Whether generator returns experiment-first outputs.
         code_timeout: Timeout in seconds for code execution.
-        use_modal_sandbox: Whether to run code in Modal sandbox.
+        backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
         vision_model: Vision model used for plot analysis.
@@ -633,7 +633,15 @@ def get_agents(
         human_input_mode="NEVER",
     )
 
-    install_snippet = """\nimport subprocess
+    if backend == "process":
+        # The process backend places an `install-package` script on PATH
+        # that installs into a per-cell temp directory via uv.
+        install_snippet = """\nimport subprocess
+
+def install(package):
+    subprocess.check_call(["install-package", package])\n\n\n"""
+    else:
+        install_snippet = """\nimport subprocess
 import sys
 
 def install(package):
@@ -717,10 +725,10 @@ def install(package):
     ## Code Executor Setup
     modal_working_dir = None  # Track working directory for Modal sandbox
 
-    if use_modal_sandbox:
+    if backend == "modal":
         # Use Modal sandbox for code execution
         if not bucket_path:
-            raise ValueError("bucket_path is required when use_modal_sandbox is True")
+            raise ValueError("bucket_path is required when backend is 'modal'")
 
         import modal
         from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
@@ -755,7 +763,7 @@ def install(package):
             ]
         )
 
-        backend = ModalSandboxIPythonBackend.for_bucket_prefix(
+        ipython_backend = ModalSandboxIPythonBackend.for_bucket_prefix(
             app_name=app_name,
             bucket=bucket_name,
             key_prefix=key_prefix,
@@ -768,7 +776,7 @@ def install(package):
         )
 
         executor = ModalSandboxExecutor(
-            backend,
+            ipython_backend,
             timeout=code_timeout,
             vision_model=vision_model,
             usage_tracker=usage_tracker,
@@ -777,20 +785,24 @@ def install(package):
             f"Using Modal sandbox with bucket gs://{bucket_name}/{key_prefix} mounted at {modal_mount_path}"
         )
         print(f"Working directory will be: {modal_working_dir}")
-    else:
-        # Use local code executor
-        executor = LocalCommandLineCodeExecutor(
-            timeout=code_timeout,  # Timeout in seconds
-            work_dir=work_dir,
-            # virtual_env_context=create_virtual_env(os.path.join(work_dir, ".venv"))  # TODO: Fix virtual env creation
+    elif backend == "process":
+        # Use isolated subprocess for code execution
+        from code_execution import ProcessIPythonBackend
+
+        ipython_backend = ProcessIPythonBackend(cwd=work_dir)
+        executor = ModalSandboxExecutor(
+            ipython_backend,
+            timeout=code_timeout,
+            vision_model=vision_model,
+            usage_tracker=usage_tracker,
         )
-        # TODO: Fix docker-based execution
-        # executor = DockerCommandLineCodeExecutor(
-        #     # image="python:3.11-alpine",
-        #     timeout=30 * 60,  # Timeout in seconds
-        #     work_dir=work_dir,
-        #     # virtual_env_context=create_virtual_env(os.path.join(work_dir, ".venv"))
-        # )
+        print(f"Using process backend with work_dir: {work_dir}")
+    else:
+        # Use local code executor (in-process, no isolation)
+        executor = LocalCommandLineCodeExecutor(
+            timeout=code_timeout,
+            work_dir=work_dir,
+        )
 
     # Create an agent with code executor configuration.
     code_executor = ConversableAgent(
@@ -801,12 +813,13 @@ def install(package):
     )
 
     # Apply appropriate transform based on executor type
-    if use_modal_sandbox:
-        # For Modal sandbox, use simple transform without image analysis patch
-        # (Modal sandbox handles image analysis internally)
+    if backend in ("modal", "process"):
+        # For sandbox-style backends, use simple transform without image analysis patch
+        # (the executor handles image analysis internally)
         # Pass the working_dir so code can change to that directory
+        sandbox_working_dir = modal_working_dir if backend == "modal" else work_dir
         transform_messages_capability = transform_messages.TransformMessages(
-            transforms=[SimpleCodeBlockTransform(working_dir=modal_working_dir)]
+            transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
         )
         transform_messages_capability.add_to_agent(code_executor)
     else:

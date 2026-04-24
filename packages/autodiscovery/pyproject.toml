@@ -21,6 +21,9 @@ dependencies = [
     "autodiscovery-modal",
 ]
 
+[project.scripts]
+auto-discovery = "autodiscovery.easy:cli_main"
+
 [build-system]
 requires = ["uv_build>=0.9.25,<0.10.0"]
 build-backend = "uv_build"

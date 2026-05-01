@@ -190,7 +190,8 @@ def get_load_dataset_experiment(
 ):
     # Set up the initial experiment to load the dataset
     load_dataset_objective = "Load the dataset and generate summary statistics. "
-    load_dataset_steps = f"1. Load the dataset(s) at {[os.path.basename(dp) for dp in dataset_paths]}.\n2. Generate summary statistics for the dataset(s)."
+    metadata_dir = os.path.dirname(os.path.abspath(dataset_metadata))
+    load_dataset_steps = f"1. Load the dataset(s) at {[os.path.relpath(dp, metadata_dir) for dp in dataset_paths]}.\n2. Generate summary statistics for the dataset(s)."
     load_dataset_deliverables = "1. Dataset(s) loaded.\n2. Summary statistics generated."
     if run_eda:
         load_dataset_steps += "\n3. Perform some exploratory data analysis (EDA) on the dataset(s) to get a better understanding of the data."

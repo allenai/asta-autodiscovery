@@ -311,7 +311,7 @@ def run_mcts(
     kl_scale=20.0,
     reward_mode="belief_and_kl",
     warmstart_experiments=None,
-    use_modal_sandbox=False,
+    backend="process",
     bucket_path=None,
     vision_model="gpt-4o",
     batch_size=1,
@@ -353,7 +353,7 @@ def run_mcts(
         kl_scale: Normalization factor for KL divergence in reward calculation.
         reward_mode: Mode for reward calculation (belief, kl, or belief_and_kl).
         warmstart_experiments: Path to JSON file with warmstart experiments to run after data loading but before MCTS selection.
-        use_modal_sandbox: Whether to use ModalSandboxIPythonBackend for code execution.
+        backend: Code execution backend (local, process, or modal).
         bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/).
         vision_model: Model used for image analysis in code execution.
         batch_size: Number of nodes to select and expand per iteration.
@@ -413,11 +413,19 @@ def run_mcts(
                 "Expected one of ['per_response', 'summary_delta']."
             )
 
-        # Copy the dataset file paths to the working directory (to avoid modifying the original dataset)
-        # Note: For Modal sandbox, files are in GCS and will be mounted directly
-        if not use_modal_sandbox:
+        # For Modal sandbox, files are in GCS and will be mounted directly.
+        # For local/process backends, ensure every dataset is reachable from
+        # work_dir so that the sandbox (which chdir's there) can find files.
+        # We symlink anything that isn't already under work_dir.
+        if backend != "modal":
             for dataset_fpath in dataset_paths:
-                shutil.copy(dataset_fpath, work_dir)
+                abs_src = os.path.abspath(dataset_fpath)
+                # Skip if already inside work_dir (e.g. easy.py already symlinked)
+                if abs_src.startswith(os.path.abspath(work_dir) + os.sep):
+                    continue
+                dst = os.path.join(work_dir, os.path.basename(dataset_fpath))
+                if not os.path.exists(dst):
+                    os.symlink(abs_src, dst)
 
         base_agent_objs = None
         if n_threads <= 1:
@@ -430,7 +438,7 @@ def run_mcts(
                 user_query=user_query,
                 experiment_first=experiment_first,
                 code_timeout=code_timeout,
-                use_modal_sandbox=use_modal_sandbox,
+                backend=backend,
                 bucket_path=bucket_path,
                 dataset_paths=dataset_paths,
                 vision_model=vision_model,
@@ -735,7 +743,7 @@ def run_mcts(
                             user_query=user_query,
                             experiment_first=experiment_first,
                             code_timeout=code_timeout,
-                            use_modal_sandbox=use_modal_sandbox,
+                            backend=backend,
                             bucket_path=bucket_path,
                             dataset_paths=dataset_paths,
                             vision_model=vision_model,
@@ -787,7 +795,7 @@ def run_mcts(
                         user_query=user_query,
                         experiment_first=experiment_first,
                         code_timeout=code_timeout,
-                        use_modal_sandbox=use_modal_sandbox,
+                        backend=backend,
                         bucket_path=bucket_path,
                         dataset_paths=dataset_paths,
                         vision_model=vision_model,
@@ -855,11 +863,14 @@ def run_mcts(
     usage_tracker.save_summary(log_dirname)
 
 
-if __name__ == "__main__":
-    parser = ArgParser()
-    args = parser.parse_args()
+def main(args):
+    """Run AutoDiscovery exploration from a parsed argument namespace."""
     print("Script arguments:")
     print(args.__dict__, "\n")
+
+    # Resolve deprecated --use_modal_sandbox into --backend
+    if getattr(args, "use_modal_sandbox", False) and args.backend == "process":
+        args.backend = "modal"
 
     # Validate and fix arguments
     if "o4-mini" in args.model and args.temperature is not None:
@@ -914,7 +925,7 @@ if __name__ == "__main__":
         if args.only_save_results:
             # Save nodes to JSON and exit
             save_nodes(nodes_by_level, log_dirname, run_dedupe=args.dedupe, model=args.belief_model)
-            exit(0)
+            return
 
         if args.continue_from_dir is not None:
             # Copy all files except args.json from continue_from_dir to the new log directory
@@ -937,7 +948,7 @@ if __name__ == "__main__":
         remaining_iters = (args.n_experiments + 1) - total_nodes  # + 1 to account for root node
         if remaining_iters <= 0:
             print(f"Already reached or exceeded target of {args.n_experiments} experiments")
-            exit(0)
+            return
         print(
             f"RESUMING: Running {remaining_iters} more experiments to reach the target experiment count of {args.n_experiments}.\n"
         )
@@ -1011,13 +1022,19 @@ if __name__ == "__main__":
         kl_scale=args.kl_scale,
         reward_mode=args.reward_mode,
         warmstart_experiments=args.warmstart_experiments,
-        use_modal_sandbox=args.use_modal_sandbox,
+        backend=args.backend,
         bucket_path=args.bucket_path,
         vision_model=args.vision_model,
         batch_size=args.batch_size,
         n_threads=args.n_threads,
         agent_usage_mode=args.agent_usage_mode,
     )
+
+
+if __name__ == "__main__":
+    parser = ArgParser()
+    args = parser.parse_args()
+    main(args)
 
     if args.delete_work_dir:
         shutil.rmtree(args.work_dir)

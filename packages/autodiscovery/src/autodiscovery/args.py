@@ -208,10 +208,17 @@ class ArgParser(argparse.ArgumentParser):
             help="Timeout for code execution in seconds",
         )
         self.add_argument(
+            "--backend",
+            type=str,
+            choices=["local", "process", "modal"],
+            default="process",
+            help="Code execution backend: local (in-process), process (isolated subprocess, default), or modal (Modal sandbox)",
+        )
+        self.add_argument(
             "--use_modal_sandbox",
             action=argparse.BooleanOptionalAction,
             default=False,
-            help="Use ModalSandboxIPythonBackend for code execution",
+            help="Deprecated: use --backend modal instead",
         )
         self.add_argument(
             "--bucket_path",

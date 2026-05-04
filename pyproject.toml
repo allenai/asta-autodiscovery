@@ -58,8 +58,8 @@ autodiscovery-modal = { workspace = true }
 autodiscovery-jobs = { workspace = true }
 code-execution = { workspace = true }
 # Local dev: uncomment below and comment out the git source
-asta-sandbox = { path = "../dv-core-asta-integration/packages/sandbox", editable = true }
-# asta-sandbox = { git = "https://github.com/allenai/dv-core-asta-integration", subdirectory = "packages/sandbox", rev = "main" }
+# asta-sandbox = { path = "../dv-core-asta-integration/packages/sandbox", editable = true }
+asta-sandbox = { git = "https://github.com/allenai/dv-core-asta-integration", subdirectory = "packages/sandbox", rev = "main" }
 
 [tool.coverage.run]
 omit = [

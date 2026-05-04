@@ -8,8 +8,6 @@ import textwrap
 from collections.abc import AsyncGenerator
 from typing import Any, Literal, Protocol, cast, override
 
-from autodiscovery_modal import ModalIPythonBackend
-from autodiscovery_modal.ipython_session import APP_NAME as MODAL_APP_NAME
 from code_execution import IPythonExecutor, LocalIPythonBackend
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
@@ -28,7 +26,7 @@ from .structured_outputs import (
 
 MODEL_ENV_VAR = "ASTA_AGENTS_MODEL"
 DEFAULT_MODEL: LiteLlm = LiteLlm(model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini"))
-ExecutionBackend = Literal["local", "modal"]
+ExecutionBackend = Literal["local"]
 
 INSTALL_SNIPPET = "%pip install package1 package2"
 
@@ -286,22 +284,16 @@ class CodeExecutorAgent(BaseAgent):
 def create_code_executor_agent(
     *,
     backend: ExecutionBackend = "local",
-    modal_app_name: str = MODAL_APP_NAME,
 ) -> CodeExecutorAgent:
     """Create a code executor agent configured for the chosen backend.
 
     Args:
-        backend: The execution backend to use ("local" or "modal").
-        modal_app_name: Modal app name when using the Modal backend.
+        backend: The execution backend to use (currently only "local").
 
     Returns:
         A configured CodeExecutorAgent instance.
     """
-    if backend == "modal":
-        executor_backend = ModalIPythonBackend(app_name=modal_app_name)
-    else:
-        executor_backend = LocalIPythonBackend()
-    executor = IPythonExecutor(executor_backend)
+    executor = IPythonExecutor(LocalIPythonBackend())
     return CodeExecutorAgent(name="code_executor", code_executor=executor)
 
 
@@ -474,15 +466,13 @@ class ExperimentWorkflowAgent(BaseAgent):
 def create_experiment_workflow_agent(
     *,
     backend: ExecutionBackend = "local",
-    modal_app_name: str = MODAL_APP_NAME,
     max_programmer_attempts: int = 6,
     model: LiteLlm | None = None,
 ) -> ExperimentWorkflowAgent:
     """Create an experiment workflow agent with a configurable executor backend.
 
     Args:
-        backend: The execution backend to use ("local" or "modal").
-        modal_app_name: Modal app name when using the Modal backend.
+        backend: The execution backend to use (currently only "local").
         max_programmer_attempts: Maximum programmer retries after analysis failure.
         model: LiteLLM model instance for the experiment agents.
 
@@ -497,10 +487,7 @@ def create_experiment_workflow_agent(
         experiment_analyst=agents["experiment_analyst"],
         experiment_reviewer=agents["experiment_reviewer"],
         experiment_reviser=agents["experiment_reviser"],
-        code_executor=create_code_executor_agent(
-            backend=backend,
-            modal_app_name=modal_app_name,
-        ),
+        code_executor=create_code_executor_agent(backend=backend),
         max_programmer_attempts=max_programmer_attempts,
     )
 

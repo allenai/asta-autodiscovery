@@ -5,8 +5,8 @@ execution. It lets you swap execution backends (local, remote, mocked) without
 changing the call sites. The executor returns the same output schema as
 `IPythonSession`.
 
-`autodiscovery_modal` ships Modal-backed executors (`ModalIPythonBackend` and
-`ModalSandboxIPythonBackend`) that plug into `IPythonExecutor`. See
+`autodiscovery_modal` ships `ModalSandboxIPythonBackend` which plugs into
+`IPythonExecutor` for sandbox-isolated execution. See
 `docs/autodiscovery_modal/ipython_executor.md` for details.
 
 ## Public API

@@ -1,32 +1,17 @@
 # Modal IPython Executor
 
-The `autodiscovery_modal` package provides Modal-backed execution backends that
-plug into `code_execution.IPythonExecutor`. Use these when you want the same
-`IPythonExecutor` interface but executed remotely, with either Modal Functions
-or Modal Sandboxes.
+The `autodiscovery_modal` package provides a Modal Sandbox-based execution backend
+that plugs into `code_execution.IPythonExecutor`. Use it when you want per-run
+dataset mounts and strong isolation for untrusted code.
 
 ## Public API
 
-- `ModalIPythonBackend`: Backend that invokes the deployed Modal function.
-- `ModalSandboxIPythonBackend`: Backend that runs each cell inside a Modal Sandbox
-  with dataset mounts scoped per run (recommended for untrusted code).
+- `ModalSandboxIPythonBackend`: Backend that runs each cell inside a fresh Modal
+  Sandbox with dataset mounts scoped per run.
 
 ## Usage Examples
 
-### Basic remote execution
-
-```python
-from autodiscovery_modal import ModalIPythonBackend
-from code_execution import IPythonExecutor
-
-executor = IPythonExecutor(ModalIPythonBackend())
-result = executor.run_cell("print('hello from Modal')")
-
-print(result["stdout"].strip())
-print(result["success"])  # True
-```
-
-### Sandbox execution with per-run dataset mount (recommended)
+### Sandbox execution with per-run dataset mount
 
 ```python
 from autodiscovery_modal import ModalSandboxIPythonBackend
@@ -115,45 +100,10 @@ print(result["stdout"])
 print(result["success"])
 ```
 
-### Target a specific Modal app name
-
-```python
-from autodiscovery_modal import ModalIPythonBackend
-from code_execution import IPythonExecutor
-
-executor = IPythonExecutor(ModalIPythonBackend(app_name="autodiscovery"))
-result = executor.run_cell("print('custom app')")
-print(result["stdout"].strip())
-```
-
-### Timeout and MIME allowlist
-
-```python
-from autodiscovery_modal import ModalIPythonBackend
-from code_execution import IPythonExecutor
-
-executor = IPythonExecutor(ModalIPythonBackend())
-result = executor.run_cell(
-    "import time; time.sleep(5)",
-    use_subprocess=True,
-    timeout_s=2.0,
-    allow_mime=["text/plain"],
-)
-
-print(result["success"])  # False
-print(result["error"]["type"])  # TimeoutError
-```
-
 ## Notes
 
-- `ModalIPythonBackend` expects the Modal function to be deployed under the
-  configured app name. See `docs/autodiscovery_modal/ipython_session.md` for
-  setup and deployment steps.
-- Each call is stateless because Modal functions do not keep session state
-  between invocations.
-- `ModalSandboxIPythonBackend` creates a fresh Sandbox per call and mounts the
-  dataset prefix specified by `key_prefix`. This is the safest option for
-  untrusted code.
+- Each call creates a fresh Sandbox and mounts the dataset prefix specified by
+  `key_prefix`. This provides strong isolation for untrusted code.
 - Use `for_bucket_prefix` when you want a generic storage prefix without user/run metadata.
 - For S3-compatible services (e.g., GCS), pass `bucket_endpoint_url` so Modal mounts the right endpoint.
 - To authenticate bucket access, pass `bucket_secret` (static credentials) or

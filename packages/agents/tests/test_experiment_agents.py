@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from agents import experiment_agents
 from agents.structured_outputs import ExperimentAnalyst, ExperimentCode
+from asta_sandbox import ExecutionResult
 from google.adk.agents import LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.run_config import RunConfig
@@ -93,15 +94,17 @@ def _make_workflow_agent(
             ]
         },
     )
-    code_executor = experiment_agents.create_code_executor_agent()
-    code_executor.code_executor.run_cell = (  # type: ignore[method-assign]
-        lambda code_str, **_: {
-            "stdout": "",
-            "stderr": "",
-            "rich_outputs": [],
-            "success": True,
-            "error": None,
-        }
+    class _DummyExecutor:
+        async def run_code(self, code: str, timeout_seconds: float | None = None) -> ExecutionResult:
+            return ExecutionResult(stdout="", stderr="", success=True)
+
+        async def start(self) -> None: pass
+        async def shutdown(self) -> None: pass
+        async def add_shares(self, *shares: Any) -> None: pass
+
+    code_executor = experiment_agents.CodeExecutorAgent(
+        name="code_executor",
+        code_executor=_DummyExecutor(),
     )
     return experiment_agents.ExperimentWorkflowAgent(
         name="workflow",
@@ -144,18 +147,40 @@ def test_extract_code_handles_payload_types() -> None:
 def test_create_code_executor_agent_uses_local_backend(monkeypatch: pytest.MonkeyPatch) -> None:
     """create_code_executor_agent wires up the local IPython backend."""
 
-    class DummyLocalBackend:
+    class DummyLocalExecutor:
         def __init__(self) -> None:
-            self.marker = "local"
+            pass
 
-        def run_cell(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-            raise RuntimeError("should not be called")
+        async def start(self) -> None: pass
+        async def shutdown(self) -> None: pass
+        async def run_code(self, code: str, timeout_seconds: float | None = None) -> ExecutionResult:
+            return ExecutionResult(stdout="", stderr="", success=True)
+        async def add_shares(self, *shares: Any) -> None: pass
 
-    monkeypatch.setattr(experiment_agents, "LocalIPythonBackend", DummyLocalBackend)
+    class DummyModalExecutor:
+        def __init__(self, *, app_name: str) -> None:
+            self.app_name = app_name
 
-    agent = experiment_agents.create_code_executor_agent(backend="local")
-    assert isinstance(agent, experiment_agents.CodeExecutorAgent)
-    assert isinstance(agent.code_executor._backend, DummyLocalBackend)
+        async def start(self) -> None: pass
+        async def shutdown(self) -> None: pass
+        async def run_code(self, code: str, timeout_seconds: float | None = None) -> ExecutionResult:
+            return ExecutionResult(stdout="", stderr="", success=True)
+        async def add_shares(self, *shares: Any) -> None: pass
+
+    monkeypatch.setattr(experiment_agents, "InProcessExecutor", DummyLocalExecutor)
+    monkeypatch.setattr(experiment_agents, "ModalEphemeralExecutor", DummyModalExecutor)
+
+    agent_local = experiment_agents.create_code_executor_agent(backend="local")
+    assert isinstance(agent_local, experiment_agents.CodeExecutorAgent)
+    assert isinstance(agent_local.code_executor, DummyLocalExecutor)
+
+    agent_modal = experiment_agents.create_code_executor_agent(
+        backend="modal",
+        modal_app_name="unit-test",
+    )
+    assert isinstance(agent_modal, experiment_agents.CodeExecutorAgent)
+    assert isinstance(agent_modal.code_executor, DummyModalExecutor)
+    assert agent_modal.code_executor.app_name == "unit-test"
 
 
 def test_create_experiment_agents_model_resolution(monkeypatch: pytest.MonkeyPatch) -> None:

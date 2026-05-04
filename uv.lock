@@ -67,7 +67,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], git = "https://github.com/allenai/dv-core-asta-integration?subdirectory=packages%2Fsandbox&rev=main" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"] },
     { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
     { name = "google-adk", specifier = ">=1.21.0" },
     { name = "litellm", specifier = "==1.80.11" },
@@ -259,10 +259,14 @@ dev = [
 
 [[package]]
 name = "asta-sandbox"
-version = "0.1.2.dev0"
-source = { git = "https://github.com/allenai/dv-core-asta-integration?subdirectory=packages%2Fsandbox&rev=main#ee38637804ce05c8bc3feedd76b4a57f5b5c5e80" }
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipython" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/01/695dc43d169ee816e32cfe4798712813145faa176aa9248ae97f96f50d56/asta_sandbox-0.1.1.tar.gz", hash = "sha256:e041cf971e6b986654ea0fdcbf2b1bc8de810db434572fd06b3b24d06529e580", size = 20824 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/84/ab/9440475a0a3ebfd3f65bfe2b40b87bc575c7c94fcfe54e06a1c64c0da547/asta_sandbox-0.1.1-py3-none-any.whl", hash = "sha256:5ed7645e3f29566dbdad1bc0131507b6074fc13044374ca380c0818c46ef3cf7", size = 29165 },
 ]
 
 [package.optional-dependencies]
@@ -380,7 +384,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], git = "https://github.com/allenai/dv-core-asta-integration?subdirectory=packages%2Fsandbox&rev=main" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"] },
     { name = "modal", specifier = ">=1.2.6" },
 ]
 

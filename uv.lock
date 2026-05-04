@@ -59,16 +59,16 @@ name = "agents"
 version = "0.1.0"
 source = { editable = "packages/agents" }
 dependencies = [
+    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
     { name = "autodiscovery-modal" },
-    { name = "code-execution" },
     { name = "google-adk" },
     { name = "litellm" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], editable = "../dv-core-asta-integration/packages/sandbox" },
     { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
-    { name = "code-execution", editable = "packages/code_execution" },
     { name = "google-adk", specifier = ">=1.21.0" },
     { name = "litellm", specifier = "==1.80.11" },
 ]
@@ -258,6 +258,58 @@ dev = [
 ]
 
 [[package]]
+name = "asta-sandbox"
+version = "0.1.2.dev0"
+source = { editable = "../dv-core-asta-integration/packages/sandbox" }
+dependencies = [
+    { name = "ipython" },
+]
+
+[package.optional-dependencies]
+modal-ephemeral = [
+    { name = "modal" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "docker", marker = "extra == 'all'", specifier = ">=7.0" },
+    { name = "docker", marker = "extra == 'docker'", specifier = ">=7.0" },
+    { name = "ipython", specifier = ">=9.8.0" },
+    { name = "jupyter-kernel-gateway", marker = "extra == 'all'" },
+    { name = "jupyter-kernel-gateway", marker = "extra == 'docker'" },
+    { name = "jupyter-kernel-gateway", marker = "extra == 'modal'" },
+    { name = "jupyter-kernel-gateway", marker = "extra == 'modal-kernel'" },
+    { name = "jupyter-server", marker = "extra == 'all'", specifier = ">=2.0" },
+    { name = "jupyter-server", marker = "extra == 'docker'", specifier = ">=2.0" },
+    { name = "jupyter-server", marker = "extra == 'modal'", specifier = ">=2.0" },
+    { name = "jupyter-server", marker = "extra == 'modal-kernel'", specifier = ">=2.0" },
+    { name = "matplotlib", marker = "extra == 'all'" },
+    { name = "matplotlib", marker = "extra == 'inprocess'" },
+    { name = "matplotlib-inline", marker = "extra == 'all'" },
+    { name = "matplotlib-inline", marker = "extra == 'inprocess'" },
+    { name = "modal", marker = "extra == 'all'", specifier = ">=0.73" },
+    { name = "modal", marker = "extra == 'modal'", specifier = ">=0.73" },
+    { name = "modal", marker = "extra == 'modal-ephemeral'", specifier = ">=0.73" },
+    { name = "modal", marker = "extra == 'modal-kernel'", specifier = ">=0.73" },
+    { name = "requests", marker = "extra == 'all'" },
+    { name = "requests", marker = "extra == 'docker'" },
+    { name = "requests", marker = "extra == 'modal'" },
+    { name = "requests", marker = "extra == 'modal-kernel'" },
+]
+provides-extras = ["inprocess", "docker", "modal-kernel", "modal-ephemeral", "modal", "all"]
+
+[package.metadata.requires-dev]
+test = [
+    { name = "docker", specifier = ">=7.0" },
+    { name = "jupyter-kernel-gateway" },
+    { name = "jupyter-server", specifier = ">=2.0" },
+    { name = "modal", specifier = ">=0.73" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "requests" },
+]
+
+[[package]]
 name = "asttokens"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -361,13 +413,13 @@ name = "autodiscovery-modal"
 version = "0.1.0"
 source = { editable = "packages/autodiscovery_modal" }
 dependencies = [
-    { name = "code-execution" },
+    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
     { name = "modal" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "code-execution", editable = "packages/code_execution" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], editable = "../dv-core-asta-integration/packages/sandbox" },
     { name = "modal", specifier = ">=1.2.6" },
 ]
 

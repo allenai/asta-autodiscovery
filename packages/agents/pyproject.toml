@@ -8,8 +8,8 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "asta-sandbox[modal-ephemeral]",
     "autodiscovery-modal",
-    "code-execution",
     "google-adk>=1.21.0",
     "litellm==1.80.11"
 ]

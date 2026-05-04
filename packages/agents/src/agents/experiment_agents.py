@@ -8,7 +8,8 @@ import textwrap
 from collections.abc import AsyncGenerator
 from typing import Any, Literal, Protocol, cast, override
 
-from code_execution import IPythonExecutor, LocalIPythonBackend
+from asta_sandbox import ExecutionResult, InProcessExecutor, SandboxExecutor
+from asta_sandbox.backends.modal_ephemeral import ModalEphemeralExecutor
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
@@ -219,7 +220,7 @@ def create_experiment_agents(*, model: LiteLlm | None = None) -> dict[str, LlmAg
 class CodeExecutorAgent(BaseAgent):
     """Custom agent that executes experiment code without an LLM."""
 
-    code_executor: IPythonExecutor
+    code_executor: SandboxExecutor
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -227,13 +228,13 @@ class CodeExecutorAgent(BaseAgent):
         self,
         *,
         name: str,
-        code_executor: IPythonExecutor,
+        code_executor: SandboxExecutor,
     ) -> None:
         """Initialize the code executor agent.
 
         Args:
             name: The agent name.
-            code_executor: IPython execution helper for running code.
+            code_executor: Sandbox executor for running code.
         """
         data: dict[str, Any] = {
             "name": name,
@@ -247,7 +248,7 @@ class CodeExecutorAgent(BaseAgent):
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event]:
         """Execute the latest experiment code and emit a summary event."""
         code_str = str(ctx.session.state.get("experiment_code", ""))
-        execution_result = self.code_executor.run_cell(code_str)
+        execution_result = await self.code_executor.run_code(code_str)
         summary = self._summarize_execution(execution_result)
         state_delta = {
             "execution_summary": summary,
@@ -265,19 +266,17 @@ class CodeExecutorAgent(BaseAgent):
             content=content,
         )
 
-    def _summarize_execution(self, result: dict[str, Any]) -> str:
+    def _summarize_execution(self, result: ExecutionResult) -> str:
         """Summarize execution output for downstream analysis."""
-        stdout = (result.get("stdout") or "").strip()
-        stderr = (result.get("stderr") or "").strip()
-        error = result.get("error")
-        success = bool(result.get("success"))
-        pieces = [f"success: {success}"]
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        pieces = [f"success: {result.success}"]
         if stdout:
             pieces.append(f"stdout:\n{stdout}")
         if stderr:
             pieces.append(f"stderr:\n{stderr}")
-        if error:
-            pieces.append(f"error: {error}")
+        if result.error:
+            pieces.append(f"error: {result.error}")
         return "\n\n".join(pieces)
 
 
@@ -293,7 +292,10 @@ def create_code_executor_agent(
     Returns:
         A configured CodeExecutorAgent instance.
     """
-    executor = IPythonExecutor(LocalIPythonBackend())
+    if backend == "modal":
+        executor: SandboxExecutor = ModalEphemeralExecutor(app_name=modal_app_name)
+    else:
+        executor = InProcessExecutor()
     return CodeExecutorAgent(name="code_executor", code_executor=executor)
 
 

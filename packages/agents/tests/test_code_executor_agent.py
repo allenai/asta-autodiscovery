@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 from agents import experiment_agents
+from asta_sandbox import ExecutionResult
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.sessions import InMemorySessionService
 
@@ -15,32 +16,21 @@ async def test_code_executor_agent_local(monkeypatch: pytest.MonkeyPatch) -> Non
     """Runs the custom code executor against a local backend."""
     captured: dict[str, Any] = {}
 
-    class DummyBackend:
-        def run_cell(
-            self,
-            code_str: str,
-            *,
-            use_subprocess: bool = False,
-            timeout_s: float | None = None,
-            allow_mime: Any = None,
-            matplotlib_backend: str | None = None,
-        ) -> dict[str, Any]:
-            captured["init"] = {
-                "use_subprocess": use_subprocess,
-                "timeout_s": timeout_s,
-                "allow_mime": allow_mime,
-                "matplotlib_backend": matplotlib_backend,
-            }
+    class DummyExecutor:
+        async def run_code(self, code_str: str, timeout_seconds: float | None = None) -> ExecutionResult:
             captured["code"] = code_str
-            return {
-                "stdout": "hello\n",
-                "stderr": "",
-                "rich_outputs": [],
-                "success": True,
-                "error": None,
-            }
+            return ExecutionResult(stdout="hello\n", stderr="", success=True)
 
-    monkeypatch.setattr(experiment_agents, "LocalIPythonBackend", DummyBackend)
+        async def start(self) -> None:
+            pass
+
+        async def shutdown(self) -> None:
+            pass
+
+        async def add_shares(self, *shares) -> None:
+            pass
+
+    monkeypatch.setattr(experiment_agents, "InProcessExecutor", DummyExecutor)
 
     agent = experiment_agents.create_code_executor_agent(backend="local")
 
@@ -63,8 +53,37 @@ async def test_code_executor_agent_local(monkeypatch: pytest.MonkeyPatch) -> Non
     assert captured["code"] == "print('hi')"
     state_delta = cast(dict[str, Any], event.actions.state_delta)
     assert state_delta["execution_summary"].startswith("success: True")
-    assert state_delta["execution_result_raw"]["stdout"] == "hello\n"
+    result = state_delta["execution_result_raw"]
+    assert result.stdout == "hello\n"
 
     await session_service.append_event(session=session, event=event)
     assert session.state["execution_summary"].startswith("success: True")
-    assert session.state["execution_result_raw"]["success"] is True
+    assert session.state["execution_result_raw"].success is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.modal
+async def test_code_executor_agent_modal() -> None:
+    """Runs the code executor against the deployed Modal app."""
+    agent = experiment_agents.create_code_executor_agent(backend="modal")
+
+    session_service = InMemorySessionService()
+    session = await session_service.create_session(
+        app_name="app",
+        user_id="user",
+        state={"experiment_code": "print('modal')\n1 + 1"},
+    )
+    ctx = InvocationContext(
+        session_service=session_service,
+        invocation_id="invocation",
+        agent=agent,
+        session=session,
+    )
+
+    events = [event async for event in agent.run_async(ctx)]
+
+    assert len(events) == 1
+    event = events[0]
+    result = cast(dict[str, Any], event.actions.state_delta)["execution_result_raw"]
+    assert result.success is True
+    assert "modal" in result.stdout

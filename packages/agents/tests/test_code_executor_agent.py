@@ -10,27 +10,20 @@ from asta_sandbox import ExecutionResult
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.sessions import InMemorySessionService
 
+from conftest import DummyExecutor
+
 
 @pytest.mark.asyncio
 async def test_code_executor_agent_local(monkeypatch: pytest.MonkeyPatch) -> None:
     """Runs the custom code executor against a local backend."""
     captured: dict[str, Any] = {}
 
-    class DummyExecutor:
+    class CapturingExecutor(DummyExecutor):
         async def run_code(self, code_str: str, timeout_seconds: float | None = None) -> ExecutionResult:
             captured["code"] = code_str
             return ExecutionResult(stdout="hello\n", stderr="", success=True)
 
-        async def start(self) -> None:
-            pass
-
-        async def shutdown(self) -> None:
-            pass
-
-        async def add_shares(self, *shares) -> None:
-            pass
-
-    monkeypatch.setattr(experiment_agents, "InProcessExecutor", DummyExecutor)
+    monkeypatch.setattr(experiment_agents, "InProcessExecutor", CapturingExecutor)
 
     agent = experiment_agents.create_code_executor_agent(backend="local")
 

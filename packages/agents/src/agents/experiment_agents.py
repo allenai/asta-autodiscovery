@@ -27,7 +27,9 @@ from .structured_outputs import (
 
 MODEL_ENV_VAR = "ASTA_AGENTS_MODEL"
 DEFAULT_MODEL: LiteLlm = LiteLlm(model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini"))
-ExecutionBackend = Literal["local"]
+ExecutionBackend = Literal["local", "modal"]
+
+_DEFAULT_MODAL_APP_NAME = "autodiscovery"
 
 INSTALL_SNIPPET = "%pip install package1 package2"
 
@@ -283,11 +285,13 @@ class CodeExecutorAgent(BaseAgent):
 def create_code_executor_agent(
     *,
     backend: ExecutionBackend = "local",
+    modal_app_name: str = _DEFAULT_MODAL_APP_NAME,
 ) -> CodeExecutorAgent:
     """Create a code executor agent configured for the chosen backend.
 
     Args:
-        backend: The execution backend to use (currently only "local").
+        backend: The execution backend to use ("local" or "modal").
+        modal_app_name: Modal app name when using the modal backend.
 
     Returns:
         A configured CodeExecutorAgent instance.
@@ -468,13 +472,15 @@ class ExperimentWorkflowAgent(BaseAgent):
 def create_experiment_workflow_agent(
     *,
     backend: ExecutionBackend = "local",
+    modal_app_name: str = _DEFAULT_MODAL_APP_NAME,
     max_programmer_attempts: int = 6,
     model: LiteLlm | None = None,
 ) -> ExperimentWorkflowAgent:
     """Create an experiment workflow agent with a configurable executor backend.
 
     Args:
-        backend: The execution backend to use (currently only "local").
+        backend: The execution backend to use ("local" or "modal").
+        modal_app_name: Modal app name when using the modal backend.
         max_programmer_attempts: Maximum programmer retries after analysis failure.
         model: LiteLLM model instance for the experiment agents.
 
@@ -489,7 +495,7 @@ def create_experiment_workflow_agent(
         experiment_analyst=agents["experiment_analyst"],
         experiment_reviewer=agents["experiment_reviewer"],
         experiment_reviser=agents["experiment_reviser"],
-        code_executor=create_code_executor_agent(backend=backend),
+        code_executor=create_code_executor_agent(backend=backend, modal_app_name=modal_app_name),
         max_programmer_attempts=max_programmer_attempts,
     )
 

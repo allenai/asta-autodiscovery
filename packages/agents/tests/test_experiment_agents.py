@@ -141,8 +141,8 @@ def test_extract_code_handles_payload_types() -> None:
     assert workflow._extract_code("not-json") is None
 
 
-def test_create_code_executor_agent_backend_selection(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Select local vs modal execution backends when building agents."""
+def test_create_code_executor_agent_uses_local_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """create_code_executor_agent wires up the local IPython backend."""
 
     class DummyLocalBackend:
         def __init__(self) -> None:
@@ -151,27 +151,11 @@ def test_create_code_executor_agent_backend_selection(monkeypatch: pytest.Monkey
         def run_cell(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
             raise RuntimeError("should not be called")
 
-    class DummyModalBackend:
-        def __init__(self, *, app_name: str) -> None:
-            self.app_name = app_name
-
-        def run_cell(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-            raise RuntimeError("should not be called")
-
     monkeypatch.setattr(experiment_agents, "LocalIPythonBackend", DummyLocalBackend)
-    monkeypatch.setattr(experiment_agents, "ModalIPythonBackend", DummyModalBackend)
 
-    agent_local = experiment_agents.create_code_executor_agent(backend="local")
-    assert isinstance(agent_local, experiment_agents.CodeExecutorAgent)
-    assert isinstance(agent_local.code_executor._backend, DummyLocalBackend)
-
-    agent_modal = experiment_agents.create_code_executor_agent(
-        backend="modal",
-        modal_app_name="unit-test",
-    )
-    assert isinstance(agent_modal, experiment_agents.CodeExecutorAgent)
-    assert isinstance(agent_modal.code_executor._backend, DummyModalBackend)
-    assert agent_modal.code_executor._backend.app_name == "unit-test"
+    agent = experiment_agents.create_code_executor_agent(backend="local")
+    assert isinstance(agent, experiment_agents.CodeExecutorAgent)
+    assert isinstance(agent.code_executor._backend, DummyLocalBackend)
 
 
 def test_create_experiment_agents_model_resolution(monkeypatch: pytest.MonkeyPatch) -> None:

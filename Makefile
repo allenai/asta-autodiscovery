@@ -1,4 +1,4 @@
-.PHONY: test test-modal test-all lint format type-check modal-deploy sync adk-web serve-docs deploy-docs \
+.PHONY: test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery
 
@@ -23,9 +23,6 @@ type-check:
 	uv run pyright
 
 # Deployment targets
-modal-deploy:
-	uv run modal deploy -m autodiscovery_modal.ipython_session
-
 deploy-autodiscovery:
 	cd packages/autodiscovery && ./scripts/rebuild_and_deploy.sh
 

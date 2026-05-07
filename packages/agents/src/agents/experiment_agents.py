@@ -6,10 +6,9 @@ import json
 import os
 import textwrap
 from collections.abc import AsyncGenerator
-from typing import Any, Literal, Protocol, cast, override
+from typing import Any, Protocol, cast, override
 
 from asta_sandbox import ExecutionResult, InProcessExecutor, SandboxExecutor
-from asta_sandbox.backends.modal_ephemeral import ModalEphemeralExecutor
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
@@ -27,9 +26,6 @@ from .structured_outputs import (
 
 MODEL_ENV_VAR = "ASTA_AGENTS_MODEL"
 DEFAULT_MODEL: LiteLlm = LiteLlm(model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini"))
-ExecutionBackend = Literal["local", "modal"]
-
-_DEFAULT_MODAL_APP_NAME = "autodiscovery"
 
 INSTALL_SNIPPET = "%pip install package1 package2"
 
@@ -282,24 +278,13 @@ class CodeExecutorAgent(BaseAgent):
         return "\n\n".join(pieces)
 
 
-def create_code_executor_agent(
-    *,
-    backend: ExecutionBackend = "local",
-    modal_app_name: str = _DEFAULT_MODAL_APP_NAME,
-) -> CodeExecutorAgent:
-    """Create a code executor agent configured for the chosen backend.
-
-    Args:
-        backend: The execution backend to use ("local" or "modal").
-        modal_app_name: Modal app name when using the modal backend.
+def create_code_executor_agent() -> CodeExecutorAgent:
+    """Create a code executor agent using the in-process executor.
 
     Returns:
         A configured CodeExecutorAgent instance.
     """
-    if backend == "modal":
-        executor: SandboxExecutor = ModalEphemeralExecutor(app_name=modal_app_name)
-    else:
-        executor = InProcessExecutor()
+    executor: SandboxExecutor = InProcessExecutor()
     return CodeExecutorAgent(name="code_executor", code_executor=executor)
 
 
@@ -471,16 +456,12 @@ class ExperimentWorkflowAgent(BaseAgent):
 
 def create_experiment_workflow_agent(
     *,
-    backend: ExecutionBackend = "local",
-    modal_app_name: str = _DEFAULT_MODAL_APP_NAME,
     max_programmer_attempts: int = 6,
     model: LiteLlm | None = None,
 ) -> ExperimentWorkflowAgent:
-    """Create an experiment workflow agent with a configurable executor backend.
+    """Create an experiment workflow agent with an in-process executor.
 
     Args:
-        backend: The execution backend to use ("local" or "modal").
-        modal_app_name: Modal app name when using the modal backend.
         max_programmer_attempts: Maximum programmer retries after analysis failure.
         model: LiteLLM model instance for the experiment agents.
 
@@ -495,7 +476,7 @@ def create_experiment_workflow_agent(
         experiment_analyst=agents["experiment_analyst"],
         experiment_reviewer=agents["experiment_reviewer"],
         experiment_reviser=agents["experiment_reviser"],
-        code_executor=create_code_executor_agent(backend=backend, modal_app_name=modal_app_name),
+        code_executor=create_code_executor_agent(),
         max_programmer_attempts=max_programmer_attempts,
     )
 

@@ -136,27 +136,13 @@ def test_extract_code_handles_payload_types() -> None:
     assert workflow._extract_code("not-json") is None
 
 
-def test_create_code_executor_agent_uses_local_backend(monkeypatch: pytest.MonkeyPatch) -> None:
-    """create_code_executor_agent wires up the local IPython backend."""
-
-    class DummyModalExecutor(DummyExecutor):
-        def __init__(self, *, app_name: str) -> None:
-            self.app_name = app_name
-
+def test_create_code_executor_agent_uses_inprocess_executor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """create_code_executor_agent wires up the InProcessExecutor."""
     monkeypatch.setattr(experiment_agents, "InProcessExecutor", DummyExecutor)
-    monkeypatch.setattr(experiment_agents, "ModalEphemeralExecutor", DummyModalExecutor)
 
-    agent_local = experiment_agents.create_code_executor_agent(backend="local")
-    assert isinstance(agent_local, experiment_agents.CodeExecutorAgent)
-    assert isinstance(agent_local.code_executor, DummyExecutor)
-
-    agent_modal = experiment_agents.create_code_executor_agent(
-        backend="modal",
-        modal_app_name="unit-test",
-    )
-    assert isinstance(agent_modal, experiment_agents.CodeExecutorAgent)
-    assert isinstance(agent_modal.code_executor, DummyModalExecutor)
-    assert agent_modal.code_executor.app_name == "unit-test"
+    agent = experiment_agents.create_code_executor_agent()
+    assert isinstance(agent, experiment_agents.CodeExecutorAgent)
+    assert isinstance(agent.code_executor, DummyExecutor)
 
 
 def test_create_experiment_agents_model_resolution(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1040,4 +1040,4 @@ if __name__ == "__main__":
         shutil.rmtree(args.work_dir)
         print(f"\nDELETED WORKING DIRECTORY: {args.work_dir}")
 
-    print(f"\nRUN FINISHED!\n\nLOGS: {log_dirname}")
+    print(f"\nRUN FINISHED!\n\nLOGS: {args.out_dir}")

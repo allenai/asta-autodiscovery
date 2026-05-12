@@ -1,157 +1,105 @@
 # Modal Sandbox Backend
 
-`autodiscovery_modal.sandbox_backend` provides a Modal Sandbox-based execution
-backend that plugs into `code_execution.IPythonExecutor`. It creates a fresh
-Sandbox per call, mounts a dataset prefix into the Sandbox filesystem, and then
-executes the IPython cell inside the container. This is the safest approach for
-LLM-generated or otherwise untrusted code.
+`autodiscovery_modal` provides helpers for running isolated code in Modal
+ephemeral sandboxes. Each call creates a fresh sandbox, executes the code, and
+terminates the sandbox. No state persists between calls.
 
-## Public API
+The main types re-exported from `asta_sandbox`:
 
-- `ModalSandboxIPythonBackend`: Sandbox-backed `IPythonExecutor` backend.
+- `ModalEphemeralExecutor`: Async executor that creates a fresh Modal sandbox per `run_code()` call.
+- `CloudShare`: Mounts a cloud storage bucket prefix into the sandbox filesystem.
+- `build_sandbox_image` / `build_modal_ephemeral_image`: Build Modal images with IPython and optional extra packages.
 
 ## Usage Examples
 
-### Basic execution with a per-run dataset mount (read-only by default)
+### Basic execution
 
 ```python
-from autodiscovery_modal import ModalSandboxIPythonBackend
-from code_execution import IPythonExecutor
+import asyncio
+from autodiscovery_modal import ModalEphemeralExecutor, build_sandbox_image
 
-backend = ModalSandboxIPythonBackend.for_run_dataset(
-    app_name="asta-autodiscovery",
-    user_id="user-123",
-    run_id="forecasting-2026-01-06T120102Z",
-    bucket="myapp-datasets",
-    key_prefix="users/user-123/runs/forecasting-2026-01-06T120102Z/dataset/",
+image = build_sandbox_image(extra_packages=["numpy", "pandas", "matplotlib", "matplotlib-inline"])
+
+executor = ModalEphemeralExecutor(app_name="my-app", image=image)
+
+async def main():
+    await executor.start()
+    result = await executor.run_code("print('hello')\n1 + 1")
+    print(result.stdout)
+    print(result.success)
+    await executor.shutdown()
+
+asyncio.run(main())
+```
+
+### Execution with a GCS bucket mount
+
+```python
+import asyncio
+import modal
+from autodiscovery_modal import ModalEphemeralExecutor, CloudShare, build_sandbox_image
+
+image = build_sandbox_image(extra_packages=["pandas"])
+
+cloud_share = CloudShare(
+    dest="/data",
+    bucket="my-bucket",
+    key_prefix="datasets/my-dataset/",
     read_only=True,
+    bucket_endpoint_url="https://storage.googleapis.com",
+    modal_secret=modal.Secret.from_name("gcs-my-bucket"),
 )
 
-executor = IPythonExecutor(backend)
-result = executor.run_cell(
-    """
-import os
-from pathlib import Path
-
-root = Path(os.environ["DATASET_ROOT"])
-print("USER_ID:", os.environ["USER_ID"])
-print("RUN_ID:", os.environ["RUN_ID"])
-print("DATASET_ROOT:", root)
-
-for p in sorted(root.rglob("*")):
-    if p.is_file():
-        print(" -", p.relative_to(root))
-"""
+executor = ModalEphemeralExecutor(
+    app_name="my-app",
+    image=image,
+    environment={"DATASET_ROOT": "/data"},
 )
 
-print(result["stdout"])
-print(result["success"])
+async def main():
+    await executor.start()
+    await executor.add_shares(cloud_share)
+    result = await executor.run_code(
+        "import os, pathlib; print(list(pathlib.Path(os.environ['DATASET_ROOT']).iterdir()))"
+    )
+    print(result.stdout)
+    await executor.shutdown()
+
+asyncio.run(main())
 ```
 
-### Execution with a generic bucket prefix (no user/run metadata)
+### Capturing matplotlib figures
+
+Figures produced by `plt.show()` are returned as `rich_outputs` on the result:
 
 ```python
-from autodiscovery_modal import ModalSandboxIPythonBackend
-from code_execution import IPythonExecutor
+import asyncio
+from autodiscovery_modal import ModalEphemeralExecutor, build_sandbox_image
 
-backend = ModalSandboxIPythonBackend.for_bucket_prefix(
-    app_name="asta-autodiscovery",
-    bucket="myapp-datasets",
-    key_prefix="samples/",
-    read_only=True,
-    env={"EXPERIMENT_NAME": "smoke-test"},
-)
+image = build_sandbox_image(extra_packages=["matplotlib", "matplotlib-inline"])
 
-executor = IPythonExecutor(backend)
-result = executor.run_cell("import os; print(os.environ['DATASET_ROOT'])")
+executor = ModalEphemeralExecutor(app_name="my-app", image=image)
 
-print(result["stdout"].strip())
-print(result["success"])
-```
+async def main():
+    await executor.start()
+    result = await executor.run_code(
+        "import matplotlib.pyplot as plt\nplt.plot([1,2,3])\nplt.show()"
+    )
+    for ro in result.rich_outputs:
+        if "image/png" in ro.data:
+            print("Got PNG figure")
+    await executor.shutdown()
 
-### Write-enabled dataset mounts
-
-```python
-from autodiscovery_modal import ModalSandboxIPythonBackend
-from code_execution import IPythonExecutor
-
-backend = ModalSandboxIPythonBackend.for_run_dataset(
-    app_name="asta-autodiscovery",
-    user_id="user-123",
-    run_id="experiment-2026-01-06T120102Z",
-    bucket="myapp-datasets",
-    key_prefix="users/user-123/runs/experiment-2026-01-06T120102Z/dataset/",
-    read_only=False,
-)
-
-executor = IPythonExecutor(backend)
-result = executor.run_cell(
-    """
-from pathlib import Path
-import os
-
-root = Path(os.environ["DATASET_ROOT"])
-root.mkdir(parents=True, exist_ok=True)
-(root / "note.txt").write_text("hello from sandbox")
-print((root / "note.txt").read_text().strip())
-"""
-)
-
-print(result["stdout"])
-print(result["success"])
-```
-
-### Adding environment variables
-
-```python
-from autodiscovery_modal import ModalSandboxIPythonBackend
-from code_execution import IPythonExecutor
-
-backend = ModalSandboxIPythonBackend.for_run_dataset(
-    app_name="asta-autodiscovery",
-    user_id="user-123",
-    run_id="forecasting-2026-01-06T120102Z",
-    bucket="myapp-datasets",
-    key_prefix="users/user-123/runs/forecasting-2026-01-06T120102Z/dataset/",
-    env={"EXPERIMENT_NAME": "forecasting"},
-)
-
-executor = IPythonExecutor(backend)
-result = executor.run_cell("import os; print(os.environ['EXPERIMENT_NAME'])")
-
-print(result["stdout"].strip())
-```
-
-### Custom image with extra dependencies
-
-```python
-from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
-from code_execution import IPythonExecutor
-
-custom_image = build_sandbox_image(extra_packages=["matplotlib", "matplotlib-inline", "scipy"])
-
-backend = ModalSandboxIPythonBackend.for_bucket_prefix(
-    app_name="asta-autodiscovery",
-    bucket="myapp-datasets",
-    key_prefix="samples/",
-    read_only=True,
-    image=custom_image,
-)
-
-executor = IPythonExecutor(backend)
-result = executor.run_cell("import scipy; print(scipy.__version__)")
-
-print(result["stdout"].strip())
+asyncio.run(main())
 ```
 
 ## Notes
 
-- Each call creates a fresh Sandbox. This prevents untrusted code from
-  inspecting other runs, and avoids cross-run leakage.
-- `key_prefix` must end with `/`. The backend normalizes prefixes automatically.
-- Use `for_bucket_prefix` when you want a generic storage prefix without user/run metadata.
-- For S3-compatible services (e.g., GCS), pass `bucket_endpoint_url` so Modal mounts the right endpoint.
-- For bucket authentication, pass `bucket_secret` (static credentials) or
-  `oidc_auth_role_arn` (OIDC-based IAM role).
-- Sandboxes default to a 10-minute lifetime. Override with `sandbox_timeout_s`
-  if you need longer-running executions.
+- Each `run_code()` call creates a new sandbox. No variables, imports, or data
+  persist between calls.
+- `CloudShare` mounts are scoped per executor instance. Call `add_shares()`
+  before `run_code()`.
+- Use `build_sandbox_image(extra_packages=[...])` to bake in Python packages.
+  Modal caches image layers by content hash, so unchanged images are free to reuse.
+- For the full `asta_sandbox` API (including `SandboxBase`, `ExecutionResult`,
+  `RichOutput`), see the [asta-sandbox package](https://pypi.org/project/asta-sandbox/).

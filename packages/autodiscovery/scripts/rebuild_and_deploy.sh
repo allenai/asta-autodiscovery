@@ -15,7 +15,6 @@ IMAGE="us-west1-docker.pkg.dev/${PROJECT_ID}/autodiscovery/autodiscovery:${ENV_T
 JOB_NAME="autodiscovery-job"
 BUCKET="example-gcp-project"
 OPENAI_SECRET_NAME="openai-api-key-secret"
-GITHUB_SECRET_NAME="github-token-secret"
 MODAL_TOKEN_ID_SECRET_NAME="modal-token-id-secret"
 MODAL_TOKEN_SECRET_SECRET_NAME="modal-token-secret"
 MODAL_ENVIRONMENT_SECRET_NAME="modal-environment-secret"
@@ -32,7 +31,6 @@ echo ""
 echo "Verifying required secrets..."
 missing_secrets=()
 for secret in \
-    "${GITHUB_SECRET_NAME}" \
     "${OPENAI_SECRET_NAME}" \
     "${MODAL_TOKEN_ID_SECRET_NAME}" \
     "${MODAL_TOKEN_SECRET_SECRET_NAME}" \

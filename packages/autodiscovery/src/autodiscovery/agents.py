@@ -197,7 +197,7 @@ class ModalSandboxExecutor(CodeExecutor):
         print(f"[ModalSandboxExecutor] Code length: {len(code)} characters")
 
         try:
-            result = _run_async(self._executor.run_code(code))
+            result = _run_async(self._executor.run_code(code, timeout_seconds=self._timeout))
 
             print("[ModalSandboxExecutor] Execution completed")
             print(f"[ModalSandboxExecutor] Success: {result.success}")
@@ -807,7 +807,6 @@ def install(package):
             app_name=app_name,
             image=sandbox_image,
             environment={"DATASET_ROOT": modal_mount_path},
-            sandbox_timeout_s=86400,
         )
         _run_async(modal_executor.add_shares(cloud_share))
 

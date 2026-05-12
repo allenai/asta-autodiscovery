@@ -259,14 +259,14 @@ dev = [
 
 [[package]]
 name = "asta-sandbox"
-version = "0.1.2.dev1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipython" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6a/d7/9291a89803ebc15d511417f04c6c2a482c22bd63313bcccdc98d408f8e02/asta_sandbox-0.1.2.dev1.tar.gz", hash = "sha256:3a0ceda6ad2ef9650b99941961cb9cd6a234e0e5f2aeba372feb27521afbf557", size = 20805 }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/05/d870bd28fea8688bca8322cb6e2a1cf075279d4557d51589517752c7af00/asta_sandbox-0.1.2.tar.gz", hash = "sha256:746911311b09921a77dec5fc51685bf22a1ae6d44e2e3d91e7aca2c12dd73970", size = 20801 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/e7/edd836fe6c1fbabb7ba19ab347fdef19dbc88cc38dc0b89601b2a2b6a9dc/asta_sandbox-0.1.2.dev1-py3-none-any.whl", hash = "sha256:66c540c885dcb8f368961184508b3c14062b069166d5ecaeee2d2801e6e35f4d", size = 29189 },
+    { url = "https://files.pythonhosted.org/packages/67/12/290e5b5bd85036bb5b903cfed14127156180bdf463a70317e04750305da0/asta_sandbox-0.1.2-py3-none-any.whl", hash = "sha256:24735e585f95ef30ead6cde94ae620f1a220d54bb426e55dfe725f6feb72b100", size = 29141 },
 ]
 
 [package.optional-dependencies]
@@ -384,7 +384,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2.dev1" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2" },
     { name = "modal", specifier = ">=1.2.6" },
 ]
 

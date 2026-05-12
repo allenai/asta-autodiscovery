@@ -803,11 +803,15 @@ def install(package):
             modal_secret=modal.Secret.from_name(secret_name),
         )
 
+        # sandbox_timeout_s covers startup + execution + teardown, so it must exceed
+        # code_timeout (the process-level limit). The buffer gives time for Modal sandbox
+        # startup and for the finally-block terminate() to run after the process times out.
+        _SANDBOX_OVERHEAD_S = 60
         modal_executor = ModalEphemeralExecutor(
             app_name=app_name,
             image=sandbox_image,
             environment={"DATASET_ROOT": modal_mount_path},
-            sandbox_timeout_s=code_timeout,
+            sandbox_timeout_s=code_timeout + _SANDBOX_OVERHEAD_S,
         )
         _run_async(modal_executor.add_shares(cloud_share))
 

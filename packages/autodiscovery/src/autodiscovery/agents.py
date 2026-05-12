@@ -211,7 +211,15 @@ class ModalSandboxExecutor(CodeExecutor):
                 output += f"\nSTDERR:\n{result.stderr}"
 
             if not result.success:
-                error_msg = result.error or "Unknown error"
+                if result.error:
+                    tb = "".join(result.error.traceback)
+                    error_msg = f"{result.error.etype}: {result.error.evalue}"
+                    if tb:
+                        error_msg += f"\n{tb}"
+                elif not result.stdout and not result.stderr:
+                    error_msg = f"Execution timed out after {self._timeout}s"
+                else:
+                    error_msg = "Unknown error"
                 print(f"[ModalSandboxExecutor] Error: {error_msg}")
                 output += f"\nERROR: {error_msg}"
 

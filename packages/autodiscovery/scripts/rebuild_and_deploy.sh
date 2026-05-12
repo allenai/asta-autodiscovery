@@ -12,7 +12,7 @@ VERTEX_LOCATION="${VERTEX_LOCATION:-$REGION}"
 ENV_TAG="${ENV_TAG:-dev}"  # Default to dev, override with ENV_TAG=prod
 SKIP_BUILD="${SKIP_BUILD:-false}"  # Set SKIP_BUILD=true to skip image build
 IMAGE="us-west1-docker.pkg.dev/${PROJECT_ID}/autodiscovery/autodiscovery:${ENV_TAG}"
-JOB_NAME="autodiscovery-job"
+JOB_NAME="autodiscovery-job-${ENV_TAG}"
 BUCKET="example-gcp-project"
 OPENAI_SECRET_NAME="openai-api-key-secret"
 MODAL_TOKEN_ID_SECRET_NAME="modal-token-id-secret"

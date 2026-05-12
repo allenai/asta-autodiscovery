@@ -807,6 +807,7 @@ def install(package):
             app_name=app_name,
             image=sandbox_image,
             environment={"DATASET_ROOT": modal_mount_path},
+            sandbox_timeout_s=code_timeout,
         )
         _run_async(modal_executor.add_shares(cloud_share))
 

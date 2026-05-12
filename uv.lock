@@ -67,7 +67,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], editable = "../dv-core-asta-integration/packages/sandbox" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"] },
     { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
     { name = "google-adk", specifier = ">=1.21.0" },
     { name = "litellm", specifier = "==1.80.11" },
@@ -259,54 +259,19 @@ dev = [
 
 [[package]]
 name = "asta-sandbox"
-version = "0.1.2.dev0"
-source = { editable = "../dv-core-asta-integration/packages/sandbox" }
+version = "0.1.2.dev1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipython" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6a/d7/9291a89803ebc15d511417f04c6c2a482c22bd63313bcccdc98d408f8e02/asta_sandbox-0.1.2.dev1.tar.gz", hash = "sha256:3a0ceda6ad2ef9650b99941961cb9cd6a234e0e5f2aeba372feb27521afbf557", size = 20805 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e6/e7/edd836fe6c1fbabb7ba19ab347fdef19dbc88cc38dc0b89601b2a2b6a9dc/asta_sandbox-0.1.2.dev1-py3-none-any.whl", hash = "sha256:66c540c885dcb8f368961184508b3c14062b069166d5ecaeee2d2801e6e35f4d", size = 29189 },
 ]
 
 [package.optional-dependencies]
 modal-ephemeral = [
     { name = "modal" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "docker", marker = "extra == 'all'", specifier = ">=7.0" },
-    { name = "docker", marker = "extra == 'docker'", specifier = ">=7.0" },
-    { name = "ipython", specifier = ">=9.8.0" },
-    { name = "jupyter-kernel-gateway", marker = "extra == 'all'" },
-    { name = "jupyter-kernel-gateway", marker = "extra == 'docker'" },
-    { name = "jupyter-kernel-gateway", marker = "extra == 'modal'" },
-    { name = "jupyter-kernel-gateway", marker = "extra == 'modal-kernel'" },
-    { name = "jupyter-server", marker = "extra == 'all'", specifier = ">=2.0" },
-    { name = "jupyter-server", marker = "extra == 'docker'", specifier = ">=2.0" },
-    { name = "jupyter-server", marker = "extra == 'modal'", specifier = ">=2.0" },
-    { name = "jupyter-server", marker = "extra == 'modal-kernel'", specifier = ">=2.0" },
-    { name = "matplotlib", marker = "extra == 'all'" },
-    { name = "matplotlib", marker = "extra == 'inprocess'" },
-    { name = "matplotlib-inline", marker = "extra == 'all'" },
-    { name = "matplotlib-inline", marker = "extra == 'inprocess'" },
-    { name = "modal", marker = "extra == 'all'", specifier = ">=0.73" },
-    { name = "modal", marker = "extra == 'modal'", specifier = ">=0.73" },
-    { name = "modal", marker = "extra == 'modal-ephemeral'", specifier = ">=0.73" },
-    { name = "modal", marker = "extra == 'modal-kernel'", specifier = ">=0.73" },
-    { name = "requests", marker = "extra == 'all'" },
-    { name = "requests", marker = "extra == 'docker'" },
-    { name = "requests", marker = "extra == 'modal'" },
-    { name = "requests", marker = "extra == 'modal-kernel'" },
-]
-provides-extras = ["inprocess", "docker", "modal-kernel", "modal-ephemeral", "modal", "all"]
-
-[package.metadata.requires-dev]
-test = [
-    { name = "docker", specifier = ">=7.0" },
-    { name = "jupyter-kernel-gateway" },
-    { name = "jupyter-server", specifier = ">=2.0" },
-    { name = "modal", specifier = ">=0.73" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "requests" },
 ]
 
 [[package]]
@@ -419,7 +384,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], editable = "../dv-core-asta-integration/packages/sandbox" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2.dev1" },
     { name = "modal", specifier = ">=1.2.6" },
 ]
 

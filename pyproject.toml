@@ -58,7 +58,7 @@ autodiscovery-modal = { workspace = true }
 autodiscovery-jobs = { workspace = true }
 code-execution = { workspace = true }
 # Local dev: path override for asta-sandbox (comment out to use PyPI)
-asta-sandbox = { path = "../dv-core-asta-integration/packages/sandbox", editable = true }
+#asta-sandbox = { path = "../dv-core-asta-integration/packages/sandbox", editable = true }
 
 [tool.coverage.run]
 omit = [

@@ -217,6 +217,9 @@ class ModalSandboxExecutor(CodeExecutor):
                     if tb:
                         error_msg += f"\n{tb}"
                 elif not result.stdout and not result.stderr:
+                    # Imprecise: asta-sandbox doesn't yet surface a typed TimeoutError,
+                    # so empty output on failure is our best signal. Fix this when
+                    # asta-sandbox propagates timeout as a proper ExecutionError.
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"

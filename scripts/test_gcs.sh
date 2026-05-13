@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define constants
-BUCKET="example-gcp-project"
+BUCKET="autodiscovery"
 OTHER_BUCKET="aristo-reeca"
 ENDPOINT="https://storage.googleapis.com"
 

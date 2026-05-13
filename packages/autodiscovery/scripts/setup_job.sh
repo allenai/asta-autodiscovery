@@ -54,7 +54,7 @@ LOCAL_DATA_DIR=$3
 METADATA_FILE=${4:-""}
 
 # Configuration
-BUCKET="example-gcp-project"
+BUCKET="autodiscovery"
 JOB_BASE="users/${USERID}/jobs/${JOBID}"
 
 echo "========================================="

@@ -6,7 +6,6 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,12 +17,8 @@ ENV PATH="/root/.local/bin:/root/.cargo/bin:${PATH}"
 COPY pyproject.toml uv.lock ./
 COPY packages ./packages
 
-# Install Python dependencies with GitHub authentication
-# Mount the GitHub token as a secret to avoid exposing it in layers
-RUN --mount=type=secret,id=github_token \
-    git config --global url."https://$(cat /run/secrets/github_token)@github.com/".insteadOf "https://github.com/" && \
-    /root/.local/bin/uv sync --frozen --package autodiscovery && \
-    git config --global --unset url."https://$(cat /run/secrets/github_token)@github.com/".insteadOf
+# Install Python dependencies (all public PyPI packages)
+RUN /root/.local/bin/uv sync --frozen --package autodiscovery
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

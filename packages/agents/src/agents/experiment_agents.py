@@ -6,9 +6,9 @@ import json
 import os
 import textwrap
 from collections.abc import AsyncGenerator
-from typing import Any, Literal, Protocol, cast, override
+from typing import Any, Protocol, cast, override
 
-from code_execution import IPythonExecutor, LocalIPythonBackend
+from asta_sandbox import ExecutionResult, InProcessExecutor, SandboxExecutor
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
@@ -26,7 +26,6 @@ from .structured_outputs import (
 
 MODEL_ENV_VAR = "ASTA_AGENTS_MODEL"
 DEFAULT_MODEL: LiteLlm = LiteLlm(model=os.getenv(MODEL_ENV_VAR, "openai/gpt-5-mini"))
-ExecutionBackend = Literal["local"]
 
 INSTALL_SNIPPET = "%pip install package1 package2"
 
@@ -219,7 +218,7 @@ def create_experiment_agents(*, model: LiteLlm | None = None) -> dict[str, LlmAg
 class CodeExecutorAgent(BaseAgent):
     """Custom agent that executes experiment code without an LLM."""
 
-    code_executor: IPythonExecutor
+    code_executor: SandboxExecutor
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -227,13 +226,13 @@ class CodeExecutorAgent(BaseAgent):
         self,
         *,
         name: str,
-        code_executor: IPythonExecutor,
+        code_executor: SandboxExecutor,
     ) -> None:
         """Initialize the code executor agent.
 
         Args:
             name: The agent name.
-            code_executor: IPython execution helper for running code.
+            code_executor: Sandbox executor for running code.
         """
         data: dict[str, Any] = {
             "name": name,
@@ -247,7 +246,7 @@ class CodeExecutorAgent(BaseAgent):
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event]:
         """Execute the latest experiment code and emit a summary event."""
         code_str = str(ctx.session.state.get("experiment_code", ""))
-        execution_result = self.code_executor.run_cell(code_str)
+        execution_result = await self.code_executor.run_code(code_str)
         summary = self._summarize_execution(execution_result)
         state_delta = {
             "execution_summary": summary,
@@ -265,35 +264,27 @@ class CodeExecutorAgent(BaseAgent):
             content=content,
         )
 
-    def _summarize_execution(self, result: dict[str, Any]) -> str:
+    def _summarize_execution(self, result: ExecutionResult) -> str:
         """Summarize execution output for downstream analysis."""
-        stdout = (result.get("stdout") or "").strip()
-        stderr = (result.get("stderr") or "").strip()
-        error = result.get("error")
-        success = bool(result.get("success"))
-        pieces = [f"success: {success}"]
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        pieces = [f"success: {result.success}"]
         if stdout:
             pieces.append(f"stdout:\n{stdout}")
         if stderr:
             pieces.append(f"stderr:\n{stderr}")
-        if error:
-            pieces.append(f"error: {error}")
+        if result.error:
+            pieces.append(f"error: {result.error}")
         return "\n\n".join(pieces)
 
 
-def create_code_executor_agent(
-    *,
-    backend: ExecutionBackend = "local",
-) -> CodeExecutorAgent:
-    """Create a code executor agent configured for the chosen backend.
-
-    Args:
-        backend: The execution backend to use (currently only "local").
+def create_code_executor_agent() -> CodeExecutorAgent:
+    """Create a code executor agent using the in-process executor.
 
     Returns:
         A configured CodeExecutorAgent instance.
     """
-    executor = IPythonExecutor(LocalIPythonBackend())
+    executor: SandboxExecutor = InProcessExecutor()
     return CodeExecutorAgent(name="code_executor", code_executor=executor)
 
 
@@ -465,14 +456,12 @@ class ExperimentWorkflowAgent(BaseAgent):
 
 def create_experiment_workflow_agent(
     *,
-    backend: ExecutionBackend = "local",
     max_programmer_attempts: int = 6,
     model: LiteLlm | None = None,
 ) -> ExperimentWorkflowAgent:
-    """Create an experiment workflow agent with a configurable executor backend.
+    """Create an experiment workflow agent with an in-process executor.
 
     Args:
-        backend: The execution backend to use (currently only "local").
         max_programmer_attempts: Maximum programmer retries after analysis failure.
         model: LiteLLM model instance for the experiment agents.
 
@@ -487,7 +476,7 @@ def create_experiment_workflow_agent(
         experiment_analyst=agents["experiment_analyst"],
         experiment_reviewer=agents["experiment_reviewer"],
         experiment_reviser=agents["experiment_reviser"],
-        code_executor=create_code_executor_agent(backend=backend),
+        code_executor=create_code_executor_agent(),
         max_programmer_attempts=max_programmer_attempts,
     )
 

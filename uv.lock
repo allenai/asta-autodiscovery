@@ -59,16 +59,16 @@ name = "agents"
 version = "0.1.0"
 source = { editable = "packages/agents" }
 dependencies = [
+    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
     { name = "autodiscovery-modal" },
-    { name = "code-execution" },
     { name = "google-adk" },
     { name = "litellm" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "asta-sandbox", extras = ["modal-ephemeral"] },
     { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
-    { name = "code-execution", editable = "packages/code_execution" },
     { name = "google-adk", specifier = ">=1.21.0" },
     { name = "litellm", specifier = "==1.80.11" },
 ]
@@ -258,6 +258,23 @@ dev = [
 ]
 
 [[package]]
+name = "asta-sandbox"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ipython" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/05/d870bd28fea8688bca8322cb6e2a1cf075279d4557d51589517752c7af00/asta_sandbox-0.1.2.tar.gz", hash = "sha256:746911311b09921a77dec5fc51685bf22a1ae6d44e2e3d91e7aca2c12dd73970", size = 20801 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/12/290e5b5bd85036bb5b903cfed14127156180bdf463a70317e04750305da0/asta_sandbox-0.1.2-py3-none-any.whl", hash = "sha256:24735e585f95ef30ead6cde94ae620f1a220d54bb426e55dfe725f6feb72b100", size = 29141 },
+]
+
+[package.optional-dependencies]
+modal-ephemeral = [
+    { name = "modal" },
+]
+
+[[package]]
 name = "asttokens"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -361,13 +378,13 @@ name = "autodiscovery-modal"
 version = "0.1.0"
 source = { editable = "packages/autodiscovery_modal" }
 dependencies = [
-    { name = "code-execution" },
+    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
     { name = "modal" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "code-execution", editable = "packages/code_execution" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2" },
     { name = "modal", specifier = ">=1.2.6" },
 ]
 

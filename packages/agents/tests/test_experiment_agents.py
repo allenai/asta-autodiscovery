@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from agents import experiment_agents
 from agents.structured_outputs import ExperimentAnalyst, ExperimentCode
+from conftest import DummyExecutor
 from google.adk.agents import LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.run_config import RunConfig
@@ -93,15 +94,9 @@ def _make_workflow_agent(
             ]
         },
     )
-    code_executor = experiment_agents.create_code_executor_agent()
-    code_executor.code_executor.run_cell = (  # type: ignore[method-assign]
-        lambda code_str, **_: {
-            "stdout": "",
-            "stderr": "",
-            "rich_outputs": [],
-            "success": True,
-            "error": None,
-        }
+    code_executor = experiment_agents.CodeExecutorAgent(
+        name="code_executor",
+        code_executor=DummyExecutor(),
     )
     return experiment_agents.ExperimentWorkflowAgent(
         name="workflow",
@@ -141,21 +136,13 @@ def test_extract_code_handles_payload_types() -> None:
     assert workflow._extract_code("not-json") is None
 
 
-def test_create_code_executor_agent_uses_local_backend(monkeypatch: pytest.MonkeyPatch) -> None:
-    """create_code_executor_agent wires up the local IPython backend."""
+def test_create_code_executor_agent_uses_inprocess_executor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """create_code_executor_agent wires up the InProcessExecutor."""
+    monkeypatch.setattr(experiment_agents, "InProcessExecutor", DummyExecutor)
 
-    class DummyLocalBackend:
-        def __init__(self) -> None:
-            self.marker = "local"
-
-        def run_cell(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-            raise RuntimeError("should not be called")
-
-    monkeypatch.setattr(experiment_agents, "LocalIPythonBackend", DummyLocalBackend)
-
-    agent = experiment_agents.create_code_executor_agent(backend="local")
+    agent = experiment_agents.create_code_executor_agent()
     assert isinstance(agent, experiment_agents.CodeExecutorAgent)
-    assert isinstance(agent.code_executor._backend, DummyLocalBackend)
+    assert isinstance(agent.code_executor, DummyExecutor)
 
 
 def test_create_experiment_agents_model_resolution(monkeypatch: pytest.MonkeyPatch) -> None:

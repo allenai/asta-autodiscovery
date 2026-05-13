@@ -1,3 +1,5 @@
+import asyncio
+import concurrent.futures
 import copy
 import json
 import os
@@ -40,8 +42,54 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 5. Statistical Insights: Provide insights based on the information presented in the plot."""
 
 
+def _run_async(coro):
+    """Run a coroutine from a synchronous context.
+
+    Safe to call whether or not there is already a running event loop.
+    """
+    try:
+        asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
+class _ProcessBackendAdapter:
+    """Wraps ProcessIPythonBackend in an async interface compatible with ModalSandboxExecutor."""
+
+    def __init__(self, backend) -> None:
+        self._backend = backend
+
+    async def run_code(self, code: str, timeout_seconds: float | None = None):
+        from asta_sandbox import ExecutionError, ExecutionResult, RichOutput
+
+        result = self._backend.run_cell(code, timeout_s=timeout_seconds)
+        error = None
+        if result.get("error"):
+            err = result["error"]
+            tb = err.get("traceback", "")
+            error = ExecutionError(
+                etype=err.get("type"),
+                evalue=err.get("message"),
+                traceback=(tb,) if tb else (),
+            )
+        rich_outputs = tuple(
+            RichOutput(output_type="display_data", data=ro, metadata={})
+            for ro in result.get("rich_outputs", [])
+            if ro
+        )
+        return ExecutionResult(
+            stdout=result.get("stdout", ""),
+            stderr=result.get("stderr", ""),
+            success=result.get("success", False),
+            rich_outputs=rich_outputs,
+            error=error,
+        )
+
+
 class ModalSandboxExecutor(CodeExecutor):
-    """Wrapper for ModalSandboxIPythonBackend to work with Autogen's executor interface."""
+    """Wraps an async sandbox executor to satisfy Autogen's synchronous CodeExecutor interface."""
 
     def __init__(
         self,
@@ -50,17 +98,15 @@ class ModalSandboxExecutor(CodeExecutor):
         vision_model: str = "gpt-4o",
         usage_tracker: UsageTracker | None = None,
     ):
-        """Initialize the Modal sandbox executor.
+        """Initialize the sandbox executor wrapper.
 
         Args:
-            backend: ModalSandboxIPythonBackend instance
-            timeout: Timeout in seconds (for compatibility, not used by Modal sandbox)
+            backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
+            timeout: Timeout in seconds (for Autogen compatibility)
             vision_model: Model to use for image analysis
             usage_tracker: Optional usage tracker for image analysis calls.
         """
-        from code_execution import IPythonExecutor
-
-        self._executor = IPythonExecutor(backend)
+        self._executor = backend
         self._timeout = timeout
         self.vision_model = vision_model
         self._usage_tracker = usage_tracker
@@ -137,7 +183,7 @@ class ModalSandboxExecutor(CodeExecutor):
         return response.choices[0].message.content
 
     def execute_code_blocks(self, code_blocks: list[CodeBlock]) -> CodeResult:
-        """Execute code blocks using Modal sandbox.
+        """Execute code blocks using the sandbox backend.
 
         Args:
             code_blocks: List of code blocks to execute
@@ -145,52 +191,54 @@ class ModalSandboxExecutor(CodeExecutor):
         Returns:
             CodeResult with execution output and success status
         """
-        # Combine all code blocks into a single execution
         code = "\n".join(block.code for block in code_blocks)
 
-        print("\n[ModalSandboxExecutor] Executing code in Modal sandbox...")
+        print("\n[ModalSandboxExecutor] Executing code in sandbox...")
         print(f"[ModalSandboxExecutor] Code length: {len(code)} characters")
 
         try:
-            result = self._executor.run_cell(code)
+            result = _run_async(self._executor.run_code(code, timeout_seconds=self._timeout))
 
             print("[ModalSandboxExecutor] Execution completed")
-            print(f"[ModalSandboxExecutor] Result keys: {list(result.keys())}")
-            print(f"[ModalSandboxExecutor] Success: {result.get('success', True)}")
+            print(f"[ModalSandboxExecutor] Success: {result.success}")
 
-            # Get stdout
-            output = result.get("stdout", "")
+            output = result.stdout or ""
 
             print(f"[ModalSandboxExecutor] Stdout length: {len(output)} characters")
 
-            # Get stderr if any
-            if result.get("stderr"):
-                stderr = result["stderr"]
-                print(f"[ModalSandboxExecutor] Stderr: {stderr[:200]}")
-                output += f"\nSTDERR:\n{stderr}"
+            if result.stderr:
+                print(f"[ModalSandboxExecutor] Stderr: {result.stderr[:200]}")
+                output += f"\nSTDERR:\n{result.stderr}"
 
-            # Check for errors
-            if not result.get("success", True):
-                error_msg = result.get("error", "Unknown error")
+            if not result.success:
+                if result.error:
+                    tb = "".join(result.error.traceback)
+                    error_msg = f"{result.error.etype}: {result.error.evalue}"
+                    if tb:
+                        error_msg += f"\n{tb}"
+                elif not result.stdout and not result.stderr:
+                    # Imprecise: asta-sandbox doesn't yet surface a typed TimeoutError,
+                    # so empty output on failure is our best signal. Fix this when
+                    # asta-sandbox propagates timeout as a proper ExecutionError.
+                    error_msg = f"Execution timed out after {self._timeout}s"
+                else:
+                    error_msg = "Unknown error"
                 print(f"[ModalSandboxExecutor] Error: {error_msg}")
                 output += f"\nERROR: {error_msg}"
 
-            # If output is empty, add a note
             if not output.strip():
                 output = "[ModalSandboxExecutor] Code executed but produced no output"
                 print("[ModalSandboxExecutor] Warning: No output produced")
 
-            # Store rich outputs for later access
-            self._last_rich_outputs = result.get("rich_outputs", [])
+            # Store rich output data dicts for image analysis
+            self._last_rich_outputs = [ro.data for ro in result.rich_outputs]
 
             if self._last_rich_outputs:
                 print(f"[ModalSandboxExecutor] Found {len(self._last_rich_outputs)} rich outputs")
 
-            # Analyze images from rich outputs
             if self._last_rich_outputs:
                 image_analyses = []
                 for idx, rich_output in enumerate(self._last_rich_outputs):
-                    # Look for PNG images in the rich output
                     if "image/png" in rich_output:
                         png_data = rich_output["image/png"]
                         try:
@@ -206,9 +254,7 @@ class ModalSandboxExecutor(CodeExecutor):
                 if image_analyses:
                     output += "\n" + "\n".join(image_analyses)
 
-            exit_code = 0 if result.get("success", True) else 1
-
-            return CodeResult(exit_code=exit_code, output=output)
+            return CodeResult(exit_code=0 if result.success else 1, output=output)
 
         except Exception as e:
             import traceback
@@ -731,15 +777,13 @@ def install(package):
             raise ValueError("bucket_path is required when backend is 'modal'")
 
         import modal
-        from autodiscovery_modal import ModalSandboxIPythonBackend, build_sandbox_image
+        from asta_sandbox import CloudShare
+        from asta_sandbox.backends.modal_ephemeral import ModalEphemeralExecutor
+        from autodiscovery_modal.ipython_session import build_sandbox_image
 
         # Parse bucket path
         bucket_name, key_prefix = parse_bucket_path(bucket_path)
 
-        # Calculate the working directory for the dataset
-        # The bucket_path already points to the dataset directory
-        # e.g., gs://example-bucket/discoverybench/nls_ses
-        # When mounted at /data, files are directly at /data/
         modal_mount_path = "/data"
         modal_working_dir = modal_mount_path
 
@@ -748,8 +792,6 @@ def install(package):
         secret_name = os.environ.get("MODAL_BUCKET_SECRET", "example-bucket-secret")
         bucket_endpoint_url = os.environ.get("GCS_ENDPOINT_URL", "https://storage.googleapis.com")
 
-        # Create Modal backend
-        bucket_secret = modal.Secret.from_name(secret_name)
         sandbox_image = build_sandbox_image(
             extra_packages=[
                 "numpy",
@@ -763,20 +805,29 @@ def install(package):
             ]
         )
 
-        ipython_backend = ModalSandboxIPythonBackend.for_bucket_prefix(
-            app_name=app_name,
+        cloud_share = CloudShare(
+            dest=modal_mount_path,
             bucket=bucket_name,
             key_prefix=key_prefix,
-            mount_path=modal_mount_path,
             read_only=True,
             bucket_endpoint_url=bucket_endpoint_url,
-            bucket_secret=bucket_secret,
-            image=sandbox_image,
-            env={"DATASET_ROOT": modal_working_dir},
+            modal_secret=modal.Secret.from_name(secret_name),
         )
 
+        # sandbox_timeout_s covers startup + execution + teardown, so it must exceed
+        # code_timeout (the process-level limit). The buffer gives time for Modal sandbox
+        # startup and for the finally-block terminate() to run after the process times out.
+        _SANDBOX_OVERHEAD_S = 60
+        modal_executor = ModalEphemeralExecutor(
+            app_name=app_name,
+            image=sandbox_image,
+            environment={"DATASET_ROOT": modal_mount_path},
+            sandbox_timeout_s=code_timeout + _SANDBOX_OVERHEAD_S,
+        )
+        _run_async(modal_executor.add_shares(cloud_share))
+
         executor = ModalSandboxExecutor(
-            ipython_backend,
+            modal_executor,
             timeout=code_timeout,
             vision_model=vision_model,
             usage_tracker=usage_tracker,
@@ -789,9 +840,9 @@ def install(package):
         # Use isolated subprocess for code execution
         from code_execution import ProcessIPythonBackend
 
-        ipython_backend = ProcessIPythonBackend(cwd=work_dir)
+        process_backend = ProcessIPythonBackend(cwd=work_dir)
         executor = ModalSandboxExecutor(
-            ipython_backend,
+            _ProcessBackendAdapter(process_backend),
             timeout=code_timeout,
             vision_model=vision_model,
             usage_tracker=usage_tracker,

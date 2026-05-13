@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 
 import modal
+from asta_sandbox import build_modal_ephemeral_image
 
 
 def build_sandbox_image(
@@ -12,20 +13,18 @@ def build_sandbox_image(
 ) -> modal.Image:
     """Build a Modal image for IPython-based execution.
 
+    Thin wrapper around build_modal_ephemeral_image from asta_sandbox.
+
     Args:
-        extra_packages: Optional additional packages to install via uv.
+        extra_packages: Optional additional packages to install.
         python_version: Python version for the base image.
 
     Returns:
-        A Modal image with IPython and local code_execution sources.
+        A Modal image with IPython and asta_sandbox sources.
     """
-    packages = ["ipython>=9.8.0"]
-    if extra_packages:
-        packages.extend(extra_packages)
-    return (
-        modal.Image.debian_slim(python_version=python_version)
-        .uv_pip_install(*packages)
-        .add_local_python_source("code_execution")
+    return build_modal_ephemeral_image(
+        extra_packages=list(extra_packages) if extra_packages else None,
+        python_version=python_version,
     )
 
 

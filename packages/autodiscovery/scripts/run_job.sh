@@ -59,7 +59,7 @@ fi
 PROJECT_ID=$(gcloud config get-value project)
 REGION="us-west1"
 JOB_NAME="autodiscovery-job"
-BUCKET="example-gcp-project"
+BUCKET="autodiscovery"
 
 # Construct paths
 JOB_BASE="users/${USERID}/jobs/${JOBID}"

@@ -173,8 +173,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcts_selection",
         type=str,
         choices=["ucb1", "ucb1_recursive", "pw", "pw_all", "beam_search"],
-        default="ucb1_recursive",
-        help="MCTS selection strategy (default: ucb1_recursive)",
+        default="pw",
+        help="MCTS selection strategy (default: pw)",
     )
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
@@ -194,7 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="low",
     )
     adv.add_argument("--k_experiments", type=int, default=8, help="Branching factor")
-    adv.add_argument("--n_warmstart", type=int, default=8)
+    adv.add_argument("--n_warmstart", type=int, default=0)
     adv.add_argument("--batch_size", type=int, default=2)
     adv.add_argument("--n_threads", type=int, default=2)
     adv.add_argument(

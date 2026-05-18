@@ -286,13 +286,13 @@ The `run_job()` method supports the following arguments (see `cloudrun.run_job()
 - `temperature`: Temperature for agents (default: 1.0)
 - `belief_temperature`: Temperature for belief agent (default: 1.0)
 - `k_experiments`: Branching factor (default: 8)
-- `mcts_selection`: Selection method (default: "ucb1_recursive")
+- `mcts_selection`: Selection method (default: "pw")
   - Choices: "ucb1", "beam_search", "pw", "pw_all", "ucb1_recursive"
 - `reasoning_effort`: For o-series models (default: "medium")
   - Choices: "low", "medium", "high"
 - `exploration_weight`: UCB1 exploration weight (default: 2.0)
 - `code_timeout`: Timeout in seconds (default: 1800)
-- `n_warmstart`: Number of warmstart experiments (default: 8)
+- `n_warmstart`: Number of warmstart experiments (default: 0)
 
 ### Additional Arguments via **kwargs
 

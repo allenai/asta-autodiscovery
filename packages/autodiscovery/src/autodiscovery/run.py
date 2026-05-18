@@ -292,7 +292,7 @@ def run_mcts(
     selection_method=None,
     allow_generate_experiments=False,
     n_belief_samples=5,
-    k_parents=3,
+    k_parents=10,
     temperature=1.0,
     belief_temperature=1.0,
     reasoning_effort="medium",

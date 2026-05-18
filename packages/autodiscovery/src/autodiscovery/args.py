@@ -155,7 +155,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--k_parents",
             type=int,
-            default=3,
+            default=10,
             help="Number of parent levels to include in prompts (None for all)",
         )
         self.add_argument(

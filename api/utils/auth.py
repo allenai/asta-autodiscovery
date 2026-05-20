@@ -41,9 +41,10 @@ def get_public_key(auth0_domain, kid):
 def verify_token(token, auth0_domain, auth0_audience):
     """Verify JWT token from Auth0.
 
-    Accepts tokens with the primary audience (AUTH0_AUDIENCE, web UI) or the
-    gateway audience (AUTH0_GATEWAY_AUDIENCE, CLI via gateway).  All tokens
-    share the same issuer since both clients use the same Auth0 custom domain.
+    Accepts tokens with the primary audience (AUTH0_AUDIENCE, web UI), the
+    gateway audience (AUTH0_GATEWAY_AUDIENCE, CLI via gateway), or the shared
+    asta-core audience (AUTH0_CORE_AUDIENCE).  All tokens share the same issuer
+    since the clients use the same Auth0 custom domain.
     """
     try:
         unverified_header = jwt.get_unverified_header(token)
@@ -54,6 +55,9 @@ def verify_token(token, auth0_domain, auth0_audience):
         gateway_audience = os.environ.get("AUTH0_GATEWAY_AUDIENCE")
         if gateway_audience:
             audiences.append(gateway_audience)
+        core_audience = os.environ.get("AUTH0_CORE_AUDIENCE")
+        if core_audience:
+            audiences.append(core_audience)
 
         return jwt.decode(
             token,

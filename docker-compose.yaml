@@ -23,6 +23,7 @@ services:
       - AUTH0_DOMAIN=auth.example.com
       - AUTH0_AUDIENCE=https://autodiscovery.example.com
       - AUTH0_GATEWAY_AUDIENCE=https://api.example.com/api
+      - AUTH0_CORE_AUDIENCE=https://asta-core.example.com
       # If set, users must have this Auth0 permission. If empty/unset, any authenticated user can access.
       - AUTH0_REQUIRED_PERMISSION=${AUTH0_REQUIRED_PERMISSION}
       # GCS and Google Cloud credentials

@@ -10,11 +10,11 @@ import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 export const MCTS_SELECTION = {
-    UCB1_RECURSIVE: { value: 'ucb1_recursive', label: 'UCB1 Recursive' },
     PROGRESSIVE_WIDENING: {
         value: 'pw',
         label: 'MCTS with Progressive Widening',
     },
+    UCB1_RECURSIVE: { value: 'ucb1_recursive', label: 'UCB1 Recursive' },
 };
 
 export type Dataset = {
@@ -116,11 +116,11 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         nExperiments: 4,
         intent: '',
         explorationWeight: 2,
-        mctsSelection: MCTS_SELECTION.UCB1_RECURSIVE.value,
+        mctsSelection: MCTS_SELECTION.PROGRESSIVE_WIDENING.value,
         surprisalWidth: 0.2,
         evidenceWeight: 2,
         warmstartExperiments: '',
-        nWarmstart: 8,
+        nWarmstart: 0,
         parentRunId: null,
         parentRunName: null,
     });

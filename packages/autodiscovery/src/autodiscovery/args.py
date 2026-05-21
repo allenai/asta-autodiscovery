@@ -145,7 +145,7 @@ class ArgParser(argparse.ArgumentParser):
             "--mcts_selection",
             type=str,
             choices=["ucb1", "beam_search", "pw", "pw_all", "ucb1_recursive"],
-            default="ucb1_recursive",
+            default="pw",
             help="Selection method to use in MCTS (UCB1, beam search, progressive widening, progressive widening with all nodes)",
         )
         self.add_argument("--pw_k", type=float, help="Progressive widening constant k", default=1.0)
@@ -155,7 +155,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--k_parents",
             type=int,
-            default=3,
+            default=10,
             help="Number of parent levels to include in prompts (None for all)",
         )
         self.add_argument(
@@ -234,7 +234,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--n_warmstart",
             type=int,
-            default=8,
+            default=0,
             help="Number of initial experiments to run after data loading before using MCTS",
         )
         self.add_argument(

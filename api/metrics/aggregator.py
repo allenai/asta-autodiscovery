@@ -3,12 +3,17 @@
 Scans all users and jobs in GCS to build an in-memory cache of job snapshots.
 Uses a stale-while-revalidate pattern with background refresh.
 Incremental scanning skips terminal jobs that are already cached.
+
+The cache is persisted to GCS so pod restarts don't trigger a full rescan.
 """
 
 from __future__ import annotations
 
+import dataclasses
+import fcntl
 import json
 import logging
+import os
 import statistics
 import threading
 import time
@@ -39,6 +44,15 @@ STARTED_STATUSES = {"PENDING", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"}
 TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 # Historical runs may use either root filename; both are non-experiment init nodes.
 ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
+
+# Where the persisted metrics cache snapshot lives in the shared GCS bucket.
+# Loaded on cold start so pod restarts don't re-scan every job from scratch.
+PERSIST_BLOB_PATH = "_metrics/jobs_cache.json"
+PERSIST_SCHEMA_VERSION = 1
+
+# Per-pod file lock so only one gunicorn worker scans GCS at a time. Other
+# workers wait for the persisted blob and pick it up via warm-start.
+SCAN_LOCK_PATH = "/tmp/asta_metrics_scan.lock"
 
 
 @dataclass
@@ -107,6 +121,61 @@ def _read_gcs_jsonl(bucket: storage.Bucket, blob_path: str) -> list[dict[str, An
         if isinstance(parsed, dict):
             events.append(parsed)
     return events
+
+
+def _save_persisted_cache(bucket: storage.Bucket, data: AggregatedData) -> None:
+    """Write the aggregated cache to GCS so future pods can warm-start from it."""
+    try:
+        payload = {
+            "schema_version": PERSIST_SCHEMA_VERSION,
+            "refreshed_at": data.refreshed_at,
+            "scan_duration_seconds": data.scan_duration_seconds,
+            "jobs": [dataclasses.asdict(j) for j in data.jobs],
+        }
+        blob = bucket.blob(PERSIST_BLOB_PATH)
+        blob.upload_from_string(json.dumps(payload), content_type="application/json")
+        logger.warning(
+            f"Persisted metrics cache: {len(data.jobs)} jobs to gs://{bucket.name}/{PERSIST_BLOB_PATH}"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to persist metrics cache: {e}")
+
+
+def _load_persisted_cache(bucket: storage.Bucket) -> AggregatedData | None:
+    """Load the persisted cache from GCS. Returns None if absent or unreadable."""
+    try:
+        blob = bucket.blob(PERSIST_BLOB_PATH)
+        content = blob.download_as_text()
+    except Exception:
+        return None
+
+    try:
+        payload = json.loads(content)
+    except Exception as e:
+        logger.warning(f"Persisted metrics cache is not valid JSON: {e}")
+        return None
+
+    if payload.get("schema_version") != PERSIST_SCHEMA_VERSION:
+        logger.info(
+            f"Ignoring persisted cache with schema_version={payload.get('schema_version')} "
+            f"(expected {PERSIST_SCHEMA_VERSION}); will rebuild."
+        )
+        return None
+
+    jobs: list[JobSnapshot] = []
+    for raw in payload.get("jobs", []):
+        try:
+            jobs.append(JobSnapshot(**raw))
+        except TypeError:
+            # Drop snapshots that don't match the current dataclass shape; the
+            # incremental rescan will rebuild them.
+            continue
+
+    return AggregatedData(
+        jobs=jobs,
+        refreshed_at=payload.get("refreshed_at"),
+        scan_duration_seconds=float(payload.get("scan_duration_seconds") or 0.0),
+    )
 
 
 def _coerce_nonnegative_int(value: object) -> int:
@@ -421,8 +490,15 @@ def _scan_all_jobs(
             to_scan.append(key)
     skipped = len(all_snapshots)
 
+    logger.warning(
+        f"Metrics scan starting: {len(all_job_keys)} jobs total "
+        f"(scanning {len(to_scan)}, reusing {skipped} from cache)"
+    )
+
     # Scan all remaining jobs in a single global thread pool
     scanned = 0
+    progress_lock = threading.Lock()
+    last_log = [time.monotonic()]
     if to_scan:
         with ThreadPoolExecutor(max_workers=16) as executor:
             futures = {
@@ -433,11 +509,19 @@ def _scan_all_jobs(
                 snapshot = future.result()
                 if snapshot:
                     all_snapshots.append(snapshot)
+                with progress_lock:
                     scanned += 1
+                    now = time.monotonic()
+                    if now - last_log[0] >= 10.0:
+                        logger.warning(
+                            f"Metrics scan progress: {scanned}/{len(to_scan)} jobs "
+                            f"({now - start_time:.0f}s elapsed)"
+                        )
+                        last_log[0] = now
 
     unique_users = len({k[0] for k in all_job_keys})
     elapsed = time.monotonic() - start_time
-    logger.info(
+    logger.warning(
         f"Metrics scan complete: {len(all_snapshots)} jobs from {unique_users} users "
         f"in {elapsed:.1f}s (scanned {scanned}, reused {skipped})"
     )
@@ -471,17 +555,59 @@ class MetricsCache:
     def get_data(self) -> AggregatedData:
         """Get cached data, triggering refresh if stale or empty.
 
-        On cold start (no data), blocks until scan completes.
-        If stale, serves existing data and refreshes in background.
+        On cold start, attempts to warm-start from the GCS-persisted snapshot
+        so the HTTP request never blocks on a full scan. If no persisted
+        snapshot exists, returns empty data immediately and refreshes in the
+        background; callers should treat ``refreshed_at is None`` as a
+        "warming up" signal.
+
+        While still warming up, re-checks GCS on each call so that as soon as
+        *any* worker (in this pod or another) finishes its scan and persists
+        the blob, all other workers pick it up on their next request rather
+        than waiting for their own independent scan to finish.
         """
         with self._lock:
             if self._data is None:
-                # Cold start: block until first scan
-                self._do_refresh()
-                return self._data  # type: ignore
+                self._data = self._warm_start(initial=True)
+                self._trigger_background_refresh()
+            elif self._data.refreshed_at is None:
+                warmed = self._warm_start(initial=False)
+                if warmed.refreshed_at is not None:
+                    self._data = warmed
+                self._trigger_background_refresh()
             elif self._is_stale():
                 self._trigger_background_refresh()
             return self._data
+
+    def _warm_start(self, initial: bool) -> AggregatedData:
+        """Try to populate the cache from GCS; fall back to empty.
+
+        ``initial`` controls log verbosity: the very first attempt logs the
+        outcome at WARNING so it's visible operationally; subsequent retries
+        during the warming-up window are silent on the "blob still missing"
+        path to avoid spamming on every poll.
+        """
+        try:
+            client = storage.Client(project=self._config.project_id)
+            bucket = client.bucket(self._config.bucket)
+            loaded = _load_persisted_cache(bucket)
+        except Exception as e:
+            if initial:
+                logger.warning(f"Warm-start load failed: {e}")
+            loaded = None
+
+        if loaded is not None:
+            logger.warning(
+                f"Warm-started metrics cache from GCS: {len(loaded.jobs)} jobs "
+                f"(refreshed_at={loaded.refreshed_at})"
+            )
+            return loaded
+
+        if initial:
+            logger.warning(
+                "No persisted metrics cache found; serving empty while background scan runs."
+            )
+        return AggregatedData()
 
     def force_refresh(self) -> None:
         """Force a background refresh regardless of staleness."""
@@ -506,9 +632,32 @@ class MetricsCache:
         thread.start()
 
     def _background_refresh(self) -> None:
+        """Run a refresh, but only if no other worker on this pod is already scanning.
+
+        Workers that lose the lock race quickly clear their in-process
+        ``_refreshing`` flag and return; they'll pick up the persisted
+        snapshot via warm-start as soon as the scanning worker writes it.
+        """
+        lock_file = None
         try:
+            try:
+                lock_file = open(SCAN_LOCK_PATH, "w")
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                logger.warning(
+                    f"Metrics scan skipped on pid={os.getpid()}: another worker holds {SCAN_LOCK_PATH}"
+                )
+                if lock_file is not None:
+                    lock_file.close()
+                lock_file = None
+                return
             self._do_refresh()
         finally:
+            if lock_file is not None:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_file.close()
             with self._lock:
                 self._refreshing = False
 
@@ -521,6 +670,12 @@ class MetricsCache:
             data = _scan_all_jobs(self._config, previous=previous)
             with self._lock:
                 self._data = data
+            try:
+                client = storage.Client(project=self._config.project_id)
+                bucket = client.bucket(self._config.bucket)
+                _save_persisted_cache(bucket, data)
+            except Exception as e:
+                logger.warning(f"Failed to persist metrics cache after refresh: {e}")
         except Exception as e:
             logger.error(f"Metrics cache refresh failed: {e}")
         finally:
@@ -668,6 +823,7 @@ def compute_overview(
         runs_by_status=dict(status_counts),
         time_series=time_series,
         cache_refreshed_at=data.refreshed_at,
+        is_warming_up=data.refreshed_at is None,
     )
 
 

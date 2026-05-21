@@ -29,6 +29,7 @@ export interface OverviewMetrics {
     runs_by_status: Record<string, number>;
     time_series: DailyMetrics[];
     cache_refreshed_at: string | null;
+    is_warming_up: boolean;
 }
 
 export interface UserMetricsSummary {

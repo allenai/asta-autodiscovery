@@ -39,6 +39,10 @@ class OverviewMetrics(BaseModel):
     runs_by_status: dict[str, int] = Field(default_factory=dict)
     time_series: list[DailyMetrics] = Field(default_factory=list)
     cache_refreshed_at: str | None = Field(None)
+    is_warming_up: bool = Field(
+        False,
+        description="True when no cached data exists yet and a background scan is in progress.",
+    )
 
 
 class UserMetricsSummary(BaseModel):

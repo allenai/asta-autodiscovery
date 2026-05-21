@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, Typography, styled, Button } from '@mui/material';
 
 import { getMetricsApi } from '@/api/MetricsApi';
@@ -12,6 +12,8 @@ import CostBreakdownChart from './components/CostBreakdownChart';
 import AggregatedUsageDialog from './components/AggregatedUsageDialog';
 import DailyEnvelopeCharts from './components/DailyEnvelopeCharts';
 
+const WARMING_UP_POLL_MS = 5000;
+
 export default function MetricsOverviewPage() {
     const [data, setData] = useState<OverviewMetrics | null>(null);
     const [loading, setLoading] = useState(true);
@@ -19,6 +21,7 @@ export default function MetricsOverviewPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [usageDialogOpen, setUsageDialogOpen] = useState(false);
+    const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const fetchData = useCallback(async (sd?: string, ed?: string) => {
         setLoading(true);
@@ -41,6 +44,24 @@ export default function MetricsOverviewPage() {
         fetchData();
     }, [fetchData]);
 
+    // While the server reports it's warming up its cache, poll for fresh data.
+    // Depends on `data` (not `data?.is_warming_up`) so the effect re-runs after
+    // each poll response and re-arms the timer; otherwise polling fires once.
+    useEffect(() => {
+        if (pollTimerRef.current) {
+            clearTimeout(pollTimerRef.current);
+            pollTimerRef.current = null;
+        }
+        if (data?.is_warming_up) {
+            pollTimerRef.current = setTimeout(() => {
+                fetchData(startDate || undefined, endDate || undefined);
+            }, WARMING_UP_POLL_MS);
+        }
+        return () => {
+            if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+        };
+    }, [data, fetchData, startDate, endDate]);
+
     const handleApplyFilter = () => fetchData(startDate, endDate);
     const handleClearFilter = () => {
         setStartDate('');
@@ -58,7 +79,7 @@ export default function MetricsOverviewPage() {
         }
     };
 
-    if (loading && !data) {
+    if ((loading && !data) || data?.is_warming_up) {
         return (
             <CenteredBox>
                 <CircularProgress />
@@ -69,7 +90,9 @@ export default function MetricsOverviewPage() {
                         color: (theme: any) =>
                             theme.color['cream-60']?.rgba?.toString() || 'rgba(255,255,255,0.6)',
                     }}>
-                    Loading metrics (first load may take a minute while scanning data)...
+                    {data?.is_warming_up
+                        ? 'Building metrics cache in the background — this only happens once per deploy. Refreshing automatically…'
+                        : 'Loading metrics…'}
                 </Typography>
             </CenteredBox>
         );

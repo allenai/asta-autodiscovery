@@ -1,6 +1,7 @@
 .PHONY: test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
-        build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery
+        build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
+        show-version set-version push-version-tag
 
 # Test targets
 test:
@@ -127,3 +128,21 @@ update-autodiscovery-job:
 		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
 		exit 1; \
 	fi
+
+# Show current version
+show-version:
+	@uv run python scripts/manage-version.py show
+
+# Set version in all workspace pyproject.toml files (requires VERSION=x.y.z)
+set-version:
+	@uv run python scripts/manage-version.py set $(VERSION)
+
+# Create and push git tag using current version
+push-version-tag:
+	@if ! uv run python scripts/manage-version.py check; then \
+		exit 1; \
+	fi; \
+	VERSION=$$(uv run python scripts/manage-version.py show); \
+	git tag v$$VERSION && \
+	git push origin v$$VERSION && \
+	echo "Pushed tag v$$VERSION"

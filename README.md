@@ -2,6 +2,12 @@
 
 > AutoDiscovery for Asta
 
+## Standalone CLI
+
+To run AutoDiscovery against a local dataset without the full Skiff stack, see
+[docs/autodiscovery/standalone.md](docs/autodiscovery/standalone.md) for `pip install` and release
+instructions.
+
 ## Setting Up
 
 Install all required packages (including those for testing and documentation) using:

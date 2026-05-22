@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery"
-version = "0.0.1"
+version = "0.1.0"
 description = "Asta AutoDiscovery"
 readme = "README.md"
 authors = [

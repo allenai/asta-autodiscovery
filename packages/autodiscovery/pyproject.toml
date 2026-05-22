@@ -1,6 +1,6 @@
 [project]
-name = "autodiscovery"
-version = "0.1.0"
+name = "asta-autodiscovery"
+version = "0.1.1"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -18,7 +18,7 @@ dependencies = [
     "h5py",
     "boto3",
     "tenacity>=9.1.2",
-    "autodiscovery-modal",
+    "asta-autodiscovery-modal",
 ]
 
 [project.scripts]
@@ -27,3 +27,6 @@ auto-discovery = "autodiscovery.easy:cli_main"
 [build-system]
 requires = ["uv_build>=0.9.25,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "autodiscovery"

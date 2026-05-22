@@ -17,6 +17,7 @@ jobs:
 
     permissions:
       id-token: write  # Required for trusted publishing
+      contents: read   # Required to checkout the repo
 
     steps:
       - name: Checkout code
@@ -30,12 +31,20 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
-      - name: Build packages
-        run: |
-          uv build --package autodiscovery
-          uv build --package autodiscovery-modal
+      - name: Build asta-autodiscovery
+        run: uv build --package asta-autodiscovery --out-dir dist/asta-autodiscovery
 
-      - name: Publish to PyPI
+      - name: Build asta-autodiscovery-modal
+        run: uv build --package asta-autodiscovery-modal --out-dir dist/asta-autodiscovery-modal
+
+      - name: Publish asta-autodiscovery to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          packages-dir: dist/asta-autodiscovery
+          print-hash: true
+
+      - name: Publish asta-autodiscovery-modal to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/asta-autodiscovery-modal
           print-hash: true

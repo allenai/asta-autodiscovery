@@ -1,6 +1,6 @@
 [project]
-name = "devtools"
-version = "0.1.0"
+name = "asta-devtools"
+version = "0.1.1"
 description = "Developer tooling for AutoDiscovery"
 readme = "README.md"
 authors = [
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-cli = ["code-execution"]
+cli = ["asta-code-execution"]
 
 [project.scripts]
 ipython-session = "devtools.cli:main"
@@ -20,3 +20,6 @@ ipython-session = "devtools.cli:main"
 [build-system]
 requires = ["uv_build>=0.8.16,<0.9.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "devtools"

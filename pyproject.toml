@@ -1,7 +1,7 @@
 [project]
-name = "asta-autodiscovery"
-version = "0.1.0"
-description = "Asta AutoDiscovery"
+name = "asta-autodiscovery-workspace"
+version = "0.1.1"
+description = "Asta AutoDiscovery (workspace root)"
 readme = "README.md"
 authors = [
     { name = "Allen Institute for Artificial Intelligence" }
@@ -52,11 +52,11 @@ members = [
 ]
 
 [tool.uv.sources]
-agents = { workspace = true }
-autodiscovery = { workspace = true }
-autodiscovery-modal = { workspace = true }
-autodiscovery-jobs = { workspace = true }
-code-execution = { workspace = true }
+asta-agents = { workspace = true }
+asta-autodiscovery = { workspace = true }
+asta-autodiscovery-modal = { workspace = true }
+asta-autodiscovery-jobs = { workspace = true }
+asta-code-execution = { workspace = true }
 # Local dev: path override for asta-sandbox (comment out to use PyPI)
 #asta-sandbox = { path = "../dv-core-asta-integration/packages/sandbox", editable = true }
 

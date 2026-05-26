@@ -18,7 +18,7 @@ COPY pyproject.toml uv.lock ./
 COPY packages ./packages
 
 # Install Python dependencies (all public PyPI packages)
-RUN /root/.local/bin/uv sync --frozen --package autodiscovery
+RUN /root/.local/bin/uv sync --frozen --package asta-autodiscovery
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

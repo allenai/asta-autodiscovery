@@ -12,13 +12,13 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "agents",
+    "asta-agents",
     "asta-autodiscovery",
-    "autodiscovery",
-    "autodiscovery-jobs",
-    "autodiscovery-modal",
-    "code-execution",
-    "devtools",
+    "asta-autodiscovery-jobs",
+    "asta-autodiscovery-modal",
+    "asta-autodiscovery-workspace",
+    "asta-code-execution",
+    "asta-devtools",
 ]
 
 [[package]]
@@ -52,25 +52,6 @@ gemini = [
 ]
 openai = [
     { name = "openai" },
-]
-
-[[package]]
-name = "agents"
-version = "0.1.0"
-source = { editable = "packages/agents" }
-dependencies = [
-    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
-    { name = "autodiscovery-modal" },
-    { name = "google-adk" },
-    { name = "litellm" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"] },
-    { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
-    { name = "google-adk", specifier = ">=1.21.0" },
-    { name = "litellm", specifier = "==1.80.11" },
 ]
 
 [[package]]
@@ -216,8 +197,111 @@ wheels = [
 ]
 
 [[package]]
+name = "asta-agents"
+version = "0.1.1"
+source = { editable = "packages/agents" }
+dependencies = [
+    { name = "asta-autodiscovery-modal" },
+    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
+    { name = "google-adk" },
+    { name = "litellm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asta-autodiscovery-modal", editable = "packages/autodiscovery_modal" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"] },
+    { name = "google-adk", specifier = ">=1.21.0" },
+    { name = "litellm", specifier = "==1.80.11" },
+]
+
+[[package]]
 name = "asta-autodiscovery"
-version = "0.1.0"
+version = "0.1.1"
+source = { editable = "packages/autodiscovery" }
+dependencies = [
+    { name = "ag2", extra = ["gemini", "openai"] },
+    { name = "asta-autodiscovery-modal" },
+    { name = "boto3" },
+    { name = "google-cloud-aiplatform" },
+    { name = "h5py" },
+    { name = "ipython" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pip" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "statsmodels" },
+    { name = "tenacity" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ag2", extras = ["openai", "gemini"], specifier = "==0.10" },
+    { name = "asta-autodiscovery-modal", editable = "packages/autodiscovery_modal" },
+    { name = "boto3" },
+    { name = "google-cloud-aiplatform" },
+    { name = "h5py" },
+    { name = "ipython", specifier = ">=9.9.0" },
+    { name = "matplotlib", specifier = "==3.10" },
+    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "pandas", specifier = ">=2.2.0" },
+    { name = "pip" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "statsmodels" },
+    { name = "tenacity", specifier = ">=9.1.2" },
+]
+
+[[package]]
+name = "asta-autodiscovery-jobs"
+version = "0.1.1"
+source = { editable = "packages/autodiscovery_jobs" }
+dependencies = [
+    { name = "google-api-core" },
+    { name = "google-cloud-logging" },
+    { name = "google-cloud-run" },
+    { name = "google-cloud-storage" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-mock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "google-api-core", specifier = ">=2.15.0" },
+    { name = "google-cloud-logging", specifier = ">=3.0.0" },
+    { name = "google-cloud-run", specifier = ">=0.11.0" },
+    { name = "google-cloud-storage", specifier = ">=2.14.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.10" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "asta-autodiscovery-modal"
+version = "0.1.1"
+source = { editable = "packages/autodiscovery_modal" }
+dependencies = [
+    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
+    { name = "modal" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2" },
+    { name = "modal", specifier = ">=1.2.6" },
+]
+
+[[package]]
+name = "asta-autodiscovery-workspace"
+version = "0.1.1"
 source = { virtual = "." }
 
 [package.optional-dependencies]
@@ -256,6 +340,37 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
+
+[[package]]
+name = "asta-code-execution"
+version = "0.1.1"
+source = { editable = "packages/code_execution" }
+dependencies = [
+    { name = "ipython" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "ipython", specifier = ">=9.9.0" }]
+
+[[package]]
+name = "asta-devtools"
+version = "0.1.1"
+source = { editable = "packages/devtools" }
+dependencies = [
+    { name = "google-cloud-storage" },
+]
+
+[package.optional-dependencies]
+cli = [
+    { name = "asta-code-execution" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asta-code-execution", marker = "extra == 'cli'", editable = "packages/code_execution" },
+    { name = "google-cloud-storage" },
+]
+provides-extras = ["cli"]
 
 [[package]]
 name = "asta-sandbox"
@@ -302,90 +417,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bb/9b/b1661026ff24bc641b76b78c5222d614776b0c085bcfdac9bd15a1cb4b35/authlib-1.6.6.tar.gz", hash = "sha256:45770e8e056d0f283451d9996fbb59b70d45722b45d854d58f32878d0a40c38e", size = 164894, upload-time = "2025-12-12T08:01:41.464Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/51/321e821856452f7386c4e9df866f196720b1ad0c5ea1623ea7399969ae3b/authlib-1.6.6-py2.py3-none-any.whl", hash = "sha256:7d9e9bc535c13974313a87f53e8430eb6ea3d1cf6ae4f6efcd793f2e949143fd", size = 244005, upload-time = "2025-12-12T08:01:40.209Z" },
-]
-
-[[package]]
-name = "autodiscovery"
-version = "0.1.0"
-source = { editable = "packages/autodiscovery" }
-dependencies = [
-    { name = "ag2", extra = ["gemini", "openai"] },
-    { name = "autodiscovery-modal" },
-    { name = "boto3" },
-    { name = "google-cloud-aiplatform" },
-    { name = "h5py" },
-    { name = "ipython" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pip" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "statsmodels" },
-    { name = "tenacity" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "ag2", extras = ["openai", "gemini"], specifier = "==0.10" },
-    { name = "autodiscovery-modal", editable = "packages/autodiscovery_modal" },
-    { name = "boto3" },
-    { name = "google-cloud-aiplatform" },
-    { name = "h5py" },
-    { name = "ipython", specifier = ">=9.9.0" },
-    { name = "matplotlib", specifier = "==3.10" },
-    { name = "numpy", specifier = ">=2.0.0" },
-    { name = "pandas", specifier = ">=2.2.0" },
-    { name = "pip" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "statsmodels" },
-    { name = "tenacity", specifier = ">=9.1.2" },
-]
-
-[[package]]
-name = "autodiscovery-jobs"
-version = "0.1.0"
-source = { editable = "packages/autodiscovery_jobs" }
-dependencies = [
-    { name = "google-api-core" },
-    { name = "google-cloud-logging" },
-    { name = "google-cloud-run" },
-    { name = "google-cloud-storage" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-mock" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "google-api-core", specifier = ">=2.15.0" },
-    { name = "google-cloud-logging", specifier = ">=3.0.0" },
-    { name = "google-cloud-run", specifier = ">=0.11.0" },
-    { name = "google-cloud-storage", specifier = ">=2.14.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.10" },
-]
-provides-extras = ["dev"]
-
-[[package]]
-name = "autodiscovery-modal"
-version = "0.1.0"
-source = { editable = "packages/autodiscovery_modal" }
-dependencies = [
-    { name = "asta-sandbox", extra = ["modal-ephemeral"] },
-    { name = "modal" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2" },
-    { name = "modal", specifier = ">=1.2.6" },
 ]
 
 [[package]]
@@ -579,17 +610,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/27/fb/576f067976d320f5f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl", hash = "sha256:9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a", size = 22228, upload-time = "2025-11-03T09:25:25.534Z" },
 ]
-
-[[package]]
-name = "code-execution"
-version = "0.1.0"
-source = { editable = "packages/code_execution" }
-dependencies = [
-    { name = "ipython" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "ipython", specifier = ">=9.9.0" }]
 
 [[package]]
 name = "colorama"
@@ -786,26 +806,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/43/fa/6d96a0978d19e17b6
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl", hash = "sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a", size = 9190, upload-time = "2025-02-24T04:41:32.565Z" },
 ]
-
-[[package]]
-name = "devtools"
-version = "0.1.0"
-source = { editable = "packages/devtools" }
-dependencies = [
-    { name = "google-cloud-storage" },
-]
-
-[package.optional-dependencies]
-cli = [
-    { name = "code-execution" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "code-execution", marker = "extra == 'cli'", editable = "packages/code_execution" },
-    { name = "google-cloud-storage" },
-]
-provides-extras = ["cli"]
 
 [[package]]
 name = "diskcache"

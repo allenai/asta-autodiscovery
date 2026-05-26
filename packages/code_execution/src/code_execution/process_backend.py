@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import os
 import shutil
@@ -148,10 +149,17 @@ class ProcessIPythonBackend:
                 text=True,
             )
 
-        # Install code_execution package (editable) so the sandbox runner works
-        code_exec_pkg = Path(__file__).resolve().parent.parent.parent  # packages/code_execution
+        # Install code_execution package so the sandbox runner can import it.
+        code_exec_pkg = Path(__file__).resolve().parent.parent.parent
+        if (code_exec_pkg / "pyproject.toml").is_file():
+            # Running from local workspace
+            install_spec = ["-e", str(code_exec_pkg)]
+        else:
+            # Running from pip-installed cli
+            version = importlib.metadata.version("asta-code-execution")
+            install_spec = [f"asta-code-execution=={version}"]
         subprocess.run(
-            [uv, "pip", "install", "--python", str(python_bin), "-e", str(code_exec_pkg)],
+            [uv, "pip", "install", "--python", str(python_bin), *install_spec],
             check=True,
             capture_output=True,
             text=True,

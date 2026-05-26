@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery"
-version = "0.1.1"
+version = "0.1.4"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -19,6 +19,7 @@ dependencies = [
     "boto3",
     "tenacity>=9.1.2",
     "asta-autodiscovery-modal",
+    "asta-code-execution",
 ]
 
 [project.scripts]

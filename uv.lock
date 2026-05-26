@@ -198,7 +198,7 @@ wheels = [
 
 [[package]]
 name = "asta-agents"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/agents" }
 dependencies = [
     { name = "asta-autodiscovery-modal" },
@@ -217,11 +217,12 @@ requires-dist = [
 
 [[package]]
 name = "asta-autodiscovery"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/autodiscovery" }
 dependencies = [
     { name = "ag2", extra = ["gemini", "openai"] },
     { name = "asta-autodiscovery-modal" },
+    { name = "asta-code-execution" },
     { name = "boto3" },
     { name = "google-cloud-aiplatform" },
     { name = "h5py" },
@@ -240,6 +241,7 @@ dependencies = [
 requires-dist = [
     { name = "ag2", extras = ["openai", "gemini"], specifier = "==0.10" },
     { name = "asta-autodiscovery-modal", editable = "packages/autodiscovery_modal" },
+    { name = "asta-code-execution", editable = "packages/code_execution" },
     { name = "boto3" },
     { name = "google-cloud-aiplatform" },
     { name = "h5py" },
@@ -256,7 +258,7 @@ requires-dist = [
 
 [[package]]
 name = "asta-autodiscovery-jobs"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/autodiscovery_jobs" }
 dependencies = [
     { name = "google-api-core" },
@@ -286,7 +288,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "asta-autodiscovery-modal"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/autodiscovery_modal" }
 dependencies = [
     { name = "asta-sandbox", extra = ["modal-ephemeral"] },
@@ -301,7 +303,7 @@ requires-dist = [
 
 [[package]]
 name = "asta-autodiscovery-workspace"
-version = "0.1.1"
+version = "0.1.4"
 source = { virtual = "." }
 
 [package.optional-dependencies]
@@ -343,7 +345,7 @@ dev = [
 
 [[package]]
 name = "asta-code-execution"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/code_execution" }
 dependencies = [
     { name = "ipython" },
@@ -354,7 +356,7 @@ requires-dist = [{ name = "ipython", specifier = ">=9.9.0" }]
 
 [[package]]
 name = "asta-devtools"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/devtools" }
 dependencies = [
     { name = "google-cloud-storage" },

@@ -25,6 +25,7 @@ import csv
 import json
 import os
 import tempfile
+from importlib.metadata import version
 from pathlib import Path
 
 
@@ -70,18 +71,22 @@ def _build_metadata(
             else ""
         )
         if path.is_dir():
-            # For directory datasets, walk recursively and add each file
+            # For directory datasets, walk recursively and add each file.
+            # The description applies to the directory as a whole, so attach
+            # it only to the first file to avoid repeating it per-file.
+            first = True
             for child in sorted(path.rglob("*")):
                 if child.is_file() and not any(p.startswith(".") for p in child.relative_to(path).parts):
                     rel = str(Path(path.name) / child.relative_to(path))
                     entry: dict = {
                         "name": rel,
-                        "description": desc,
+                        "description": desc if first else "",
                     }
                     columns = _sniff_columns(child)
                     if columns:
                         entry["columns"] = {"raw": columns}
                     datasets.append(entry)
+                    first = False
         else:
             entry = {
                 "name": path.name,
@@ -110,6 +115,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="auto-discovery",
         description="Simplified AutoDiscovery CLI — flat args, no metadata file required.",
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version('asta-autodiscovery')}",
     )
 
     # -- Datasets (positional) -----------------------------------------------

@@ -10,3 +10,4 @@ convention = "google"
 [lint.per-file-ignores]
 "**/tests/*.py" = ["D"]
 "**/report.py" = ["E501", "T20"]
+"scripts/*.py" = ["D", "T20"]

@@ -95,7 +95,7 @@ from .email import (
     DEFAULT_SMTP_SERVER,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.4"
 
 __all__ = [
     # Main class

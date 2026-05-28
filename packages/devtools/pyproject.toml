@@ -1,6 +1,6 @@
 [project]
 name = "asta-devtools"
-version = "0.1.1"
+version = "0.1.4"
 description = "Developer tooling for AutoDiscovery"
 readme = "README.md"
 authors = [

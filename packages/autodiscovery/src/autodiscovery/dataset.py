@@ -120,7 +120,8 @@ def get_dataset_description(dataset_metadata_path: str) -> str:
     description.append("\n### DATASETS: ###\n")
     for dataset in metadata["datasets"]:
         description.append(f"Dataset Name: {dataset['name']}")
-        description.append(f"Dataset Description: {dataset['description']}")
+        if dataset.get("description"):
+            description.append(f"Dataset Description: {dataset['description']}")
         if "columns" in dataset and "raw" in dataset["columns"]:
             description.append("\n### COLUMNS: ###")
             for col in dataset["columns"]["raw"]:
@@ -148,7 +149,8 @@ def get_asta_description(dataset_metadata_path: str) -> str:
     description.append("\n### DATASETS: ###\n")
     for dataset in metadata["datasets"]:
         description.append(f"Dataset Name: {dataset['name']}")
-        description.append(f"Dataset Description: {dataset['description']}")
+        if dataset.get("description"):
+            description.append(f"Dataset Description: {dataset['description']}")
         if "columns" in dataset and "raw" in dataset["columns"]:
             description.append("\n### COLUMNS: ###")
             for col in dataset["columns"]["raw"]:

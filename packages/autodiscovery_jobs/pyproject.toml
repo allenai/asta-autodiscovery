@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery-jobs"
-version = "0.1.4"
+version = "0.1.5"
 description = "Python package for managing Cloud Run jobs with GCS integration"
 readme = "README.md"
 requires-python = ">=3.10"

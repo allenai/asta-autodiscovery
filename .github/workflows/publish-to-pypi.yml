@@ -49,11 +49,6 @@ jobs:
           packages-dir: dist/asta-code-execution
           print-hash: true
 
-      - name: Pin asta-autodiscovery dependencies from uv.lock
-        # Temporarily overwrite packages/autodiscovery/pyproject.toml with pinned dependencies
-        # This ensures that "pip install" is deterministic
-        run: uv run scripts/pin-dependencies.py asta-autodiscovery
-
       - name: Build asta-autodiscovery
         run: uv build --package asta-autodiscovery --out-dir dist/asta-autodiscovery
 

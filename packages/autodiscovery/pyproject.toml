@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery"
-version = "0.1.4"
+version = "0.1.5"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
 readme = "README.md"
 requires-python = ">=3.13"

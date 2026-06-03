@@ -4,7 +4,7 @@ import { Auth0Client } from '@auth0/auth0-spa-js';
 export const auth0Config = {
     domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || 'auth.example.com',
     clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || 'YOUR_AUTH0_CLIENT_ID',
-    audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://autodiscovery.example.com',
+    audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://asta-core.example.com',
     // If not set or empty, no permission is required (any authenticated user can access)
     requiredPermission: process.env.NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION || undefined,
 };

@@ -9,6 +9,7 @@
     "lint": "next lint",
     "ts-check": "tsc --noEmit",
     "verify": "yarn ts-check && yarn lint && yarn test",
+    "fix": "prettier --write . && eslint --fix .",
     "test": "yarn test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"

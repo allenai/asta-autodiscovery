@@ -47,26 +47,31 @@ const datasetDescription =
     '- **`decontXcounts`** - Ambient RNA-corrected counts (decontX)\n' +
     '- **`scale_data`** - Scaled/normalized expression';
 
+// GCS bucket hosting the preloaded sample datasets. Set
+// NEXT_PUBLIC_PRELOADED_DATASET_BUCKET in your deployment; the default is a
+// placeholder so the public source carries no environment-specific bucket.
+const DATASET_BUCKET = process.env.NEXT_PUBLIC_PRELOADED_DATASET_BUCKET || 'your-dataset-bucket';
+
 export const PRELOADED_DATASETS: PreloadedDataset[] = [
     {
         id: 'tabula-sapiens-heart',
         label: 'Tabula Sapiens - Heart',
         filename: 'heart.h5ad',
         description: datasetDescription,
-        url: 'gs://example-bucket/ai1/CELLxGENE/heart.h5ad',
+        url: `gs://${DATASET_BUCKET}/ai1/CELLxGENE/heart.h5ad`,
     },
     {
         id: 'tabula-sapiens-kidney',
         label: 'Tabula Sapiens - Kidney',
         filename: 'kidney.h5ad',
         description: datasetDescription,
-        url: 'gs://example-bucket/ai1/CELLxGENE/kidney.h5ad',
+        url: `gs://${DATASET_BUCKET}/ai1/CELLxGENE/kidney.h5ad`,
     },
     {
         id: 'tabula-sapiens-lung',
         label: 'Tabula Sapiens - Lung',
         filename: 'lung.h5ad',
         description: datasetDescription,
-        url: 'gs://example-bucket/ai1/CELLxGENE/lung.h5ad',
+        url: `gs://${DATASET_BUCKET}/ai1/CELLxGENE/lung.h5ad`,
     },
 ];

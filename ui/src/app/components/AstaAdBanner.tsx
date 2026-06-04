@@ -47,7 +47,7 @@ export const AstaAdBanner = ({ isFullWidth = false }: AstaAdBannerProps) => {
 
     return (
         <Box
-            onClick={() => window.open('https://asta.example.com?utm_source=AutoDiscovery', '_blank')}
+            onClick={() => window.open('https://asta.allen.ai?utm_source=AutoDiscovery', '_blank')}
             sx={{
                 position: 'fixed',
                 bottom: showBanner ? '0' : '-200px',

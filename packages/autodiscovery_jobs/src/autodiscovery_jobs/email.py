@@ -4,18 +4,18 @@ This module provides functions for sending emails via SMTP.
 """
 
 import logging
+import os
 import smtplib
 from email.message import EmailMessage
 from email.policy import SMTP as SMTPPolicy
 
 logger = logging.getLogger(__name__)
 
-# Default SMTP server - Internal AI2 mail server
-DEFAULT_SMTP_SERVER = "smtp.example.com"
-DEFAULT_SMTP_PORT = 25
-
-# Default sender email
-DEFAULT_SENDER_EMAIL = "no-reply@allenai.org"
+# SMTP configuration. Set these via environment in your deployment; the
+# defaults are placeholders so the package carries no environment-specific host.
+DEFAULT_SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.example.com")
+DEFAULT_SMTP_PORT = int(os.environ.get("SMTP_PORT", "25"))
+DEFAULT_SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "no-reply@example.com")
 
 
 def send_email(

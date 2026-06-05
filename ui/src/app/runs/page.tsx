@@ -54,7 +54,7 @@ export default function RunsPage() {
                             </Ai2LogoWrapper>{' '}
                             and is an{' '}
                             <AstaLabsLogoWrapper
-                                href="https://asta.example.com"
+                                href="https://asta.allen.ai"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 data-test-id={TEST_ID_ASTA_LABS_LOGO_LINK}>

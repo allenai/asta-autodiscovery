@@ -1,5 +1,6 @@
-import { memo, ReactNode } from 'react';
-import { styled, Typography, Box, Stack } from '@mui/material';
+import { memo, ReactNode, useEffect, useRef, useState } from 'react';
+import { styled, Typography, Box, Stack, Button } from '@mui/material';
+import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment, ExperimentStatus } from '@/types/Run';
@@ -10,21 +11,53 @@ import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
 import { BeliefDistributionPlot } from '@/runs/components/BeliefDistributionPlot';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
+import { ContinueWithAstaModal } from './ContinueWithAstaModal';
 
 type ExperimentDetailsProps = {
     experiment: Experiment;
+    runId: string;
     actions?: ReactNode;
     surprisalWidth?: number | null;
+    datasetExpired?: boolean;
 };
 
 export const ExperimentDetails = memo(function ExperimentDetails({
     experiment,
+    runId,
     actions,
     surprisalWidth,
+    datasetExpired,
 }: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;
+    const [hasScrolled, setHasScrolled] = useState(false);
+    const [isContinueModalOpen, setIsContinueModalOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        // Walk up to the nearest scrollable ancestor (the ExperimentPanel)
+        let scrollParent = wrapperRef.current?.parentElement;
+        while (scrollParent) {
+            const { overflowY } = getComputedStyle(scrollParent);
+            if (overflowY === 'auto' || overflowY === 'scroll') break;
+            scrollParent = scrollParent.parentElement;
+        }
+        if (!scrollParent) return;
+        const el = scrollParent;
+
+        let timer: ReturnType<typeof setTimeout>;
+        const handler = () => {
+            if (el.scrollTop > 0 && !timer) {
+                timer = setTimeout(() => setHasScrolled(true), 1000);
+            }
+        };
+        el.addEventListener('scroll', handler, { passive: true });
+        return () => {
+            el.removeEventListener('scroll', handler);
+            clearTimeout(timer);
+        };
+    }, []);
 
     // Mirror the table's threshold logic so the panel and the Surprisal column stay in sync.
     const isSurprising =
@@ -35,7 +68,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
               : experiment.isSurprising;
 
     return (
-        <DetailsWrapper spacing={0}>
+        <DetailsWrapper ref={wrapperRef} spacing={0}>
             <TitleWrapper>
                 <Bookmark>
                     <ExperimentBookmarkControl experiment={experiment} />
@@ -157,6 +190,21 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                     </Box>
                 )}
             </ContentWrapper>
+            <BottomBar $visible={hasScrolled}>
+                <ContinueExploringButton
+                    variant="outlined"
+                    endIcon={datasetExpired ? undefined : <ArrowOutwardIcon />}
+                    disabled={datasetExpired}
+                    onClick={() => !datasetExpired && setIsContinueModalOpen(true)}>
+                    {datasetExpired ? 'Dataset expired' : 'Continue exploring with Asta'}
+                </ContinueExploringButton>
+            </BottomBar>
+            <ContinueWithAstaModal
+                open={isContinueModalOpen}
+                onClose={() => setIsContinueModalOpen(false)}
+                runId={runId}
+                experiment={experiment}
+            />
         </DetailsWrapper>
     );
 });
@@ -217,6 +265,44 @@ const OrangeText = styled('strong')`
 
 const CreamText = styled('strong')`
     color: ${({ theme }) => theme.color['cream-100'].hex};
+`;
+
+const BottomBar = styled('div')<{ $visible: boolean }>`
+    position: sticky;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 8px 8px;
+    padding: ${({ theme }) => theme.spacing(1.5, 3)};
+    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    border: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    border-radius: 4px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(${({ $visible }) => ($visible ? '0' : 'calc(100% + 8px)')});
+    transition: transform 250ms ease-out;
+`;
+
+const ContinueExploringButton = styled(Button)`
+    &.MuiButton-root {
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+        padding: ${({ theme }) => theme.spacing(0, 2)};
+        height: 32px;
+        white-space: nowrap;
+
+        & .MuiButton-endIcon {
+            margin-left: ${({ theme }) => theme.spacing(0.5)};
+        }
+    }
+
+    &.MuiButton-outlined {
+        border: 1px solid ${({ theme }) => theme.color['green-40'].rgba.toString()};
+
+        &:hover {
+            color: ${({ theme }) => theme.color['green-100'].hex};
+            border: 1px solid ${({ theme }) => theme.color['green-100'].hex};
+        }
+    }
 `;
 
 const StyledMarkdown = styled(Markdown)`

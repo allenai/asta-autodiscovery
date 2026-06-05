@@ -32,6 +32,7 @@ from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
+    AutoDiscoveryContextModel,
     BookmarkExperimentRequestModel,
     BookmarkExperimentResponseModel,
     BookmarkRunRequestModel,
@@ -41,6 +42,8 @@ from runs.models import (
     CreateRunResponseModel,
     DeleteRunRequestModel,
     DeleteRunResponseModel,
+    DigDeeperRequestModel,
+    DigDeeperResponseModel,
     ExperimentModel,
     ForkRunRequestModel,
     GenerateUploadUrlRequestModel,
@@ -57,6 +60,7 @@ from runs.models import (
     GetSharedRunOwnerResponseModel,
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
+    ManifestModel,
     MetadataModel,
     RunDetailsModel,
     RunModel,
@@ -1466,5 +1470,158 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to get shared run owner for {req.runid}: {e}")
             return jsonify({"error": "Internal server error"}), 500
+
+    @api.route("/<userid>/<runid>/experiments/<experiment_id>/dig-deeper", methods=["POST"])
+    @requires_enrollment
+    def dig_deeper_with_asta(userid: str, runid: str, experiment_id: str):  # pyright: ignore reportUnusedFunction
+        """Create an Asta context handoff from an AutoDiscovery experiment node.
+
+        Saves a manifest.json and a copy of the dataset to the Asta workspace
+        GCS bucket, then fires an A2A message/send to Asta DataVoyager.
+
+        Returns the Asta chat URL and the GCS URI of the saved manifest.
+        """
+        import requests as _requests
+
+        import utils.asta_client as asta_client
+        from autodiscovery_jobs import asta_gcs
+
+        if not JOBS_AVAILABLE:
+            return jsonify({"error": "Job management not available"}), 503
+
+        caller_id = request.user.get("sub")
+        if caller_id != userid:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        body = request.get_json(silent=True) or {}
+        try:
+            req = DigDeeperRequestModel(**body)
+        except Exception:
+            return jsonify({"error": "Missing or invalid 'query' field"}), 400
+
+        job_manager = get_job_manager()
+        config = job_manager.config
+
+        # Load run metadata for description and dataset_description
+        try:
+            metadata = job_manager.get_metadata(userid, runid)
+        except Exception as e:
+            current_app.logger.error("Failed to load metadata for run %s: %s", runid, e)
+            return jsonify({"error": "Run not found"}), 404
+
+        description = metadata.get("description")
+        datasets = metadata.get("datasets") or []
+        dataset_description = datasets[0].get("description") if datasets else None
+
+        # Load just the target experiment node
+        target_node = ExperimentTree.load_node(userid, runid, experiment_id, config)
+        if target_node is None:
+            return jsonify({"error": f"Experiment {experiment_id} not found"}), 404
+
+        source_code = target_node.code
+
+        # Extract figure descriptions from rich outputs on the target node
+        figure_descriptions: list[str] = []
+        try:
+            rich_outputs = read_rich_outputs(userid, runid, target_node.level, target_node.index, config)
+            for i, bundle in enumerate(rich_outputs):
+                text = bundle.get("text/plain") or bundle.get("text/markdown")
+                figure_descriptions.append(text.strip() if text else f"Figure {i + 1}")
+        except Exception as e:
+            current_app.logger.warning("Could not read rich outputs for %s: %s", experiment_id, e)
+
+        # Build the manifest
+        context = AutoDiscoveryContextModel(
+            hypothesis=target_node.hypothesis,
+            experiment_plan=target_node.experiment_plan,
+            analysis=target_node.analysis,
+            source_code=source_code,
+            stdout=target_node.code_output,
+            figure_descriptions=figure_descriptions,
+        )
+        manifest = ManifestModel(
+            query=req.query,
+            description=description,
+            dataset_description=dataset_description,
+            autodiscovery_context=context,
+        )
+
+        # Fetch full user profile from Auth0 for the Asta login call
+        auth0_user_id = request.user.get("sub", "")
+        auth0_domain = os.environ.get("AUTH0_DOMAIN", "")
+        token = (request.headers.get("Authorization", "") or "").split()[-1]
+        email = name = nickname = ""
+        if token and auth0_domain:
+            try:
+                info = _requests.get(
+                    f"https://{auth0_domain}/userinfo",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=10,
+                )
+                info.raise_for_status()
+                u = info.json()
+                email = u.get("email", "")
+                name = u.get("name", email)
+                nickname = u.get("nickname", email)
+            except Exception as e:
+                current_app.logger.warning("Could not fetch Auth0 userinfo: %s", e)
+                email = auth0_user_id
+
+        try:
+            user_uuid = asta_client.login_or_create_user(
+                auth0_user_id=auth0_user_id,
+                email=email,
+                name=name,
+                nickname=nickname,
+            )
+        except Exception as e:
+            current_app.logger.error("Asta login failed: %s", e)
+            return jsonify({"error": "Failed to authenticate with Asta"}), 502
+
+        try:
+            thread_id = asta_client.create_thread(token)
+        except Exception as e:
+            current_app.logger.error("Asta thread creation failed: %s", e)
+            return jsonify({"error": "Failed to create Asta thread"}), 502
+
+        manifest_gcs_uri = asta_gcs.get_manifest_gcs_uri(user_uuid, thread_id)
+        asta_url = f"{asta_client.ASTA_BASE_URL}/chat/{thread_id}"
+
+        # Save manifest.json — this is the primary deliverable for M1
+        try:
+            asta_gcs.save_manifest_json(user_uuid, thread_id, manifest.model_dump())
+        except Exception as e:
+            current_app.logger.error("Failed to write manifest to GCS: %s", e)
+            return jsonify({"error": "Failed to save context to storage"}), 500
+
+        # Copy dataset files — required for Asta to load the data
+        try:
+            dataset_uris = asta_gcs.copy_dataset_to_asta_workspace(userid, runid, user_uuid, thread_id, config)
+            current_app.logger.info("Copied %d dataset file(s) to Asta workspace", len(dataset_uris))
+        except Exception as e:
+            current_app.logger.error("Dataset copy failed: %s", e)
+            return jsonify({"error": "Failed to copy dataset to Asta workspace"}), 500
+
+        dataset_attachments = "".join(
+            f'\n<astaattachment type="dataset" gcs_uri="{uri}">{uri.split("/")[-1]}</astaattachment>'
+            for uri in dataset_uris
+        )
+        formatted_query = (
+            f"{req.query}\n\n"
+            f'<astaattachment type="analysis_context" gcs_uri="{manifest_gcs_uri}">Autodiscovery_context.json</astaattachment>'
+            f"{dataset_attachments}"
+        )
+
+        # Fire message (best-effort: manifest is already saved regardless)
+        current_app.logger.info("Firing A2A message: thread_id=%s", thread_id)
+        try:
+            asta_client.send_dig_deeper_message(thread_id, formatted_query, token)
+            current_app.logger.info("A2A message sent successfully: thread_id=%s", thread_id)
+        except Exception as e:
+            current_app.logger.error("A2A message failed (non-fatal): %s", e)
+
+        return jsonify(
+            DigDeeperResponseModel(asta_url=asta_url, manifest_gcs_uri=manifest_gcs_uri).model_dump()
+        ), 200
 
     return api

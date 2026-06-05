@@ -765,6 +765,7 @@ function RunViewContent({
                         <ExperimentsTable
                             runStats={run.stats}
                             surprisalWidth={run.metadata?.surprisalWidth}
+                            datasetExpired={datasetExpired}
                         />
                     </RunContent>
                     {isDragEnabled && (
@@ -797,7 +798,9 @@ function RunViewContent({
                         {selectedExperiment && (
                             <ExperimentDetails
                                 experiment={selectedExperiment}
+                                runId={run.id}
                                 surprisalWidth={run.metadata?.surprisalWidth}
+                                datasetExpired={datasetExpired}
                                 actions={
                                     <>
                                         <Tooltip title="Share experiment" placement="bottom">

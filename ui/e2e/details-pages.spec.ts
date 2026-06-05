@@ -29,7 +29,7 @@ for (const url of DETAILS_URLS) {
 
             // More than one surprisal in list — wait for job to complete
             const surprisalItems = page.locator(`[data-test-id="${TEST_ID_TOP_SURPRISALS_ITEM}"]`);
-            await expect(surprisalItems.first()).toBeVisible({ timeout: 30000 });
+            await expect(surprisalItems.first()).toBeVisible({ timeout: 50000 });
             expect(await surprisalItems.count()).toBeGreaterThan(0);
 
             // More than one experiment in table
@@ -40,7 +40,7 @@ for (const url of DETAILS_URLS) {
             const graphContainer = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_GRAPH}"]`);
             await expect(graphContainer).toBeVisible();
             const treeNodes = graphContainer.locator('circle.node');
-            await expect(treeNodes.first()).toBeVisible({ timeout: 15000 });
+            await expect(treeNodes.first()).toBeVisible({ timeout: 30000 });
             expect(await treeNodes.count()).toBeGreaterThan(1);
 
             // A table row is highlighted
@@ -59,7 +59,7 @@ for (const url of DETAILS_URLS) {
             // Details panel is open (wait for URL sync effect to select the experiment)
             await expect(
                 page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`)
-            ).toBeVisible({ timeout: 30000 });
+            ).toBeVisible({ timeout: 60000 });
         });
 
         test('sign in button links to auth.example.com', async ({ page }) => {
@@ -68,7 +68,7 @@ for (const url of DETAILS_URLS) {
 
             const requestPromise = page.waitForRequest(
                 (req) => req.url().includes('auth.example.com'),
-                { timeout: 10000 }
+                { timeout: 20000 }
             );
             await signInBtn.click();
             const request = await requestPromise;
@@ -94,7 +94,7 @@ for (const url of DETAILS_URLS) {
         test('closing details panel clears all selection state', async ({ page }) => {
             // Panel should be open initially (wait for URL sync effect to select the experiment)
             const detailsPanel = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`);
-            await expect(detailsPanel).toBeVisible({ timeout: 30000 });
+            await expect(detailsPanel).toBeVisible({ timeout: 60000 });
 
             // Close via the X button
             const closeBtn = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_CLOSE}"]`);

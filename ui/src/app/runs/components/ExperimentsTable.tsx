@@ -1,4 +1,5 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton, GlobalStyles } from '@mui/material';
+import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import {
     DataGrid,
     GridColDef,
@@ -8,7 +9,7 @@ import {
 } from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { RunStats, ExperimentStatus } from '@/types/Run';
+import { RunStats, ExperimentStatus, Experiment } from '@/types/Run';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
@@ -16,6 +17,7 @@ import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetail
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
+import { ContinueWithAstaModal } from './ContinueWithAstaModal';
 import { TEST_ID_EXPERIMENTS_TABLE } from '@/testIds';
 
 const DEFAULT_PAGE_SIZE = -1;
@@ -23,9 +25,14 @@ const DEFAULT_PAGE_SIZE = -1;
 interface ExperimentsTableProps {
     runStats?: RunStats | null;
     surprisalWidth?: number | null;
+    datasetExpired?: boolean;
 }
 
-export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableProps) {
+export function ExperimentsTable({
+    runStats,
+    surprisalWidth,
+    datasetExpired,
+}: ExperimentsTableProps) {
     const {
         experiments,
         lastError,
@@ -61,6 +68,8 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
         }
     }, [selectedExperiment?.idInRun]);
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
+    const [continueExperiment, setContinueExperiment] = useState<Experiment | null>(null);
+    const [exploredExperimentIds, setExploredExperimentIds] = useState<Set<string>>(new Set());
     const columns = useMemo(() => {
         const DEFAULT_COLUMNS: GridColDef[] = [
             {
@@ -69,11 +78,11 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                 width: 40,
                 minWidth: 40,
                 align: 'center',
-                sortable: false,
                 filterable: false,
                 disableColumnMenu: true,
                 resizable: false,
                 headerClassName: 'bookmark-column-header',
+                sortComparator: (a: boolean, b: boolean) => Number(b) - Number(a),
                 renderCell: (params: GridRenderCellParams) => {
                     return <ExperimentBookmarkControl experiment={params.row.experiment} />;
                 },
@@ -137,7 +146,6 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
             {
                 field: 'prior',
                 headerName: 'Belief Before',
-                align: 'center',
                 flex: 1,
                 minWidth: 80,
                 maxWidth: 120,
@@ -157,7 +165,6 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
             {
                 field: 'posterior',
                 headerName: 'Belief After',
-                align: 'center',
                 flex: 1,
                 minWidth: 80,
                 maxWidth: 120,
@@ -177,7 +184,6 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
             {
                 field: 'direction',
                 headerName: 'Direction',
-                align: 'center',
                 flex: 1,
                 minWidth: 50,
                 maxWidth: 120,
@@ -190,11 +196,45 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                     return <Box>{direction ?? 'N/A'}</Box>;
                 },
             },
+            {
+                field: 'exploration',
+                headerName: 'Exploration',
+                flex: 1,
+                minWidth: 160,
+                sortable: false,
+                filterable: false,
+                disableColumnMenu: true,
+                resizable: false,
+                cellClassName: 'exploration-cell',
+                renderCell: (params: GridRenderCellParams) => {
+                    if (params.row.isSkeleton) return null;
+                    const isExplored = exploredExperimentIds.has(params.row.id as string);
+                    return (
+                        <ExplorationLink
+                            href="#"
+                            className={isExplored ? 'explored' : 'not-explored'}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setExploredExperimentIds((prev) =>
+                                    new Set(prev).add(params.row.id as string)
+                                );
+                                setContinueExperiment(params.row.experiment);
+                            }}>
+                            Explore with Asta
+                            <ArrowOutwardIcon />
+                        </ExplorationLink>
+                    );
+                },
+            },
         ];
+        const visibleColumns = datasetExpired
+            ? DEFAULT_COLUMNS.filter((col) => col.field !== 'exploration')
+            : DEFAULT_COLUMNS;
         return isExperimentBookmarksEnabled
-            ? DEFAULT_COLUMNS
-            : DEFAULT_COLUMNS.filter((col) => col.field !== 'isBookmarked');
-    }, [isExperimentBookmarksEnabled, visitedIds]);
+            ? visibleColumns
+            : visibleColumns.filter((col) => col.field !== 'isBookmarked');
+    }, [isExperimentBookmarksEnabled, visitedIds, exploredExperimentIds, datasetExpired]);
 
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
@@ -254,6 +294,7 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                 runtimeMs: 'N/A',
                 isSkeleton: true,
                 isBookmarked: false,
+                exploration: null,
                 experiment: null,
             }));
             return skeletonRows;
@@ -263,7 +304,7 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
 
     // Convert experiments to rows for DataGrid
     const rows = useMemo(() => {
-        const experimentRows = experiments.map((experiment) => {
+        const experimentRows = experiments.map((experiment, _index) => {
             // For failed or inconclusive experiments, show N/A in all cells
             const isInconclusiveOrFailed = experiment.status !== ExperimentStatus.SUCCEEDED;
 
@@ -293,6 +334,7 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                 runtimeMs: isInconclusiveOrFailed ? 'N/A' : experiment.runtimeMs ?? 'N/A',
                 isSkeleton: false,
                 isBookmarked: bookmarkedExperimentIds.has(experiment.experimentId),
+                exploration: null,
                 experiment,
             };
         });
@@ -439,6 +481,12 @@ export function ExperimentsTable({ runStats, surprisalWidth }: ExperimentsTableP
                     hideFooter={true}
                 />
             </Wrapper>
+            <ContinueWithAstaModal
+                open={continueExperiment !== null}
+                onClose={() => setContinueExperiment(null)}
+                runId={runid ?? ''}
+                experiment={continueExperiment}
+            />
         </>
     );
 }
@@ -629,4 +677,33 @@ const HypothesisText = styled(Box)`
 
 const BeliefValue = styled(Box)`
     word-wrap: break-word;
+`;
+
+const ExplorationLink = styled('a')`
+    display: inline-flex;
+    align-items: center;
+    gap: ${({ theme }) => theme.spacing(0.5)};
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+
+    &.not-explored {
+        color: ${({ theme }) => theme.color['cream-100'].hex};
+
+        &:hover {
+            color: ${({ theme }) => theme.color['green-100'].hex};
+        }
+    }
+
+    &.explored {
+        color: ${({ theme }) => theme.color['green-100'].hex};
+
+        &:hover {
+            color: ${({ theme }) => theme.color['green-40'].hex};
+        }
+    }
+
+    svg {
+        font-size: 14px;
+    }
 `;

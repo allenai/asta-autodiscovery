@@ -180,6 +180,11 @@ export interface GetSharedRunOwnerResponseBody {
     userid: string;
 }
 
+export interface DigDeeperResponseBody {
+    asta_url: string;
+    manifest_gcs_uri: string;
+}
+
 export class RunsApi extends BaseApi {
     async createRun() {
         return this.request<RunResponseBody>({
@@ -378,6 +383,23 @@ export class RunsApi extends BaseApi {
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/bookmark`,
             method: 'POST',
             body: { is_bookmarked: isBookmarked },
+        });
+    }
+
+    async digDeeperWithAsta({
+        runId,
+        experimentId,
+        query,
+    }: {
+        runId: string;
+        experimentId: string;
+        query: string;
+    }) {
+        const userid = await this.getUserId();
+        return this.request<DigDeeperResponseBody>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/dig-deeper`,
+            method: 'POST',
+            body: { query },
         });
     }
 }

@@ -1,0 +1,16 @@
+name: Process public main changed
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger workflow
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_DISPATCH_TOKEN }}
+        run: |
+          gh workflow run process-public-main-change.yml \
+            --repo allenai/asta-autodiscovery-private --ref main

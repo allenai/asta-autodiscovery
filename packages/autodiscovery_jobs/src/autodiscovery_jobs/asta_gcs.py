@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 
 from google.cloud import storage
 
@@ -9,7 +10,7 @@ from .config import JobConfig
 
 _log = logging.getLogger(__name__)
 
-ASTA_BUCKET = "example-workspaces-project"
+ASTA_BUCKET = os.environ.get("ASTA_BUCKET", "example-workspaces-project")
 
 
 def get_manifest_gcs_uri(user_uuid: str, thread_id: str) -> str:

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { expectExternalLink } from './helpers';
+import { expectExternalLink, AUTH_DOMAIN } from './helpers';
 import {
     TEST_ID_SIGN_IN_BUTTON,
     TEST_ID_FEEDBACK_BUTTON,
@@ -32,18 +32,18 @@ test.describe('Homepage (/runs)', () => {
         await expect(page.locator('.MuiAlert-filledError')).toHaveCount(0);
     });
 
-    test('sign in button links to auth.example.com domain', async ({ page }) => {
+    test('sign in button links to the auth domain', async ({ page }) => {
         const signInBtn = page.locator(`[data-test-id="${TEST_ID_SIGN_IN_BUTTON}"]`);
         await expect(signInBtn).toBeVisible();
 
         // Intercept navigation to auth0 before it completes
         const requestPromise = page.waitForRequest(
-            (req) => req.url().includes('auth.example.com'),
+            (req) => req.url().includes(AUTH_DOMAIN),
             { timeout: 10000 }
         );
         await signInBtn.click();
         const request = await requestPromise;
-        expect(request.url()).toContain('auth.example.com');
+        expect(request.url()).toContain(AUTH_DOMAIN);
     });
 
     test('feedback button links to a page that does not error out', async ({ page, context }) => {

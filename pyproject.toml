@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery-workspace"
-version = "0.1.5"
+version = "0.2.0"
 description = "Asta AutoDiscovery (workspace root)"
 readme = "README.md"
 authors = [

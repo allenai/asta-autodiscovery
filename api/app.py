@@ -17,7 +17,8 @@ def create_app() -> ProxyFix:
     fmt = os.getenv("LOG_FORMAT")
     handlers = [glog.Handler()] if fmt == "google:json" else []
     level = os.environ.get("LOG_LEVEL", default=logging.INFO)
-    logging.basicConfig(level=level, handlers=handlers)
+    logging.basicConfig(level=level, handlers=handlers, force=True)
+    logging.root.setLevel(level)
 
     app = Flask("api")
     userid_logging.instrument(app, logging.root)

@@ -14,7 +14,12 @@ services:
       - .env
     volumes:
       - ./api:/api
-      - ${GOOGLE_APPLICATION_CREDENTIALS}:/secrets/gcp-key.json:ro
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        target: /secrets/gcp-key.json
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.

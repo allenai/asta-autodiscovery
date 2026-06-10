@@ -49,7 +49,7 @@ export function ExperimentsTable({
         if (saved) {
             try {
                 return new Set(JSON.parse(saved));
-            } catch (e) {
+            } catch {
                 return new Set();
             }
         }

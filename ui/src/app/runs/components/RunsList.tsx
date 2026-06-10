@@ -113,7 +113,7 @@ export default function RunsList({ selectedRunId, onSelectRun }: RunsListProps) 
         try {
             await api.bookmarkRun({ runId: run.id, isBookmarked: newBookmarkStatus });
             addSuccessToast(newBookmarkStatus ? 'Run bookmarked' : 'Run removed from bookmarks');
-        } catch (err) {
+        } catch {
             // Rollback on error
             updateViewerRun({
                 id: run.id,

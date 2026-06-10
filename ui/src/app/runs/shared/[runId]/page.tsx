@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
@@ -10,9 +10,9 @@ import RunView from '@/runs/components/RunView';
 import { getRunsApi } from '@/api/RunsApi';
 
 interface SharedRunPageProps {
-    params: {
+    params: Promise<{
         runId: string;
-    };
+    }>;
 }
 
 /**
@@ -22,7 +22,7 @@ interface SharedRunPageProps {
 export default function SharedRunPage({ params }: SharedRunPageProps) {
     const api = getRunsApi();
     const { isLoading: authLoading } = useAuth0();
-    const { runId } = params;
+    const { runId } = use(params);
     const [userid, setUserid] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isLoadingOwner, setIsLoadingOwner] = useState(true);

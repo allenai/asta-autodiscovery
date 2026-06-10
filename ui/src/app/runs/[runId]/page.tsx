@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert, Button } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
@@ -14,9 +14,9 @@ import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
 
 interface RunPageProps {
-    params: {
+    params: Promise<{
         runId: string;
-    };
+    }>;
 }
 
 /**
@@ -27,7 +27,7 @@ interface RunPageProps {
 export default function RunPage({ params }: RunPageProps) {
     const { isAuthenticated, isLoading, getAccessToken, loginWithRedirect } = useAuth0();
     const router = useRouter();
-    const runId = params.runId;
+    const { runId } = use(params);
     const api = getRunsApi();
 
     const [checkingRun, setCheckingRun] = useState(true);

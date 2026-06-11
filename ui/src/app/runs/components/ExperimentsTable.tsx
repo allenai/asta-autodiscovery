@@ -237,7 +237,13 @@ export function ExperimentsTable({
         return isExperimentBookmarksEnabled
             ? visibleColumns
             : visibleColumns.filter((col) => col.field !== 'isBookmarked');
-    }, [isExperimentBookmarksEnabled, visitedIds, exploredExperimentIds, datasetExpired, canExploreWithAsta]);
+    }, [
+        isExperimentBookmarksEnabled,
+        visitedIds,
+        exploredExperimentIds,
+        datasetExpired,
+        canExploreWithAsta,
+    ]);
 
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 

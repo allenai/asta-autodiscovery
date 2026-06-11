@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { expectExternalLink, waitForExperimentsLoaded } from './helpers';
+import { expectExternalLink, waitForExperimentsLoaded, AUTH_DOMAIN } from './helpers';
 import {
     TEST_ID_SIGN_IN_BUTTON,
     TEST_ID_FEEDBACK_BUTTON,
@@ -73,17 +73,17 @@ for (const url of RUN_URLS) {
             await expect(page).toHaveURL(/\/runs$/);
         });
 
-        test('sign in button links to auth.example.com', async ({ page }) => {
+        test('sign in button links to the auth domain', async ({ page }) => {
             const signInBtn = page.locator(`[data-test-id="${TEST_ID_SIGN_IN_BUTTON}"]`);
             await expect(signInBtn).toBeVisible();
 
             const requestPromise = page.waitForRequest(
-                (req) => req.url().includes('auth.example.com'),
+                (req) => req.url().includes(AUTH_DOMAIN),
                 { timeout: 10000 }
             );
             await signInBtn.click();
             const request = await requestPromise;
-            expect(request.url()).toContain('auth.example.com');
+            expect(request.url()).toContain(AUTH_DOMAIN);
         });
 
         test('feedback button opens page without error', async ({ page, context }) => {

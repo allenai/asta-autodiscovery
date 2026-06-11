@@ -1,5 +1,7 @@
 'use client';
 
+import { use } from 'react';
+
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -8,10 +10,10 @@ import { RunBookmarksProvider } from '@/contexts/RunBookmarksContext';
 import { ExperimentBookmarksProvider } from '@/contexts/ExperimentBookmarksContext';
 
 interface SharedRunPageProps {
-    params: {
+    params: Promise<{
         userid: string;
         runid: string;
-    };
+    }>;
 }
 
 /**
@@ -20,8 +22,9 @@ interface SharedRunPageProps {
  */
 export default function SharedRunPage({ params }: SharedRunPageProps) {
     const { isLoading } = useAuth0();
-    const userid = decodeURIComponent(params.userid);
-    const runid = decodeURIComponent(params.runid);
+    const { userid: useridParam, runid: runidParam } = use(params);
+    const userid = decodeURIComponent(useridParam);
+    const runid = decodeURIComponent(runidParam);
 
     if (isLoading) {
         return <LoadingSpinner />;

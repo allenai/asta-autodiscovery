@@ -1,6 +1,13 @@
 import { Page, BrowserContext, expect } from '@playwright/test';
 
 /**
+ * Auth provider domain the sign-in button redirects to. Configurable via the
+ * E2E_AUTH_DOMAIN env var (set per-environment in CI); falls back to a generic
+ * placeholder for the public repo.
+ */
+export const AUTH_DOMAIN = process.env.E2E_AUTH_DOMAIN || 'auth.example.com';
+
+/**
  * Clicks an element and asserts the outgoing navigation request goes to a URL
  * containing the given domain. Intercepts the request before it completes so
  * the test page is not navigated away from.

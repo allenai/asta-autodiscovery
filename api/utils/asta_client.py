@@ -5,9 +5,9 @@ import os
 
 import requests
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger("api.asta_client")
 
-ASTA_BASE_URL = os.environ.get("ASTA_BASE_URL", "https://asta-rc.example.com")
+ASTA_BASE_URL = os.environ.get("ASTA_BASE_URL", "https://asta-rc.allen.ai")
 
 
 def login_or_create_user(
@@ -37,7 +37,6 @@ def login_or_create_user(
             "email": email,
             "name": name,
             "nickname": nickname,
-            "anonymous_user_id": None,
         },
         timeout=30,
     )

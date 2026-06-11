@@ -605,8 +605,9 @@ def create() -> Blueprint:
             has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
             max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
 
-            # Check if user has AI1_DATASETS permission for dataset access in the UI
+            # Check if user has permission for access in the UI
             has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
+            has_asta_integration = PermissionType.ASTA_INTEGRATION.value in permissions
 
             # Compute dataset expiry
             dataset_expires_at = _compute_dataset_expires_at(run_details)
@@ -624,6 +625,7 @@ def create() -> Blueprint:
                 execution_status={},
                 max_file_size=max_file_size,
                 can_view_datasets=has_ai1_datasets,
+                can_explore_with_asta=has_asta_integration,
                 parent_run_id=(
                     run_metadata_model.parent_run_id if run_metadata_model else None
                 ),

@@ -297,7 +297,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.2" },
+    { name = "asta-sandbox", extras = ["modal-ephemeral"], specifier = "==0.1.3" },
     { name = "modal", specifier = ">=1.2.6" },
 ]
 
@@ -376,14 +376,14 @@ provides-extras = ["cli"]
 
 [[package]]
 name = "asta-sandbox"
-version = "0.1.2"
+version = "0.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipython" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/05/d870bd28fea8688bca8322cb6e2a1cf075279d4557d51589517752c7af00/asta_sandbox-0.1.2.tar.gz", hash = "sha256:746911311b09921a77dec5fc51685bf22a1ae6d44e2e3d91e7aca2c12dd73970", size = 20801, upload-time = "2026-05-12T21:58:45.581Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/8f/c0fb2b579a8c8c596e91bcf4cedc77cc33b29c34a3c0314325e66dfde621/asta_sandbox-0.1.3.tar.gz", hash = "sha256:7dbf0c8f62d41053dd7db3cad4e4fef921d43800cea9227554e691bf27d77753", size = 24749, upload-time = "2026-06-08T23:52:12.769Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/12/290e5b5bd85036bb5b903cfed14127156180bdf463a70317e04750305da0/asta_sandbox-0.1.2-py3-none-any.whl", hash = "sha256:24735e585f95ef30ead6cde94ae620f1a220d54bb426e55dfe725f6feb72b100", size = 29141, upload-time = "2026-05-12T21:58:44.302Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/4a/81cf79c318ac762d931bbb2785dd943fedd8a4e674588b8134683bf0c306/asta_sandbox-0.1.3-py3-none-any.whl", hash = "sha256:4b0596d70517230fb6bd0ee3c8373edc442ded0fb555f3a7468126eb9d0f0783", size = 33496, upload-time = "2026-06-08T23:52:11.827Z" },
 ]
 
 [package.optional-dependencies]

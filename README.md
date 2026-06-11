@@ -121,3 +121,7 @@ You can find more details about your application via [Marina](https://deploy.exa
 ## Getting Help
 
 See [Skiff's Documentation](https://***REMOVED***/) for more information.
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) and [NOTICE](NOTICE) files for details.

@@ -3,6 +3,7 @@ name = "asta-autodiscovery-jobs"
 version = "0.1.5"
 description = "Python package for managing Cloud Run jobs with GCS integration"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     "google-cloud-storage>=2.14.0",

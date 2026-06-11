@@ -3,6 +3,7 @@ name = "asta-agents"
 version = "0.1.5"
 description = "Add your description here"
 readme = "README.md"
+license = "Apache-2.0"
 authors = [
     { name = "Allen Institute for Artificial Intelligence" }
 ]

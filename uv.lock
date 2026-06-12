@@ -198,7 +198,7 @@ wheels = [
 
 [[package]]
 name = "asta-agents"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "packages/agents" }
 dependencies = [
     { name = "asta-autodiscovery-modal" },
@@ -217,7 +217,7 @@ requires-dist = [
 
 [[package]]
 name = "asta-autodiscovery"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "packages/autodiscovery" }
 dependencies = [
     { name = "ag2", extra = ["gemini", "openai"] },
@@ -258,7 +258,7 @@ requires-dist = [
 
 [[package]]
 name = "asta-autodiscovery-jobs"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "packages/autodiscovery_jobs" }
 dependencies = [
     { name = "google-api-core" },
@@ -288,7 +288,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "asta-autodiscovery-modal"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "packages/autodiscovery_modal" }
 dependencies = [
     { name = "asta-sandbox", extra = ["modal-ephemeral"] },
@@ -303,7 +303,7 @@ requires-dist = [
 
 [[package]]
 name = "asta-autodiscovery-workspace"
-version = "0.1.5"
+version = "0.2.0"
 source = { virtual = "." }
 
 [package.optional-dependencies]
@@ -345,7 +345,7 @@ dev = [
 
 [[package]]
 name = "asta-code-execution"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "packages/code_execution" }
 dependencies = [
     { name = "ipython" },
@@ -356,7 +356,7 @@ requires-dist = [{ name = "ipython", specifier = ">=9.9.0" }]
 
 [[package]]
 name = "asta-devtools"
-version = "0.1.5"
+version = "0.2.0"
 source = { editable = "packages/devtools" }
 dependencies = [
     { name = "google-cloud-storage" },

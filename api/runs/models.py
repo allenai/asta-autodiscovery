@@ -251,6 +251,7 @@ class RunModel(BaseModel):
     run_metadata: MetadataModel | None = Field(None, description="Metadata associated with the run")
     max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
     can_view_datasets: bool = Field(False, description="Bool flag determining if AI1 datasets are visible")
+    can_explore_with_asta: bool = Field(False, description="Bool flag determining if Asta exploration features are visible")
     parent_run_id: str | None = Field(None, description="ID of the parent run this was forked from")
     parent_run_name: str | None = Field(None, description="Name of the parent run")
     dataset_expires_at: str | None = Field(

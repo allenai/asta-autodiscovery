@@ -18,6 +18,7 @@ class PermissionType(Enum):
     ADMIN = "enroll:autodiscovery_admin"
     HIGHER_UPLOAD_LIMIT = "enroll:higher_upload_limit"
     AI1_DATASETS = "enroll:ai1_datasets"
+    ASTA_INTEGRATION= "enroll:asta_integration"
 
 
 def get_public_key(auth0_domain, kid):

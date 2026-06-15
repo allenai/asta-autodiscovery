@@ -63,6 +63,7 @@ export interface RunFromApi {
     parent_run_id?: string | null;
     parent_run_name?: string | null;
     dataset_expires_at?: string | null;
+    can_explore_with_asta?: boolean;
 }
 
 export interface UploadDatasetResponseBody {
@@ -80,6 +81,7 @@ export interface GenerateUploadUrlResponseBody {
 
 export interface RunResponseBody extends RunFromApi {
     can_view_datasets: boolean;
+    can_explore_with_asta: boolean;
 }
 
 export interface GetViewerRunsResponseBody {

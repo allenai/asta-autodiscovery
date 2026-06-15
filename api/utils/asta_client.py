@@ -7,7 +7,7 @@ import requests
 
 _log = logging.getLogger("api.asta_client")
 
-ASTA_BASE_URL = os.environ.get("ASTA_BASE_URL", "https://asta-rc.allen.ai")
+ASTA_BASE_URL = os.environ.get("ASTA_BASE_URL", "https://asta.allen.ai")
 
 
 def login_or_create_user(

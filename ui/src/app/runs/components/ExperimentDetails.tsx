@@ -19,6 +19,7 @@ type ExperimentDetailsProps = {
     actions?: ReactNode;
     surprisalWidth?: number | null;
     datasetExpired?: boolean;
+    canExploreWithAsta?: boolean;
 };
 
 export const ExperimentDetails = memo(function ExperimentDetails({
@@ -27,6 +28,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
     actions,
     surprisalWidth,
     datasetExpired,
+    canExploreWithAsta = false,
 }: ExperimentDetailsProps) {
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
@@ -190,21 +192,25 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                     </Box>
                 )}
             </ContentWrapper>
-            <BottomBar $visible={hasScrolled}>
-                <ContinueExploringButton
-                    variant="outlined"
-                    endIcon={datasetExpired ? undefined : <ArrowOutwardIcon />}
-                    disabled={datasetExpired}
-                    onClick={() => !datasetExpired && setIsContinueModalOpen(true)}>
-                    {datasetExpired ? 'Dataset expired' : 'Continue exploring with Asta'}
-                </ContinueExploringButton>
-            </BottomBar>
-            <ContinueWithAstaModal
-                open={isContinueModalOpen}
-                onClose={() => setIsContinueModalOpen(false)}
-                runId={runId}
-                experiment={experiment}
-            />
+            {canExploreWithAsta && (
+                <>
+                    <BottomBar $visible={hasScrolled}>
+                        <ContinueExploringButton
+                            variant="outlined"
+                            endIcon={datasetExpired ? undefined : <ArrowOutwardIcon />}
+                            disabled={datasetExpired}
+                            onClick={() => !datasetExpired && setIsContinueModalOpen(true)}>
+                            {datasetExpired ? 'Dataset expired' : 'Continue exploring with Asta'}
+                        </ContinueExploringButton>
+                    </BottomBar>
+                    <ContinueWithAstaModal
+                        open={isContinueModalOpen}
+                        onClose={() => setIsContinueModalOpen(false)}
+                        runId={runId}
+                        experiment={experiment}
+                    />
+                </>
+            )}
         </DetailsWrapper>
     );
 });

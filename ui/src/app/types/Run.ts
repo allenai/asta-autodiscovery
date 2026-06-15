@@ -41,6 +41,8 @@ export type Run = {
     parentRunName?: string | null;
     /** ISO date when the dataset will be deleted (typically 7 days after run creation) */
     datasetExpiresAt?: string | null;
+    /** Whether the user has permission to use Asta exploration features */
+    canExploreWithAsta?: boolean;
 };
 
 export type RunStats = {
@@ -143,6 +145,7 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         parentRunId: runFromApi.parent_run_id ?? null,
         parentRunName: runFromApi.parent_run_name ?? null,
         datasetExpiresAt: runFromApi.dataset_expires_at ?? null,
+        canExploreWithAsta: runFromApi.can_explore_with_asta ?? false,
     };
 };
 

@@ -26,12 +26,14 @@ interface ExperimentsTableProps {
     runStats?: RunStats | null;
     surprisalWidth?: number | null;
     datasetExpired?: boolean;
+    canExploreWithAsta?: boolean;
 }
 
 export function ExperimentsTable({
     runStats,
     surprisalWidth,
     datasetExpired,
+    canExploreWithAsta = false,
 }: ExperimentsTableProps) {
     const {
         experiments,
@@ -228,13 +230,20 @@ export function ExperimentsTable({
                 },
             },
         ];
-        const visibleColumns = datasetExpired
-            ? DEFAULT_COLUMNS.filter((col) => col.field !== 'exploration')
-            : DEFAULT_COLUMNS;
+        const visibleColumns =
+            datasetExpired || !canExploreWithAsta
+                ? DEFAULT_COLUMNS.filter((col) => col.field !== 'exploration')
+                : DEFAULT_COLUMNS;
         return isExperimentBookmarksEnabled
             ? visibleColumns
             : visibleColumns.filter((col) => col.field !== 'isBookmarked');
-    }, [isExperimentBookmarksEnabled, visitedIds, exploredExperimentIds, datasetExpired]);
+    }, [
+        isExperimentBookmarksEnabled,
+        visitedIds,
+        exploredExperimentIds,
+        datasetExpired,
+        canExploreWithAsta,
+    ]);
 
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
@@ -481,12 +490,14 @@ export function ExperimentsTable({
                     hideFooter={true}
                 />
             </Wrapper>
-            <ContinueWithAstaModal
-                open={continueExperiment !== null}
-                onClose={() => setContinueExperiment(null)}
-                runId={runid ?? ''}
-                experiment={continueExperiment}
-            />
+            {canExploreWithAsta && (
+                <ContinueWithAstaModal
+                    open={continueExperiment !== null}
+                    onClose={() => setContinueExperiment(null)}
+                    runId={runid ?? ''}
+                    experiment={continueExperiment}
+                />
+            )}
         </>
     );
 }

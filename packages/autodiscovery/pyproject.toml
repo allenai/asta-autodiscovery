@@ -1,8 +1,8 @@
 [project]
 name = "asta-autodiscovery"
-version = "0.1.5"
+version = "0.2.2"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
-readme = "README.md"
+readme = "RELEASE.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [

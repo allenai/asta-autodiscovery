@@ -1,14 +1,29 @@
-"""Generate a self-contained static HTML report for AutoDiscovery results.
+"""Generate a static HTML report directory for AutoDiscovery results.
 
-Mirrors the UI in ``ui/`` as closely as possible: dark-teal theme, experiments
-table, D3 radial tree, experiment detail panel, belief distribution plots,
-code blocks, and rich output figures.
+The report is written as a directory of assets rather than a single
+self-contained HTML file: ``index.html`` carries markup + CSS + JS,
+``data.js`` defines the embedded run data as global JS constants, and
+``figures/`` holds per-experiment images as separate files. Only the
+fields actually rendered by the UI are emitted — internal MCTS state
+(messages, untried/tried experiments, visits/value, full belief
+distributions, etc.) is dropped.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
+import shutil
+
+# MIME types we know how to render, in priority order (best first).
+_IMAGE_MIME_EXT = {
+    "image/svg+xml": "svg",
+    "image/png": "png",
+    "image/jpeg": "jpg",
+}
+_RICH_OUTPUT_PRIORITY = ("image/svg+xml", "image/png", "image/jpeg", "text/plain")
 
 
 def _load_nodes(out_dir: str) -> list[dict]:
@@ -60,44 +75,133 @@ def _load_metadata(out_dir: str) -> dict:
     return {}
 
 
+def _belief_mean(b: object) -> float | None:
+    if isinstance(b, dict):
+        m = b.get("mean")
+        if isinstance(m, (int, float)):
+            return float(m)
+    return None
+
+
+def _trim_plan(plan: object) -> dict | None:
+    if not isinstance(plan, dict):
+        return None
+    kept = {k: plan.get(k) for k in ("objective", "steps", "deliverables") if plan.get(k)}
+    return kept or None
+
+
+def _write_rich_outputs(
+    bundles: list,
+    node_id: str,
+    figures_dir: str,
+) -> list[dict]:
+    """Write image bundles to disk; return list of UI-ready figure descriptors."""
+    figs: list[dict] = []
+    for idx, bundle in enumerate(bundles):
+        if not isinstance(bundle, dict):
+            continue
+        chosen = next((m for m in _RICH_OUTPUT_PRIORITY if bundle.get(m)), None)
+        if chosen is None:
+            continue
+        payload = bundle[chosen]
+        if chosen == "text/plain":
+            figs.append({"kind": "text", "text": str(payload)})
+            continue
+        ext = _IMAGE_MIME_EXT[chosen]
+        fname = f"{node_id}_{idx}.{ext}"
+        fpath = os.path.join(figures_dir, fname)
+        try:
+            if chosen == "image/svg+xml":
+                trimmed = payload.strip() if isinstance(payload, str) else ""
+                if trimmed.startswith("<"):
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        f.write(trimmed)
+                else:
+                    with open(fpath, "wb") as f:
+                        f.write(base64.b64decode(payload))
+            else:
+                with open(fpath, "wb") as f:
+                    f.write(base64.b64decode(payload))
+        except (binascii.Error, ValueError, TypeError):
+            continue
+        figs.append({"kind": "image", "src": f"figures/{fname}"})
+    return figs
+
+
+def _trim_node(node: dict, figures: list[dict]) -> dict:
+    return {
+        "id": node.get("id"),
+        "parent_id": node.get("parent_id"),
+        "creation_idx": node.get("creation_idx"),
+        "success": bool(node.get("success")),
+        "surprising": bool(node.get("surprising")),
+        "belief_change": node.get("belief_change"),
+        "prior_mean": _belief_mean(node.get("prior")),
+        "posterior_mean": _belief_mean(node.get("posterior")),
+        "hypothesis": node.get("hypothesis") or "",
+        "experiment_plan": _trim_plan(node.get("experiment_plan")),
+        "code": node.get("code") or "",
+        "code_output": node.get("code_output") or "",
+        "analysis": node.get("analysis") or "",
+        "review": node.get("review") or "",
+        "rich_outputs": figures,
+    }
+
+
 def _escape_json_for_script(obj: object) -> str:
     """Serialize to JSON safe for embedding inside a <script> tag."""
     return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
 
 
 def generate_report(out_dir: str) -> str:
-    """Generate a static HTML report and write it to *out_dir*/report.html.
+    """Generate a static HTML report directory under *out_dir*/report.
 
-    Returns the path to the generated file.
+    Returns the path to the generated ``index.html``.
     """
-    nodes = _load_nodes(out_dir)
+    raw_nodes = _load_nodes(out_dir)
     rich_outputs = _load_rich_outputs(out_dir)
     run_args = _load_args(out_dir)
     metadata = _load_metadata(out_dir)
 
-    # Embed rich output images inline as base64 data URIs
-    for node in nodes:
-        nid = node.get("id", "")
-        ro_list = rich_outputs.get(nid, [])
-        node["_rich_outputs"] = ro_list
+    report_dir = os.path.join(out_dir, "report")
+    figures_dir = os.path.join(report_dir, "figures")
+    if os.path.isdir(figures_dir):
+        shutil.rmtree(figures_dir)
+    os.makedirs(figures_dir, exist_ok=True)
 
-    report_path = os.path.join(out_dir, "report.html")
-    html = _build_html(nodes, run_args, metadata)
-    with open(report_path, "w") as f:
-        f.write(html)
-    return report_path
+    nodes: list[dict] = []
+    for node in raw_nodes:
+        nid = node.get("id") or ""
+        bundles = rich_outputs.get(nid, [])
+        figures = _write_rich_outputs(bundles, nid, figures_dir) if bundles else []
+        nodes.append(_trim_node(node, figures))
+
+    trimmed_args = {"dataset_metadata": run_args.get("dataset_metadata", "")}
+    trimmed_metadata = {
+        "name": metadata.get("name", ""),
+        "description": metadata.get("description", ""),
+    }
+
+    data_js = (
+        f"const NODES = {_escape_json_for_script(nodes)};\n"
+        f"const RUN_ARGS = {_escape_json_for_script(trimmed_args)};\n"
+        f"const METADATA = {_escape_json_for_script(trimmed_metadata)};\n"
+    )
+    with open(os.path.join(report_dir, "data.js"), "w", encoding="utf-8") as f:
+        f.write(data_js)
+
+    index_path = os.path.join(report_dir, "index.html")
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(_INDEX_HTML)
+    return index_path
 
 
 # ---------------------------------------------------------------------------
-# HTML template
+# HTML
 # ---------------------------------------------------------------------------
 
-def _build_html(nodes: list[dict], run_args: dict, metadata: dict) -> str:
-    nodes_json = _escape_json_for_script(nodes)
-    args_json = _escape_json_for_script(run_args)
-    metadata_json = _escape_json_for_script(metadata)
-
-    return f"""<!DOCTYPE html>
+_INDEX_HTML = (
+    """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -106,37 +210,10 @@ def _build_html(nodes: list[dict], run_args: dict, metadata: dict) -> str:
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-{_CSS}
-</style>
-</head>
-<body>
-<div id="app">
-  <div id="graph-panel"></div>
-  <div id="run-panel">
-    <div id="run-header"></div>
-    <div id="top-surprisals"></div>
-    <div id="experiments-table"></div>
-  </div>
-  <div id="detail-panel" class="hidden">
-    <div id="detail-content"></div>
-  </div>
-</div>
-<script>
-// ---- Embedded data ----
-const NODES = {nodes_json};
-const RUN_ARGS = {args_json};
-const METADATA = {metadata_json};
-{_JS}
-</script>
-</body>
-</html>"""
-
-
-# ---------------------------------------------------------------------------
-# CSS — mirrors the dark-teal Varnish2 theme from ui/
-# ---------------------------------------------------------------------------
-
-_CSS = r"""
+"""
+    # The CSS body is concatenated rather than f-string interpolated so that
+    # the `{` / `}` characters inside the stylesheet don't need to be escaped.
+    + r"""
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -256,7 +333,8 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--cream); font
 .figures-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .figure-card { background: rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; cursor: pointer; border: 1px solid var(--cream-border); transition: border-color 0.15s; }
 .figure-card:hover { border-color: var(--green); }
-.figure-card img, .figure-card svg { width: 100%; height: auto; display: block; }
+.figure-card img { width: 100%; height: auto; display: block; }
+.figure-card pre { padding: 8px; font-size: 11px; max-height: 200px; overflow: auto; }
 .figure-card .fig-label { padding: 6px 10px; font-size: 11px; color: var(--cream-dim); }
 
 /* Status chip */
@@ -266,7 +344,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--cream); font
 
 /* Fullscreen overlay for figures */
 .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.overlay img, .overlay svg { max-width: 90%; max-height: 90%; }
+.overlay img { max-width: 90%; max-height: 90%; }
 
 /* D3 tree styles */
 .node circle { stroke-width: 2; cursor: pointer; }
@@ -291,20 +369,26 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--cream); font
 ::-webkit-scrollbar-thumb { background: rgba(250,242,233,0.15); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(250,242,233,0.25); }
 """
-
-
-# ---------------------------------------------------------------------------
-# JavaScript — table, tree, detail panel logic
-# ---------------------------------------------------------------------------
-
-_JS = r"""
+    + """
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="graph-panel"></div>
+  <div id="run-panel">
+    <div id="run-header"></div>
+    <div id="top-surprisals"></div>
+    <div id="experiments-table"></div>
+  </div>
+  <div id="detail-panel" class="hidden">
+    <div id="detail-content"></div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script>
+"""
+    + r"""
 // ---- Helpers ----
-function beliefMean(b) {
-  if (!b) return null;
-  if (b.mean != null) return b.mean;
-  return null;
-}
-
 function beliefLabel(val) {
   if (val == null) return '—';
   if (val < 0.2) return 'Likely False';
@@ -315,18 +399,12 @@ function beliefLabel(val) {
 }
 
 function beliefDirection(node) {
-  const pr = beliefMean(node.prior);
-  const po = beliefMean(node.posterior);
+  const pr = node.prior_mean;
+  const po = node.posterior_mean;
   if (pr == null || po == null) return 'neutral';
   const d = po - pr;
   if (Math.abs(d) < 0.005) return 'neutral';
   return d > 0 ? 'positive' : 'negative';
-}
-
-function nodeIndex(node) {
-  // Extract a human-readable index from node id like "node_2_0" -> 2
-  const parts = node.id.replace('node_', '').split('_');
-  return parseInt(parts[0], 10);
 }
 
 function escapeHtml(s) {
@@ -341,8 +419,34 @@ function renderMarkdown(s) {
   try { return marked.parse(s); } catch { return '<p>' + escapeHtml(s) + '</p>'; }
 }
 
+function nodeNumber(n) {
+  if (!n || !n.id) return '';
+  return n.id.startsWith('node_') ? n.id.slice(5) : n.id;
+}
+
+function nodeNumberSortKey(n) {
+  const num = nodeNumber(n);
+  const parts = String(num).split('_').map(p => {
+    const v = parseInt(p, 10);
+    return Number.isFinite(v) ? v : p;
+  });
+  return parts;
+}
+
+function compareSortKey(a, b) {
+  const la = Math.max(a.length, b.length);
+  for (let i = 0; i < la; i++) {
+    const va = a[i], vb = b[i];
+    if (va === undefined) return -1;
+    if (vb === undefined) return 1;
+    if (va < vb) return -1;
+    if (va > vb) return 1;
+  }
+  return 0;
+}
+
 // ---- Filter experiment nodes (skip root/data-loading) ----
-const experimentNodes = NODES.filter(n => n.hypothesis != null && n.hypothesis !== '');
+const experimentNodes = NODES.filter(n => n.hypothesis);
 const allNodesById = {};
 NODES.forEach(n => { allNodesById[n.id] = n; });
 
@@ -387,7 +491,7 @@ function renderTopSurprisals() {
   el.innerHTML = `
     <h3>Top Findings</h3>
     ${items.map(n => {
-      const postMean = beliefMean(n.posterior);
+      const postMean = n.posterior_mean;
       const label = postMean != null ? ("It's " + beliefLabel(postMean) + ' that:') : '';
       return `
         <div class="surprisal-item ${selectedNodeId === n.id ? 'selected' : ''}" data-id="${n.id}">
@@ -408,13 +512,16 @@ function renderTopSurprisals() {
 function renderTable() {
   const el = document.getElementById('experiments-table');
   const sorted = [...experimentNodes].sort((a, b) => {
+    if (sortCol === 'creation_idx') {
+      const cmp = compareSortKey(nodeNumberSortKey(a), nodeNumberSortKey(b));
+      return sortAsc ? cmp : -cmp;
+    }
     let va, vb;
     switch (sortCol) {
-      case 'creation_idx': va = a.creation_idx; vb = b.creation_idx; break;
       case 'hypothesis': va = (a.hypothesis || '').toLowerCase(); vb = (b.hypothesis || '').toLowerCase(); break;
       case 'surprisal': va = Math.abs(a.belief_change || 0); vb = Math.abs(b.belief_change || 0); break;
-      case 'prior': va = beliefMean(a.prior) ?? -1; vb = beliefMean(b.prior) ?? -1; break;
-      case 'posterior': va = beliefMean(a.posterior) ?? -1; vb = beliefMean(b.posterior) ?? -1; break;
+      case 'prior': va = a.prior_mean ?? -1; vb = b.prior_mean ?? -1; break;
+      case 'posterior': va = a.posterior_mean ?? -1; vb = b.posterior_mean ?? -1; break;
       default: va = a.creation_idx; vb = b.creation_idx;
     }
     if (va < vb) return sortAsc ? -1 : 1;
@@ -442,11 +549,11 @@ function renderTable() {
         ${sorted.map(n => {
           const bc = n.belief_change != null ? Math.abs(n.belief_change).toFixed(3) : '—';
           const dir = beliefDirection(n);
-          const priorLabel = beliefLabel(beliefMean(n.prior));
-          const postLabel = beliefLabel(beliefMean(n.posterior));
+          const priorLabel = beliefLabel(n.prior_mean);
+          const postLabel = beliefLabel(n.posterior_mean);
           const dirLabel = dir.charAt(0).toUpperCase() + dir.slice(1);
           return `<tr class="${selectedNodeId === n.id ? 'selected' : ''}" data-id="${n.id}">
-            <td class="col-id">${n.creation_idx}</td>
+            <td class="col-id">${escapeHtml(nodeNumber(n))}</td>
             <td class="col-hyp">${escapeHtml(n.hypothesis)}</td>
             <td class="col-surprisal ${n.surprising ? 'surprising' : ''}">${bc}</td>
             <td class="col-belief">${priorLabel}</td>
@@ -487,8 +594,8 @@ function renderDetail() {
   const dir = beliefDirection(n);
   const dirLabel = dir.charAt(0).toUpperCase() + dir.slice(1);
   const bc = n.belief_change != null ? Math.abs(n.belief_change).toFixed(3) : null;
-  const priorMean = beliefMean(n.prior);
-  const postMean = beliefMean(n.posterior);
+  const priorMean = n.prior_mean;
+  const postMean = n.posterior_mean;
 
   let beliefHtml = '';
   if (priorMean != null && postMean != null) {
@@ -564,19 +671,14 @@ function renderDetail() {
 
   // Rich outputs (figures)
   let figuresHtml = '';
-  const ro = n._rich_outputs || [];
+  const ro = n.rich_outputs || [];
   if (ro.length > 0) {
     const figs = ro.map((item, i) => {
       let inner = '';
-      if (item.mime_type && item.mime_type.startsWith('image/') && item.data) {
-        const src = `data:${item.mime_type};base64,${item.data}`;
-        inner = `<img src="${src}" alt="Figure ${i+1}" loading="lazy"/>`;
-      } else if (item.type === 'image' && item.data) {
-        const mime = item.format === 'svg' ? 'image/svg+xml' : 'image/' + (item.format || 'png');
-        const src = `data:${mime};base64,${item.data}`;
-        inner = `<img src="${src}" alt="Figure ${i+1}" loading="lazy"/>`;
-      } else if (typeof item === 'string') {
-        inner = `<pre style="padding:8px;font-size:11px">${escapeHtml(item)}</pre>`;
+      if (item.kind === 'image' && item.src) {
+        inner = `<img src="${item.src}" alt="Figure ${i+1}" loading="lazy"/>`;
+      } else if (item.kind === 'text' && item.text) {
+        inner = `<pre>${escapeHtml(item.text)}</pre>`;
       }
       if (!inner) return '';
       return `<div class="figure-card" onclick="openOverlay(this)"><div class="fig-content">${inner}</div><div class="fig-label">Figure ${i+1}</div></div>`;
@@ -593,7 +695,7 @@ function renderDetail() {
 
   content.innerHTML = `
     <div class="detail-header">
-      <h2>Experiment ${n.creation_idx} ${statusChip}</h2>
+      <h2>Experiment ${escapeHtml(nodeNumber(n))} ${statusChip}</h2>
       <button class="close-btn" onclick="selectNode(null)">&times; Close</button>
     </div>
     ${beliefHtml}
@@ -642,22 +744,17 @@ function renderGraph() {
   const width = container.clientWidth || 500;
   const height = container.clientHeight || 500;
 
-  // Build tree data
   const nodeMap = {};
-  NODES.forEach(n => {
-    nodeMap[n.id] = { ...n, children: [] };
-  });
+  NODES.forEach(n => { nodeMap[n.id] = { ...n, children: [] }; });
 
   let rootId = null;
   NODES.forEach(n => {
     if (n.parent_id && nodeMap[n.parent_id]) {
       nodeMap[n.parent_id].children.push(nodeMap[n.id]);
-    } else if (!n.parent_id || !nodeMap[n.parent_id]) {
-      if (!rootId) rootId = n.id;
+    } else if (!rootId) {
+      rootId = n.id;
     }
   });
-
-  // Find root: node with parent_id not in nodeMap, or first node
   if (!rootId && NODES.length > 0) rootId = NODES[0].id;
   if (!rootId) return;
 
@@ -677,22 +774,17 @@ function renderGraph() {
   const g = svg.append('g')
     .attr('transform', `translate(${width/2},${height/2})`);
 
-  // Zoom
   const zoom = d3.zoom()
     .scaleExtent([0.3, 3])
     .on('zoom', (event) => g.attr('transform', `translate(${width/2 + event.transform.x},${height/2 + event.transform.y}) scale(${event.transform.k})`));
   svg.call(zoom);
 
-  // Links
   g.selectAll('.link')
     .data(treeRoot.links())
     .join('path')
     .attr('class', 'link')
-    .attr('d', d3.linkRadial()
-      .angle(d => d.x)
-      .radius(d => d.y));
+    .attr('d', d3.linkRadial().angle(d => d.x).radius(d => d.y));
 
-  // Nodes
   const nodeG = g.selectAll('.node')
     .data(treeRoot.descendants())
     .join('g')
@@ -716,10 +808,9 @@ function renderGraph() {
     .attr('stroke-width', d => d.data.id === selectedNodeId ? 3 : 1.5);
 
   nodeG.append('text')
-    .text(d => d.data.creation_idx != null ? d.data.creation_idx : '')
+    .text(d => nodeNumber(d.data))
     .attr('transform', d => `rotate(${-(d.x * 180 / Math.PI - 90)})`);
 
-  // Legend
   container.insertAdjacentHTML('beforeend', `
     <div class="graph-legend">
       <div class="legend-row"><div class="swatch" style="background:var(--node-base)"></div> Low surprisal</div>
@@ -734,7 +825,6 @@ function highlightGraphNode(id) {
     .attr('stroke', d => d.data.id === id ? 'var(--green)' : 'rgba(250,242,233,0.2)')
     .attr('stroke-width', d => d.data.id === id ? 3 : 1.5);
 
-  // Highlight path to root
   const ancestors = new Set();
   if (id) {
     let cur = id;
@@ -749,9 +839,14 @@ function highlightGraphNode(id) {
     .attr('stroke-width', d => ancestors.has(d.target.data.id) ? 2.5 : 1.2);
 }
 
-// ---- Init ----
 renderRunHeader();
 renderTopSurprisals();
 renderTable();
 renderGraph();
 """
+    + """
+</script>
+</body>
+</html>
+"""
+)

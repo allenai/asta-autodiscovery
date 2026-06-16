@@ -1,5 +1,4 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton, GlobalStyles } from '@mui/material';
-import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import {
     DataGrid,
     GridColDef,
@@ -224,7 +223,6 @@ export function ExperimentsTable({
                                 setContinueExperiment(params.row.experiment);
                             }}>
                             Explore with Asta
-                            <ArrowOutwardIcon />
                         </ExplorationLink>
                     );
                 },
@@ -712,9 +710,5 @@ const ExplorationLink = styled('a')`
         &:hover {
             color: ${({ theme }) => theme.color['green-40'].hex};
         }
-    }
-
-    svg {
-        font-size: 14px;
     }
 `;

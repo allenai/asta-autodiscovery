@@ -1,6 +1,5 @@
 import { memo, ReactNode, useEffect, useRef, useState } from 'react';
 import { styled, Typography, Box, Stack, Button } from '@mui/material';
-import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment, ExperimentStatus } from '@/types/Run';
@@ -192,25 +191,33 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                     </Box>
                 )}
             </ContentWrapper>
-            {canExploreWithAsta && (
-                <>
-                    <BottomBar $visible={hasScrolled}>
-                        <ContinueExploringButton
-                            variant="outlined"
-                            endIcon={datasetExpired ? undefined : <ArrowOutwardIcon />}
-                            disabled={datasetExpired}
-                            onClick={() => !datasetExpired && setIsContinueModalOpen(true)}>
-                            {datasetExpired ? 'Dataset expired' : 'Continue exploring with Asta'}
-                        </ContinueExploringButton>
-                    </BottomBar>
-                    <ContinueWithAstaModal
-                        open={isContinueModalOpen}
-                        onClose={() => setIsContinueModalOpen(false)}
-                        runId={runId}
-                        experiment={experiment}
-                    />
-                </>
-            )}
+            {canExploreWithAsta &&
+                (datasetExpired ? (
+                    <ExpiredNotice>
+                        This dataset has expired and is no longer available for exploration here.
+                        You can continue your analysis with{' '}
+                        <a href="https://asta.allen.ai" target="_blank" rel="noopener noreferrer">
+                            Asta
+                        </a>{' '}
+                        by uploading the dataset there.
+                    </ExpiredNotice>
+                ) : (
+                    <>
+                        <BottomBar $visible={hasScrolled}>
+                            <ContinueExploringButton
+                                variant="outlined"
+                                onClick={() => setIsContinueModalOpen(true)}>
+                                Continue exploring with Asta
+                            </ContinueExploringButton>
+                        </BottomBar>
+                        <ContinueWithAstaModal
+                            open={isContinueModalOpen}
+                            onClose={() => setIsContinueModalOpen(false)}
+                            runId={runId}
+                            experiment={experiment}
+                        />
+                    </>
+                ))}
         </DetailsWrapper>
     );
 });
@@ -289,16 +296,33 @@ const BottomBar = styled('div')<{ $visible: boolean }>`
     transition: transform 250ms ease-out;
 `;
 
+const ExpiredNotice = styled(Typography)`
+    margin: 0 8px 8px;
+    padding: ${({ theme }) => theme.spacing(1.5, 3)};
+    background-color: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+    border: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    border-radius: 4px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    font-size: 0.875rem;
+
+    a {
+        color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
+        text-decoration: underline;
+
+        &:hover {
+            color: ${({ theme }) => theme.color['green-100'].hex};
+        }
+    }
+`;
+
 const ContinueExploringButton = styled(Button)`
     &.MuiButton-root {
         color: ${({ theme }) => theme.color['cream-100'].hex};
         padding: ${({ theme }) => theme.spacing(0, 2)};
         height: 32px;
         white-space: nowrap;
-
-        & .MuiButton-endIcon {
-            margin-left: ${({ theme }) => theme.spacing(0.5)};
-        }
     }
 
     &.MuiButton-outlined {

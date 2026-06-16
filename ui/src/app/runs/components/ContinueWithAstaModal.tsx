@@ -133,7 +133,7 @@ export function ContinueWithAstaModal({
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         variant="outlined"
-                        placeholder="Enter a follow-up question, or hypothesis to test."
+                        placeholder="Ask a follow-up question, or leave blank and Asta will suggest questions."
                     />
                 </PromptFieldGroup>
                 {error && (

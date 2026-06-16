@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RunStats, ExperimentStatus, Experiment } from '@/types/Run';
+import { useAuth0 } from '@/contexts/Auth0Context';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
@@ -25,15 +26,14 @@ interface ExperimentsTableProps {
     runStats?: RunStats | null;
     surprisalWidth?: number | null;
     datasetExpired?: boolean;
-    canExploreWithAsta?: boolean;
 }
 
 export function ExperimentsTable({
     runStats,
     surprisalWidth,
     datasetExpired,
-    canExploreWithAsta = false,
 }: ExperimentsTableProps) {
+    const { canExploreWithAsta } = useAuth0();
     const {
         experiments,
         lastError,

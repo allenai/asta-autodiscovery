@@ -285,7 +285,6 @@ function RunViewContent({
     const datasetExpired = isDatasetExpired(run.datasetExpiresAt);
     const datasetExpiryLabel = getDatasetExpiryLabel(run.datasetExpiresAt);
     const canFork = !datasetExpired && !isForking;
-    const canExploreWithAsta = run.canExploreWithAsta ?? false;
 
     const handleFork = useCallback(async () => {
         setIsForking(true);
@@ -767,7 +766,6 @@ function RunViewContent({
                             runStats={run.stats}
                             surprisalWidth={run.metadata?.surprisalWidth}
                             datasetExpired={datasetExpired}
-                            canExploreWithAsta={canExploreWithAsta}
                         />
                     </RunContent>
                     {isDragEnabled && (
@@ -803,7 +801,6 @@ function RunViewContent({
                                 runId={run.id}
                                 surprisalWidth={run.metadata?.surprisalWidth}
                                 datasetExpired={datasetExpired}
-                                canExploreWithAsta={canExploreWithAsta}
                                 actions={
                                     <>
                                         <Tooltip title="Share experiment" placement="bottom">

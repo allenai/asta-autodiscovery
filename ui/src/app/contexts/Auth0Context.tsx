@@ -21,6 +21,7 @@ export interface Auth0ContextType {
     logout: () => void;
     getAccessToken: () => Promise<string>;
     hasRequiredPermission: boolean;
+    canExploreWithAsta: boolean;
     authError: string | null;
 }
 
@@ -35,6 +36,7 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | undefined>(undefined);
     const [hasRequiredPermission, setHasRequiredPermission] = useState(false);
+    const [canExploreWithAsta, setCanExploreWithAsta] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -66,36 +68,35 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
                     const userProfile = await auth0Client.getUser();
                     setUser(userProfile);
 
-                    // Check for required permission if specified
-                    if (auth0Config.requiredPermission) {
-                        try {
-                            const token = await auth0Client.getTokenSilently();
+                    // Decode the access token to check permissions.
+                    // Note: This is a simple decode, not validation (validation happens on backend)
+                    try {
+                        const token = await auth0Client.getTokenSilently();
+                        const tokenParts = token.split('.');
+                        const payload = JSON.parse(atob(tokenParts[1]));
+                        const permissions: string[] = Array.isArray(payload.permissions)
+                            ? payload.permissions
+                            : [];
 
-                            // Decode the access token to get permissions
-                            // Note: This is a simple decode, not validation (validation happens on backend)
-                            const tokenParts = token.split('.');
-                            const payload = JSON.parse(atob(tokenParts[1]));
-
-                            // Permissions are typically in the "permissions" claim
-                            const permissions = payload.permissions || [];
-
-                            const hasPermission =
-                                Array.isArray(permissions) &&
-                                permissions.includes(auth0Config.requiredPermission);
+                        if (auth0Config.requiredPermission) {
+                            const hasPermission = permissions.includes(
+                                auth0Config.requiredPermission
+                            );
                             setHasRequiredPermission(hasPermission);
-
                             if (!hasPermission) {
                                 setAuthError(
                                     `Access denied. Required permission: ${auth0Config.requiredPermission}`
                                 );
                                 // Don't auto-logout - let the dialog handle user action
                             }
-                        } catch (error) {
-                            console.error('Error checking permissions:', error);
-                            setAuthError('Failed to verify user permissions');
+                        } else {
+                            setHasRequiredPermission(true);
                         }
-                    } else {
-                        setHasRequiredPermission(true);
+
+                        setCanExploreWithAsta(permissions.includes('enroll:asta_integration'));
+                    } catch (error) {
+                        console.error('Error checking permissions:', error);
+                        setAuthError('Failed to verify user permissions');
                     }
                 }
 
@@ -148,6 +149,7 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
             logout,
             getAccessToken,
             hasRequiredPermission,
+            canExploreWithAsta,
             authError,
         }),
         [
@@ -158,6 +160,7 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
             logout,
             getAccessToken,
             hasRequiredPermission,
+            canExploreWithAsta,
             authError,
         ]
     );

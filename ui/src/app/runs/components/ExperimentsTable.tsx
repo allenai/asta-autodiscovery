@@ -494,6 +494,7 @@ export function ExperimentsTable({
                     onClose={() => setContinueExperiment(null)}
                     runId={runid ?? ''}
                     experiment={continueExperiment}
+                    surprisalWidth={surprisalWidth}
                 />
             )}
         </>

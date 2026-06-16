@@ -1,14 +1,17 @@
 import { memo, ReactNode, useEffect, useRef, useState } from 'react';
 import { styled, Typography, Box, Stack, Button } from '@mui/material';
-import { Markdown } from '@allenai/varnish2/components';
 
 import { Experiment, ExperimentStatus } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
-import { getSurprisalDirection, escapeMarkdown } from '@/runs/utils/ExperimentUtils';
+import { escapeMarkdown } from '@/runs/utils/ExperimentUtils';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
-import { BeliefDistributionPlot } from '@/runs/components/BeliefDistributionPlot';
+import {
+    ExperimentContextSummary,
+    SectionHeader,
+    StyledMarkdown,
+} from '@/runs/components/ExperimentContextSummary';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
 import { ContinueWithAstaModal } from './ContinueWithAstaModal';
 
@@ -60,14 +63,6 @@ export const ExperimentDetails = memo(function ExperimentDetails({
         };
     }, []);
 
-    // Mirror the table's threshold logic so the panel and the Surprisal column stay in sync.
-    const isSurprising =
-        experiment.status !== ExperimentStatus.SUCCEEDED
-            ? false
-            : surprisalWidth != null
-              ? Math.abs(experiment.surprise ?? 0) >= surprisalWidth
-              : experiment.isSurprising;
-
     return (
         <DetailsWrapper ref={wrapperRef} spacing={0}>
             <TitleWrapper>
@@ -91,48 +86,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                     </Box>
                 )}
 
-                {(experiment.surprise !== null ||
-                    experiment.priorBelief ||
-                    experiment.posteriorBelief) && (
-                    <Box>
-                        <SectionHeader>
-                            Belief Shift
-                            {experiment.surprise !== null &&
-                                (isSurprising ? (
-                                    <OrangeText>
-                                        : {getSurprisalDirection(experiment.surprise)} (
-                                        {experiment.surprise.toFixed(3)})
-                                    </OrangeText>
-                                ) : (
-                                    <CreamText>
-                                        : {getSurprisalDirection(experiment.surprise)} (
-                                        {experiment.surprise.toFixed(3)})
-                                    </CreamText>
-                                ))}
-                        </SectionHeader>
-                        {(experiment.priorBelief || experiment.posteriorBelief) && (
-                            <BeliefDistributionPlot
-                                prior={experiment.priorBelief}
-                                posterior={experiment.posteriorBelief}
-                                isSurprising={isSurprising}
-                            />
-                        )}
-                    </Box>
-                )}
-
-                {experiment.hypothesis && (
-                    <Box>
-                        <SectionHeader>Hypothesis</SectionHeader>
-                        <StyledMarkdown>{escapeMarkdown(experiment.hypothesis)}</StyledMarkdown>
-                    </Box>
-                )}
-
-                {experiment.analysis && (
-                    <Box>
-                        <SectionHeader>Analysis</SectionHeader>
-                        <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
-                    </Box>
-                )}
+                <ExperimentContextSummary experiment={experiment} surprisalWidth={surprisalWidth} />
 
                 {experiment.experimentPlan && (
                     <>
@@ -215,6 +169,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                             onClose={() => setIsContinueModalOpen(false)}
                             runId={runId}
                             experiment={experiment}
+                            surprisalWidth={surprisalWidth}
                         />
                     </>
                 ))}
@@ -265,19 +220,6 @@ const Bookmark = styled('div')`
     .MuiIconButton-root {
         padding: 0px 8px 1px 8px;
     }
-`;
-
-const SectionHeader = styled(Typography)`
-    color: ${({ theme }) => theme.color['green-40'].rgba.toString()};
-    font-weight: 700;
-`;
-
-const OrangeText = styled('strong')`
-    color: ${({ theme }) => theme.color['warning-orange-100'].hex};
-`;
-
-const CreamText = styled('strong')`
-    color: ${({ theme }) => theme.color['cream-100'].hex};
 `;
 
 const BottomBar = styled('div')<{ $visible: boolean }>`
@@ -332,62 +274,5 @@ const ContinueExploringButton = styled(Button)`
             color: ${({ theme }) => theme.color['green-100'].hex};
             border: 1px solid ${({ theme }) => theme.color['green-100'].hex};
         }
-    }
-`;
-
-const StyledMarkdown = styled(Markdown)`
-    margin-top: ${({ theme }) => theme.spacing(0.5)};
-
-    &,
-    & * {
-        font-size: 0.875rem !important;
-        margin: 0;
-    }
-
-    & ol,
-    & ul {
-        padding-left: 1.5em;
-        margin: 0.25em 0;
-    }
-
-    & li {
-        margin: 0.125em 0;
-    }
-
-    & p {
-        margin: 0.25em 0;
-    }
-
-    & p:first-of-type {
-        margin-top: 0;
-    }
-
-    /*
-     * Varnish2's Markdown maps every <code> (inline or block) to a block-level
-     * <pre>, which shows single-backtick inline code as a full-width dark block.
-     * Inline code comes out as <p><pre>...</pre></p>; block code as
-     * <span><pre>...</pre></span>. Reset <pre> to inline appearance and keep
-     * block styling only when it's wrapped by varnish2's <span>.
-     */
-    & pre {
-        display: inline;
-        padding: 1px 6px;
-        margin: 0 2px;
-        max-height: none;
-        max-width: fit-content;
-        overflow: visible;
-        font-size: 0.85em;
-        line-height: inherit;
-        vertical-align: baseline;
-    }
-
-    & span > pre {
-        display: block;
-        padding: ${({ theme }) => theme.spacing(2)};
-        margin: ${({ theme }) => theme.spacing(1)} 0;
-        max-width: 100%;
-        overflow: auto;
-        font-size: 0.8125rem;
-        line-height: 1.4;
     }
 `;

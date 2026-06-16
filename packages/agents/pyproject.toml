@@ -12,7 +12,7 @@ dependencies = [
     "asta-sandbox[modal-ephemeral]",
     "asta-autodiscovery-modal",
     "google-adk>=1.28.1,<2",
-    "litellm==1.83.7"
+    "litellm==1.85.0"
 ]
 
 [build-system]

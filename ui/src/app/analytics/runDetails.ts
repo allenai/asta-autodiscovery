@@ -40,5 +40,4 @@ export const mkContinueExploringWithAstaBtnAttrs = (props: {
 }) => mkTrackAttrs(`${RUN_DETAILS}__continue_exploring_with_asta_btn`, props);
 
 // Start Asta exploration event name (fired when user confirms and launches Asta)
-export const startAstaExplorationEventName =
-    `${RUN_DETAILS}__start_asta_exploration` as const;
+export const startAstaExplorationEventName = `${RUN_DETAILS}__start_asta_exploration` as const;

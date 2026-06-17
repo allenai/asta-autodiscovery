@@ -225,7 +225,7 @@ export function ExperimentsTable({
                             onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-setExploredExperimentIds((prev) =>
+                                setExploredExperimentIds((prev) =>
                                     new Set(prev).add(params.row.id as string)
                                 );
                                 setContinueExperiment(params.row.experiment);

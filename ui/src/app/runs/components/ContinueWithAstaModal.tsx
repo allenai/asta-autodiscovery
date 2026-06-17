@@ -68,7 +68,7 @@ export function ContinueWithAstaModal({
                 experimentId: experiment.experimentId,
                 hasCustomPrompt: prompt.trim().length > 0,
             });
-window.open(result.data.asta_url, '_blank', 'noopener,noreferrer');
+            window.open(result.data.asta_url, '_blank', 'noopener,noreferrer');
             onClose();
         } catch {
             setError('Failed to start Asta session. Please try again.');

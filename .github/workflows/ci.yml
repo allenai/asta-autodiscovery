@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # This build is purely for CI. The built images are not pushed anywhere.
+  docker-build:
+    name: Docker Compose Build
+    runs-on: ubuntu-latest
+
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build containers
+        run: docker compose build
+        env:
+          # These all need to be set for the build.
+          GOOGLE_APPLICATION_CREDENTIALS: /dev/null
+          GCS_BUCKET: ""
+          GCP_PROJECT: ""
+          GOOGLE_ACCESS_KEY_ID: ""
+          GOOGLE_ACCESS_KEY_SECRET: ""
+
+      - name: Notify Slack on failure
+        if: ${{ failure() && github.ref == 'refs/heads/main' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 CI: Docker Compose Build failed\nAuthor: ${{ github.actor }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+
+  # This build is purely for CI. It does not publish any artifacts.
+  ui-build:
+    name: UI Build
+    runs-on: ubuntu-latest
+
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    defaults:
+      run:
+        working-directory: ui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "yarn"
+          cache-dependency-path: ui/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Notify Slack on failure
+        if: ${{ failure() && github.ref == 'refs/heads/main' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 CI: UI Build failed\nAuthor: ${{ github.actor }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+
+  # Notify the private repo once, but only after both builds succeed on a
+  # push to main. `needs` guarantees this runs only on success of both jobs.
+  notify-private:
+    name: Process public main change
+    needs: [docker-build, ui-build]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger workflow
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_DISPATCH_TOKEN }}
+        run: |
+          gh workflow run process-public-main-change.yml \
+            --repo allenai/asta-autodiscovery-private --ref main

@@ -9,7 +9,7 @@ Uses a GCS-based lock to prevent concurrent executions when scheduled frequently
 
 Environment variables required:
     - GCS credentials (for reading/writing job state)
-    - AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for user email lookup)
+    - AUTH0_MGMT_DOMAIN, AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for user email lookup)
 """
 
 import argparse

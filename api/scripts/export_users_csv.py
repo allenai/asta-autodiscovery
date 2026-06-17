@@ -11,7 +11,7 @@ With --daily-activity, additional columns are appended:
     - experiments_YYYY-MM-DD: Experiments completed on each day (one column per day)
 
 Environment variables required:
-    AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for email lookup)
+    AUTH0_MGMT_DOMAIN, AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for email lookup)
     GCS credentials (for reading job/user state)
 
 Usage:

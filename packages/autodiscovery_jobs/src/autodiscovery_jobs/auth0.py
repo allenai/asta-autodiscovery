@@ -4,6 +4,8 @@ This module provides functions to query Auth0 for user information,
 specifically to retrieve user email addresses by user ID.
 
 Required environment variables:
+    AUTH0_MGMT_DOMAIN: Auth0 tenant domain for the Management API
+                       (e.g. "your-tenant.us.auth0.com")
     AUTH0_MGMT_CLIENT_ID: Management API client ID
     AUTH0_MGMT_CLIENT_SECRET: Management API client secret
 
@@ -19,13 +21,18 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
-AUTH0_MGMT_DOMAIN = "YOUR_TENANT.us.auth0.com"
-
-
 class Auth0Error(Exception):
     """Raised when Auth0 API calls fail."""
 
     pass
+
+
+def _require_env(name: str) -> str:
+    """Return the value of a required environment variable, or raise."""
+    try:
+        return os.environ[name]
+    except KeyError as e:
+        raise Auth0Error(f"Missing required environment variable: {e}")
 
 
 @lru_cache(maxsize=1)
@@ -35,18 +42,16 @@ def _get_management_token() -> str:
     Uses client credentials grant to obtain a token.
     Token is cached for the lifetime of the process.
     """
-    try:
-        client_id = os.environ["AUTH0_MGMT_CLIENT_ID"]
-        client_secret = os.environ["AUTH0_MGMT_CLIENT_SECRET"]
-    except KeyError as e:
-        raise Auth0Error(f"Missing required environment variable: {e}")
+    domain = _require_env("AUTH0_MGMT_DOMAIN")
+    client_id = _require_env("AUTH0_MGMT_CLIENT_ID")
+    client_secret = _require_env("AUTH0_MGMT_CLIENT_SECRET")
 
-    token_url = f"https://{AUTH0_MGMT_DOMAIN}/oauth/token"
+    token_url = f"https://{domain}/oauth/token"
     payload = {
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret,
-        "audience": f"https://{AUTH0_MGMT_DOMAIN}/api/v2/",
+        "audience": f"https://{domain}/api/v2/",
     }
 
     try:
@@ -76,8 +81,9 @@ def get_user(userid: str) -> dict[str, Any]:
     from urllib.parse import quote
 
     token = _get_management_token()
+    domain = _require_env("AUTH0_MGMT_DOMAIN")
     encoded_userid = quote(userid, safe="")
-    user_url = f"https://{AUTH0_MGMT_DOMAIN}/api/v2/users/{encoded_userid}"
+    user_url = f"https://{domain}/api/v2/users/{encoded_userid}"
 
     try:
         req = Request(user_url, method="GET")

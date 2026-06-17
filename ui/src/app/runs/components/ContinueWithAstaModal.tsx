@@ -20,6 +20,8 @@ import { useEffect, useState } from 'react';
 import { getRunsApi } from '@/api/RunsApi';
 import { Experiment } from '@/types/Run';
 import { ExperimentContextSummary } from '@/runs/components/ExperimentContextSummary';
+import { startAstaExplorationEventName } from '@/analytics/runDetails';
+import { track } from '@/analytics/track';
 
 interface ContinueWithAstaModalProps {
     open: boolean;
@@ -60,6 +62,11 @@ export function ContinueWithAstaModal({
                 runId,
                 experimentId: experiment.experimentId,
                 query: prompt,
+            });
+            track(startAstaExplorationEventName, {
+                runId,
+                experimentId: experiment.experimentId,
+                hasCustomPrompt: prompt.trim().length > 0,
             });
             window.open(result.data.asta_url, '_blank', 'noopener,noreferrer');
             onClose();

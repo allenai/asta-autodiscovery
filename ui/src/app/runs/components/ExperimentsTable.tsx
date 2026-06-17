@@ -13,7 +13,11 @@ import { useAuth0 } from '@/contexts/Auth0Context';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
-import { mkExperimentRowAttrs, sortColumnEventName } from '@/analytics/runDetails';
+import {
+    mkExperimentRowAttrs,
+    mkExploreWithAstaTableLinkAttrs,
+    sortColumnEventName,
+} from '@/analytics/runDetails';
 import { track } from '@/analytics/track';
 import { useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { ExperimentBookmarkControl } from './ExperimentBookmarkControl';
@@ -214,6 +218,10 @@ export function ExperimentsTable({
                         <ExplorationLink
                             href="#"
                             className={isExplored ? 'explored' : 'not-explored'}
+                            {...mkExploreWithAstaTableLinkAttrs({
+                                runId: runid ?? '',
+                                experimentId: params.row.experiment?.experimentId,
+                            })}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();

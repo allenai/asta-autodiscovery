@@ -28,3 +28,17 @@ export const mkDownloadCsvMenuItemAttrs = (props: { runId: string }) =>
 // Download JSON menu item click
 export const mkDownloadJsonMenuItemAttrs = (props: { runId: string }) =>
     mkTrackAttrs(`${RUN_DETAILS}__download_json`, props);
+
+// Explore with Asta table link click (opens modal from experiments table)
+export const mkExploreWithAstaTableLinkAttrs = (props: { runId: string; experimentId: string }) =>
+    mkTrackAttrs(`${RUN_DETAILS}__explore_with_asta_table_link`, props);
+
+// Continue exploring with Asta button click (opens modal from experiment detail panel)
+export const mkContinueExploringWithAstaBtnAttrs = (props: {
+    runId: string;
+    experimentId: string;
+}) => mkTrackAttrs(`${RUN_DETAILS}__continue_exploring_with_asta_btn`, props);
+
+// Start Asta exploration event name (fired when user confirms and launches Asta)
+export const startAstaExplorationEventName =
+    `${RUN_DETAILS}__start_asta_exploration` as const;

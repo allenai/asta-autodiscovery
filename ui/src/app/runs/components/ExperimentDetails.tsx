@@ -6,6 +6,7 @@ import { CodeBlock } from '@/components/CodeBlock';
 import { escapeMarkdown } from '@/runs/utils/ExperimentUtils';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { mkContinueExploringWithAstaBtnAttrs } from '@/analytics/runDetails';
 import { StatusChip } from '@/runs/components/StatusChip';
 import { RichOutputsSection } from '@/runs/components/RichOutputsSection';
 import {
@@ -160,6 +161,10 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                         <BottomBar $visible={hasScrolled}>
                             <ContinueExploringButton
                                 variant="outlined"
+                                {...mkContinueExploringWithAstaBtnAttrs({
+                                    runId,
+                                    experimentId: experiment.experimentId,
+                                })}
                                 onClick={() => setIsContinueModalOpen(true)}>
                                 Continue exploring with Asta
                             </ContinueExploringButton>

@@ -20,5 +20,9 @@ RUN pip install -r requirements.txt
 # Copy over the source code
 COPY api/ .
 
-# Kick things off
-ENTRYPOINT [ "/api/dev.sh" ]
+# Kick things off. Default to the production entrypoint (start.sh: no --reload,
+# structured JSON access logs). Under Skiff1 the prod command was overridden to
+# /api/start.sh in webapp.jsonnet; Skiff2 (Cloud Run) cannot override the image
+# command, so the prod entrypoint must be the image default. Local dev gets
+# /api/dev.sh (hot reload) via the docker-compose `entrypoint` override.
+ENTRYPOINT [ "/api/start.sh" ]

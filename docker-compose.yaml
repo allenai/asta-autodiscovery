@@ -10,6 +10,10 @@ services:
     build:
       context: .
       dockerfile: ./api/Dockerfile
+    # The image ENTRYPOINT defaults to the production script (start.sh) for
+    # Skiff2/Cloud Run, which cannot override the container command.
+    # Local dev uses dev.sh for hot reload (--reload).
+    entrypoint: ["/api/dev.sh"]
     env_file:
       - .env
     volumes:

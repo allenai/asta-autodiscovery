@@ -90,9 +90,8 @@ from .auth0 import (
 
 # Email sending
 from .email import (
+    EmailError,
     send_email,
-    DEFAULT_SENDER_EMAIL,
-    DEFAULT_SMTP_SERVER,
 )
 
 __version__ = "0.2.2"
@@ -154,7 +153,6 @@ __all__ = [
     # Auth0 functions
     "get_user",
     # Email functions
+    "EmailError",
     "send_email",
-    "DEFAULT_SENDER_EMAIL",
-    "DEFAULT_SMTP_SERVER",
 ]

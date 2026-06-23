@@ -1605,8 +1605,6 @@ def create() -> Blueprint:
             return jsonify({"error": "Failed to save context to storage"}), 500
 
         # Copy dataset files — required for Asta to load the data.
-        # TODO: register these objects' metadata with the context service so the
-        # datasets are tracked too (follow-up; the service has no copy endpoint).
         try:
             dataset_uris = asta_gcs.copy_dataset_to_asta_workspace(userid, runid, user_uuid, thread_id, config)
             current_app.logger.info("Copied %d dataset file(s) to Asta workspace", len(dataset_uris))

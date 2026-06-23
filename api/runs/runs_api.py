@@ -1486,6 +1486,7 @@ def create() -> Blueprint:
         import requests as _requests
 
         import utils.asta_client as asta_client
+        import utils.asta_context_client as asta_context_client
         from autodiscovery_jobs import asta_gcs
 
         if not JOBS_AVAILABLE:
@@ -1586,17 +1587,26 @@ def create() -> Blueprint:
             current_app.logger.error("Asta thread creation failed: %s", e)
             return jsonify({"error": "Failed to create Asta thread"}), 502
 
-        manifest_gcs_uri = asta_gcs.get_manifest_gcs_uri(user_uuid, thread_id)
         asta_url = f"{asta_client.ASTA_BASE_URL}/chat/{thread_id}"
 
-        # Save manifest.json — this is the primary deliverable for M1
+        # Upload manifest.json through the context service so it is tracked.
+        # The service writes the object + metadata row and returns its gs:// path.
         try:
-            asta_gcs.save_manifest_json(user_uuid, thread_id, manifest.model_dump())
+            manifest_gcs_uri = asta_context_client.upload_json_artifact(
+                owner_id=user_uuid,
+                prefix=thread_id,
+                filename="manifest.json",
+                content=manifest.model_dump(),
+                artifact_type="manifest",
+                source="autodiscovery",
+            )
         except Exception as e:
-            current_app.logger.error("Failed to write manifest to GCS: %s", e)
+            current_app.logger.error("Failed to upload manifest to context service: %s", e)
             return jsonify({"error": "Failed to save context to storage"}), 500
 
-        # Copy dataset files — required for Asta to load the data
+        # Copy dataset files — required for Asta to load the data.
+        # TODO: register these objects' metadata with the context service so the
+        # datasets are tracked too (follow-up; the service has no copy endpoint).
         try:
             dataset_uris = asta_gcs.copy_dataset_to_asta_workspace(userid, runid, user_uuid, thread_id, config)
             current_app.logger.info("Copied %d dataset file(s) to Asta workspace", len(dataset_uris))

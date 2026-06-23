@@ -1,6 +1,10 @@
-"""GCS operations for the Asta workspace bucket."""
+"""GCS operations for the Asta workspace bucket.
 
-import json
+The manifest and dataset metadata writes now go through asta-context-service
+(see api/utils/asta_context_client.py) so they are tracked. This module retains
+only the server-side dataset copy.
+"""
+
 import logging
 import os
 
@@ -11,46 +15,6 @@ from .config import JobConfig
 _log = logging.getLogger(__name__)
 
 ASTA_BUCKET = os.environ.get("ASTA_BUCKET", "example-workspaces-project")
-
-
-def get_manifest_gcs_uri(user_uuid: str, thread_id: str) -> str:
-    """Return the GCS URI for a manifest.json file.
-
-    Args:
-        user_uuid: Asta user UUID
-        thread_id: Thread UUID
-
-    Returns:
-        Full GCS URI string
-    """
-    return f"gs://{ASTA_BUCKET}/owners/{user_uuid}/{thread_id}/manifest.json"
-
-
-def save_manifest_json(user_uuid: str, thread_id: str, manifest: dict) -> str:
-    """Upload manifest.json to the Asta workspace bucket.
-
-    Args:
-        user_uuid: Asta user UUID
-        thread_id: Pre-generated thread UUID
-        manifest: Manifest data dict to serialize as JSON
-
-    Returns:
-        GCS URI of the uploaded manifest
-
-    Raises:
-        google.cloud.exceptions.GoogleCloudError: If the upload fails
-    """
-    client = storage.Client()
-    bucket = client.bucket(ASTA_BUCKET)
-    blob_path = f"owners/{user_uuid}/{thread_id}/manifest.json"
-    blob = bucket.blob(blob_path)
-    blob.upload_from_string(
-        json.dumps(manifest, indent=2),
-        content_type="application/json",
-    )
-    uri = f"gs://{ASTA_BUCKET}/{blob_path}"
-    _log.info("Saved manifest to %s", uri)
-    return uri
 
 
 def copy_dataset_to_asta_workspace(

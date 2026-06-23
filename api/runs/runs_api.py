@@ -1591,6 +1591,7 @@ def create() -> Blueprint:
 
         # Upload manifest.json through the context service so it is tracked.
         # The service writes the object + metadata row and returns its gs:// path.
+        deletable_date = (datetime.now(UTC) + timedelta(days=30)).date().isoformat()
         try:
             manifest_gcs_uri = asta_context_client.upload_json_artifact(
                 owner_id=user_uuid,
@@ -1599,6 +1600,7 @@ def create() -> Blueprint:
                 content=manifest.model_dump(),
                 artifact_type="manifest",
                 source="autodiscovery",
+                tags=[f"dataset_deletable_date:{deletable_date}"],
             )
         except Exception as e:
             current_app.logger.error("Failed to upload manifest to context service: %s", e)

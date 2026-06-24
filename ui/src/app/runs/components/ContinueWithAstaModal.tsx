@@ -68,7 +68,7 @@ export function ContinueWithAstaModal({
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{
-      background: ${({ theme }) => theme.color['extra-dark-teal-100'].hex};
+      background: #0A3235;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       height:100vh;gap:20px;font-family:Manrope,sans-serif;
     }

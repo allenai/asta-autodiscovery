@@ -95,29 +95,6 @@ cd app/
 yarn install --frozen-lockfile
 ```
 
-### Onboarding
-
-To deploy your application to Skiff it'll need to be [onboarded](https://***REMOVED***/onboarding.html).
-Start by editing the `skiff.json` file in your repository:
-
-- change `appName` to a short, unique identifier that's valid DNS subdomain
-- set `contact` to your AI2 email address without the `@allenai.org` suffix
-- set `team` to the name of the AI2 team that's responsible for the application
-
-After making and committing those changes, submit a [request to be onboarded](https://github.com/allenai/skiff/issues/new/choose).
-
-### Deploys
-
-Commits to the `main` branch are automatically deployed to the development environment. 
-
-**Environments:**
-- **Development:** `main` branch → https://autodiscovery-dev.example.com/
-  - Automatically deployed.
-- **Production:** `env/prod` branch → https://autodiscovery.example.com/
-  - Manually deployed by pointing the branch at a good commit. 
-
-You can find more details about your application via [Marina](https://deploy.example.com/a/asta-autodiscovery).
-
 ## Getting Help
 
 See [Skiff's Documentation](https://***REMOVED***/) for more information.

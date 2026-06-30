@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/api/autodiscovery_modal/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/api/code_execution/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/autodiscovery/standalone/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/autodiscovery/surprisal_normalization/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/autodiscovery_modal/sandbox_backend/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/code_execution/ipython_executor/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+    <url>
+         <loc>https://allenai.github.io/asta-autodiscovery/code_execution/ipython_session/</loc>
+         <lastmod>2026-06-30</lastmod>
+    </url>
+</urlset>

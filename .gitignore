@@ -34,3 +34,8 @@ UI_DESIGN_GUIDE.md
 # macOS
 .DS_Store
 **/.DS_Store
+
+# Autodiscovery: large local datasets & downloaded job results (keep small inputs/config)
+packages/autodiscovery/data/ad-hypo-prompts/
+*.arrow
+packages/autodiscovery/test-adv-output/

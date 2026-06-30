@@ -1,0 +1,45 @@
+{
+  "description": "Sampled hypothesis-surprisal records derived from the ad-hypo-prompts dataset. Each row is one candidate scientific hypothesis that was tested against a dataset, with its annotated Bayesian-surprise score and context features.",
+  "datasets": [
+    {
+      "name": "ad_hypo_surprisal.csv",
+      "description": "One row per candidate hypothesis evaluation, with provenance, context-size features, and a surprise score.",
+      "columns": {
+        "raw": [
+          {
+            "name": "normalized_id",
+            "description": "Unique id of the hypothesis evaluation (corpus + MCTS node id)."
+          },
+          {
+            "name": "sequence_group_id",
+            "description": "Id grouping hypotheses that share an exploration sequence/run."
+          },
+          {
+            "name": "source_corpus",
+            "description": "Source corpus the hypothesis came from (categorical, e.g. 'asta', 'gpt5mini')."
+          },
+          {
+            "name": "creation_idx",
+            "description": "Integer order in which the record was created within its group."
+          },
+          {
+            "name": "surprisal",
+            "description": "Bayesian-surprise score of the hypothesis result, 0 (unsurprising) to 1 (very surprising)."
+          },
+          {
+            "name": "prompt_char_len",
+            "description": "Character length of the full prompt shown to the predictor."
+          },
+          {
+            "name": "candidate_char_len",
+            "description": "Character length of the candidate hypothesis text."
+          },
+          {
+            "name": "num_previous_hypotheses",
+            "description": "Count of previously-tested hypotheses provided as context (0-4)."
+          }
+        ]
+      }
+    }
+  ]
+}

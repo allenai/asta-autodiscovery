@@ -1,0 +1,13 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - packages/autodiscovery/Dockerfile
+      - -t
+      - us-central1-docker.pkg.dev/autodiscovery-research/autodiscovery/asta-autodiscovery:latest
+      - .
+images:
+  - us-central1-docker.pkg.dev/autodiscovery-research/autodiscovery/asta-autodiscovery:latest
+options:
+  machineType: E2_HIGHCPU_8

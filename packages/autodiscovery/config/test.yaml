@@ -1,0 +1,42 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  annotations:
+    run.googleapis.com/creator: sijial@allenai.org
+    run.googleapis.com/lastModifier: sijial@allenai.org
+  labels:
+    cloud.googleapis.com/location: us-central1
+    run.googleapis.com/lastUpdatedTime: '2026-06-29T22:54:49.900984Z'
+  name: test-adv
+  namespace: '1045379309345'
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/client-name: gcloud
+        run.googleapis.com/client-version: 574.0.0
+        run.googleapis.com/execution-environment: gen2
+      labels:
+        client.knative.dev/nonce: dus_zoc_dur
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          containers:
+          - image: us-central1-docker.pkg.dev/autodiscovery-research/autodiscovery/asta-autodiscovery@sha256:7f8cef5be1b79ff47bc0bbeadf8ef2a9036d047b88476585af93166066d2fb62
+            resources:
+              limits:
+                cpu: 1000m
+                memory: 512Mi
+            volumeMounts:
+            - mountPath: /mnt/gcs
+              name: job-storage
+          maxRetries: 3
+          serviceAccountName: 1045379309345-compute@developer.gserviceaccount.com
+          timeoutSeconds: '3600'
+          volumes:
+          - csi:
+              driver: gcsfuse.run.googleapis.com
+              volumeAttributes:
+                bucketName: sijia-adv-exp
+            name: job-storage

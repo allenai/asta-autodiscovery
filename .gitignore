@@ -39,3 +39,7 @@ UI_DESIGN_GUIDE.md
 packages/autodiscovery/data/ad-hypo-prompts/
 *.arrow
 packages/autodiscovery/test-adv-output/
+
+# Docker image artifacts (e.g. `docker save` output) — never commit built images
+*.tar
+*.tar.gz

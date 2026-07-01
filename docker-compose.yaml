@@ -24,15 +24,30 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # For AUTH_PROVIDER=password_file, mount the store and point AUTH_PASSWORD_FILE at it:
+      # - type: bind
+      #   source: ./secrets/users.json
+      #   target: /secrets/users.json
+      #   read_only: true
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      # Active auth provider: auth0 (default) | password_file | none
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-auth0}
       - AUTH0_DOMAIN=${AUTH0_DOMAIN:-auth0.allenai.org}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://asta-core.allen.ai}
-      # If set, users must have this Auth0 permission. If empty/unset, any authenticated user can access.
-      - AUTH0_REQUIRED_PERMISSION=${AUTH0_REQUIRED_PERMISSION}
+      # Served to the UI via /api/auth/config so the SPA client can be built at runtime.
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      # If set, users must have this permission. If empty/unset, any authenticated user can access.
+      - AUTH_REQUIRED_PERMISSION=${AUTH_REQUIRED_PERMISSION:-${AUTH0_REQUIRED_PERMISSION}}
+      # password_file provider: path to the mounted store + HS256 session signing secret.
+      - AUTH_PASSWORD_FILE=${AUTH_PASSWORD_FILE}
+      - AUTH_SESSION_SECRET=${AUTH_SESSION_SECRET}
+      - AUTH_SESSION_TTL=${AUTH_SESSION_TTL}
+      # none ("desktop mode") provider: identity of the fixed local user (optional).
+      - AUTH_LOCAL_SUB=${AUTH_LOCAL_SUB}
       # GCS and Google Cloud credentials
       - GCS_BUCKET=${GCS_BUCKET}
       - GCP_PROJECT=${GCP_PROJECT}

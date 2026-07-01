@@ -9,13 +9,18 @@ import { mkLoginBtnTrackAttrs, mkLogoutBtnTrackAttrs } from '@/analytics/run';
 import { TEST_ID_SIGN_IN_BUTTON } from '@/testIds';
 
 export default function AuthButton() {
-    const { isAuthenticated, isLoading, loginWithRedirect, logout } = useAuth0();
+    const { isAuthenticated, isLoading, loginWithRedirect, logout, provider } = useAuth0();
 
     const handleLogout = () => {
         logout();
     };
 
     if (isLoading) {
+        return null;
+    }
+
+    // Desktop mode ("none" provider) has no sign-in/out affordance.
+    if (provider === 'none') {
         return null;
     }
 

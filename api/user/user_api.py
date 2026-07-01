@@ -1,8 +1,5 @@
-import os
-
-import requests
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import requires_auth, requires_enrollment
+from utils.auth import get_auth_provider, requires_auth, requires_enrollment
 from utils.credits import get_user_credits
 
 # Import autodiscovery_jobs when available
@@ -40,29 +37,12 @@ def create() -> Blueprint:
     @api.route("/me")
     @requires_auth()
     def api_user():  # pyright: ignore reportUnusedFunction
-        auth0_domain = os.environ.get("AUTH0_DOMAIN")
-
-        # The access token only has basic claims, so fetch full user info from /userinfo endpoint
-        token = request.headers.get("Authorization", "").split()[1]
-
+        # Delegate to the active auth provider. For Auth0 this fetches the full
+        # profile from /userinfo; other providers derive it from the session.
         try:
-            userinfo_url = f"https://{auth0_domain}/userinfo"
-            headers = {"Authorization": f"Bearer {token}"}
-            userinfo_response = requests.get(userinfo_url, headers=headers)
-            userinfo_response.raise_for_status()
-            user = userinfo_response.json()
-
-            return jsonify(
-                {
-                    "user": {
-                        "sub": user.get("sub"),
-                        "name": user.get("name"),
-                        "email": user.get("email"),
-                        "picture": user.get("picture"),
-                        "email_verified": user.get("email_verified"),
-                    },
-                }
-            )
+            provider = get_auth_provider()
+            profile = provider.user_profile(request, request.auth_user)
+            return jsonify({"user": profile})
         except Exception as e:
             current_app.logger.error(f"Failed to fetch user info: {str(e)}")
             return jsonify({"error": f"Failed to fetch user info: {str(e)}"}), 500

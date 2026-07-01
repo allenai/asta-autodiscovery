@@ -12,8 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from google.cloud import storage
-
+from .client import get_storage_client
 from .config import JobConfig
 
 
@@ -114,7 +113,7 @@ def create_run_details(
         The created RunDetails object
     """
     config = config or JobConfig.from_env()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     run_details = RunDetails.create_new()
@@ -142,7 +141,7 @@ def get_run_details(
         RunDetails object, or None if not found
     """
     config = config or JobConfig.from_env()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = get_run_details_path(userid, runid)
@@ -174,7 +173,7 @@ def update_run_details(
         Updated RunDetails object
     """
     config = config or JobConfig.from_env()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     # Get existing details

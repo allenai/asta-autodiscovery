@@ -46,8 +46,6 @@ services:
       - AUTH_PASSWORD_FILE=${AUTH_PASSWORD_FILE}
       - AUTH_SESSION_SECRET=${AUTH_SESSION_SECRET}
       - AUTH_SESSION_TTL=${AUTH_SESSION_TTL}
-      # none ("desktop mode") provider: identity of the fixed local user (optional).
-      - AUTH_LOCAL_SUB=${AUTH_LOCAL_SUB}
       # GCS and Google Cloud credentials
       - GCS_BUCKET=${GCS_BUCKET}
       - GCP_PROJECT=${GCP_PROJECT}

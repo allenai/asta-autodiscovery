@@ -117,8 +117,9 @@ the active provider. Their required-vs-optional semantics are preserved:
 | `requires_auth` / `requires_enrollment` | 401 | 401 | check perms, set `request.user` |
 | `optional_enrollment` | `request.user = {}` | `request.user = {}` | set `request.user` |
 
-`DEV_MASQUERADE_USER` and `set_userid(...)` move into the shared decorator path so they
-apply to every provider.
+`set_userid(...)` moves into the shared decorator path so it applies to every provider.
+(The old Auth0-only `DEV_MASQUERADE_USER` debug override was dropped — it had fallen out of
+use, and the `none` provider covers the "run as a fixed user" case.)
 
 ### 3. Activation / config
 
@@ -148,7 +149,7 @@ both required and optional decorators just work:
 
 ```python
 AuthenticatedUser(
-    sub=os.environ.get("AUTH_LOCAL_SUB", "local"),
+    sub="local",   # hardcoded fixed identity
     name="Local User", email="local@localhost", email_verified=True,
     permissions=ALL_PERMISSIONS,   # every PermissionType value -> all features unlocked
 )
@@ -222,8 +223,9 @@ and runs **offline**, not in the request path. Out of scope for swapping; left a
 | `AUTH_PASSWORD_FILE` | password_file | path to mounted JSON |
 | `AUTH_SESSION_SECRET` | password_file | HS256 signing secret |
 | `AUTH_SESSION_TTL` | password_file | token lifetime (default e.g. 12h) |
-| `AUTH_LOCAL_SUB` | none | default `local` |
 | `AUTH0_*` | auth0 | unchanged |
+
+(The `none` provider needs no configuration — its `local` identity is hardcoded.)
 
 ---
 

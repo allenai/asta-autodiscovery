@@ -12,14 +12,8 @@ from .permissions import PermissionType
 
 
 def _establish_user(user: AuthenticatedUser) -> dict:
-    """Set request.user (back-compat dict) and the logging context.
-
-    Honors the DEV_MASQUERADE_USER override so it applies to every provider.
-    """
+    """Set request.user (back-compat dict) and the logging context."""
     request_user = user.to_request_user()
-    masquerade_user = os.environ.get("DEV_MASQUERADE_USER")
-    if masquerade_user:
-        request_user["sub"] = masquerade_user
     request.user = request_user
     request.auth_user = user  # typed identity, for provider.user_profile()
     g._userid_logging_token = set_userid(request_user.get("sub"))

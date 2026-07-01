@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from google.cloud import storage
 from google.api_core import retry as google_retry
 from google.cloud.exceptions import NotFound
 
+from .client import get_storage_client
 from .config import JobConfig
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ def create_user_profile(
         raise ValueError(f"granted_credits must be non-negative, got {granted_credits}")
 
     config = config or JobConfig.from_env()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     user_profile = UserProfile.create_new(granted_credits=granted_credits)
@@ -131,7 +131,7 @@ def get_user_profile(
         UserProfile object, or None if not found or on error
     """
     config = config or JobConfig.from_env()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = get_user_profile_path(userid)
@@ -176,7 +176,7 @@ def update_user_profile(
             raise ValueError(f"granted_credits must be non-negative, got {credits}")
 
     config = config or JobConfig.from_env()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     # Get existing profile

@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from google.cloud import storage
+from google.cloud.exceptions import NotFound
 
+from .client import get_storage_client
 from .config import JobConfig
 from .exceptions import GCSError, JobAlreadyExistsError, JobNotFoundError
 
@@ -85,7 +87,7 @@ def list_user_ids(config: JobConfig | None = None) -> list[str]:
         GCSError: If listing fails
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = "users/"
@@ -122,7 +124,7 @@ def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
         GCSError: If listing fails
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/"
@@ -158,7 +160,7 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
         GCSError: If listing fails
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     try:
@@ -183,7 +185,7 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
 
 def _shared_run_index_blob(jobid: str, config: JobConfig) -> storage.Blob:
     """Return the GCS blob for a shared run index entry."""
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
     return bucket.blob(f"index/shared-runs/{jobid}")
 
@@ -250,7 +252,7 @@ def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool
         True if job exists, False otherwise
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/{jobid}/"
@@ -290,7 +292,7 @@ def create_job_directory(
     if not overwrite and job_exists(userid, jobid, config):
         raise JobAlreadyExistsError(f"Job {jobid} already exists for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     base_path = f"users/{userid}/jobs/{jobid}"
@@ -331,7 +333,7 @@ def copy_job_data_files(
         GCSError: If copy fails
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     source_prefix = f"users/{source_userid}/jobs/{source_jobid}/data/"
@@ -370,7 +372,7 @@ def has_data_files(
         True if the job's data/ directory contains at least one real file
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
     prefix = f"users/{userid}/jobs/{jobid}/data/"
 
@@ -399,7 +401,7 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/{jobid}/"
@@ -446,7 +448,7 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     # Delete all files in data/ directory except .placeholder
@@ -523,7 +525,7 @@ def upload_dataset(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     base_path = f"users/{userid}/jobs/{jobid}/data"
@@ -582,7 +584,7 @@ def expire_datasets(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
     prefix = f"users/{userid}/jobs/{jobid}/data/"
 
@@ -639,7 +641,7 @@ def upload_metadata(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
@@ -675,7 +677,7 @@ def upload_job_args(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = f"users/{userid}/jobs/{jobid}/output/args.json"
@@ -705,18 +707,25 @@ def get_metadata(userid: str, jobid: str, config: JobConfig | None = None) -> di
     """
     config = config or JobConfig()
 
-    if not job_exists(userid, jobid, config):
-        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
-
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
 
+    # Download directly instead of pre-checking existence with a separate list
+    # request. On a miss we fall back to job_exists() only to preserve the
+    # historical exception contract (JobNotFoundError vs GCSError); the common
+    # case where metadata.json exists costs a single round-trip.
     try:
         blob = bucket.blob(blob_path)
         metadata_str = blob.download_as_text()
         return json.loads(metadata_str)
+    except NotFound:
+        if not job_exists(userid, jobid, config):
+            raise JobNotFoundError(f"Job {jobid} not found for user {userid}") from None
+        raise GCSError(
+            f"Failed to download metadata: metadata.json not found for job {jobid}"
+        ) from None
     except Exception as e:
         raise GCSError(f"Failed to download metadata: {e}")
 
@@ -741,7 +750,7 @@ def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) ->
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/{jobid}/output/"
@@ -783,7 +792,7 @@ def download_job_results(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/{jobid}/output/"
@@ -831,7 +840,7 @@ def count_experiment_results(userid: str, jobid: str, config: JobConfig | None =
         5
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/{jobid}/output/"
@@ -870,21 +879,22 @@ def get_job_args(userid: str, jobid: str, config: JobConfig | None = None) -> di
         10
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = f"users/{userid}/jobs/{jobid}/output/args.json"
 
+    # Download directly rather than pre-checking existence with a separate
+    # request; a miss surfaces as NotFound and is handled like before.
     try:
         blob = bucket.blob(blob_path)
-        if not blob.exists():
-            import logging
-
-            logging.warning(f"args.json not found for job {jobid}")
-            return None
-
         content = blob.download_as_text()
         return json.loads(content)
+    except NotFound:
+        import logging
+
+        logging.warning(f"args.json not found for job {jobid}")
+        return None
     except json.JSONDecodeError as e:
         import logging
 
@@ -919,7 +929,7 @@ def list_experiment_files(userid: str, jobid: str, config: JobConfig | None = No
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     prefix = f"users/{userid}/jobs/{jobid}/output/"
@@ -957,7 +967,7 @@ def read_experiment_node(
         "node_0_0"
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     blob_path = f"users/{userid}/jobs/{jobid}/output/{filename}"
@@ -1005,7 +1015,7 @@ def read_rich_outputs(
         Returns an empty list when no rich outputs are found or parsing fails.
     """
     config = config or JobConfig()
-    client = storage.Client(project=config.project_id)
+    client = get_storage_client(config)
     bucket = client.bucket(config.bucket)
 
     filename = f"ro_{level}_{index}.json"
@@ -1087,7 +1097,7 @@ def generate_upload_url(
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
     try:
-        client = storage.Client(project=config.project_id)
+        client = get_storage_client(config)
         bucket = client.bucket(config.bucket)
 
         # Construct blob path (matches existing pattern: users/{userid}/jobs/{jobid}/data/{filename})

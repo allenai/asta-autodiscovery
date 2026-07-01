@@ -18,6 +18,17 @@ Example:
         >>> run_job("exampleuser", "test_1", n_experiments=4)
 """
 
+# Auth0 client
+from .auth0 import (
+    Auth0Error,
+    get_user,
+)
+from .backends import (
+    CloudRunBackend,
+    JobBackend,
+    build_job_args,
+    get_backend,
+)
 from .cloudrun import (
     cancel_job,
     get_job_logs,
@@ -25,12 +36,28 @@ from .cloudrun import (
     run_job,
 )
 from .config import DATASET_EXPIRY_DAYS, JobConfig
+
+# Email sending
+from .email import (
+    EmailError,
+    send_email,
+)
+
+# Email state management
+from .email_state import (
+    get_email_state,
+    get_email_state_path,
+    record_email_sent,
+    was_email_sent,
+)
 from .exceptions import (
     AutodiscoveryJobError,
     CloudRunError,
     DatasetExpiredError,
+    DockerBackendError,
     GCSError,
     JobAlreadyExistsError,
+    JobBackendError,
     JobNotFoundError,
 )
 
@@ -55,21 +82,13 @@ from .manager import ForkResult, JobManager
 
 # Run details management
 from .run_details import (
-    RunDetails,
     TERMINAL_STATUSES,
+    RunDetails,
     create_run_details,
     get_run_details,
     get_run_details_path,
     refresh_run_status,
     update_run_details,
-)
-
-# Email state management
-from .email_state import (
-    get_email_state,
-    get_email_state_path,
-    record_email_sent,
-    was_email_sent,
 )
 
 # User profile management
@@ -80,18 +99,6 @@ from .user_profile import (
     get_user_profile,
     get_user_profile_path,
     update_user_profile,
-)
-
-# Auth0 client
-from .auth0 import (
-    Auth0Error,
-    get_user,
-)
-
-# Email sending
-from .email import (
-    EmailError,
-    send_email,
 )
 
 __version__ = "0.2.2"
@@ -107,9 +114,16 @@ __all__ = [
     "JobNotFoundError",
     "JobAlreadyExistsError",
     "GCSError",
+    "JobBackendError",
     "CloudRunError",
+    "DockerBackendError",
     "DatasetExpiredError",
     "Auth0Error",
+    # Job backends
+    "JobBackend",
+    "CloudRunBackend",
+    "get_backend",
+    "build_job_args",
     # GCS functions
     "parse_gcs_path",
     "get_user_path",

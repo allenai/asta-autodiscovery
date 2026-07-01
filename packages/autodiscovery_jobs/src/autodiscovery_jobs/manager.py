@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
-from . import cloudrun, gcs
+from . import gcs
+from .backends import get_backend
 from .config import JobConfig
 from .exceptions import DatasetExpiredError
 from .run_details import RunDetails, create_run_details, get_run_details
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -27,7 +28,9 @@ class JobManager:
     """High-level interface for managing Cloud Run jobs.
 
     This class provides a convenient way to manage jobs with persistent configuration.
-    All operations delegate to the functional APIs in gcs and cloudrun modules.
+    GCS operations delegate to the functional APIs in the gcs module; job
+    execution (run/status/cancel/logs) delegates to a swappable
+    :class:`~autodiscovery_jobs.backends.JobBackend` selected by config.
 
     Example:
         >>> from autodiscovery_jobs import JobManager
@@ -44,6 +47,7 @@ class JobManager:
             config: Configuration (uses default from environment if None)
         """
         self.config = config or JobConfig.from_env()
+        self.backend = get_backend(self.config)
 
     # User operations
 
@@ -265,10 +269,7 @@ class JobManager:
         # Cancel execution if job is RUNNING
         if run_details and run_details.status == "RUNNING" and run_details.execution_id:
             try:
-                cloudrun.cancel_execution(
-                    execution_id=run_details.execution_id,
-                    config=self.config
-                )
+                self.backend.cancel_job(run_details.execution_id)
                 cancelled_execution = True
             except Exception:
                 # Continue with soft delete even if cancellation fails
@@ -514,21 +515,20 @@ class JobManager:
         Returns:
             Execution ID
         """
-        return cloudrun.run_job(
+        return self.backend.run_job(
             userid,
             jobid,
-            self.config,
-            n_experiments,
-            model,
-            belief_model,
-            temperature,
-            belief_temperature,
-            k_experiments,
-            mcts_selection,
-            reasoning_effort,
-            exploration_weight,
-            code_timeout,
-            n_warmstart,
+            n_experiments=n_experiments,
+            model=model,
+            belief_model=belief_model,
+            temperature=temperature,
+            belief_temperature=belief_temperature,
+            k_experiments=k_experiments,
+            mcts_selection=mcts_selection,
+            reasoning_effort=reasoning_effort,
+            exploration_weight=exploration_weight,
+            code_timeout=code_timeout,
+            n_warmstart=n_warmstart,
             **kwargs,
         )
 
@@ -541,7 +541,7 @@ class JobManager:
         Returns:
             Dictionary with status information
         """
-        return cloudrun.get_job_status(execution_id, self.config)
+        return self.backend.get_job_status(execution_id)
 
     def cancel_job(self, execution_id: str) -> None:
         """Cancel a running job execution.
@@ -549,7 +549,7 @@ class JobManager:
         Args:
             execution_id: Execution ID from run_job()
         """
-        cloudrun.cancel_job(execution_id, self.config)
+        self.backend.cancel_job(execution_id)
 
     def get_job_logs(self, execution_id: str | None = None, limit: int = 50) -> list[str]:
         """Get logs for a job execution.
@@ -561,7 +561,7 @@ class JobManager:
         Returns:
             List of log entries
         """
-        return cloudrun.get_job_logs(execution_id, self.config, limit)
+        return self.backend.get_job_logs(execution_id, limit)
 
     # Results
 

@@ -23,6 +23,11 @@ class JobConfig:
     region: str = "us-west1"
     job_name: str = "autodiscovery-job"
 
+    # Job backend selection: "gcp" (Cloud Run, default) or "docker" (local containers)
+    backend: str = "gcp"
+    # AD job image reference used by the Docker backend (ignored for gcp)
+    job_image: str | None = None
+
     # Modal Configuration (for sandbox execution)
     modal_app_name: str = "asta-autodiscovery"
     modal_bucket_secret: str = "example-bucket-secret"
@@ -46,6 +51,8 @@ class JobConfig:
             project_id=os.environ.get("GCP_PROJECT"),
             region=os.environ.get("GCP_REGION", cls.region),
             job_name=os.environ.get("CLOUDRUN_JOB_NAME", cls.job_name),
+            backend=os.environ.get("JOB_BACKEND", cls.backend),
+            job_image=os.environ.get("AUTODISCOVERY_IMAGE"),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),
             modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
         )

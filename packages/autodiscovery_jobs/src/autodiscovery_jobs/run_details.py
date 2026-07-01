@@ -200,12 +200,13 @@ def refresh_run_status(
     runid: str,
     config: JobConfig | None = None,
 ) -> RunDetails | None:
-    """Get run details, refreshing status from Cloud Run if not yet finished.
+    """Get run details, refreshing status from the job backend if not yet finished.
 
     This function:
     1. Fetches run details from GCS
     2. If the run is already finished (terminal status), returns as-is
-    3. If not finished and has an execution_id, queries Cloud Run for current status
+    3. If not finished and has an execution_id, queries the configured job
+       backend (Cloud Run or Docker) for current status
     4. Updates and persists the new status if changed
 
     Use this instead of get_run_details when you need the most up-to-date status.
@@ -218,7 +219,7 @@ def refresh_run_status(
     Returns:
         RunDetails object with refreshed status, or None if not found
     """
-    from .cloudrun import get_job_status
+    from .backends import get_backend
 
     config = config or JobConfig.from_env()
 
@@ -227,13 +228,13 @@ def refresh_run_status(
     if not run_details:
         return None
 
-    # If no execution_id, can't query Cloud Run
+    # If no execution_id, can't query the backend
     if not run_details.execution_id:
         return run_details
 
-    # Query Cloud Run for current status
+    # Query the job backend for current status
     try:
-        status_response = get_job_status(run_details.execution_id, config)
+        status_response = get_backend(config).get_job_status(run_details.execution_id)
         phase = status_response.get("phase", status_response.get("status", "UNKNOWN"))
         created_at = status_response.get("create_time", run_details.created_at)
         finished_at = status_response.get("completion_time")

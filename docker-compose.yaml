@@ -24,6 +24,9 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # Lets the API launch AutoDiscovery job containers on the host daemon when
+      # JOB_BACKEND=docker (docker-out-of-docker).
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
@@ -41,9 +44,26 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
       # Cloud Run job name for local dev (use -dev suffix)
       - CLOUDRUN_JOB_NAME=${CLOUDRUN_JOB_NAME:-autodiscovery-job-dev}
+      # Job backend selection. Override via .env/shell to switch the same local
+      # stack between launching jobs on GCP Cloud Run or as local containers.
+      - JOB_BACKEND=${JOB_BACKEND:-gcp}
+      # Image the docker backend launches per job (built via `docker compose build autodiscovery`).
+      - AUTODISCOVERY_IMAGE=${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
+      # docker backend: absolute host path of the GCP key, bind-mounted into each job container.
+      - GCP_KEY_HOST_PATH=${GCP_KEY_HOST_PATH:-}
       # Asta context service (artifact storage + metadata)
       - ASTA_CONTEXT_SERVICE_URL=${ASTA_CONTEXT_SERVICE_URL}
       - ASTA_CONTEXT_SERVICE_API_KEY=${ASTA_CONTEXT_SERVICE_API_KEY}
+  # Build-only: produces the AD job image that the API launches per run when
+  # JOB_BACKEND=docker. Not started by `docker compose up` (guarded by a profile);
+  # build it explicitly with `docker compose build autodiscovery`. The `image:`
+  # tag must match AUTODISCOVERY_IMAGE so the API can launch it by name.
+  autodiscovery:
+    profiles: ["jobs"]
+    image: ${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
+    build:
+      context: .
+      dockerfile: ./packages/autodiscovery/Dockerfile
   ui:
     build:
       context: ./ui

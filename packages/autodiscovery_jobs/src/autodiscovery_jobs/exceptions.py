@@ -25,8 +25,20 @@ class GCSError(AutodiscoveryJobError):
     pass
 
 
-class CloudRunError(AutodiscoveryJobError):
+class JobBackendError(AutodiscoveryJobError):
+    """Raised when a job backend (Cloud Run, Docker, ...) operation fails."""
+
+    pass
+
+
+class CloudRunError(JobBackendError):
     """Raised when Cloud Run operations fail."""
+
+    pass
+
+
+class DockerBackendError(JobBackendError):
+    """Raised when local Docker backend operations fail."""
 
     pass
 

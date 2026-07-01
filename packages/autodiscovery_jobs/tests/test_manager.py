@@ -200,7 +200,7 @@ def test_get_shared_run_owner_metadata_error(mock_config):
 
 def test_run_job(mock_config):
     """Test run_job method."""
-    with patch("autodiscovery_jobs.cloudrun.run_job") as mock_run:
+    with patch("autodiscovery_jobs.backends.gcp.run_job") as mock_run:
         mock_run.return_value = "execution-123"
 
         manager = JobManager(mock_config)
@@ -214,7 +214,7 @@ def test_run_job(mock_config):
 
 def test_get_job_status(mock_config):
     """Test get_job_status method."""
-    with patch("autodiscovery_jobs.cloudrun.get_job_status") as mock_status:
+    with patch("autodiscovery_jobs.backends.gcp.get_job_status") as mock_status:
         mock_status.return_value = {"status": {"phase": "SUCCEEDED"}}
 
         manager = JobManager(mock_config)
@@ -226,7 +226,7 @@ def test_get_job_status(mock_config):
 
 def test_cancel_job(mock_config):
     """Test cancel_job method."""
-    with patch("autodiscovery_jobs.cloudrun.cancel_job") as mock_cancel:
+    with patch("autodiscovery_jobs.backends.gcp.cancel_job") as mock_cancel:
         manager = JobManager(mock_config)
         manager.cancel_job("execution-123")
 
@@ -235,7 +235,7 @@ def test_cancel_job(mock_config):
 
 def test_get_job_logs(mock_config):
     """Test get_job_logs method."""
-    with patch("autodiscovery_jobs.cloudrun.get_job_logs") as mock_logs:
+    with patch("autodiscovery_jobs.backends.gcp.get_job_logs") as mock_logs:
         mock_logs.return_value = ["log1", "log2", "log3"]
 
         manager = JobManager(mock_config)
@@ -287,7 +287,7 @@ def test_setup_and_run(mock_config, tmp_path):
         patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
         patch("autodiscovery_jobs.gcs.upload_dataset") as mock_upload_data,
         patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload_meta,
-        patch("autodiscovery_jobs.cloudrun.run_job") as mock_run,
+        patch("autodiscovery_jobs.backends.gcp.run_job") as mock_run,
     ):
         mock_create.return_value = "gs://test-bucket/users/testuser/jobs/job1/"
         mock_upload_data.return_value = "gs://test-bucket/users/testuser/jobs/job1/data/"

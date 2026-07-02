@@ -10,25 +10,27 @@ A ``storage.Client`` is safe to share across threads for the read/write blob
 operations used here, and the Google client libraries recommend reusing a
 single long-lived client (it transparently refreshes credentials). We therefore
 cache one client per ``project_id`` for the lifetime of the process.
+
+The cache is unlocked: dict get/set are atomic, so concurrent first-callers can
+at worst each build a client and race to store it (last write wins; the extras
+are valid and simply discarded). We accept that rare, harmless duplication on a
+worker's first request rather than serialize every lookup behind a lock.
 """
 
 from __future__ import annotations
-
-import threading
 
 from google.cloud import storage
 
 from .config import JobConfig
 
 _clients: dict[str | None, storage.Client] = {}
-_lock = threading.Lock()
 
 
 def get_storage_client(config: JobConfig | None = None) -> storage.Client:
     """Return a process-wide cached ``storage.Client`` for the config's project.
 
     Reuses a single client per ``project_id`` to avoid repeated credential and
-    HTTP-session setup. Thread-safe.
+    HTTP-session setup.
 
     Args:
         config: Job configuration (uses default if None).
@@ -40,13 +42,7 @@ def get_storage_client(config: JobConfig | None = None) -> storage.Client:
     project_id = config.project_id
 
     client = _clients.get(project_id)
-    if client is not None:
-        return client
-
-    with _lock:
-        # Re-check inside the lock in case another thread just created it.
-        client = _clients.get(project_id)
-        if client is None:
-            client = storage.Client(project=project_id)
-            _clients[project_id] = client
-        return client
+    if client is None:
+        client = storage.Client(project=project_id)
+        _clients[project_id] = client
+    return client

@@ -113,7 +113,7 @@ def create_run_details(
         The created RunDetails object
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config)
+    client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
     run_details = RunDetails.create_new()
@@ -141,7 +141,7 @@ def get_run_details(
         RunDetails object, or None if not found
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config)
+    client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
     blob_path = get_run_details_path(userid, runid)
@@ -173,7 +173,7 @@ def update_run_details(
         Updated RunDetails object
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config)
+    client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
     # Get existing details

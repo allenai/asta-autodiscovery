@@ -21,26 +21,21 @@ from __future__ import annotations
 
 from google.cloud import storage
 
-from .config import JobConfig
-
 _clients: dict[str | None, storage.Client] = {}
 
 
-def get_storage_client(config: JobConfig | None = None) -> storage.Client:
-    """Return a process-wide cached ``storage.Client`` for the config's project.
+def get_storage_client(project_id: str | None = None) -> storage.Client:
+    """Return a process-wide cached ``storage.Client`` for a project.
 
     Reuses a single client per ``project_id`` to avoid repeated credential and
     HTTP-session setup.
 
     Args:
-        config: Job configuration (uses default if None).
+        project_id: GCP project to scope the client to (auto-detected when None).
 
     Returns:
-        A shared ``storage.Client`` scoped to ``config.project_id``.
+        A shared ``storage.Client`` scoped to ``project_id``.
     """
-    config = config or JobConfig()
-    project_id = config.project_id
-
     client = _clients.get(project_id)
     if client is None:
         client = storage.Client(project=project_id)

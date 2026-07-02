@@ -54,7 +54,7 @@ def get_email_state(
         Email state dictionary, or None if not found
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config)
+    client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
     blob_path = get_email_state_path(userid, runid)
@@ -93,7 +93,7 @@ def record_email_sent(
         The created email state dictionary
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config)
+    client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
     email_state = {

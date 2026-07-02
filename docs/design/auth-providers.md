@@ -175,8 +175,9 @@ AuthenticatedUser(
   ```
 - **Login**: new endpoint `POST /api/auth/login {username, password}`. Validates against
   the file (password verified **only here**), then issues a short-lived **HS256 JWT**
-  signed with `AUTH_SESSION_SECRET` containing `{sub:"file|alice", name, email}`.
-  Returns `{token, expires_at}`. PyJWT is already a dependency.
+  signed with `AUTH_SESSION_SECRET` containing `{sub:"file|alice", username, name, email,
+  permissions, iat, exp}` (`permissions` is for client-side UI gating only — see the
+  per-request note below). Returns `{token, expires_at}`. PyJWT is already a dependency.
 - **Per-request**: `authenticate()` verifies the token signature, then **re-reads the
   file** to confirm the user still exists and is not `disabled`, and loads *current*
   `permissions` from the file (not from the token). This is what satisfies "consult the
@@ -191,22 +192,23 @@ AuthenticatedUser(
 
 ### 5. Admin CLI (`password_file` administration)
 
-A console entry point (added to `api/pyproject.toml`), e.g. `autodiscovery-auth`:
+A script at `api/scripts/auth_admin.py` (the API isn't an installed package), run via
+`uv run api/scripts/auth_admin.py ...` or `python scripts/auth_admin.py ...` from `api/`.
+The file path comes from `--file` or `$AUTH_PASSWORD_FILE`:
 
 ```
-autodiscovery-auth --file $AUTH_PASSWORD_FILE useradd alice --email a@x.org --name Alice \
-                   --permission enroll:autodiscovery_admin   # prompts for password
-autodiscovery-auth passwd alice
-autodiscovery-auth usermod alice --add-permission enroll:higher_upload_limit
-autodiscovery-auth disable alice            # / enable
-autodiscovery-auth userdel alice
-autodiscovery-auth list
+uv run api/scripts/auth_admin.py useradd alice --email a@x.org --name Alice \
+    --permission enroll:autodiscovery_admin   # prompts for password
+uv run api/scripts/auth_admin.py passwd alice
+uv run api/scripts/auth_admin.py usermod alice --add-permission enroll:higher_upload_limit
+uv run api/scripts/auth_admin.py disable alice            # / enable
+uv run api/scripts/auth_admin.py userdel alice
+uv run api/scripts/auth_admin.py list
 ```
 
-Writes are atomic (temp file + `os.replace`) with an advisory file lock to avoid clobbering
-concurrent edits. Because the backend re-reads on every check, CLI changes are live
-immediately. The CLI ships in the same image so an operator can `kubectl exec` and run it
-against the mounted file.
+Writes are atomic (temp file + `os.replace`). Because the backend re-reads on every check,
+CLI changes are live immediately. The CLI ships in the same image so an operator can
+`kubectl exec` and run it against the mounted file.
 
 ### 6. Auth0 Management-API usage in offline scripts
 
@@ -246,7 +248,7 @@ interface AuthContextType {
   hasPermission: (p: string) => boolean;// NEW: replaces ad-hoc JWT decodes
   login: (creds?: {username: string; password: string}) => Promise<void>;
   logout: () => void;
-  getAccessToken: () => Promise<string | null>;
+  getAccessToken: () => Promise<string>;   // '' when there is no token (e.g. "none")
   hasRequiredPermission: boolean;
   canExploreWithAsta: boolean;          // = hasPermission('enroll:asta_integration')
   authError: string | null;
@@ -268,7 +270,8 @@ matching implementation:
   → `POST /api/auth/login`, stores token (localStorage); `getAccessToken()` returns the
   stored token; `permissions` decoded from our HS256 JWT; logout clears storage.
 - `NoneAuthProvider` — immediately `isAuthenticated=true` as the local user; `login`/
-  `logout` are no-ops; `getAccessToken()` returns `null`; `permissions` = all. No login UI.
+  `logout` are no-ops; `getAccessToken()` returns `''` (the bridge's `getToken` returns
+  `null`, so no `Authorization` header is sent); `permissions` = all. No login UI.
 
 This makes the active mode a **runtime** decision — one build serves all three. (Auth0's
 `NEXT_PUBLIC_AUTH0_*` values can be served from `/api/auth/config` too, so they no longer

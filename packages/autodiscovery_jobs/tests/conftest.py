@@ -28,11 +28,21 @@ def mock_gcs_client():
 
 @pytest.fixture
 def mock_storage_client(monkeypatch, mock_gcs_client):
-    """Mock google.cloud.storage.Client."""
+    """Mock google.cloud.storage.Client.
+
+    The GCS helpers obtain their client via the shared, cached
+    ``autodiscovery_jobs.client.get_storage_client`` factory, so patch the
+    construction site there and clear the per-process cache so each test gets
+    its own mock rather than a client cached by an earlier test.
+    """
+    import autodiscovery_jobs.client as client_module
+
     client, bucket = mock_gcs_client
 
     def mock_client(*args, **kwargs):
         return client
 
-    monkeypatch.setattr("autodiscovery_jobs.gcs.storage.Client", mock_client)
+    client_module._clients.clear()
+    monkeypatch.setattr("autodiscovery_jobs.client.storage.Client", mock_client)
+    monkeypatch.setattr(client_module, "_clients", {})
     return client, bucket

@@ -4,6 +4,7 @@ version = "0.2.2"
 description = "Developer tooling for AutoDiscovery"
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "Allen Institute for Artificial Intelligence" }
 ]

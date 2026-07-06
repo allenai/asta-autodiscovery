@@ -4,6 +4,7 @@ version = "0.2.2"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
 readme = "RELEASE.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
     "pip",

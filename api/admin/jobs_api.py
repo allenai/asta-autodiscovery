@@ -1,14 +1,18 @@
-"""Admin API for managing autodiscovery jobs."""
+"""Authenticated API for managing the caller's autodiscovery jobs.
+
+Every route requires a valid JWT (via @requires_enrollment) and operates on the
+authenticated user's own data: `userid` is taken from the token's `sub` claim
+(request.user["sub"]), never from a client-supplied parameter.
+"""
 
 from flask import Blueprint, current_app, jsonify, request
+from utils.auth import requires_enrollment
 from werkzeug.exceptions import BadRequest
 
 # Import autodiscovery_jobs when available
 try:
     from autodiscovery_jobs import JobConfig, JobManager
     from autodiscovery_jobs.exceptions import (
-        CloudRunError,
-        GCSError,
         JobAlreadyExistsError,
         JobNotFoundError,
     )
@@ -21,8 +25,8 @@ except ImportError:
 
 
 def create() -> Blueprint:
-    """Create the admin jobs API blueprint."""
-    api = Blueprint("admin_jobs_api", __name__)
+    """Create the jobs API blueprint."""
+    api = Blueprint("jobs_api", __name__)
 
     def get_job_manager() -> JobManager:
         """Get a configured JobManager instance."""
@@ -34,6 +38,7 @@ def create() -> Blueprint:
         return JobManager(config)
 
     @api.route("/health")
+    @requires_enrollment
     def health():
         """Health check endpoint."""
         if not JOBS_AVAILABLE:
@@ -42,9 +47,11 @@ def create() -> Blueprint:
             )
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
-    @api.route("/list/<userid>")
-    def list_jobs(userid: str):
-        """List all jobs for a user."""
+    @api.route("/list")
+    @requires_enrollment
+    def list_jobs():
+        """List all jobs for the authenticated user."""
+        userid = request.user.get("sub")
         try:
             manager = get_job_manager()
             jobs = manager.list_jobs(userid)
@@ -54,17 +61,17 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/create", methods=["POST"])
+    @requires_enrollment
     def create_job():
-        """Create a new job."""
+        """Create a new job for the authenticated user."""
+        userid = request.user.get("sub")
         data = request.json
         if not data:
             raise BadRequest("No request body")
 
-        userid = data.get("userid")
         jobid = data.get("jobid")
-
-        if not userid or not jobid:
-            raise BadRequest("userid and jobid are required")
+        if not jobid:
+            raise BadRequest("jobid is required")
 
         try:
             manager = get_job_manager()
@@ -76,9 +83,11 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to create job: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @api.route("/exists/<userid>/<jobid>")
-    def job_exists(userid: str, jobid: str):
-        """Check if a job exists."""
+    @api.route("/exists/<jobid>")
+    @requires_enrollment
+    def job_exists(jobid: str):
+        """Check if a job exists for the authenticated user."""
+        userid = request.user.get("sub")
         try:
             manager = get_job_manager()
             exists = manager.job_exists(userid, jobid)
@@ -88,17 +97,17 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/delete", methods=["POST"])
+    @requires_enrollment
     def delete_job():
-        """Delete a job."""
+        """Delete a job owned by the authenticated user."""
+        userid = request.user.get("sub")
         data = request.json
         if not data:
             raise BadRequest("No request body")
 
-        userid = data.get("userid")
         jobid = data.get("jobid")
-
-        if not userid or not jobid:
-            raise BadRequest("userid and jobid are required")
+        if not jobid:
+            raise BadRequest("jobid is required")
 
         try:
             manager = get_job_manager()
@@ -111,8 +120,11 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-dataset", methods=["POST"])
+    @requires_enrollment
     def upload_dataset():
-        """Upload a dataset file for a job."""
+        """Upload a dataset file for one of the authenticated user's jobs."""
+        userid = request.user.get("sub")
+
         # Check if file is in request
         if "file" not in request.files:
             raise BadRequest("No file provided")
@@ -121,11 +133,9 @@ def create() -> Blueprint:
         if file.filename == "":
             raise BadRequest("No file selected")
 
-        userid = request.form.get("userid")
         jobid = request.form.get("jobid")
-
-        if not userid or not jobid:
-            raise BadRequest("userid and jobid are required")
+        if not jobid:
+            raise BadRequest("jobid is required")
 
         try:
             manager = get_job_manager()
@@ -161,18 +171,19 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-metadata", methods=["POST"])
+    @requires_enrollment
     def upload_metadata():
-        """Upload metadata for a job."""
+        """Upload metadata for one of the authenticated user's jobs."""
+        userid = request.user.get("sub")
         data = request.json
         if not data:
             raise BadRequest("No request body")
 
-        userid = data.get("userid")
         jobid = data.get("jobid")
         metadata = data.get("metadata")
 
-        if not userid or not jobid or not metadata:
-            raise BadRequest("userid, jobid, and metadata are required")
+        if not jobid or not metadata:
+            raise BadRequest("jobid and metadata are required")
 
         try:
             manager = get_job_manager()
@@ -183,17 +194,17 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/run", methods=["POST"])
+    @requires_enrollment
     def run_job():
-        """Run a Cloud Run job."""
+        """Run a Cloud Run job for the authenticated user."""
+        userid = request.user.get("sub")
         data = request.json
         if not data:
             raise BadRequest("No request body")
 
-        userid = data.get("userid")
         jobid = data.get("jobid")
-
-        if not userid or not jobid:
-            raise BadRequest("userid and jobid are required")
+        if not jobid:
+            raise BadRequest("jobid is required")
 
         # Extract job parameters
         n_experiments = data.get("n_experiments")
@@ -221,6 +232,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/status/<execution_id>")
+    @requires_enrollment
     def get_status(execution_id: str):
         """Get job execution status."""
         try:
@@ -232,6 +244,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/logs/<execution_id>")
+    @requires_enrollment
     def get_logs(execution_id: str):
         """Get job logs."""
         limit = request.args.get("limit", default=50, type=int)
@@ -245,6 +258,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/cancel", methods=["POST"])
+    @requires_enrollment
     def cancel_job():
         """Cancel a running job."""
         data = request.json

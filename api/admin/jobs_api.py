@@ -1,12 +1,12 @@
 """Authenticated API for managing the caller's autodiscovery jobs.
 
-Every route requires a valid JWT (via @requires_enrollment) and operates on the
-authenticated user's own data: `userid` is taken from the token's `sub` claim
-(request.user["sub"]), never from a client-supplied parameter.
+Every route requires a valid JWT (via @requires_auth(with_enrollment=True)) and
+operates on the authenticated user's own data: `userid` is taken from the token's
+`sub` claim (request.user["sub"]), never from a client-supplied parameter.
 """
 
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import requires_enrollment
+from utils.auth import requires_auth
 from werkzeug.exceptions import BadRequest
 
 # Import autodiscovery_jobs when available
@@ -38,7 +38,7 @@ def create() -> Blueprint:
         return JobManager(config)
 
     @api.route("/health")
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def health():
         """Health check endpoint."""
         if not JOBS_AVAILABLE:
@@ -48,7 +48,7 @@ def create() -> Blueprint:
         return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
 
     @api.route("/list")
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def list_jobs():
         """List all jobs for the authenticated user."""
         userid = request.user.get("sub")
@@ -61,7 +61,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/create", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def create_job():
         """Create a new job for the authenticated user."""
         userid = request.user.get("sub")
@@ -84,7 +84,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/exists/<jobid>")
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def job_exists(jobid: str):
         """Check if a job exists for the authenticated user."""
         userid = request.user.get("sub")
@@ -97,7 +97,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/delete", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def delete_job():
         """Delete a job owned by the authenticated user."""
         userid = request.user.get("sub")
@@ -120,7 +120,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-dataset", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def upload_dataset():
         """Upload a dataset file for one of the authenticated user's jobs."""
         userid = request.user.get("sub")
@@ -171,7 +171,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-metadata", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def upload_metadata():
         """Upload metadata for one of the authenticated user's jobs."""
         userid = request.user.get("sub")
@@ -194,7 +194,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/run", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def run_job():
         """Run a Cloud Run job for the authenticated user."""
         userid = request.user.get("sub")
@@ -232,7 +232,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/status/<execution_id>")
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def get_status(execution_id: str):
         """Get job execution status."""
         try:
@@ -244,7 +244,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/logs/<execution_id>")
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def get_logs(execution_id: str):
         """Get job logs."""
         limit = request.args.get("limit", default=50, type=int)
@@ -258,7 +258,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/cancel", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def cancel_job():
         """Cancel a running job."""
         data = request.json

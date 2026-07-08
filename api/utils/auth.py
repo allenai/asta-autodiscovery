@@ -66,8 +66,24 @@ def verify_token(token, auth0_domain, auth0_audience):
 def requires_auth(
     required_permission = None,
     check_permissions: list[PermissionType] = [],
+    with_enrollment: bool = False,
 ):
-    """Decorator to require authentication and optionally check specific permissions"""
+    """Decorator to require a valid JWT, optionally checking permissions.
+
+    Args:
+        required_permission: If set, reject with 403 unless the token carries this
+            permission.
+        check_permissions: For each permission listed, set a ``request.<permission>``
+            boolean flag the handler can read (does not reject).
+        with_enrollment: If True and no explicit ``required_permission`` is given, fall
+            back to the app-wide enrollment gate in the ``AUTH0_REQUIRED_PERMISSION``
+            env var. If that is unset/empty, only a valid JWT is required.
+
+    Usage:
+        @requires_auth()                      # any valid JWT
+        @requires_auth(with_enrollment=True)  # valid JWT + enrollment gate (if configured)
+        @requires_auth(required_permission=PermissionType.ADMIN.value)
+    """
 
     def decorator(f):
         @wraps(f)
@@ -107,12 +123,16 @@ def requires_auth(
                 if not isinstance(permissions, list):
                     permissions = [permissions]
 
-                # Check for required permission if specified
-                if required_permission:
-                    if required_permission not in permissions:
-                        return jsonify(
-                            {"error": f"Access denied. Required permission: {required_permission}"}
-                        ), 403
+                # Resolve the effective required permission: an explicit value wins;
+                # otherwise, when with_enrollment is set, fall back to the app-wide gate.
+                effective_required = required_permission
+                if effective_required is None and with_enrollment:
+                    effective_required = os.environ.get("AUTH0_REQUIRED_PERMISSION") or None
+
+                if effective_required and effective_required not in permissions:
+                    return jsonify(
+                        {"error": f"Access denied. Required permission: {effective_required}"}
+                    ), 403
 
                 # Check for optional permissions and set flags on request object
                 if check_permissions:
@@ -129,26 +149,11 @@ def requires_auth(
     return decorator
 
 
-def requires_enrollment(f):
-    """Decorator that requires authentication with the default permission from AUTH0_REQUIRED_PERMISSION env var.
-
-    This is a convenience wrapper around requires_auth that automatically uses the
-    AUTH0_REQUIRED_PERMISSION environment variable. If not set or empty, no permission is required.
-
-    Usage:
-        @requires_enrollment
-        def my_route():
-            ...
-    """
-    default_permission = os.environ.get("AUTH0_REQUIRED_PERMISSION") or None
-    return requires_auth(required_permission=default_permission)(f)
-
-
 def optional_enrollment(f):
     """Decorator that authenticates if a token is present, but allows unauthenticated access.
 
     If a valid Authorization header is present, validates the token and sets request.user
-    (same as requires_enrollment). If no Authorization header is present, sets request.user
+    (same as requires_auth). If no Authorization header is present, sets request.user
     to an empty dict and continues. This enables endpoints to serve both authenticated
     and unauthenticated users (e.g., for shared runs).
     """

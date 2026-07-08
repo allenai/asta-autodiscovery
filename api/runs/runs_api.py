@@ -19,7 +19,6 @@ from utils.auth import (
     PermissionType,
     optional_enrollment,
     requires_auth,
-    requires_enrollment,
 )
 from utils.credits import (
     ExperimentLimitExceededError,
@@ -642,7 +641,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>", methods=["DELETE"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def delete_run(runid: str):
         """Soft delete a run - removes user data but preserves results.
 
@@ -687,7 +686,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-dataset", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def upload_dataset():
         """Upload a dataset file for a run.
 
@@ -827,7 +826,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>/metadata", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def save_metadata(runid: str):
         """Save or update metadata for a run.
 
@@ -918,7 +917,7 @@ def create() -> Blueprint:
         return jsonify(resp.model_dump()), 200
 
     @api.route("/submit", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def submit_run():
         """Submit a run for execution.
 
@@ -1210,7 +1209,7 @@ def create() -> Blueprint:
         return jsonify(resp.model_dump()), 200
 
     @api.route("/<userid>/<runid>/cancel", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def cancel_run(userid: str, runid: str):
         """Cancel a running job.
 
@@ -1263,7 +1262,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/bookmark", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def bookmark_run(userid: str, runid: str):
         """Bookmark or unbookmark a run. Only the run owner can toggle bookmarking.
 
@@ -1321,7 +1320,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/experiments/<experiment_id>/bookmark", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def bookmark_experiment(userid: str, runid: str, experiment_id: str):
         """Bookmark or unbookmark an experiment within a run. Only the run owner can toggle bookmarking.
 
@@ -1384,7 +1383,7 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<userid>/<runid>/share", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def share_run(userid: str, runid: str):
         """Share or unshare a run. Only the run owner can toggle sharing.
 
@@ -1474,7 +1473,7 @@ def create() -> Blueprint:
             return jsonify({"error": "Internal server error"}), 500
 
     @api.route("/<userid>/<runid>/experiments/<experiment_id>/dig-deeper", methods=["POST"])
-    @requires_enrollment
+    @requires_auth(with_enrollment=True)
     def dig_deeper_with_asta(userid: str, runid: str, experiment_id: str):  # pyright: ignore reportUnusedFunction
         """Create an Asta context handoff from an AutoDiscovery experiment node.
 

@@ -63,7 +63,7 @@ def create_thread(
     Raises:
         requests.HTTPError: If the thread creation call fails
     """
-    body = {"Autodiscovery_link": autodiscovery_link} if autodiscovery_link else None
+    body = {"autodiscovery_link": autodiscovery_link} if autodiscovery_link else {}
     _log.info("Asta create_thread request body: %s", body)
     resp = requests.put(
         f"{ASTA_BASE_URL}/api/chat/thread",

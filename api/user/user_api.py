@@ -68,7 +68,7 @@ def create() -> Blueprint:
             return jsonify({"error": f"Failed to fetch user info: {str(e)}"}), 500
 
     @api.route("/me/credits", methods=["GET"])
-    @requires_auth(with_enrollment=True)
+    @requires_auth()
     def get_viewer_credits():
         """Get the number of credits for the authenticated user."""
         user_id = request.user.get("sub")
@@ -93,7 +93,7 @@ def create() -> Blueprint:
 
     # Example protected endpoint - requires special permission
     @api.route("/me/enrollment-status")
-    @requires_auth(with_enrollment=True)
+    @requires_auth()
     def enrollment_status():  # pyright: ignore reportUnusedFunction
         """Example endpoint that requires the enroll:autodiscovery_v0 permission.
         Returns enrollment status for the authenticated user.

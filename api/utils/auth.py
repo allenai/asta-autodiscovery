@@ -66,7 +66,6 @@ def verify_token(token, auth0_domain, auth0_audience):
 def requires_auth(
     required_permission = None,
     check_permissions: list[PermissionType] = [],
-    with_enrollment: bool = False,
 ):
     """Decorator to require a valid JWT, optionally checking permissions.
 
@@ -75,13 +74,9 @@ def requires_auth(
             permission.
         check_permissions: For each permission listed, set a ``request.<permission>``
             boolean flag the handler can read (does not reject).
-        with_enrollment: If True and no explicit ``required_permission`` is given, fall
-            back to the app-wide enrollment gate in the ``AUTH0_REQUIRED_PERMISSION``
-            env var. If that is unset/empty, only a valid JWT is required.
 
     Usage:
         @requires_auth()                      # any valid JWT
-        @requires_auth(with_enrollment=True)  # valid JWT + enrollment gate (if configured)
         @requires_auth(required_permission=PermissionType.ADMIN.value)
     """
 
@@ -123,15 +118,10 @@ def requires_auth(
                 if not isinstance(permissions, list):
                     permissions = [permissions]
 
-                # Resolve the effective required permission: an explicit value wins;
-                # otherwise, when with_enrollment is set, fall back to the app-wide gate.
-                effective_required = required_permission
-                if effective_required is None and with_enrollment:
-                    effective_required = os.environ.get("AUTH0_REQUIRED_PERMISSION") or None
-
-                if effective_required and effective_required not in permissions:
+                # Check for required permission if specified
+                if required_permission and required_permission not in permissions:
                     return jsonify(
-                        {"error": f"Access denied. Required permission: {effective_required}"}
+                        {"error": f"Access denied. Required permission: {required_permission}"}
                     ), 403
 
                 # Check for optional permissions and set flags on request object

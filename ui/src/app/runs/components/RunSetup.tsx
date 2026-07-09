@@ -317,6 +317,25 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
                     />
                 </FormControl>
+                <FormControl fullWidth>
+                    <StyledFormLabel>
+                        Intent <OptionalText>(Optional)</OptionalText>
+                    </StyledFormLabel>
+                    <HelperText>
+                        Provide high-level guidance to loosely condition the exploration without
+                        specifying exact hypotheses. The system will still autonomously navigate the
+                        hypothesis space, but can consider your areas of interest during generation.
+                    </HelperText>
+                    <TextField
+                        value={settings.intent}
+                        onChange={(e) => {
+                            updateSettings('intent', e.target.value);
+                            debouncedSaveMetadata();
+                        }}
+                        placeholder="e.g., Focus on how weather patterns impact migration timing and route efficiency"
+                        disabled={isFormDisabled}
+                    />
+                </FormControl>
 
                 <StyledAccordian>
                     <AccordionSummary
@@ -326,27 +345,6 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         {...mkExpandAdvancedSettingsTrackAttrs({ runId: runid })}>
                         <Typography component="span">Advanced settings</Typography>
                     </AccordionSummary>
-
-                    <FormControl fullWidth>
-                        <StyledFormLabel>
-                            Intent <OptionalText>(Optional)</OptionalText>
-                        </StyledFormLabel>
-                        <HelperText>
-                            Provide high-level guidance to loosely condition the exploration without
-                            specifying exact hypotheses. The system will still autonomously navigate
-                            the hypothesis space, but can consider your areas of interest during
-                            generation.
-                        </HelperText>
-                        <TextField
-                            value={settings.intent}
-                            onChange={(e) => {
-                                updateSettings('intent', e.target.value);
-                                debouncedSaveMetadata();
-                            }}
-                            placeholder="e.g., Focus on how weather patterns impact migration timing and route efficiency"
-                            disabled={isFormDisabled}
-                        />
-                    </FormControl>
 
                     <FormControl fullWidth>
                         <StyledFormLabel>Exploration weight</StyledFormLabel>

@@ -44,12 +44,18 @@ def login_or_create_user(
     return resp.json()["user"]["uuid"]
 
 
-def create_thread(auth_token: str, profile: str = "dv-a2a-only") -> str:
+def create_thread(
+    auth_token: str,
+    profile: str = "dv-a2a-only",
+    autodiscovery_link: str | None = None,
+) -> str:
     """Create a new Asta thread and return the thread key.
 
     Args:
         auth_token: User's bearer token for Asta authentication
         profile: Handler profile to bind to the thread
+        autodiscovery_link: URL back to the source AutoDiscovery experiment,
+            surfaced by Asta so the user can navigate back
 
     Returns:
         Thread key string (use as thread_id for subsequent calls)
@@ -57,9 +63,12 @@ def create_thread(auth_token: str, profile: str = "dv-a2a-only") -> str:
     Raises:
         requests.HTTPError: If the thread creation call fails
     """
+    body = {"source_link": autodiscovery_link} if autodiscovery_link else {}
+    _log.info("Asta create_thread request body: %s", body)
     resp = requests.put(
         f"{ASTA_BASE_URL}/api/chat/thread",
         params={"profile": profile, "channel_prefix": "datavoyager"},
+        json=body,
         headers={"Authorization": f"Bearer {auth_token}"},
         timeout=30,
     )

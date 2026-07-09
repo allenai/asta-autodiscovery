@@ -35,6 +35,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Configuration: configuration.md
   - Autodiscovery:
       - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:

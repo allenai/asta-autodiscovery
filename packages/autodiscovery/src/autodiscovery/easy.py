@@ -190,7 +190,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
     adv = parser.add_argument_group("advanced")
-    adv.add_argument("--model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument("--theorizer_model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument("--execution_model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument(
+        "--base_url",
+        type=str,
+        default=None,
+        help="OpenAI-compatible base URL for the theorizer model (e.g. a local vLLM server).",
+    )
     adv.add_argument("--belief_model", type=str, default="gemini-3-flash-preview")
     adv.add_argument("--vision_model", type=str, default="gemini-3.1-pro-preview")
     adv.add_argument("--temperature", type=float, default=1.0)
@@ -280,7 +287,9 @@ def cli_main(argv: list[str] | None = None) -> None:
         out_dir=os.path.abspath(args.out_dir),
         work_dir=work_dir,
         n_experiments=args.n_experiments,
-        model=args.model,
+        theorizer_model=args.theorizer_model,
+        execution_model=args.execution_model,
+        base_url=args.base_url,
         belief_model=args.belief_model,
         vision_model=args.vision_model,
         temperature=args.temperature,

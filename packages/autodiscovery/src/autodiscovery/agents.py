@@ -3,6 +3,8 @@ import concurrent.futures
 import copy
 import json
 import os
+import urllib.request
+from datetime import datetime, timezone
 
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
@@ -23,7 +25,11 @@ from autodiscovery.structured_outputs import (
     ExperimentList,
     ExperimentReviewer,
 )
-from autodiscovery.utils import get_vertex_access_token, is_gemini_model, normalize_vertex_model_name
+from autodiscovery.utils import (
+    get_vertex_access_token,
+    is_gemini_model,
+    normalize_vertex_model_name,
+)
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
 from autodiscovery.vertex_config import get_vertex_openai_base_url
 
@@ -530,12 +536,56 @@ class SimpleCodeBlockTransform(transforms.MessageTransform):
         return "SimpleCodeBlockTransform", True
 
 
+def _ping_served_model(base_url, timeout=3):
+    """Best-effort health check of an OpenAI-compatible server (e.g. a local
+    vLLM endpoint). Returns (ok_or_None, detail). ok is None when base_url is
+    unset (i.e. the default endpoint), so we skip the ping."""
+    if not base_url:
+        return None, "default endpoint"
+    url = base_url.rstrip("/") + "/models"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            code = resp.status
+            return (200 <= code < 300), f"HTTP {code}"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
+def _make_checkpoint_hook(agent_name, base_url):
+    """Return a `process_all_messages_before_reply` hook that logs a checkpoint
+    and pings the served model right before this agent makes its LLM call.
+
+    A mid-run server death otherwise surfaces only later as an opaque
+    'Connection refused'; pinging here pins the death to the exact call that
+    triggered it. The programmer step is the usual culprit, so make it loud."""
+    emphasize = agent_name == "experiment_programmer"
+
+    def hook(messages):
+        ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        ok, detail = _ping_served_model(base_url)
+        if ok is None:
+            status = f"server={detail}"
+        else:
+            status = f"server={'ALIVE' if ok else 'DOWN'} ({detail})"
+        bar = "####" if emphasize else "----"
+        n = len(messages) if messages is not None else 0
+        print(
+            f"\n{bar} [{ts}] llm-checkpoint: about to call '{agent_name}' "
+            f"| {n} msgs | {status} {bar}",
+            flush=True,
+        )
+        return messages
+
+    return hook
+
+
 def get_openai_config(
     api_key: str | None = None,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     timeout: int = 600,
     model_name: str = "o4-mini",
+    base_url: str | None = None,
 ):
     """Build a model config for AG2/Autogen clients.
 
@@ -545,6 +595,9 @@ def get_openai_config(
         reasoning_effort: Optional reasoning effort for o-series models.
         timeout: Request timeout in seconds.
         model_name: Target model name.
+        base_url: OpenAI-compatible base URL for the model (e.g. a local vLLM
+            server). Only applied to non-Gemini models; Gemini keeps its Vertex
+            endpoint.
 
     Returns:
         Configuration dict for the Autogen LLM client.
@@ -578,11 +631,15 @@ def get_openai_config(
             "api_type": "openai",
             "model": model_name,
             "timeout": timeout,
-            "api_key": api_key,
+            # vLLM (and other OpenAI-compatible servers) ignore the key but ag2 requires a non-empty one.
+            "api_key": api_key or ("EMPTY" if base_url else api_key),
             # Retries are handled by apply_openai_client_backoff_retry().
             "max_retries": 0,
             "cache_seed": None,  # Disabling caching also addresses this bug: https://github.com/ag2ai/ag2/issues/1103
         }
+        # Point the model at an OpenAI-compatible endpoint (e.g. a local vLLM server serving Qwen).
+        if base_url is not None:
+            config["base_url"] = base_url
         if temperature is not None:
             config["temperature"] = temperature
 
@@ -598,7 +655,8 @@ def get_openai_config(
 
 def get_agents(
     work_dir,
-    model_name="o4-mini",
+    theorizer_model="o4-mini",
+    execution_model="o4-mini",
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -610,12 +668,16 @@ def get_agents(
     dataset_paths=None,
     vision_model: str = "gpt-4o",
     usage_tracker: UsageTracker | None = None,
+    base_url: str | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
 
     Args:
         work_dir: Working directory for code execution.
-        model_name: Model used for AG2 conversational agents.
+        theorizer_model: Model used by the experiment_generator (hypothesis
+            theorizer). This is the model that ``base_url`` is routed to.
+        execution_model: Model used by the execution agents (programmer,
+            analyst, reviewer, reviser). Always uses its default endpoint.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
         branching_factor: Number of experiment candidates to request.
@@ -627,18 +689,28 @@ def get_agents(
         dataset_paths: Optional dataset paths (reserved for future use).
         vision_model: Vision model used for plot analysis.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
+        base_url: Optional OpenAI-compatible base URL for the theorizer model
+            (e.g. a local vLLM server). Applied only to the experiment_generator;
+            ignored for Gemini models and never applied to the execution agents.
 
     Returns:
         Dictionary mapping agent name to agent instance.
     """
-    is_gemini = is_gemini_model(model_name)
-    api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
-    llm_config = get_openai_config(
-        api_key=api_key,
-        model_name=model_name,
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
-    )
+
+    def _build_config(model_name, model_base_url):
+        api_key = None if is_gemini_model(model_name) else os.getenv("OPENAI_API_KEY")
+        return get_openai_config(
+            api_key=api_key,
+            model_name=model_name,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+            base_url=model_base_url,
+        )
+
+    # The theorizer (experiment_generator) is the only agent routed to base_url.
+    # The execution agents always use their default endpoint.
+    theorizer_llm_config = _build_config(theorizer_model, base_url)
+    execution_llm_config = _build_config(execution_model, None)
 
     # Create token limit transform
     token_limit_capability = transform_messages.TransformMessages(
@@ -653,7 +725,7 @@ def get_agents(
     experiment_generator = ConversableAgent(
         name="experiment_generator",
         llm_config={
-            **llm_config,
+            **theorizer_llm_config,
             "response_format": ExperimentList if not experiment_first else ExperimentHypothesisList,
         },
         system_message=(
@@ -696,7 +768,7 @@ def install(package):
     # Experiment Programmer
     experiment_programmer = ConversableAgent(
         name="experiment_programmer",
-        llm_config={**llm_config, "response_format": ExperimentCode},
+        llm_config={**execution_llm_config, "response_format": ExperimentCode},
         system_message=(
             "You are a scientific experiment programmer proficient in writing python code given an experiment plan. "
             "Your code will be included in a python file that is executed and any relevant results should be printed to standard out or presented using plt.show appropriately. "
@@ -727,7 +799,7 @@ def install(package):
     # Experiment Analyst
     experiment_analyst = ConversableAgent(
         name="experiment_code_analyst",
-        llm_config={**llm_config, "response_format": ExperimentAnalyst},
+        llm_config={**execution_llm_config, "response_format": ExperimentAnalyst},
         system_message=(
             "You are a research scientist responsible for evaluating the code execution output for a scientific experiment written by a programmer. "
             "If no code was executed, there was an error, or the code fails silently, return the success status as **false**. "
@@ -742,7 +814,7 @@ def install(package):
     # Experiment Reviewer
     experiment_reviewer = ConversableAgent(
         name="experiment_reviewer",
-        llm_config={**llm_config, "response_format": ExperimentReviewer},
+        llm_config={**execution_llm_config, "response_format": ExperimentReviewer},
         system_message=(
             "You are a research scientist responsible for holistically reviewing the entire experiment pipeline, i.e., the generated code, the output, and the analysis w.r.t. the original experiment plan. "
             "Assess whether the experiment was faithfully implemented, i.e., whether the implementation follows the experiment plan without significant deviation and whether the hypothesis was in fact tested sufficiently. "
@@ -755,7 +827,7 @@ def install(package):
     # Experiment Reviser
     experiment_reviser = ConversableAgent(
         name="experiment_reviser",
-        llm_config={**llm_config, "response_format": Experiment},
+        llm_config={**execution_llm_config, "response_format": Experiment},
         system_message=(
             "You are a research scientist revisiting the most recent experiment, which could not be conducted correctly due to issues in the code or the formulation of the experiment plan,"
             "as indicated by the reviewer. Your goal is to revise this failed experiment plan by addressing the issues and limitations pointed out by the reviewer. "
@@ -900,6 +972,27 @@ def install(package):
     # Apply token limit to all agents
     for agent in agents:
         token_limit_capability.add_to_agent(agent)
+
+    # Checkpoint + server ping before every LLM call, so a mid-run server crash is
+    # tied to the exact agent call instead of only surfacing later as a
+    # 'Connection refused'. Only the llm-backed agents make calls (code_executor
+    # and user_proxy have llm_config=False), so hook just those.
+    llm_agents = [
+        experiment_generator,
+        experiment_programmer,
+        experiment_analyst,
+        experiment_reviewer,
+        experiment_reviser,
+    ]
+    for agent in llm_agents:
+        # Only the theorizer (experiment_generator) is served via base_url, so
+        # only its checkpoint pings that endpoint; the rest use their default
+        # endpoint and just log the checkpoint (ping is skipped when base_url is None).
+        hook_base_url = base_url if agent is experiment_generator else None
+        agent.register_hook(
+            "process_all_messages_before_reply",
+            _make_checkpoint_hook(agent.name, hook_base_url),
+        )
 
     agents_dict = {agent.name: agent for agent in agents}
     return agents_dict

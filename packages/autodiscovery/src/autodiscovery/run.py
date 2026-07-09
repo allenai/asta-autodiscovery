@@ -284,7 +284,8 @@ def run_mcts(
     dataset_paths,
     log_dirname,
     work_dir,
-    model_name="gpt-4o",
+    theorizer_model="gpt-4o",
+    execution_model="gpt-4o",
     belief_model_name="gemini-3-flash-preview",
     max_iterations=100,
     branching_factor=8,
@@ -317,6 +318,7 @@ def run_mcts(
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
+    base_url=None,
 ):
     """Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
 
@@ -326,7 +328,10 @@ def run_mcts(
         dataset_paths: List of paths to dataset files.
         log_dirname: Directory to save logs and MCTS nodes.
         work_dir: Working directory for agents.
-        model_name: LLM model name for agents.
+        theorizer_model: LLM model name for the hypothesis theorizer
+            (experiment_generator); the model that base_url is routed to.
+        execution_model: LLM model name for the execution agents (programmer,
+            analyst, reviewer, reviser); always uses its default endpoint.
         belief_model_name: LLM model name for belief distribution agent.
         max_iterations: Maximum number of MCTS iterations.
         branching_factor: Maximum number of children per node.
@@ -361,6 +366,8 @@ def run_mcts(
         agent_usage_mode: Tracking mode for agents chat usage. ``per_response`` records
             usage from each AG2 model response. ``summary_delta`` records usage from
             AG2 usage-summary deltas.
+        base_url: OpenAI-compatible base URL for the agent model (e.g. a local vLLM
+            server). The belief model always uses its default endpoint.
     """
 
     def _get_executor_rich_outputs(code_executor_agent) -> list:
@@ -431,7 +438,8 @@ def run_mcts(
         if n_threads <= 1:
             base_agent_objs = get_agents(
                 work_dir,
-                model_name=model_name,
+                theorizer_model=theorizer_model,
+                execution_model=execution_model,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
                 branching_factor=branching_factor,
@@ -443,6 +451,7 @@ def run_mcts(
                 dataset_paths=dataset_paths,
                 vision_model=vision_model,
                 usage_tracker=usage_tracker,
+                base_url=base_url,
             )
 
         if selection_method is None:
@@ -736,7 +745,8 @@ def run_mcts(
                         os.makedirs(thread_work_dir, exist_ok=True)
                         thread_local.agent_objs = get_agents(
                             thread_work_dir,
-                            model_name=model_name,
+                            theorizer_model=theorizer_model,
+                            execution_model=execution_model,
                             temperature=temperature,
                             reasoning_effort=reasoning_effort,
                             branching_factor=branching_factor,
@@ -748,6 +758,7 @@ def run_mcts(
                             dataset_paths=dataset_paths,
                             vision_model=vision_model,
                             usage_tracker=usage_tracker,
+                            base_url=base_url,
                         )
                     return thread_local.agent_objs
 
@@ -788,7 +799,8 @@ def run_mcts(
                 if base_agent_objs is None:
                     base_agent_objs = get_agents(
                         work_dir,
-                        model_name=model_name,
+                        theorizer_model=theorizer_model,
+                        execution_model=execution_model,
                         temperature=temperature,
                         reasoning_effort=reasoning_effort,
                         branching_factor=branching_factor,
@@ -800,6 +812,7 @@ def run_mcts(
                         dataset_paths=dataset_paths,
                         vision_model=vision_model,
                         usage_tracker=usage_tracker,
+                        base_url=base_url,
                     )
 
                 next_node_idx_by_level = defaultdict(
@@ -873,7 +886,7 @@ def main(args):
         args.backend = "modal"
 
     # Validate and fix arguments
-    if "o4-mini" in args.model and args.temperature is not None:
+    if ("o4-mini" in args.theorizer_model or "o4-mini" in args.execution_model) and args.temperature is not None:
         print("Warning: Setting temperature for o4-mini is not permitted. Using default None.")
         args.temperature = None
     if "o4-mini" in args.belief_model and args.belief_temperature is not None:
@@ -1002,7 +1015,8 @@ def main(args):
         allow_generate_experiments=args.allow_generate_experiments,
         n_belief_samples=args.n_belief_samples,
         k_parents=args.k_parents,
-        model_name=args.model,
+        theorizer_model=args.theorizer_model,
+        execution_model=args.execution_model,
         belief_model_name=args.belief_model,
         temperature=args.temperature,
         belief_temperature=args.belief_temperature,
@@ -1028,6 +1042,7 @@ def main(args):
         batch_size=args.batch_size,
         n_threads=args.n_threads,
         agent_usage_mode=args.agent_usage_mode,
+        base_url=args.base_url,
     )
 
 

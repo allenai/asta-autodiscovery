@@ -10,16 +10,38 @@ class ArgParser(argparse.ArgumentParser):
         )
         self.add_argument("--out_dir", type=str, required=True, help="Output directory for logs.")
         self.add_argument(
-            "--model",
+            "--theorizer_model",
             type=str,
             default="gemini-3.1-pro-preview",
-            help="LLM to use for all agents (except belief distribution agent).",
+            help=(
+                "LLM used by the experiment_generator (theorizer) to generate hypotheses. "
+                "This is the model that --base_url is routed to."
+            ),
+        )
+        self.add_argument(
+            "--execution_model",
+            type=str,
+            default="gemini-3.1-pro-preview",
+            help=(
+                "LLM used by the execution agents (programmer, analyst, reviewer, reviser). "
+                "Always uses its default endpoint (never --base_url)."
+            ),
         )
         self.add_argument(
             "--belief_model",
             type=str,
             default="gemini-3-flash-preview",
             help="LLM to use for belief distribution agent.",
+        )
+        self.add_argument(
+            "--base_url",
+            type=str,
+            default=None,
+            help=(
+                "OpenAI-compatible base URL for the --theorizer_model only (e.g. a local vLLM "
+                "server like http://localhost:8000/v1). The execution and belief models always "
+                "use their default endpoints."
+            ),
         )
         self.add_argument(
             "--vision_model",

@@ -40,6 +40,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Ensure uv/uvx are on THIS process's PATH. serve_vllm.sh installs uv, but only
+# in its own child process, so the post-run S3 sync here (uvx --from awscli)
+# would otherwise fail with "uvx: command not found".
+if ! command -v uvx >/dev/null 2>&1; then
+    echo "=== installing uv ==="
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+export PATH="$HOME/.local/bin:$PATH"
+
 # Base run args come from this JSON config (co-located with the launcher). Its
 # values are the defaults; the runtime paths and any explicitly-set env var below
 # replace them (argparse: the last occurrence of a flag wins). Set CONFIG="" to

@@ -32,6 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 WORKSPACE="${WORKSPACE:-ai2/autodiscovery}"
 CLUSTER="${CLUSTER:-ai2/jupiter}"
+BUDGET="${BUDGET:-ai2/asta}"
 MODEL="${MODEL:-gpt-5-mini}"
 BELIEF_MODEL="${BELIEF_MODEL:-$MODEL}"
 N_EXPERIMENTS="${N_EXPERIMENTS:-10}"
@@ -81,6 +82,7 @@ for metadata in "${datasets[@]}"; do
     # shellcheck disable=SC2086
     gantry run --allow-dirty --workspace "$WORKSPACE" \
         --cluster "$CLUSTER" \
+        --budget "$BUDGET" \
         --no-python \
         --gpus "$GPUS" \
         --weka "${WEKA_BUCKET}:${WEKA_MOUNT}" \

@@ -7,12 +7,6 @@ import { useAuth0 } from '@/contexts/Auth0Context';
 
 const projectId = process.env.NODE_ENV === 'production' ? 1887597889 : 2426822886;
 
-// LOCAL DEV ONLY: skip the real Heap SDK on localhost and log events to the console instead,
-// so local testing never sends real events into the shared dev Heap project.
-// TODO(you): remove this before committing if you don't want to keep it around.
-const useLocalHeapMock =
-    typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
 // TypeScript declarations for Heap
 declare global {
     interface Window {
@@ -20,34 +14,13 @@ declare global {
             identify: (identifier: string) => void;
             addUserProperties: (properties: Record<string, any>) => void;
             addEventProperties: (properties: Record<string, any>) => void;
-            track?: (eventName: string, properties?: Record<string, any>) => void;
-            clearEventProperties?: () => void;
-            resetIdentity?: () => void;
         };
     }
-}
-
-function installLocalHeapMock() {
-    window.heap = {
-        identify: (id) => console.log('[heap mock] identify', id),
-        addUserProperties: (props) => console.log('[heap mock] addUserProperties', props),
-        addEventProperties: (props) => console.log('[heap mock] addEventProperties', props),
-        clearEventProperties: () => {},
-        resetIdentity: () => {},
-        track: (eventName, props) => console.log('[heap mock] track', eventName, props ?? {}),
-    };
 }
 
 export default function HeapAnalyticsLoader() {
     const [scriptLoaded, setScriptLoaded] = useState(false);
     const { user } = useAuth0(); // Assuming useAuth is a custom hook to get auth status and session
-
-    useEffect(() => {
-        if (useLocalHeapMock) {
-            installLocalHeapMock();
-            setScriptLoaded(true);
-        }
-    }, []);
 
     useEffect(() => {
         if (!window.heap) {
@@ -71,10 +44,6 @@ export default function HeapAnalyticsLoader() {
             setScriptLoaded(true);
         }
     };
-
-    if (useLocalHeapMock) {
-        return null;
-    }
 
     return (
         <Script

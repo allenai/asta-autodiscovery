@@ -69,7 +69,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--seed",
             type=int,
-            default=0,
+            default=42,
             help="Sampling seed sent to the generation models (theorizer + execution) "
             "for reproducibility. With temperature=1.0 a fixed seed makes a vLLM-served "
             "theorizer deterministic (same input -> same output); OpenAI treats it as "

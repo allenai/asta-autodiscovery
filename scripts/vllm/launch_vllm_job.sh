@@ -51,6 +51,7 @@ OUT_DIR="${OUT_DIR:-${WEKA_MOUNT}/sijial/results}"
 gantry run --allow-dirty --workspace "$WORKSPACE" \
     --cluster "$CLUSTER" \
     --budget "$BUDGET" \
+    --no-python \
     --gpus "$GPUS" \
     --weka "${WEKA_BUCKET}:${WEKA_MOUNT}" \
     --priority "${PRIORITY:-normal}" \

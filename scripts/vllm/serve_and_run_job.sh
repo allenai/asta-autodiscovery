@@ -43,7 +43,10 @@ N_EXPERIMENTS="${N_EXPERIMENTS:-4}"
 N_WARMSTART="${N_WARMSTART:-0}"
 OUT_DIR="${OUT_DIR:-/weka/nora-default/sijial/results}"
 PORT="${PORT:-8000}"
-RUN_CMD="${RUN_CMD:-python -m autodiscovery.run}"
+# Run the client through uv so the autodiscovery package + its workspace-sibling
+# deps resolve from the uv workspace (this is a uv monorepo; plain `python -m`
+# would not find the package). serve_vllm.sh ensures uv is installed.
+RUN_CMD="${RUN_CMD:-uv run --package autodiscovery python -m autodiscovery.run}"
 : "${DATASET_METADATA:?DATASET_METADATA must be set}"
 
 # Per-run directory under OUT_DIR: co-locate this run's logs, agent work_dir, and

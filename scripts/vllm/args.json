@@ -17,7 +17,7 @@
     "n_belief_samples": 5,
     "timestamp_dir": true,
     "exploration_weight": 2.0,
-    "dataset_metadata_type": "dbench",
+    "dataset_metadata_type": "asta",
     "work_dir": "work",
     "delete_work_dir": true,
     "beam_width": 8,

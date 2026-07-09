@@ -111,6 +111,10 @@ UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 # Users whose runs are publicly accessible (can be queried by anyone)
 PUBLIC_USERS = {"samples"}
 
+# AutoDiscovery's own frontend base URL, used to build a link back to the
+# source experiment when handing a user off to Asta.
+AUTODISCOVERY_BASE_URL = os.environ.get("AUTODISCOVERY_BASE_URL", "https://autodiscovery.allen.ai")
+
 def sync_preloaded_dataset(source_gs_url, dest_bucket_name, dest_path):
     """Efficiently copies a file between GCS buckets."""
     storage_client = storage.Client()
@@ -1548,26 +1552,42 @@ def create() -> Blueprint:
             autodiscovery_context=context,
         )
 
-        # Fetch full user profile from Auth0 for the Asta login call
+        # Fetch full user profile from Auth0 for the Asta login call.
+        # Asta's login falls back to matching by email when auth0_user_id doesn't
+        # match an existing record (e.g. the user authenticated via a different
+        # Auth0 connection than before), so a missing/bad email here can cause
+        # Asta to create a duplicate account instead of recognizing a returning
+        # user. Retry once on transient failures rather than sending fake data.
         auth0_user_id = request.user.get("sub", "")
         auth0_domain = os.environ.get("AUTH0_DOMAIN", "")
         token = (request.headers.get("Authorization", "") or "").split()[-1]
-        email = name = nickname = ""
+
+        userinfo = None
         if token and auth0_domain:
-            try:
-                info = _requests.get(
-                    f"https://{auth0_domain}/userinfo",
-                    headers={"Authorization": f"Bearer {token}"},
-                    timeout=10,
-                )
-                info.raise_for_status()
-                u = info.json()
-                email = u.get("email", "")
-                name = u.get("name", email)
-                nickname = u.get("nickname", email)
-            except Exception as e:
-                current_app.logger.warning("Could not fetch Auth0 userinfo: %s", e)
-                email = auth0_user_id
+            for attempt in range(2):
+                try:
+                    info = _requests.get(
+                        f"https://{auth0_domain}/userinfo",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=10,
+                    )
+                    info.raise_for_status()
+                    userinfo = info.json()
+                    break
+                except Exception as e:
+                    current_app.logger.warning(
+                        "Auth0 userinfo fetch failed (attempt %d/2): %s", attempt + 1, e
+                    )
+
+        if userinfo is None:
+            current_app.logger.error(
+                "Could not fetch Auth0 userinfo for user %s", auth0_user_id
+            )
+            return jsonify({"error": "Failed to fetch user profile from Auth0"}), 502
+
+        email = userinfo.get("email", "")
+        name = userinfo.get("name", email)
+        nickname = userinfo.get("nickname", email)
 
         try:
             user_uuid = asta_client.login_or_create_user(
@@ -1580,8 +1600,10 @@ def create() -> Blueprint:
             current_app.logger.error("Asta login failed: %s", e)
             return jsonify({"error": "Failed to authenticate with Asta"}), 502
 
+        autodiscovery_link = f"{AUTODISCOVERY_BASE_URL}/runs/{runid}?exp={target_node.creation_idx - 1}"
+
         try:
-            thread_id = asta_client.create_thread(token)
+            thread_id = asta_client.create_thread(token, autodiscovery_link=autodiscovery_link)
         except Exception as e:
             current_app.logger.error("Asta thread creation failed: %s", e)
             return jsonify({"error": "Failed to create Asta thread"}), 502

@@ -14,6 +14,7 @@ import '@fontsource/manrope/700.css';
 
 import ClientProviders from '@/components/ClientProviders';
 import AuthErrorDialog from '@/components/AuthErrorDialog';
+import ClickTrackingListener from '@/components/ClickTrackingListener';
 import HeapAnalyticsLoader from '@/components/HeapAnalyticsLoader';
 import { Toasts } from '@/components/Toasts';
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <AppRouterCacheProvider>
                     <ClientProviders>
                         <HeapAnalyticsLoader />
+                        <ClickTrackingListener />
                         <VarnishApp>
                             <div
                                 style={{

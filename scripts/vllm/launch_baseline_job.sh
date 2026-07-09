@@ -77,7 +77,11 @@ fi
 for metadata in "${datasets[@]}"; do
     [ -n "$metadata" ] || { echo "empty dataset entry; skipping" >&2; continue; }
     name="$(basename "$metadata" _metadata.json)"
-    echo "Running baseline: $name (model=$MODEL, n=$N_EXPERIMENTS)"
+    # Same convention as the vLLM run (e.g. qwen9b-tcga-breast-cfg-n10):
+    # <tag>-<dataset>-cfg-n<N>. Override the whole name via NAME (single dataset).
+    dataset_short="$(echo "$name" | sed -e 's/_cancer$//' -e 's/_/-/g')"
+    run_name="${NAME:-baseline-${dataset_short}-cfg-n${N_EXPERIMENTS}}"
+    echo "Running baseline: $run_name (model=$MODEL, n=$N_EXPERIMENTS)"
 
     # shellcheck disable=SC2086
     gantry run --allow-dirty --workspace "$WORKSPACE" \
@@ -92,7 +96,7 @@ for metadata in "${datasets[@]}"; do
         --env-secret OPENAI_API_KEY=OPENAI_API_KEY \
         --env-secret AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID \
         --env-secret AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY \
-        --name="$name-$MODEL-baseline" \
+        --name="$run_name" \
         -- bash -c 'command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; exec "$@"' _ \
             $RUN_CMD ${CFG_FLAGS[@]+"${CFG_FLAGS[@]}"} \
             --work_dir="work" \

@@ -9,10 +9,12 @@ import {
     CircularProgress,
     Alert,
     Avatar,
+    Chip,
     styled,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 
 import { getUserApi } from '@/api/UserApi';
 import { useAuth0 } from '@/contexts/Auth0Context';
@@ -24,6 +26,7 @@ export default function DebugUserPage() {
         <Wrapper>
             <Typography variant="h1">User Debug</Typography>
             <UserProfileSection />
+            <PermissionsSection />
             <CreditsSection />
         </Wrapper>
     );
@@ -158,6 +161,116 @@ function UserProfileSection() {
     }
 
     return null;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const payloadPart = token.split('.')[1];
+    if (!payloadPart) {
+        return null;
+    }
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(atob(`${normalized}${padding}`)) as Record<string, unknown>;
+}
+
+function PermissionsSection() {
+    const { isAuthenticated, getAccessToken } = useAuth0();
+    const [permissions, setPermissions] = useState<string[] | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchPermissions = async () => {
+            if (!isAuthenticated) {
+                setLoading(false);
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                // Permissions live in the access token's `permissions` claim, not in
+                // /userinfo. Decode (not validate — the backend validates) to display them.
+                const token = await getAccessToken();
+                const payload = decodeJwtPayload(token);
+                setPermissions(
+                    Array.isArray(payload?.permissions) ? (payload.permissions as string[]) : []
+                );
+            } catch (err) {
+                console.error('Error decoding permissions:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load permissions');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPermissions();
+    }, [isAuthenticated]);
+
+    if (loading) {
+        return (
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                        <CircularProgress />
+                    </Box>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                        Permissions
+                    </Typography>
+                    <Alert severity="info">Please log in to view this information.</Alert>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                        Permissions
+                    </Typography>
+                    <Alert severity="error">{error}</Alert>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card sx={{ mb: 3, borderLeft: 4, borderColor: 'success.main' }}>
+            <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <VpnKeyIcon sx={{ mr: 1, color: 'success.main' }} />
+                    <Typography variant="h6">Permissions</Typography>
+                </Box>
+
+                {permissions && permissions.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {permissions.map((permission) => (
+                            <Chip
+                                key={permission}
+                                label={permission}
+                                size="small"
+                                sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                            />
+                        ))}
+                    </Box>
+                ) : (
+                    <Alert severity="info">This user has no permissions in the access token.</Alert>
+                )}
+            </CardContent>
+        </Card>
+    );
 }
 
 function CreditsSection() {

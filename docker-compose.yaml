@@ -31,8 +31,6 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - AUTH0_DOMAIN=${AUTH0_DOMAIN:-auth0.allenai.org}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://asta-core.allen.ai}
-      # If set, users must have this Auth0 permission. If empty/unset, any authenticated user can access.
-      - AUTH0_REQUIRED_PERMISSION=${AUTH0_REQUIRED_PERMISSION}
       # GCS and Google Cloud credentials
       - GCS_BUCKET=${GCS_BUCKET}
       - GCP_PROJECT=${GCP_PROJECT}

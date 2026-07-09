@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { User } from '@auth0/auth0-spa-js';
 
-import { auth0Client, auth0Config } from '@/auth/Auth0Client';
+import { auth0Client } from '@/auth/Auth0Client';
 
 export interface Auth0ContextType {
     isAuthenticated: boolean;
@@ -20,7 +20,6 @@ export interface Auth0ContextType {
     loginWithRedirect: () => Promise<void>;
     logout: () => void;
     getAccessToken: () => Promise<string>;
-    hasRequiredPermission: boolean;
     canExploreWithAsta: boolean;
     authError: string | null;
 }
@@ -35,7 +34,6 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | undefined>(undefined);
-    const [hasRequiredPermission, setHasRequiredPermission] = useState(false);
     const [canExploreWithAsta, setCanExploreWithAsta] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
 
@@ -77,21 +75,6 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
                         const permissions: string[] = Array.isArray(payload.permissions)
                             ? payload.permissions
                             : [];
-
-                        if (auth0Config.requiredPermission) {
-                            const hasPermission = permissions.includes(
-                                auth0Config.requiredPermission
-                            );
-                            setHasRequiredPermission(hasPermission);
-                            if (!hasPermission) {
-                                setAuthError(
-                                    `Access denied. Required permission: ${auth0Config.requiredPermission}`
-                                );
-                                // Don't auto-logout - let the dialog handle user action
-                            }
-                        } else {
-                            setHasRequiredPermission(true);
-                        }
 
                         setCanExploreWithAsta(permissions.includes('enroll:asta_integration'));
                     } catch (error) {
@@ -148,7 +131,6 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
             loginWithRedirect,
             logout,
             getAccessToken,
-            hasRequiredPermission,
             canExploreWithAsta,
             authError,
         }),
@@ -159,7 +141,6 @@ export function Auth0Provider({ children }: Auth0ProviderProps) {
             loginWithRedirect,
             logout,
             getAccessToken,
-            hasRequiredPermission,
             canExploreWithAsta,
             authError,
         ]

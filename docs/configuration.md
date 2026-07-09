@@ -129,6 +129,7 @@ Configures the "dig deeper" handoff that sends an experiment's context to Asta.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
+| `AUTODISCOVERY_BASE_URL` | No | `https://autodiscovery.allen.ai` | Base URL of this app, used to build the AutoDiscovery run link included in the Asta handoff. |
 | `ASTA_BASE_URL` | No | `https://asta.allen.ai` | Base URL used to build Asta chat links returned to the UI. |
 | `ASTA_CONTEXT_SERVICE_URL` | No | *(empty — feature disabled)* | URL of the context service that stores handoff artifacts and metadata. |
 | `ASTA_CONTEXT_SERVICE_API_KEY` | No | *(empty)* | API key for the context service. |
@@ -141,13 +142,15 @@ are **not secret**.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
+| `NEXT_PUBLIC_AUTH_PROVIDER` | No | `auth0` | Build-time fallback for the active auth provider (`auth0` / `password_file` / `none`) if `/api/auth/config` is unreachable. |
 | `NEXT_PUBLIC_AUTH0_DOMAIN` | No | `auth0.allenai.org` | Auth0 tenant domain for the browser login flow. |
 | `NEXT_PUBLIC_AUTH0_CLIENT_ID` | No | *(built-in public client id)* | Public Auth0 application (client) id for the SPA. Public by design. |
 | `NEXT_PUBLIC_AUTH0_AUDIENCE` | No | `https://asta-core.allen.ai` | Auth0 API audience requested by the browser. |
-
-These `NEXT_PUBLIC_AUTH0_*` values are build-time fallbacks; at runtime the UI prefers the values served by `GET /api/auth/config`.
 | `API_ORIGIN` | No | `http://api:8000` | Origin the UI's server-side actions use to reach the API. |
 | `NODE_ENV` | No | `development` | Standard Node environment (`development` / `production`); influences build behavior and analytics loading. |
+
+The `NEXT_PUBLIC_AUTH*` values are build-time fallbacks; at runtime the UI prefers the
+provider and settings served by `GET /api/auth/config`.
 
 ### Testing / CI (UI)
 

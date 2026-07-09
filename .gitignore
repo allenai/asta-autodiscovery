@@ -39,6 +39,8 @@ UI_DESIGN_GUIDE.md
 packages/autodiscovery/data/ad-hypo-prompts/
 *.arrow
 packages/autodiscovery/test-adv-output/
+# Run results synced from S3 (s3://ai2-asta-workspaces/autods/runs) — do not commit
+/results/
 
 # Docker image artifacts (e.g. `docker save` output) — never commit built images
 *.tar

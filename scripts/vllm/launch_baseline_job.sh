@@ -93,7 +93,8 @@ for metadata in "${datasets[@]}"; do
         --env-secret AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID \
         --env-secret AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY \
         --name="$name-$MODEL-baseline" \
-        -- $RUN_CMD ${CFG_FLAGS[@]+"${CFG_FLAGS[@]}"} \
+        -- bash -c 'command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; exec "$@"' _ \
+            $RUN_CMD ${CFG_FLAGS[@]+"${CFG_FLAGS[@]}"} \
             --work_dir="work" \
             --out_dir="$OUT_DIR" \
             --dataset_metadata="$metadata" \

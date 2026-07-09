@@ -25,14 +25,16 @@
 #   N_EXPERIMENTS     number of MCTS iterations       (override; else from config)
 #   N_WARMSTART       warmstart experiments           (override; else from config)
 #   OUT_DIR           base output dir                 (default: /weka/nora-default/sijial/results)
-#                     Each run writes to OUT_DIR/<timestamp>/ containing the logs
-#                     (mcts_nodes.json, temp_log.json, args.json), the agent
-#                     work_dir (work/), and the vLLM server stdout (vllm.log).
-#   WORK_DIR          agent work dir                  (default: OUT_DIR/<timestamp>/work)
+#                     Each run writes to OUT_DIR/<jobname>-<experimentid>-<timestamp>/
+#                     containing the logs (mcts_nodes.json, temp_log.json,
+#                     args.json), the agent work_dir (work/), and the vLLM server
+#                     stdout (vllm.log).
+#   RUN_NAME          jobname prefix for the run dir  (default: the launcher's --name; empty ok)
+#   WORK_DIR          agent work dir                  (default: <run dir>/work)
 #   PORT              local vLLM port                 (default: 8000)
 #   RUN_CMD           command that runs AutoDiscovery (default: uv run --package asta-autodiscovery python -m autodiscovery.run)
 #   RUN_EXTRA_ARGS    extra flags appended to the run command
-#   S3_RESULTS_PREFIX after the run, sync OUT_DIR/<ts> here (default: s3://ai2-asta-workspaces/autods/runs; "" to disable)
+#   S3_RESULTS_PREFIX after the run, sync the run dir here (default: s3://ai2-asta-workspaces/autods/runs; "" to disable)
 #   (plus everything serve_vllm.sh understands: GPU_COUNT, TP_SIZE,
 #    MAX_MODEL_LEN, VLLM_VERSION, GDN_PREFILL_BACKEND, ...)
 
@@ -69,10 +71,15 @@ if [ -z "${MODEL:-}" ] && [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
 fi
 MODEL="${MODEL:-Qwen/Qwen3.5-9B}"
 
-# Per-run directory under OUT_DIR: co-locate this run's logs, agent work_dir, and
+# Per-run directory under OUT_DIR, named <jobname>-<experimentid>-<timestamp> so
+# results self-identify off weka. jobname = RUN_NAME (the launcher's --name);
+# experimentid = the Beaker experiment ID (set in every job). Each part is
+# omitted if unset (e.g. running outside Beaker), so the timestamp is the
+# always-present fallback. This dir co-locates the logs, agent work_dir, and
 # vLLM server stdout so everything for one run lives under results/<run>/.
 RUN_TS="$(date -u +%Y%m%d-%H%M%S)"
-RUN_DIR="${OUT_DIR%/}/${RUN_TS}"
+RUN_SLUG="${RUN_NAME:+${RUN_NAME}-}${BEAKER_EXPERIMENT_ID:+${BEAKER_EXPERIMENT_ID}-}${RUN_TS}"
+RUN_DIR="${OUT_DIR%/}/${RUN_SLUG}"
 WORK_DIR="${WORK_DIR:-$RUN_DIR/work}"
 mkdir -p "$RUN_DIR" "$WORK_DIR"
 
@@ -131,7 +138,7 @@ run_rc=0
 # Set S3_RESULTS_PREFIX="" to disable.
 S3_RESULTS_PREFIX="${S3_RESULTS_PREFIX:-s3://ai2-asta-workspaces/autods/runs}"
 if [ -n "$S3_RESULTS_PREFIX" ]; then
-    s3_dest="${S3_RESULTS_PREFIX%/}/${RUN_TS}/"
+    s3_dest="${S3_RESULTS_PREFIX%/}/${RUN_SLUG}/"
     echo "=== [$(date -u +%H:%M:%S)] syncing $RUN_DIR -> $s3_dest ==="
     if uvx --from awscli aws s3 sync "$RUN_DIR" "$s3_dest" --no-progress; then
         echo "=== s3 sync OK: $s3_dest ==="

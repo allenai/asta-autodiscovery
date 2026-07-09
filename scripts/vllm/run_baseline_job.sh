@@ -25,8 +25,10 @@
 #   N_EXPERIMENTS    number of MCTS iterations       (override; else from config)
 #   N_WARMSTART      warmstart experiments           (default: 0)
 #   OUT_DIR          base output dir                 (default: /weka/nora-default/sijial/results)
-#                    Each run writes to OUT_DIR/<timestamp>/ (logs + agent work/).
-#   WORK_DIR         agent work dir                  (default: OUT_DIR/<timestamp>/work)
+#                    Each run writes to OUT_DIR/<jobname>-<experimentid>-<timestamp>/
+#                    (logs + agent work/).
+#   RUN_NAME         jobname prefix for the run dir  (default: the launcher's --name; empty ok)
+#   WORK_DIR         agent work dir                  (default: <run dir>/work)
 #   RUN_CMD          command that runs AutoDiscovery (default: uv run --package asta-autodiscovery python -m autodiscovery.run)
 #   RUN_EXTRA_ARGS   extra flags appended to the run command
 #   S3_RESULTS_PREFIX after the run, sync OUT_DIR/<ts> here (default: s3://ai2-asta-workspaces/autods/runs; "" to disable)
@@ -48,11 +50,14 @@ BELIEF_MODEL="${BELIEF_MODEL:-$MODEL}"
 OUT_DIR="${OUT_DIR:-/weka/nora-default/sijial/results}"
 RUN_CMD="${RUN_CMD:-uv run --package asta-autodiscovery python -m autodiscovery.run}"
 
-# Per-run directory under OUT_DIR: co-locate logs and the agent work_dir. The
+# Per-run directory under OUT_DIR, named <jobname>-<experimentid>-<timestamp> so
+# results self-identify off weka (jobname = RUN_NAME from the launcher's --name;
+# experimentid = the Beaker experiment ID; each part omitted if unset). The
 # work_dir MUST be absolute — the sandbox chdir's into it, and a relative path
 # (e.g. work/<ts>) fails to resolve there.
 RUN_TS="$(date -u +%Y%m%d-%H%M%S)"
-RUN_DIR="${OUT_DIR%/}/${RUN_TS}"
+RUN_SLUG="${RUN_NAME:+${RUN_NAME}-}${BEAKER_EXPERIMENT_ID:+${BEAKER_EXPERIMENT_ID}-}${RUN_TS}"
+RUN_DIR="${OUT_DIR%/}/${RUN_SLUG}"
 WORK_DIR="${WORK_DIR:-$RUN_DIR/work}"
 mkdir -p "$RUN_DIR" "$WORK_DIR"
 
@@ -92,7 +97,7 @@ $RUN_CMD "${RUN_ARGS[@]}" || run_rc=$?
 # failure never fails the run; outputs still persist on weka at $RUN_DIR.
 S3_RESULTS_PREFIX="${S3_RESULTS_PREFIX:-s3://ai2-asta-workspaces/autods/runs}"
 if [ -n "$S3_RESULTS_PREFIX" ]; then
-    s3_dest="${S3_RESULTS_PREFIX%/}/${RUN_TS}/"
+    s3_dest="${S3_RESULTS_PREFIX%/}/${RUN_SLUG}/"
     echo "=== [$(date -u +%H:%M:%S)] syncing $RUN_DIR -> $s3_dest ==="
     if uvx --from awscli aws s3 sync "$RUN_DIR" "$s3_dest" --no-progress; then
         echo "=== s3 sync OK: $s3_dest ==="

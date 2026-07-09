@@ -85,6 +85,7 @@ for metadata in "${datasets[@]}"; do
         --env "N_EXPERIMENTS=$N_EXPERIMENTS" \
         --env "OUT_DIR=$OUT_DIR" \
         --env "DATASET_METADATA=$metadata" \
+        --env "RUN_NAME=$run_name" \
         --name="$run_name" \
         -- bash scripts/vllm/run_baseline_job.sh
 done

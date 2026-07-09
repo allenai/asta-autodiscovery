@@ -53,6 +53,7 @@ ENV_ARGS=(
     --env "GDN_PREFILL_BACKEND=$GDN_PREFILL_BACKEND"
     --env "PORT=$PORT"
     --env "OUT_DIR=$OUT_DIR"
+    --env "RUN_NAME=$NAME"
     --env "HF_HOME=$HF_CACHE"
     --env "HF_HUB_CACHE=$HF_CACHE/hub"
 )

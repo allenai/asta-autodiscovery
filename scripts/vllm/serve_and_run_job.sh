@@ -46,7 +46,7 @@ PORT="${PORT:-8000}"
 # Run the client through uv so the autodiscovery package + its workspace-sibling
 # deps resolve from the uv workspace (this is a uv monorepo; plain `python -m`
 # would not find the package). serve_vllm.sh ensures uv is installed.
-RUN_CMD="${RUN_CMD:-uv run --package autodiscovery python -m autodiscovery.run}"
+RUN_CMD="${RUN_CMD:-uv run --package asta-autodiscovery python -m autodiscovery.run}"
 : "${DATASET_METADATA:?DATASET_METADATA must be set}"
 
 # Per-run directory under OUT_DIR: co-locate this run's logs, agent work_dir, and

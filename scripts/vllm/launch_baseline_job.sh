@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 #
 # Launch AutoDiscovery baseline runs on Beaker with a single API model for ALL
-# agents (theorizer = execution = belief) — no local vLLM serving. Submits one
-# gantry job per dataset.
+# agents (theorizer = execution, belief = BELIEF_MODEL) — no local vLLM serving.
+# Submits one gantry job per dataset.
 #
-# Base run args are loaded from the same JSON config as the vLLM path
-# (CONFIG, default scripts/vllm/args.json), EXCEPT the keys that only make sense
-# with a served theorizer (base_url, theorizer_model/execution_model) and the
-# per-run paths — those are set by this script. So the baseline shares the
-# config's hyperparameters (dataset, selection, belief settings, ...) for a fair
-# comparison against the vLLM/Qwen run.
+# The in-job wrapper (run_baseline_job.sh) loads base run args from the same
+# JSON config as the vLLM path (CONFIG, default scripts/vllm/args.json), dropping
+# the vLLM-only key (base_url) and overriding the split models / per-run paths.
+# So the baseline shares the config's hyperparameters (selection, belief, ...)
+# for a fair comparison against the vLLM/Qwen run.
 #
 # Usage:
 #   # dataset(s) from the config's dataset_metadata:
@@ -20,15 +19,16 @@
 #
 # Config (all overridable via env):
 #   WORKSPACE      Beaker workspace     (default: ai2/autodiscovery)
-#   CLUSTER        Beaker cluster       (default: ai2/jupiter; must be an Austin
-#                  cluster for the weka out_dir)
+#   CLUSTER        Beaker cluster       (default: ai2/jupiter; Austin cluster for weka)
 #   MODEL          single baseline model (theorizer + execution)  (default: gpt-5-mini)
 #   BELIEF_MODEL   belief model         (default: = MODEL)
 #   N_EXPERIMENTS  MCTS iterations      (default: 10)
 #   CONFIG         JSON args file       (default: scripts/vllm/args.json; "" to disable)
 #   GPUS           GPUs per job         (default: 0 — baseline needs none)
+#   NAME           full run name        (default: baseline-<dataset>-cfg-n<N>)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 WORKSPACE="${WORKSPACE:-ai2/autodiscovery}"
 CLUSTER="${CLUSTER:-ai2/jupiter}"
@@ -38,28 +38,11 @@ BELIEF_MODEL="${BELIEF_MODEL:-$MODEL}"
 N_EXPERIMENTS="${N_EXPERIMENTS:-10}"
 CONFIG="${CONFIG:-$SCRIPT_DIR/args.json}"
 GPUS="${GPUS:-0}"
-# uv monorepo: skip gantry's pip build (--no-python) and run via uv.
-RUN_CMD="${RUN_CMD:-uv run --package asta-autodiscovery python -m autodiscovery.run}"
 
 # WEKA-backed output. Requires an Austin cluster that mounts this weka.
 WEKA_BUCKET="${WEKA_BUCKET:-nora-default}"
 WEKA_MOUNT="${WEKA_MOUNT:-/weka/${WEKA_BUCKET}}"
 OUT_DIR="${OUT_DIR:-${WEKA_MOUNT}/sijial/results}"
-
-# Base args from the config, excluding what the baseline overrides or that only
-# apply with a served theorizer (no base_url / split models / per-run paths).
-# Runs on the launch host (macOS = bash 3.2), so avoid process-substitution +
-# heredoc; use a here-string over a shared helper instead.
-CFG_FLAGS=()
-if [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
-    while IFS= read -r _flag; do
-        [ -n "$_flag" ] && CFG_FLAGS+=("$_flag")
-    done <<EOF
-$(python3 "$SCRIPT_DIR/_config_to_flags.py" "$CONFIG" \
-    base_url theorizer_model execution_model belief_model \
-    out_dir work_dir n_experiments dataset_metadata)
-EOF
-fi
 
 # Datasets: positional args or DATASETS env, else the config's dataset_metadata.
 if [ "$#" -gt 0 ]; then
@@ -83,7 +66,8 @@ for metadata in "${datasets[@]}"; do
     run_name="${NAME:-baseline-${dataset_short}-cfg-n${N_EXPERIMENTS}}"
     echo "Running baseline: $run_name (model=$MODEL, n=$N_EXPERIMENTS)"
 
-    # shellcheck disable=SC2086
+    # The in-job wrapper (run_baseline_job.sh) bootstraps uv, builds run args from
+    # CONFIG + these env overrides, runs AutoDiscovery, and S3-syncs the results.
     gantry run --allow-dirty --workspace "$WORKSPACE" \
         --cluster "$CLUSTER" \
         --budget "$BUDGET" \
@@ -96,15 +80,11 @@ for metadata in "${datasets[@]}"; do
         --env-secret OPENAI_API_KEY=OPENAI_API_KEY \
         --env-secret AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID \
         --env-secret AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY \
+        --env "MODEL=$MODEL" \
+        --env "BELIEF_MODEL=$BELIEF_MODEL" \
+        --env "N_EXPERIMENTS=$N_EXPERIMENTS" \
+        --env "OUT_DIR=$OUT_DIR" \
+        --env "DATASET_METADATA=$metadata" \
         --name="$run_name" \
-        -- bash -c 'command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; exec "$@"' _ \
-            $RUN_CMD ${CFG_FLAGS[@]+"${CFG_FLAGS[@]}"} \
-            --work_dir="work" \
-            --out_dir="$OUT_DIR" \
-            --dataset_metadata="$metadata" \
-            --n_experiments="$N_EXPERIMENTS" \
-            --theorizer_model="$MODEL" \
-            --execution_model="$MODEL" \
-            --belief_model="$BELIEF_MODEL" \
-            --n_warmstart=0
+        -- bash scripts/vllm/run_baseline_job.sh
 done

@@ -28,16 +28,14 @@ BUDGET="${BUDGET:-ai2/asta}"
 GPUS="${GPUS:-1}"
 NAME="${NAME:-autodiscovery-vllm}"
 
-MODEL="${MODEL:-Qwen/Qwen3.5-9B}"          # theorizer, served by vLLM
-EXECUTION_MODEL="${EXECUTION_MODEL:-gemini-3.1-pro-preview}"  # execution agents, default endpoint
-BELIEF_MODEL="${BELIEF_MODEL:-gpt-5-mini}" # OpenAI, via OPENAI_API_KEY
+# Run args default to scripts/vllm/args.json (loaded by serve_and_run_job.sh).
+# The env vars below are OPTIONAL overrides — each one, when set, REPLACES the
+# corresponding value from the config file. Leave them unset to use the config.
+MODEL="${MODEL:-Qwen/Qwen3.5-9B}"          # theorizer, served by vLLM (must match the config's theorizer_model)
 # Qwen3.5 uses Gated DeltaNet; force the Triton GDN prefill backend to avoid the
 # flashinfer nvcc JIT compile (no CUDA toolkit in the container). Set to "" for
 # non-GDN models.
 GDN_PREFILL_BACKEND="${GDN_PREFILL_BACKEND:-triton}"
-DATASET_METADATA="${DATASET_METADATA:?set DATASET_METADATA to your dataset metadata path/URL}"
-N_EXPERIMENTS="${N_EXPERIMENTS:-100}"
-N_WARMSTART="${N_WARMSTART:-0}"
 PORT="${PORT:-8000}"
 # MAX_MODEL_LEN=32768                       # uncomment to cap context (passed through to vLLM)
 
@@ -47,6 +45,26 @@ WEKA_MOUNT="${WEKA_MOUNT:-/weka/${WEKA_BUCKET}}"
 HF_CACHE="${HF_CACHE:-${WEKA_MOUNT}/hf-cache}"
 OUT_DIR="${OUT_DIR:-${WEKA_MOUNT}/sijial/results}"
 # -----------------------------------------------------------------------------
+
+# Always-passed env; the run-arg overrides are appended only when set so the
+# config file (scripts/vllm/args.json) provides them otherwise.
+ENV_ARGS=(
+    --env "MODEL=$MODEL"
+    --env "GDN_PREFILL_BACKEND=$GDN_PREFILL_BACKEND"
+    --env "PORT=$PORT"
+    --env "OUT_DIR=$OUT_DIR"
+    --env "HF_HOME=$HF_CACHE"
+    --env "HF_HUB_CACHE=$HF_CACHE/hub"
+)
+[ -n "${CONFIG:-}" ]                && ENV_ARGS+=( --env "CONFIG=$CONFIG" )
+[ -n "${DATASET_METADATA:-}" ]      && ENV_ARGS+=( --env "DATASET_METADATA=$DATASET_METADATA" )
+[ -n "${DATASET_METADATA_TYPE:-}" ] && ENV_ARGS+=( --env "DATASET_METADATA_TYPE=$DATASET_METADATA_TYPE" )
+[ -n "${EXECUTION_MODEL:-}" ]       && ENV_ARGS+=( --env "EXECUTION_MODEL=$EXECUTION_MODEL" )
+[ -n "${BELIEF_MODEL:-}" ]          && ENV_ARGS+=( --env "BELIEF_MODEL=$BELIEF_MODEL" )
+[ -n "${N_EXPERIMENTS:-}" ]         && ENV_ARGS+=( --env "N_EXPERIMENTS=$N_EXPERIMENTS" )
+[ -n "${N_WARMSTART:-}" ]           && ENV_ARGS+=( --env "N_WARMSTART=$N_WARMSTART" )
+[ -n "${S3_RESULTS_PREFIX:-}" ]     && ENV_ARGS+=( --env "S3_RESULTS_PREFIX=$S3_RESULTS_PREFIX" )
+[ -n "${MAX_MODEL_LEN:-}" ]         && ENV_ARGS+=( --env "MAX_MODEL_LEN=$MAX_MODEL_LEN" )
 
 gantry run --allow-dirty --workspace "$WORKSPACE" \
     --cluster "$CLUSTER" \
@@ -61,16 +79,6 @@ gantry run --allow-dirty --workspace "$WORKSPACE" \
     --env-secret HF_TOKEN=HF_TOKEN \
     --env-secret AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID \
     --env-secret AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY \
-    --env "MODEL=$MODEL" \
-    --env "EXECUTION_MODEL=$EXECUTION_MODEL" \
-    --env "GDN_PREFILL_BACKEND=$GDN_PREFILL_BACKEND" \
-    --env "BELIEF_MODEL=$BELIEF_MODEL" \
-    --env "DATASET_METADATA=$DATASET_METADATA" \
-    --env "N_EXPERIMENTS=$N_EXPERIMENTS" \
-    --env "N_WARMSTART=$N_WARMSTART" \
-    --env "PORT=$PORT" \
-    --env "OUT_DIR=$OUT_DIR" \
-    --env "HF_HOME=$HF_CACHE" \
-    --env "HF_HUB_CACHE=$HF_CACHE/hub" \
+    "${ENV_ARGS[@]}" \
     --name="$NAME" \
     -- bash scripts/vllm/serve_and_run_job.sh

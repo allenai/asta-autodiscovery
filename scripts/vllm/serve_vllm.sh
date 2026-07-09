@@ -95,7 +95,8 @@ VLLM_CMD=( uvx --with "fastapi<0.137" "vllm==${VLLM_VERSION}" serve "$MODEL"
 [ -n "${GDN_PREFILL_BACKEND:-}" ] && VLLM_CMD+=( --gdn-prefill-backend "$GDN_PREFILL_BACKEND" )
 [ -n "${MAX_MODEL_LEN:-}" ] && VLLM_CMD+=( --max-model-len "$MAX_MODEL_LEN" )
 # Log each request's generated text (incl. reasoning tokens) to vLLM stdout.
-[ "${VLLM_ENABLE_LOG_OUTPUTS:-0}" = "1" ] && VLLM_CMD+=( --enable-log-outputs )
+# --enable-log-outputs requires --enable-log-requests (vLLM validates this pair).
+[ "${VLLM_ENABLE_LOG_OUTPUTS:-0}" = "1" ] && VLLM_CMD+=( --enable-log-requests --enable-log-outputs )
 # shellcheck disable=SC2206
 [ -n "${VLLM_EXTRA_ARGS:-}" ] && VLLM_CMD+=( ${VLLM_EXTRA_ARGS} )
 

@@ -37,16 +37,6 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
-    @api.route("/health")
-    @requires_auth()
-    def health():
-        """Health check endpoint."""
-        if not JOBS_AVAILABLE:
-            current_app.logger.warning(
-                "autodiscovery_jobs package not available - job management features disabled"
-            )
-        return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
-
     @api.route("/list")
     @requires_auth()
     def list_jobs():

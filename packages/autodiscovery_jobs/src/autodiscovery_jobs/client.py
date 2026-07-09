@@ -1,0 +1,43 @@
+"""Shared, cached Google Cloud Storage client.
+
+Constructing a :class:`google.cloud.storage.Client` is surprisingly expensive:
+each instance re-runs credential/session setup (tens of milliseconds apiece).
+The credit and run endpoints call many small GCS helpers per request, and each
+helper used to build its own client, so a single request could construct dozens
+of clients and spend seconds purely on client setup.
+
+A ``storage.Client`` is safe to share across threads for the read/write blob
+operations used here, and the Google client libraries recommend reusing a
+single long-lived client (it transparently refreshes credentials). We therefore
+cache one client per ``project_id`` for the lifetime of the process.
+
+The cache is unlocked: dict get/set are atomic, so concurrent first-callers can
+at worst each build a client and race to store it (last write wins; the extras
+are valid and simply discarded). We accept that rare, harmless duplication on a
+worker's first request rather than serialize every lookup behind a lock.
+"""
+
+from __future__ import annotations
+
+from google.cloud import storage
+
+_clients: dict[str | None, storage.Client] = {}
+
+
+def get_storage_client(project_id: str | None = None) -> storage.Client:
+    """Return a process-wide cached ``storage.Client`` for a project.
+
+    Reuses a single client per ``project_id`` to avoid repeated credential and
+    HTTP-session setup.
+
+    Args:
+        project_id: GCP project to scope the client to (auto-detected when None).
+
+    Returns:
+        A shared ``storage.Client`` scoped to ``project_id``.
+    """
+    client = _clients.get(project_id)
+    if client is None:
+        client = storage.Client(project=project_id)
+        _clients[project_id] = client
+    return client

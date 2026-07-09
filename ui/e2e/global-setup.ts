@@ -28,7 +28,7 @@ function describeError(err: unknown): string {
 
 export default async function globalSetup(config: FullConfig) {
     const baseURL = config.projects[0].use.baseURL ?? 'http://localhost:8080/';
-    const HEALTH_URL = new URL('/api/runs/health', baseURL).toString();
+    const HEALTH_URL = new URL('/api', baseURL).toString();
 
     const deadline = Date.now() + TIMEOUT_MS;
     let lastError: unknown;

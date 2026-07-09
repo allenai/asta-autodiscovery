@@ -31,6 +31,10 @@ NAME="${NAME:-autodiscovery-vllm}"
 MODEL="${MODEL:-Qwen/Qwen3.5-9B}"          # theorizer, served by vLLM
 EXECUTION_MODEL="${EXECUTION_MODEL:-gemini-3.1-pro-preview}"  # execution agents, default endpoint
 BELIEF_MODEL="${BELIEF_MODEL:-gpt-5-mini}" # OpenAI, via OPENAI_API_KEY
+# Qwen3.5 uses Gated DeltaNet; force the Triton GDN prefill backend to avoid the
+# flashinfer nvcc JIT compile (no CUDA toolkit in the container). Set to "" for
+# non-GDN models.
+GDN_PREFILL_BACKEND="${GDN_PREFILL_BACKEND:-triton}"
 DATASET_METADATA="${DATASET_METADATA:?set DATASET_METADATA to your dataset metadata path/URL}"
 N_EXPERIMENTS="${N_EXPERIMENTS:-100}"
 N_WARMSTART="${N_WARMSTART:-0}"
@@ -58,6 +62,7 @@ gantry run --allow-dirty --workspace "$WORKSPACE" \
     --env-secret AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY \
     --env "MODEL=$MODEL" \
     --env "EXECUTION_MODEL=$EXECUTION_MODEL" \
+    --env "GDN_PREFILL_BACKEND=$GDN_PREFILL_BACKEND" \
     --env "BELIEF_MODEL=$BELIEF_MODEL" \
     --env "DATASET_METADATA=$DATASET_METADATA" \
     --env "N_EXPERIMENTS=$N_EXPERIMENTS" \

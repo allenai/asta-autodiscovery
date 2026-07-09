@@ -15,6 +15,25 @@ from autodiscovery.mcts_utils import (
 from autodiscovery.utils import try_loading_dict
 
 
+def _warn_experiment_count(n_generated, expected, node_id, source):
+    """Log a warning when the experiment_generator yields an unexpected count.
+
+    Warns if it produced no parseable experiments (empty/unparseable output), or
+    a number that differs from ``expected`` (k_experiments). ``source`` labels the
+    generation path ("on-demand" or "end-of-chat"). No-op when expected is None.
+    """
+    if n_generated == 0:
+        print(
+            f"WARNING: experiment_generator produced no parseable experiments "
+            f"({source}) for node {node_id} — empty or unparseable generation."
+        )
+    elif expected is not None and n_generated != expected:
+        print(
+            f"WARNING: experiment_generator produced {n_generated} experiments "
+            f"({source}) for node {node_id}, expected {expected} (k_experiments)."
+        )
+
+
 class MCTSNode:
     _creation_counter = 0
 
@@ -149,9 +168,13 @@ class MCTSNode:
         self.normalized_surprisal = data.get("normalized_surprisal", self.normalized_surprisal)
         self.kl_divergence = data.get("kl_divergence", self.kl_divergence)
 
-    def get_next_experiment(self, experiment_generator=None, n_retry=3):
+    def get_next_experiment(self, experiment_generator=None, n_retry=3, expected_experiments=None):
         """Returns the next untried experiment. If none left and generating experiments is allowed, generates more using
         the experiment generator agent.
+
+        expected_experiments: the branching factor (k_experiments). When set, a
+        warning is logged if an on-demand generation returns no parseable
+        experiments or a count that differs from this expectation.
         """
         new_experiment, new_query = None, None
 
@@ -173,6 +196,7 @@ class MCTSNode:
                     experiments = try_loading_dict(_reply).get("experiments", [])
                 except (json.JSONDecodeError, TypeError):
                     experiments = []
+                _warn_experiment_count(len(experiments), expected_experiments, self.id, "on-demand")
                 self.untried_experiments = experiments.copy()
                 if self.untried_experiments:
                     idx = random.randrange(len(self.untried_experiments))
@@ -186,7 +210,9 @@ class MCTSNode:
                     pass
             if new_query is None:
                 return self.get_next_experiment(
-                    experiment_generator=experiment_generator, n_retry=n_retry - 1
+                    experiment_generator=experiment_generator,
+                    n_retry=n_retry - 1,
+                    expected_experiments=expected_experiments,
                 )
 
         return new_experiment, new_query
@@ -223,8 +249,14 @@ class MCTSNode:
             "messages": self.messages,
         }
 
-    def read_experiment_from_messages(self, store_new_experiments=False):
-        """Extracts experiment details from messages and updates the node's attributes."""
+    def read_experiment_from_messages(self, store_new_experiments=False, expected_experiments=None):
+        """Extracts experiment details from messages and updates the node's attributes.
+
+        expected_experiments: the branching factor (k_experiments). When
+        store_new_experiments is set, a warning is logged if the generator's
+        end-of-chat message yielded no parseable experiments or a count that
+        differs from this expectation.
+        """
         latest_experiment = None
         was_revised = False
         latest_programmer = None
@@ -287,8 +319,11 @@ class MCTSNode:
         self.success = latest_reviewer_success
 
         # Store new experiments into untried_experiments
-        if store_new_experiments and latest_experiment_generator:
-            self.untried_experiments += latest_experiment_generator
+        if store_new_experiments:
+            n_generated = len(latest_experiment_generator) if latest_experiment_generator else 0
+            _warn_experiment_count(n_generated, expected_experiments, self.id, "end-of-chat")
+            if latest_experiment_generator:
+                self.untried_experiments += latest_experiment_generator
 
     def get_context(self, include_code_output=False) -> None | str:
         """Returns the node's hypothesis, experiment, output, analysis, and review."""

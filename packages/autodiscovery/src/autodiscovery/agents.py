@@ -586,6 +586,7 @@ def get_openai_config(
     timeout: int = 600,
     model_name: str = "o4-mini",
     base_url: str | None = None,
+    seed: int | None = None,
 ):
     """Build a model config for AG2/Autogen clients.
 
@@ -598,6 +599,9 @@ def get_openai_config(
         base_url: OpenAI-compatible base URL for the model (e.g. a local vLLM
             server). Only applied to non-Gemini models; Gemini keeps its Vertex
             endpoint.
+        seed: Optional sampling seed for reproducibility. Sent as ``seed`` to the
+            OpenAI-compatible endpoint (vLLM honours it deterministically; OpenAI
+            treats it as best-effort). Omitted when None.
 
     Returns:
         Configuration dict for the Autogen LLM client.
@@ -625,6 +629,8 @@ def get_openai_config(
         }
         if temperature is not None:
             config["temperature"] = temperature
+        if seed is not None:
+            config["seed"] = seed
     else:
         # Configure for OpenAI models
         config = {
@@ -642,10 +648,15 @@ def get_openai_config(
             config["base_url"] = base_url
         if temperature is not None:
             config["temperature"] = temperature
+        if seed is not None:
+            config["seed"] = seed
 
         # o-series and gpt-5 reasoning models take reasoning_effort and reject
         # logprobs (requesting logprobs 403s). Other OpenAI models get logprobs.
-        if model_name.startswith("o") or model_name.startswith("gpt-5"):
+        # A base_url endpoint (a local vLLM server serving a Qwen reasoning model)
+        # is likewise a reasoning endpoint: pass reasoning_effort — vLLM maps it to
+        # enable_thinking (medium is the project default) — and skip logprobs.
+        if base_url is not None or model_name.startswith("o") or model_name.startswith("gpt-5"):
             if reasoning_effort is not None:
                 config["reasoning_effort"] = reasoning_effort  # Defaults to medium
         else:
@@ -670,6 +681,7 @@ def get_agents(
     vision_model: str = "gpt-4o",
     usage_tracker: UsageTracker | None = None,
     base_url: str | None = None,
+    seed: int | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
 
@@ -693,6 +705,8 @@ def get_agents(
         base_url: Optional OpenAI-compatible base URL for the theorizer model
             (e.g. a local vLLM server). Applied only to the experiment_generator;
             ignored for Gemini models and never applied to the execution agents.
+        seed: Optional sampling seed for reproducibility, applied to both the
+            theorizer and execution model configs.
 
     Returns:
         Dictionary mapping agent name to agent instance.
@@ -706,6 +720,7 @@ def get_agents(
             temperature=temperature,
             reasoning_effort=reasoning_effort,
             base_url=model_base_url,
+            seed=seed,
         )
 
     # The theorizer (experiment_generator) is the only agent routed to base_url.

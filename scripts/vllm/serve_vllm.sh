@@ -33,6 +33,14 @@
 #   VLLM_LOG        if set, also tee vLLM stdout to this file (default: unset)
 #   VLLM_ENABLE_LOG_OUTPUTS  1 => --enable-log-outputs, logging each request's
 #                            generated text incl. reasoning tokens (default: 0)
+#   REASONING_PARSER  --reasoning-parser value; extracts <think>...</think> into a
+#                     separate reasoning_content field (default: qwen3; set empty
+#                     to disable, e.g. for non-Qwen models)
+#   ENABLE_THINKING   1 => --default-chat-template-kwargs '{"enable_thinking":true}',
+#                     turning thinking on by default for every request (default: 1).
+#                     NOTE: reasoning_effort (low/medium/high) is NOT a serve flag —
+#                     it is a per-request param the client sets; medium is the
+#                     project default (run_mcts reasoning_effort="medium").
 #
 # vLLM's own stdout/stderr (incl. crash/OOM tracebacks) is streamed inline to
 # this script's stdout, prefixed with '[vllm]'. While the client runs, a
@@ -63,6 +71,11 @@ VLLM_LOG="${VLLM_LOG:-}"
 # the final/structured answer is empty or unparseable — useful for debugging the
 # experiment_generator's silent parse failures.
 VLLM_ENABLE_LOG_OUTPUTS="${VLLM_ENABLE_LOG_OUTPUTS:-0}"
+# Qwen3-family reasoning: parse <think> blocks into reasoning_content and turn
+# thinking on by default for every request. Set REASONING_PARSER= (empty) to
+# disable the parser for non-Qwen models.
+REASONING_PARSER="${REASONING_PARSER:-qwen3}"
+ENABLE_THINKING="${ENABLE_THINKING:-1}"
 
 # Detect GPU count if not provided.
 if [ -z "${GPU_COUNT:-}" ]; then
@@ -93,6 +106,12 @@ VLLM_CMD=( uvx --with "fastapi<0.137" "vllm==${VLLM_VERSION}" serve "$MODEL"
 # Optional: force a specific GDN prefill backend (e.g. "triton" for Qwen3.5 GDN,
 # which otherwise triggers a slow flashinfer nvcc JIT compile).
 [ -n "${GDN_PREFILL_BACKEND:-}" ] && VLLM_CMD+=( --gdn-prefill-backend "$GDN_PREFILL_BACKEND" )
+# Reasoning parser (extracts <think>...</think> into reasoning_content) and, when
+# ENABLE_THINKING=1, a server-level default that turns thinking on for every
+# request. reasoning_effort (low/medium/high) is per-request only, so it is not
+# set here — the client passes it (project default: medium).
+[ -n "${REASONING_PARSER:-}" ] && VLLM_CMD+=( --reasoning-parser "$REASONING_PARSER" )
+[ "${ENABLE_THINKING:-1}" = "1" ] && VLLM_CMD+=( --default-chat-template-kwargs '{"enable_thinking": true}' )
 [ -n "${MAX_MODEL_LEN:-}" ] && VLLM_CMD+=( --max-model-len "$MAX_MODEL_LEN" )
 # Log each request's generated text (incl. reasoning tokens) to vLLM stdout.
 # --enable-log-outputs requires --enable-log-requests (vLLM validates this pair).

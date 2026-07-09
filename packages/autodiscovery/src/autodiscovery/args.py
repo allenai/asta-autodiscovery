@@ -67,6 +67,15 @@ class ArgParser(argparse.ArgumentParser):
             help="Temperature setting for the belief agent. Should be set to None for OpenaAI o-series models.",
         )
         self.add_argument(
+            "--seed",
+            type=int,
+            default=0,
+            help="Sampling seed sent to the generation models (theorizer + execution) "
+            "for reproducibility. With temperature=1.0 a fixed seed makes a vLLM-served "
+            "theorizer deterministic (same input -> same output); OpenAI treats it as "
+            "best-effort. Pass a negative value to disable (send no seed).",
+        )
+        self.add_argument(
             "--reasoning_effort",
             type=str,
             help="Reasoning effort for non-belief agent calls.",

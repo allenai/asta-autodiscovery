@@ -298,6 +298,7 @@ def run_mcts(
     belief_temperature=1.0,
     reasoning_effort="medium",
     belief_reasoning_effort="low",
+    seed=None,
     implicit_bayes_posterior=False,
     surprisal_width=0.2,
     user_query=None,
@@ -442,6 +443,7 @@ def run_mcts(
                 execution_model=execution_model,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
+                seed=seed,
                 branching_factor=branching_factor,
                 user_query=user_query,
                 experiment_first=experiment_first,
@@ -537,7 +539,8 @@ def run_mcts(
                     # Fetch/generate experiments and attach a new child atomically per parent node.
                     with parent_lock:
                         new_experiment, new_query = parent_node.get_next_experiment(
-                            experiment_generator=experiment_generator
+                            experiment_generator=experiment_generator,
+                            expected_experiments=branching_factor,
                         )
                         if new_query is None:
                             if not parent_node.untried_experiments:
@@ -642,7 +645,8 @@ def run_mcts(
                     node.read_experiment_from_messages(
                         store_new_experiments=False
                         if node.level == 1 and _warmstart_experiments is not None
-                        else True
+                        else True,
+                        expected_experiments=branching_factor,
                     )
                     if node.code_output:
                         image_usage_entries, cleaned_output = extract_local_image_usage_markers(
@@ -749,6 +753,7 @@ def run_mcts(
                             execution_model=execution_model,
                             temperature=temperature,
                             reasoning_effort=reasoning_effort,
+                            seed=seed,
                             branching_factor=branching_factor,
                             user_query=user_query,
                             experiment_first=experiment_first,
@@ -803,6 +808,7 @@ def run_mcts(
                         execution_model=execution_model,
                         temperature=temperature,
                         reasoning_effort=reasoning_effort,
+                        seed=seed,
                         branching_factor=branching_factor,
                         user_query=user_query,
                         experiment_first=experiment_first,
@@ -1022,6 +1028,8 @@ def main(args):
         belief_temperature=args.belief_temperature,
         reasoning_effort=args.reasoning_effort,
         belief_reasoning_effort=args.belief_reasoning_effort,
+        # A negative --seed disables seeding (send no seed -> non-deterministic).
+        seed=args.seed if args.seed is not None and args.seed >= 0 else None,
         implicit_bayes_posterior=args.implicit_bayes_posterior,
         surprisal_width=args.surprisal_width,
         user_query=args.user_query,

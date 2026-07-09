@@ -66,6 +66,7 @@ ENV_ARGS=(
 [ -n "${N_WARMSTART:-}" ]           && ENV_ARGS+=( --env "N_WARMSTART=$N_WARMSTART" )
 [ -n "${S3_RESULTS_PREFIX:-}" ]     && ENV_ARGS+=( --env "S3_RESULTS_PREFIX=$S3_RESULTS_PREFIX" )
 [ -n "${MAX_MODEL_LEN:-}" ]         && ENV_ARGS+=( --env "MAX_MODEL_LEN=$MAX_MODEL_LEN" )
+[ -n "${REASONING_PARSER+x}" ]      && ENV_ARGS+=( --env "REASONING_PARSER=$REASONING_PARSER" )
 
 gantry run --allow-dirty --workspace "$WORKSPACE" \
     --cluster "$CLUSTER" \

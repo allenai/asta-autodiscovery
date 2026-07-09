@@ -47,22 +47,17 @@ OUT_DIR="${OUT_DIR:-${WEKA_MOUNT}/sijial/results}"
 
 # Base args from the config, excluding what the baseline overrides or that only
 # apply with a served theorizer (no base_url / split models / per-run paths).
+# Runs on the launch host (macOS = bash 3.2), so avoid process-substitution +
+# heredoc; use a here-string over a shared helper instead.
 CFG_FLAGS=()
 if [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
-    while IFS= read -r _flag; do CFG_FLAGS+=("$_flag"); done < <(
-        python3 - "$CONFIG" <<'PY'
-import json, sys
-skip = {"base_url", "theorizer_model", "execution_model", "belief_model",
-        "out_dir", "work_dir", "n_experiments", "dataset_metadata"}
-for k, v in json.load(open(sys.argv[1])).items():
-    if k in skip or v is None:
-        continue
-    if isinstance(v, bool):
-        print(f"--{k}" if v else f"--no-{k}")
-    else:
-        print(f"--{k}={v}")
-PY
-    )
+    while IFS= read -r _flag; do
+        [ -n "$_flag" ] && CFG_FLAGS+=("$_flag")
+    done <<EOF
+$(python3 "$SCRIPT_DIR/_config_to_flags.py" "$CONFIG" \
+    base_url theorizer_model execution_model belief_model \
+    out_dir work_dir n_experiments dataset_metadata)
+EOF
 fi
 
 # Datasets: positional args or DATASETS env, else the config's dataset_metadata.
@@ -96,7 +91,7 @@ for metadata in "${datasets[@]}"; do
         --env-secret AWS_ACCESS_KEY_ID=AWS_ACCESS_KEY_ID \
         --env-secret AWS_SECRET_ACCESS_KEY=AWS_SECRET_ACCESS_KEY \
         --name="$name-$MODEL-baseline" \
-        -- $RUN_CMD "${CFG_FLAGS[@]}" \
+        -- $RUN_CMD ${CFG_FLAGS[@]+"${CFG_FLAGS[@]}"} \
             --work_dir="work" \
             --out_dir="$OUT_DIR" \
             --dataset_metadata="$metadata" \

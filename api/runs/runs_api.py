@@ -166,19 +166,6 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
-    @api.route("/health")
-    def health():
-        """Health check endpoint.
-
-        Returns:
-            JSON response with health status and jobs availability.
-        """
-        if not JOBS_AVAILABLE:
-            current_app.logger.warning(
-                "autodiscovery_jobs package not available - run management features disabled"
-            )
-        return jsonify({"status": "ok", "jobs_available": JOBS_AVAILABLE})
-
     @api.route("/create", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def create_run():

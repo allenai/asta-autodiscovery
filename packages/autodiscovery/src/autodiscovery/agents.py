@@ -643,8 +643,9 @@ def get_openai_config(
         if temperature is not None:
             config["temperature"] = temperature
 
-        # Make o-series specific changes
-        if model_name.startswith("o"):
+        # o-series and gpt-5 reasoning models take reasoning_effort and reject
+        # logprobs (requesting logprobs 403s). Other OpenAI models get logprobs.
+        if model_name.startswith("o") or model_name.startswith("gpt-5"):
             if reasoning_effort is not None:
                 config["reasoning_effort"] = reasoning_effort  # Defaults to medium
         else:

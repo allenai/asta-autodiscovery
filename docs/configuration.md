@@ -32,16 +32,22 @@ missing.
 The API is served by gunicorn bound to `0.0.0.0:8000`; the port is fixed in the entrypoint
 scripts (`api/start.sh`, `api/dev.sh`) and is not configurable via environment.
 
-## Authentication (Auth0)
+## Authentication
 
-The API validates Auth0-issued JWTs; the UI drives the Auth0 login flow.
+Authentication is provided by a swappable backend selected with `AUTH_PROVIDER`:
+`auth0` (default), `password_file`, or `none` (desktop mode). See
+[Swappable Auth Providers](design/auth-providers.md). The active provider is served
+to the UI at runtime via `GET /api/auth/config`.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTH0_DOMAIN` | Yes | *(none)* | Auth0 tenant domain used to validate tokens and look up user info. `docker-compose.yaml` sets this to `auth0.allenai.org` for local dev. |
-| `AUTH0_AUDIENCE` | Yes | *(none)* | Expected audience (API identifier) for incoming access tokens. Compose default: `https://asta-core.allen.ai`. |
-| `AUTH0_REQUIRED_PERMISSION` | No | *(unset — any authenticated user)* | If set, users must have this Auth0 permission to access the API. If empty/unset, any authenticated user is allowed. Example: `enroll:autodiscovery_v0`. |
-| `DEV_MASQUERADE_USER` | No | *(unset)* | **Development only.** Forces the app to treat all requests as coming from the given user id (e.g. `google-oauth2|111...`). Leave unset outside local dev. |
+| `AUTH_PROVIDER` | No | `auth0` | Active auth backend: `auth0`, `password_file`, or `none`. |
+| `AUTH0_DOMAIN` | auth0 | *(none)* | Auth0 tenant domain used to validate tokens and look up user info. Compose default: `auth0.allenai.org`. |
+| `AUTH0_AUDIENCE` | auth0 | *(none)* | Expected audience (API identifier) for incoming access tokens. Compose default: `https://asta-core.allen.ai`. |
+| `AUTH0_CLIENT_ID` | No | *(none)* | Public SPA client id, served to the UI via `/api/auth/config`. |
+| `AUTH_PASSWORD_FILE` | password_file | *(none)* | Path to the mounted JSON user store (managed with `api/scripts/auth_admin.py`). |
+| `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
+| `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
 
 ## Google Cloud & storage
 
@@ -138,7 +144,8 @@ are **not secret**.
 | `NEXT_PUBLIC_AUTH0_DOMAIN` | No | `auth0.allenai.org` | Auth0 tenant domain for the browser login flow. |
 | `NEXT_PUBLIC_AUTH0_CLIENT_ID` | No | *(built-in public client id)* | Public Auth0 application (client) id for the SPA. Public by design. |
 | `NEXT_PUBLIC_AUTH0_AUDIENCE` | No | `https://asta-core.allen.ai` | Auth0 API audience requested by the browser. |
-| `NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION` | No | *(unset)* | If set, the UI expects this permission on the logged-in user. |
+
+These `NEXT_PUBLIC_AUTH0_*` values are build-time fallbacks; at runtime the UI prefers the values served by `GET /api/auth/config`.
 | `API_ORIGIN` | No | `http://api:8000` | Origin the UI's server-side actions use to reach the API. |
 | `NODE_ENV` | No | `development` | Standard Node environment (`development` / `production`); influences build behavior and analytics loading. |
 

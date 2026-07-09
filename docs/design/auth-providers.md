@@ -109,17 +109,23 @@ class AuthProvider(ABC):
         return {"provider": self.name}
 ```
 
-The three decorators stay as the **public API** and become thin wrappers that delegate to
+The decorators stay as the **public API** and become thin wrappers that delegate to
 the active provider. Their required-vs-optional semantics are preserved:
 
 | Decorator | NoCredentials | Invalid | Authenticated |
 |---|---|---|---|
-| `requires_auth` / `requires_enrollment` | 401 | 401 | check perms, set `request.user` |
+| `requires_auth` | 401 | 401 | check perms, set `request.user` |
 | `optional_enrollment` | `request.user = {}` | `request.user = {}` | set `request.user` |
 
 `set_userid(...)` moves into the shared decorator path so it applies to every provider.
 (The old Auth0-only `DEV_MASQUERADE_USER` debug override was dropped — it had fallen out of
 use, and the `none` provider covers the "run as a fixed user" case.)
+
+> **Update (merged with `main`):** the app-wide enrollment gate was removed upstream, so
+> `requires_enrollment` is gone — its former call sites now use `@requires_auth()`. The
+> `AUTH0_REQUIRED_PERMISSION` / `NEXT_PUBLIC_AUTH0_REQUIRED_PERMISSION` env vars and the
+> UI's `hasRequiredPermission` were removed accordingly. Explicit
+> `requires_auth(required_permission=...)` (e.g. the metrics ADMIN routes) is unchanged.
 
 ### 3. Activation / config
 
@@ -336,8 +342,8 @@ Each step keeps `auth0` working, so we can land incrementally.
 ### Backend file layout
 ```
 api/utils/auth/                 # package (replaces the old auth.py module)
-  __init__.py                   # re-exports: requires_auth, requires_enrollment,
-                                #   optional_enrollment, PermissionType, get_auth_provider, ...
+  __init__.py                   # re-exports: requires_auth, optional_enrollment,
+                                #   PermissionType, get_auth_provider, ...
   models.py                     # AuthenticatedUser
   base.py                       # AuthProvider ABC + AuthError/NoCredentials/Invalid/Config
   permissions.py                # PermissionType, ALL_PERMISSIONS

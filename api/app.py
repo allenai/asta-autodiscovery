@@ -1,7 +1,6 @@
 import logging
 import os
 
-from admin import admin_ui, jobs_api
 from auth import auth_api
 from flask import Flask
 from metrics import metrics_api
@@ -27,8 +26,6 @@ def create_app() -> ProxyFix:
     app.register_blueprint(auth_api.create(), url_prefix="/api/auth")
     app.register_blueprint(user_api.create(), url_prefix="/api/user")
     app.register_blueprint(runs_api.create(), url_prefix="/api/runs")
-    app.register_blueprint(admin_ui.create(), url_prefix="/api/admin")
-    app.register_blueprint(jobs_api.create(), url_prefix="/api/admin/jobs")
     app.register_blueprint(metrics_api.create(), url_prefix="/api/metrics")
     app.register_error_handler(HTTPException, error.handle)
 

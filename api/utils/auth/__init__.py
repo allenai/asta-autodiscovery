@@ -1,7 +1,7 @@
 """Swappable authentication.
 
 Public API preserved from the original ``utils.auth`` module so existing call
-sites (``from utils.auth import requires_auth, requires_enrollment, ...``) keep
+sites (``from utils.auth import requires_auth, optional_enrollment, ...``) keep
 working. The active provider is selected by the AUTH_PROVIDER env var.
 """
 
@@ -12,7 +12,7 @@ from .base import (
     InvalidCredentialsError,
     NoCredentialsError,
 )
-from .decorators import optional_enrollment, requires_auth, requires_enrollment
+from .decorators import optional_enrollment, requires_auth
 from .factory import get_auth_provider, reset_auth_provider
 from .models import AuthenticatedUser
 from .permissions import ALL_PERMISSIONS, PermissionType
@@ -29,6 +29,5 @@ __all__ = [
     "get_auth_provider",
     "optional_enrollment",
     "requires_auth",
-    "requires_enrollment",
     "reset_auth_provider",
 ]

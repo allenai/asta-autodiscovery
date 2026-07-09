@@ -58,10 +58,9 @@ def verify_token(token: str, auth0_domain: str, auth0_audience: str) -> dict:
 class Auth0Provider(AuthProvider):
     name = "auth0"
 
-    def __init__(self, domain: str | None, audience: str | None, required_permission: str | None):
+    def __init__(self, domain: str | None, audience: str | None):
         self.domain = domain
         self.audience = audience
-        self.required_permission = required_permission
 
     @classmethod
     def from_env(cls) -> Auth0Provider:
@@ -70,11 +69,6 @@ class Auth0Provider(AuthProvider):
         return cls(
             domain=os.environ.get("AUTH0_DOMAIN"),
             audience=os.environ.get("AUTH0_AUDIENCE"),
-            required_permission=(
-                os.environ.get("AUTH_REQUIRED_PERMISSION")
-                or os.environ.get("AUTH0_REQUIRED_PERMISSION")
-                or None
-            ),
         )
 
     def authenticate(self, request) -> AuthenticatedUser:
@@ -121,5 +115,4 @@ class Auth0Provider(AuthProvider):
             "domain": self.domain,
             "clientId": os.environ.get("AUTH0_CLIENT_ID"),
             "audience": self.audience,
-            "requiredPermission": self.required_permission,
         }

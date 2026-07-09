@@ -26,10 +26,6 @@ logger = logging.getLogger(__name__)
 def create() -> Blueprint:
     api = Blueprint("metrics_api", __name__)
 
-    @api.route("/health")
-    def health():
-        return "", 204
-
     @api.route("/overview")
     @requires_auth(required_permission=PermissionType.ADMIN.value)
     def overview():

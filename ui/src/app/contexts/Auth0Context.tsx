@@ -35,7 +35,6 @@ export interface AuthContextType {
     loginWithRedirect: () => Promise<void>;
     logout: () => void;
     getAccessToken: () => Promise<string>;
-    hasRequiredPermission: boolean;
     canExploreWithAsta: boolean;
     authError: string | null;
     /** Which provider is active, once known. */
@@ -65,7 +64,7 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
         case 'none':
             return <NoneAuthProvider>{children}</NoneAuthProvider>;
         case 'password_file':
-            return <PasswordFileAuthProvider config={config}>{children}</PasswordFileAuthProvider>;
+            return <PasswordFileAuthProvider>{children}</PasswordFileAuthProvider>;
         case 'auth0':
         default:
             return <Auth0AuthProvider config={config}>{children}</Auth0AuthProvider>;
@@ -85,7 +84,6 @@ function LoadingAuthProvider({ children }: { children: ReactNode }) {
             loginWithRedirect: async () => {},
             logout: () => {},
             getAccessToken: async () => '',
-            hasRequiredPermission: false,
             canExploreWithAsta: false,
             authError: null,
             provider: null,
@@ -135,14 +133,6 @@ function Auth0AuthProvider({ config, children }: { config: AuthConfig; children:
                             ? (payload!.permissions as string[])
                             : [];
                         setPermissions(perms);
-                        if (
-                            config.requiredPermission &&
-                            !perms.includes(config.requiredPermission)
-                        ) {
-                            setAuthError(
-                                `Access denied. Required permission: ${config.requiredPermission}`
-                            );
-                        }
                     } catch (error) {
                         console.error('Error checking permissions:', error);
                         setAuthError('Failed to verify user permissions');
@@ -155,7 +145,7 @@ function Auth0AuthProvider({ config, children }: { config: AuthConfig; children:
             }
         };
         init();
-    }, [client, config.requiredPermission]);
+    }, [client]);
 
     const loginWithRedirect = useCallback(async () => {
         if (client) {
@@ -195,10 +185,6 @@ function Auth0AuthProvider({ config, children }: { config: AuthConfig; children:
         });
     }, [client, loginWithRedirect]);
 
-    const hasRequiredPermission = config.requiredPermission
-        ? permissions.includes(config.requiredPermission)
-        : true;
-
     const value = useAuthValue({
         isAuthenticated,
         isLoading,
@@ -208,7 +194,6 @@ function Auth0AuthProvider({ config, children }: { config: AuthConfig; children:
         loginWithRedirect,
         logout,
         getAccessToken,
-        hasRequiredPermission,
         authError,
         provider: 'auth0',
     });
@@ -218,13 +203,7 @@ function Auth0AuthProvider({ config, children }: { config: AuthConfig; children:
 // ---------------------------------------------------------------------------
 // Password-file provider: login form -> /api/auth/login -> stored bearer token.
 // ---------------------------------------------------------------------------
-function PasswordFileAuthProvider({
-    config,
-    children,
-}: {
-    config: AuthConfig;
-    children: ReactNode;
-}) {
+function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [user, setUser] = useState<AuthUser | undefined>(undefined);
     const [permissions, setPermissions] = useState<string[]>([]);
@@ -316,10 +295,6 @@ function PasswordFileAuthProvider({
         });
     }, [token, user, logout]);
 
-    const hasRequiredPermission = config.requiredPermission
-        ? permissions.includes(config.requiredPermission)
-        : true;
-
     const value = useAuthValue({
         isAuthenticated: !!token,
         isLoading,
@@ -329,7 +304,6 @@ function PasswordFileAuthProvider({
         loginWithRedirect,
         logout,
         getAccessToken,
-        hasRequiredPermission,
         authError,
         provider: 'password_file',
     });
@@ -379,7 +353,6 @@ function NoneAuthProvider({ children }: { children: ReactNode }) {
             loginWithRedirect: async () => {},
             logout: () => {},
             getAccessToken: async () => '',
-            hasRequiredPermission: true,
             canExploreWithAsta: true,
             authError: null,
             provider: 'none',
@@ -402,7 +375,6 @@ function useAuthValue(
         loginWithRedirect,
         logout,
         getAccessToken,
-        hasRequiredPermission,
         authError,
         provider,
     } = parts;
@@ -418,7 +390,6 @@ function useAuthValue(
             loginWithRedirect,
             logout,
             getAccessToken,
-            hasRequiredPermission,
             canExploreWithAsta: hasPermission(ASTA_PERMISSION),
             authError,
             provider,
@@ -432,7 +403,6 @@ function useAuthValue(
         loginWithRedirect,
         logout,
         getAccessToken,
-        hasRequiredPermission,
         authError,
         provider,
     ]);

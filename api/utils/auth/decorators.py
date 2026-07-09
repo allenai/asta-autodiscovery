@@ -1,4 +1,3 @@
-import os
 from functools import wraps
 
 from flask import g, jsonify, request
@@ -57,26 +56,11 @@ def requires_auth(
     return decorator
 
 
-def requires_enrollment(f):
-    """Require authentication with the default permission from the environment.
-
-    Convenience wrapper around requires_auth that uses AUTH_REQUIRED_PERMISSION
-    (falling back to AUTH0_REQUIRED_PERMISSION). If neither is set, no specific
-    permission is required.
-    """
-    default_permission = (
-        os.environ.get("AUTH_REQUIRED_PERMISSION")
-        or os.environ.get("AUTH0_REQUIRED_PERMISSION")
-        or None
-    )
-    return requires_auth(required_permission=default_permission)(f)
-
-
 def optional_enrollment(f):
     """Authenticate if credentials are present, else continue anonymously.
 
-    On valid credentials, behaves like requires_enrollment (sets request.user).
-    On missing or invalid credentials, sets request.user to {} and continues, so
+    On valid credentials, behaves like requires_auth (sets request.user). On
+    missing or invalid credentials, sets request.user to {} and continues, so
     endpoints can serve both authenticated and anonymous users (e.g. shared runs).
     """
 

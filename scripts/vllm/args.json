@@ -12,7 +12,7 @@
     "continue_from_dir": null,
     "continue_from_json": null,
     "n_experiments": 50,
-    "k_experiments": 4,
+    "k_experiments": 1,
     "allow_generate_experiments": true,
     "n_belief_samples": 5,
     "timestamp_dir": true,

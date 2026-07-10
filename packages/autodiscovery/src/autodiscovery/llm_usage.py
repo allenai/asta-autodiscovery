@@ -4,15 +4,26 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import os
 import threading
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+_LOGGER = logging.getLogger(__name__)
+
 LOCAL_IMAGE_USAGE_MARKER = "__AUTODISCOVERY_LLM_USAGE__"
 _AG2_USAGE_TRACKER = None
 _AG2_USAGE_CONTEXT = threading.local()
+
+_REASONING_ENCODER: Any = None
+_REASONING_ENCODER_LOADED = False
+# Cache of Qwen HF BPE tokenizers keyed by model name (value None = load failed).
+_MODEL_TOKENIZERS: dict[str, Any] = {}
+# Model names we've already warned about failing to load an exact tokenizer for
+# (warn once each, so an unavailable Qwen tokenizer doesn't spam every call).
+_QWEN_TOKENIZER_WARNED: set[str] = set()
 
 
 def load_usage_events(events_path: str) -> list[dict[str, Any]]:
@@ -417,6 +428,106 @@ def _empty_bucket() -> dict[str, Any]:
         "reasoning_tokens": 0,
     }
 
+
+def _reasoning_encoder() -> Any:
+    """Return a cached tiktoken encoder."""
+    global _REASONING_ENCODER, _REASONING_ENCODER_LOADED
+    if not _REASONING_ENCODER_LOADED:
+        _REASONING_ENCODER_LOADED = True
+        try:
+            import tiktoken
+
+            _REASONING_ENCODER = tiktoken.get_encoding("o200k_base")
+        except Exception:  # noqa: BLE001 - counting must never break usage recording
+            _REASONING_ENCODER = None
+    return _REASONING_ENCODER
+
+
+def _is_qwen_model(model_name: str | None) -> bool:
+    """True if ``model_name`` is a Qwen model name."""
+    return bool(model_name) and "/" in model_name and "qwen" in model_name.lower()
+
+
+def _model_tokenizer(model_name: str | None) -> Any:
+    """Return the Qwen BPE tokenizer for ``model_name``, cached; None if N/A."""
+    if not _is_qwen_model(model_name):
+        return None
+    if model_name in _MODEL_TOKENIZERS:
+        return _MODEL_TOKENIZERS[model_name]
+    tokenizer = None
+    try:
+        from tokenizers import Tokenizer
+
+        tokenizer = Tokenizer.from_pretrained(model_name)
+    except Exception:  # noqa: BLE001 - fall back to tiktoken if the BPE load fails
+        tokenizer = None
+    _MODEL_TOKENIZERS[model_name] = tokenizer
+    return tokenizer
+
+
+def _count_text_tokens(text: str, model_name: str | None = None) -> int:
+    """Count tokens in ``text``.
+
+    Args:
+        text: Text to count tokens in.
+        model_name: Model name.
+
+    Returns:
+        Number of tokens in the text.
+    """
+    if not text:
+        return 0
+    tokenizer = _model_tokenizer(model_name)
+    if tokenizer is not None:
+        try:
+            return len(tokenizer.encode(text).ids)
+        except Exception:  # noqa: BLE001
+            pass
+    if _is_qwen_model(model_name) and model_name not in _QWEN_TOKENIZER_WARNED:
+        _QWEN_TOKENIZER_WARNED.add(model_name)
+        _LOGGER.warning(
+            "Could not load the exact Qwen BPE tokenizer for %s; reasoning-token "
+            "counts fall back to an approximate tokenizer. Install `tokenizers` and "
+            "ensure HF hub access for an exact count.",
+            model_name,
+        )
+    enc = _reasoning_encoder()
+    if enc is not None:
+        try:
+            return len(enc.encode(text))
+        except Exception:  # noqa: BLE001
+            pass
+    return max(1, len(text) // 4)
+
+
+def _response_reasoning_content_tokens(response: Any, model_name: str | None = None) -> int:
+    """Sum reasoning_content tokens across all choices of a response.
+
+    Args:
+        response: API response object.
+        model_name: Model name.
+
+    Returns:
+        Number of reasoning content tokens.
+    """
+    choices = getattr(response, "choices", None)
+    if choices is None and isinstance(response, dict):
+        choices = response.get("choices")
+    if not choices:
+        return 0
+    total = 0
+    for choice in choices:
+        message = getattr(choice, "message", None)
+        if message is None and isinstance(choice, dict):
+            message = choice.get("message")
+        reasoning = getattr(message, "reasoning_content", None)
+        if reasoning is None and isinstance(message, dict):
+            reasoning = message.get("reasoning_content")
+        if reasoning:
+            total += _count_text_tokens(reasoning, model_name)
+    return total
+
+
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""
     usage_obj = getattr(response, "usage", None)
@@ -433,6 +544,16 @@ def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     completion_tokens = _coerce_int(_get_usage_value(usage_obj, "completion_tokens"))
     total_tokens = _coerce_int(_get_usage_value(usage_obj, "total_tokens"))
     usage_payload = _normalize_usage_payload(usage_obj)
+
+    provider_reasoning = _coerce_int(
+        _get_usage_value(
+            _get_usage_value(usage_obj, "completion_tokens_details"), "reasoning_tokens"
+        )
+    )
+    if provider_reasoning <= 0:
+        content_reasoning = _response_reasoning_content_tokens(response, model)
+        if content_reasoning > 0 and isinstance(usage_payload, dict):
+            usage_payload["reasoning_tokens"] = content_reasoning
 
     return {
         "model": model,

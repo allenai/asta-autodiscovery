@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -234,6 +234,7 @@ dependencies = [
     { name = "scipy" },
     { name = "statsmodels" },
     { name = "tenacity" },
+    { name = "tokenizers" },
 ]
 
 [package.metadata]
@@ -253,6 +254,7 @@ requires-dist = [
     { name = "scipy" },
     { name = "statsmodels" },
     { name = "tenacity", specifier = ">=9.1.2" },
+    { name = "tokenizers", specifier = ">=0.20.0" },
 ]
 
 [[package]]

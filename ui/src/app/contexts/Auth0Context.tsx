@@ -254,11 +254,11 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
                 body: JSON.stringify(creds),
             });
             if (!resp.ok) {
-                const message =
-                    (await resp
-                        .json()
-                        .then((d) => d.error)
-                        .catch(() => null)) || 'Login failed';
+                // The API returns errors as either {error: "message"} (explicit
+                // responses) or {error: {code, message}} (the HTTPException handler).
+                const body = await resp.json().catch(() => null);
+                const raw = body?.error;
+                const message = (typeof raw === 'string' ? raw : raw?.message) || 'Login failed';
                 setAuthError(message);
                 throw new Error(message);
             }

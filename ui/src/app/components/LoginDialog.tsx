@@ -48,8 +48,19 @@ export default function LoginDialog({ open, onClose, onSubmit, error }: LoginDia
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
             <form onSubmit={handleSubmit}>
                 <DialogTitle>Sign in</DialogTitle>
-                {/* pt gives the first field's floating label room; MUI clips it otherwise. */}
-                <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+                {/*
+                 * MUI zeroes padding-top on a DialogContent that directly follows a
+                 * DialogTitle (via a higher-specificity `.MuiDialogTitle-root + &` rule),
+                 * which clips the first field's floating label. Re-assert top padding at
+                 * matching specificity so it actually applies.
+                 */}
+                <DialogContent
+                    sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                        '&.MuiDialogContent-root': { pt: 2 },
+                    }}>
                     {error && (
                         <Alert severity="error" data-test-id={TEST_ID_LOGIN_ERROR}>
                             {error}

@@ -190,7 +190,7 @@ export function ExperimentsTable({
                 field: 'direction',
                 headerName: 'Direction',
                 flex: 1,
-                minWidth: 50,
+                minWidth: 80,
                 maxWidth: 120,
                 resizable: false,
                 renderCell: (params: GridRenderCellParams) => {
@@ -198,7 +198,7 @@ export function ExperimentsTable({
                         return <StyledSkeleton variant="text" width="60%" />;
                     }
                     const direction = params.value;
-                    return <Box>{direction ?? 'N/A'}</Box>;
+                    return <BeliefValue>{direction ?? 'N/A'}</BeliefValue>;
                 },
             },
             {

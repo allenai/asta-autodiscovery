@@ -11,6 +11,13 @@ import {
     TextField,
 } from '@mui/material';
 
+import {
+    TEST_ID_LOGIN_ERROR,
+    TEST_ID_LOGIN_PASSWORD,
+    TEST_ID_LOGIN_SUBMIT,
+    TEST_ID_LOGIN_USERNAME,
+} from '@/testIds';
+
 interface LoginDialogProps {
     open: boolean;
     onClose: () => void;
@@ -42,13 +49,18 @@ export default function LoginDialog({ open, onClose, onSubmit, error }: LoginDia
             <form onSubmit={handleSubmit}>
                 <DialogTitle>Sign in</DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                    {error && <Alert severity="error">{error}</Alert>}
+                    {error && (
+                        <Alert severity="error" data-test-id={TEST_ID_LOGIN_ERROR}>
+                            {error}
+                        </Alert>
+                    )}
                     <TextField
                         label="Username"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         fullWidth
                         autoComplete="username"
+                        inputProps={{ 'data-test-id': TEST_ID_LOGIN_USERNAME }}
                     />
                     <TextField
                         label="Password"
@@ -57,6 +69,7 @@ export default function LoginDialog({ open, onClose, onSubmit, error }: LoginDia
                         onChange={(e) => setPassword(e.target.value)}
                         fullWidth
                         autoComplete="current-password"
+                        inputProps={{ 'data-test-id': TEST_ID_LOGIN_PASSWORD }}
                     />
                 </DialogContent>
                 <DialogActions>
@@ -66,7 +79,8 @@ export default function LoginDialog({ open, onClose, onSubmit, error }: LoginDia
                     <Button
                         type="submit"
                         variant="contained"
-                        disabled={submitting || !username || !password}>
+                        disabled={submitting || !username || !password}
+                        data-test-id={TEST_ID_LOGIN_SUBMIT}>
                         {submitting ? 'Signing in…' : 'Sign in'}
                     </Button>
                 </DialogActions>

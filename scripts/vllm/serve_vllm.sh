@@ -72,9 +72,10 @@ VLLM_LOG="${VLLM_LOG:-}"
 # experiment_generator's silent parse failures.
 VLLM_ENABLE_LOG_OUTPUTS="${VLLM_ENABLE_LOG_OUTPUTS:-0}"
 # Qwen3-family reasoning: parse <think> blocks into reasoning_content and turn
-# thinking on by default for every request. Set REASONING_PARSER= (empty) to
-# disable the parser for non-Qwen models.
-REASONING_PARSER="${REASONING_PARSER:-qwen3}"
+# thinking on by default for every request. Set REASONING_PARSER= (empty, exported)
+# to disable the parser (e.g. non-Qwen models, or to inspect raw output). Use "-"
+# not ":-" so an explicit empty value disables rather than re-defaulting to qwen3.
+REASONING_PARSER="${REASONING_PARSER-qwen3}"
 ENABLE_THINKING="${ENABLE_THINKING:-1}"
 
 # Detect GPU count if not provided.
@@ -87,6 +88,7 @@ if [ -z "${GPU_COUNT:-}" ]; then
 fi
 [ "${GPU_COUNT:-0}" -ge 1 ] 2>/dev/null || GPU_COUNT=1
 TP_SIZE="${TP_SIZE:-$GPU_COUNT}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-262144}"
 
 # Ensure uv/uvx is available (isolated vLLM env; does not pollute the project env).
 if ! command -v uvx >/dev/null 2>&1; then
@@ -106,12 +108,6 @@ VLLM_CMD=( uvx --with "fastapi<0.137" "vllm==${VLLM_VERSION}" serve "$MODEL"
 # Optional: force a specific GDN prefill backend (e.g. "triton" for Qwen3.5 GDN,
 # which otherwise triggers a slow flashinfer nvcc JIT compile).
 [ -n "${GDN_PREFILL_BACKEND:-}" ] && VLLM_CMD+=( --gdn-prefill-backend "$GDN_PREFILL_BACKEND" )
-# Reasoning parser (extracts <think>...</think> into reasoning_content) and, when
-# ENABLE_THINKING=1, a server-level default that turns thinking on for every
-# request. reasoning_effort (low/medium/high) is per-request only, so it is not
-# set here — the client passes it (project default: medium).
-[ -n "${REASONING_PARSER:-}" ] && VLLM_CMD+=( --reasoning-parser "$REASONING_PARSER" )
-[ "${ENABLE_THINKING:-1}" = "1" ] && VLLM_CMD+=( --default-chat-template-kwargs '{"enable_thinking": true}' )
 [ -n "${MAX_MODEL_LEN:-}" ] && VLLM_CMD+=( --max-model-len "$MAX_MODEL_LEN" )
 # Log each request's generated text (incl. reasoning tokens) to vLLM stdout.
 # --enable-log-outputs requires --enable-log-requests (vLLM validates this pair).

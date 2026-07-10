@@ -16,7 +16,6 @@ import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import {
     experimentRowEventName,
-    mkExperimentRowAttrs,
     mkExploreWithAstaTableLinkAttrs,
     sortColumnEventName,
 } from '@/analytics/runDetails';
@@ -496,7 +495,6 @@ export function ExperimentsTable({
                     rowSelectionModel={rowSelectionModel}
                     apiRef={apiRef}
                     slotProps={{
-                        row: mkExperimentRowAttrs(),
                         toolbar: {
                             csvOptions: { disableToolbarButton: true },
                             printOptions: { disableToolbarButton: true },

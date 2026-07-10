@@ -582,6 +582,43 @@ def _response_inline_reasonings(response: Any) -> list[str]:
     return reasonings
 
 
+def _first_choice_content(response: Any) -> str:
+    """Return the first choice's ``message.content`` as a string ("" if absent)."""
+    choices = getattr(response, "choices", None)
+    if choices is None and isinstance(response, dict):
+        choices = response.get("choices")
+    if not choices:
+        return ""
+    choice = choices[0]
+    message = getattr(choice, "message", None)
+    if message is None and isinstance(choice, dict):
+        message = choice.get("message")
+    content = getattr(message, "content", None)
+    if content is None and isinstance(message, dict):
+        content = message.get("content")
+    return content if isinstance(content, str) else ""
+
+
+def _print_vllm_call_output(model: str, response: Any, reasoning_tokens: int, source: str) -> None:
+    """Print a vLLM call's raw output to stdout so runs can be sanity-checked.
+
+    vLLM/HF endpoints don't report reasoning in usage, so this surfaces the head/tail
+    of message.content (the head is the thinking, the tail the answer/JSON) plus how
+    many reasoning tokens we recovered, per call, in the job logs.
+    """
+    content = _first_choice_content(response)
+    oneline = content.replace("\n", " ")
+    head = oneline[:400]
+    tail = oneline[-200:] if len(oneline) > 600 else ""
+    print(
+        f"[vllm-call] model={model} content_len={len(content)} "
+        f"reasoning_tokens={reasoning_tokens} src={source}\n"
+        f"  head: {head}\n"
+        f"  tail: {tail}",
+        flush=True,
+    )
+
+
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""
     usage_obj = getattr(response, "usage", None)
@@ -630,6 +667,10 @@ def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
                 content_reasoning,
                 preview,
             )
+        # Sanity dump of the vLLM call output (stdout -> job logs), whether or not any
+        # reasoning was recovered, so the run can be eyeballed.
+        if model and "/" in model:
+            _print_vllm_call_output(model, response, content_reasoning, source)
 
     return {
         "model": model,

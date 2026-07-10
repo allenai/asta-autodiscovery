@@ -738,12 +738,20 @@ def get_agents(
     # Experiment Generator
     _user_query_or_empty = f"{user_query}\n\n" if user_query is not None else ""
 
+    # A vLLM reasoning endpoint (base_url) cannot combine guided JSON decoding with
+    # thinking: response_format constrains generation from the first token, so the
+    # model either can't reason (0 reasoning_content) or, with reasoning allowed,
+    # never emits valid JSON and runs away. Drop response_format there so the model
+    # reasons then emits JSON in content; try_loading_dict tolerates the leading
+    # "reasoning</think>" prefix. OpenAI theorizers keep the structured schema.
+    _theorizer_llm_config = {**theorizer_llm_config}
+    if base_url is None:
+        _theorizer_llm_config["response_format"] = (
+            ExperimentList if not experiment_first else ExperimentHypothesisList
+        )
     experiment_generator = ConversableAgent(
         name="experiment_generator",
-        llm_config={
-            **theorizer_llm_config,
-            "response_format": ExperimentList if not experiment_first else ExperimentHypothesisList,
-        },
+        llm_config=_theorizer_llm_config,
         system_message=(
             "You are a research scientist who is interested in doing open-ended, data-driven research using the provided dataset(s). "
             f"{_user_query_or_empty}"

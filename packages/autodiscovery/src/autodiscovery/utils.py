@@ -266,6 +266,11 @@ def query_llm(
 
 
 def try_loading_dict(_dict_str):
+    # A vLLM reasoning model served without --reasoning-parser leaves thinking inline
+    # in content as "reasoning</think>answer"; drop everything up to and including the
+    # first </think> so the JSON answer parses.
+    if isinstance(_dict_str, str) and "</think>" in _dict_str:
+        _dict_str = _dict_str.split("</think>", 1)[1].strip()
     try:
         return json.loads(_dict_str)
     except json.JSONDecodeError:

@@ -500,22 +500,20 @@ def _count_text_tokens(text: str, model_name: str | None = None) -> int:
     return max(1, len(text) // 4)
 
 
-def _response_reasoning_content_tokens(response: Any, model_name: str | None = None) -> int:
-    """Sum reasoning_content tokens across all choices of a response.
+def _response_reasoning_contents(response: Any) -> list[str]:
+    """Return per-choice ``message.reasoning_content`` strings ([] if none).
 
-    Args:
-        response: API response object.
-        model_name: Model name.
-
-    Returns:
-        Number of reasoning content tokens.
+    vLLM with a reasoning parser puts the model's thinking in
+    ``message.reasoning_content`` (separate from ``content``); OpenAI leaves this
+    field empty and reports the count in usage instead. Handles both attribute and
+    dict response shapes.
     """
     choices = getattr(response, "choices", None)
     if choices is None and isinstance(response, dict):
         choices = response.get("choices")
     if not choices:
-        return 0
-    total = 0
+        return []
+    contents: list[str] = []
     for choice in choices:
         message = getattr(choice, "message", None)
         if message is None and isinstance(choice, dict):
@@ -524,8 +522,20 @@ def _response_reasoning_content_tokens(response: Any, model_name: str | None = N
         if reasoning is None and isinstance(message, dict):
             reasoning = message.get("reasoning_content")
         if reasoning:
-            total += _count_text_tokens(reasoning, model_name)
-    return total
+            contents.append(reasoning)
+    return contents
+
+
+def _response_reasoning_content_tokens(response: Any, model_name: str | None = None) -> int:
+    """Sum reasoning_content tokens across all choices of a response (0 if none).
+
+    Counting uses the model's own BPE tokenizer when available (see
+    :func:`_count_text_tokens`).
+    """
+    return sum(
+        _count_text_tokens(reasoning, model_name)
+        for reasoning in _response_reasoning_contents(response)
+    )
 
 
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
@@ -551,9 +561,21 @@ def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
         )
     )
     if provider_reasoning <= 0:
-        content_reasoning = _response_reasoning_content_tokens(response, model)
+        reasoning_parts = _response_reasoning_contents(response)
+        content_reasoning = sum(_count_text_tokens(r, model) for r in reasoning_parts)
         if content_reasoning > 0 and isinstance(usage_payload, dict):
             usage_payload["reasoning_tokens"] = content_reasoning
+            # Log the extraction so vLLM/Qwen runs (which report no reasoning count)
+            # show, per response, that thinking was produced and how much we counted.
+            joined = "".join(reasoning_parts)
+            preview = joined[:200] + "…" if len(joined) > 200 else joined
+            _LOGGER.info(
+                "reasoning_content extracted: model=%s choices=%d reasoning_tokens=%d preview=%r",
+                model,
+                len(reasoning_parts),
+                content_reasoning,
+                preview,
+            )
 
     return {
         "model": model,

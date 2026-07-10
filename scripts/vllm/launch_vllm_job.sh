@@ -20,13 +20,13 @@
 # The HuggingFace cache lives on WEKA (bucket $WEKA_BUCKET, mounted at $WEKA_MOUNT)
 # so weights download once and are reused across runs.
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- config (all overridable via env) ----------------------------------------
 WORKSPACE="${WORKSPACE:-ai2/autodiscovery}"
-CLUSTER="${CLUSTER:-ai2/rhea}"
+CLUSTER="${CLUSTER:-ai2/jupiter}"
 BUDGET="${BUDGET:-ai2/asta}"
 GPUS="${GPUS:-1}"
-NAME="${NAME:-autodiscovery-vllm}"
 
 # Run args default to scripts/vllm/args.json (loaded by serve_and_run_job.sh).
 # The env vars below are OPTIONAL overrides — each one, when set, REPLACES the
@@ -45,6 +45,27 @@ WEKA_MOUNT="${WEKA_MOUNT:-/weka/${WEKA_BUCKET}}"
 HF_CACHE="${HF_CACHE:-${WEKA_MOUNT}/hf-cache}"
 OUT_DIR="${OUT_DIR:-${WEKA_MOUNT}/sijial/results}"
 # -----------------------------------------------------------------------------
+
+# --- run name: <tag>-<dataset>-cfg-n<N>, matching the baseline convention
+# (e.g. qwen9b-tcga-breast-cfg-n10). Built from the model tag + the config's
+# dataset_metadata + n_experiments (env N_EXPERIMENTS wins). Override the whole
+# name via NAME, or just the model tag via TAG. -------------------------------
+CONFIG_PATH="${CONFIG:-$SCRIPT_DIR/args.json}"
+_cfg_get() {  # _cfg_get <key>: echo the config value ("" if absent / no config)
+    [ -f "$CONFIG_PATH" ] || return 0
+    python3 -c 'import json,sys; v=json.load(open(sys.argv[1])).get(sys.argv[2]); print("" if v is None else v)' \
+        "$CONFIG_PATH" "$1" || true
+}
+# Model tag: Qwen/Qwen3.5-9B -> qwen9b (family + trailing <N>b size).
+_model_lc="$(basename "$MODEL" | tr '[:upper:]' '[:lower:]')"
+_tag_fam="$(printf '%s' "$_model_lc" | sed -E 's/[0-9].*$//')"
+_tag_size="$(printf '%s' "$_model_lc" | grep -oE '[0-9]+b' | tail -1 || true)"
+TAG="${TAG:-${_tag_fam}${_tag_size}}"
+# Dataset short name from the metadata basename (same rules as the baseline).
+_dataset="${DATASET_METADATA:-$(_cfg_get dataset_metadata)}"
+_dataset_short="$(basename "$_dataset" _metadata.json | sed -e 's/_cancer$//' -e 's/_/-/g')"
+_n_exp="${N_EXPERIMENTS:-$(_cfg_get n_experiments)}"
+NAME="${NAME:-${TAG}-${_dataset_short}-cfg-n${_n_exp}}"
 
 # Always-passed env; the run-arg overrides are appended only when set so the
 # config file (scripts/vllm/args.json) provides them otherwise.
@@ -74,7 +95,7 @@ gantry run --allow-dirty --workspace "$WORKSPACE" \
     --no-python \
     --gpus "$GPUS" \
     --weka "${WEKA_BUCKET}:${WEKA_MOUNT}" \
-    --priority "${PRIORITY:-normal}" \
+    --priority "${PRIORITY:-urgent}" \
     --timeout -1 \
     --task-timeout 24h \
     --env-secret OPENAI_API_KEY=OPENAI_API_KEY \

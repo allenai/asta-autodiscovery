@@ -1,5 +1,5 @@
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import get_auth_provider
+from utils.auth import AuthConfigError, get_auth_provider
 
 
 def create() -> Blueprint:
@@ -31,6 +31,13 @@ def create() -> Blueprint:
             result = provider.login_with_password(username, password)
         except NotImplementedError:
             return jsonify({"error": "Password login is not enabled"}), 404
+        except AuthConfigError as e:
+            # e.g. AUTH_PASSWORD_FILE / AUTH_SESSION_SECRET not configured.
+            current_app.logger.error(f"Auth misconfigured during login: {e}")
+            return jsonify({"error": str(e)}), 500
+        except Exception as e:
+            current_app.logger.error(f"Login failed unexpectedly: {e}", exc_info=True)
+            return jsonify({"error": "Login failed due to a server error"}), 500
 
         if result is None:
             return jsonify({"error": "Invalid username or password"}), 401

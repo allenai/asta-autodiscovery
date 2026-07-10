@@ -208,7 +208,9 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | undefined>(undefined);
     const [permissions, setPermissions] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [authError, setAuthError] = useState<string | null>(null);
+    // Login-form error, shown in the LoginDialog only — kept out of the context's
+    // authError so it does not trigger the global AuthErrorDialog.
+    const [loginError, setLoginError] = useState<string | null>(null);
     const [showLogin, setShowLogin] = useState(false);
 
     const applyToken = useCallback((value: string | null) => {
@@ -247,7 +249,7 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
             if (!creds) {
                 throw new Error('Username and password are required');
             }
-            setAuthError(null);
+            setLoginError(null);
             const resp = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -259,7 +261,7 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
                 const body = await resp.json().catch(() => null);
                 const raw = body?.error;
                 const message = (typeof raw === 'string' ? raw : raw?.message) || 'Login failed';
-                setAuthError(message);
+                setLoginError(message);
                 throw new Error(message);
             }
             const data = await resp.json();
@@ -276,7 +278,7 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
 
     // Interactive login trigger (used by AuthButton / IntroBox): open the form.
     const loginWithRedirect = useCallback(async () => {
-        setAuthError(null);
+        setLoginError(null);
         setShowLogin(true);
     }, []);
 
@@ -304,7 +306,7 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
         loginWithRedirect,
         logout,
         getAccessToken,
-        authError,
+        authError: null,
         provider: 'password_file',
     });
     return (
@@ -313,7 +315,7 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
             <LoginDialog
                 open={showLogin}
                 onClose={() => setShowLogin(false)}
-                error={authError}
+                error={loginError}
                 onSubmit={async (creds) => {
                     await login(creds);
                     setShowLogin(false);

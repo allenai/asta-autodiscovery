@@ -34,10 +34,9 @@ scripts (`api/start.sh`, `api/dev.sh`) and is not configurable via environment.
 
 ## Authentication
 
-Authentication is provided by a swappable backend selected with `AUTH_PROVIDER`:
-`auth0` (default), `password_file`, or `none` (desktop mode). See
-[Swappable Auth Providers](design/auth-providers.md). The active provider is served
-to the UI at runtime via `GET /api/auth/config`.
+The backend is selected with `AUTH_PROVIDER` (`auth0` default, `password_file`, or
+`none`). See [Authentication](authentication.md) for how to set up and operate each
+provider; the table below is the variable reference.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |

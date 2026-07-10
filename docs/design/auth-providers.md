@@ -377,22 +377,9 @@ password form / no-op for `none`), so `AuthButton` and `IntroBox` did not change
 call. `AuthButton` hides itself under the `none` provider.
 
 ### Operating the password_file provider
-```bash
-# Configure
-AUTH_PROVIDER=password_file
-AUTH_PASSWORD_FILE=/secrets/users.json
-AUTH_SESSION_SECRET=<random, >= 32 bytes>   # openssl rand -hex 32
-
-# Administer (changes are live; no web-stack restart)
-uv run api/scripts/auth_admin.py useradd alice --email a@x.org --name Alice \
-    --permission enroll:autodiscovery_admin
-uv run api/scripts/auth_admin.py passwd alice
-uv run api/scripts/auth_admin.py usermod alice --add-permission enroll:higher_upload_limit
-uv run api/scripts/auth_admin.py disable alice   # / enable / userdel
-uv run api/scripts/auth_admin.py list
-```
-The file is mounted read-only into the API container (see the commented bind mount in
-`docker-compose.yaml`); the CLI runs wherever it can write the file (e.g. `kubectl exec`).
+Setup, the `auth_admin.py` CLI, and mounting are covered in the
+[Authentication guide](../authentication.md#password_file). This section stays focused on
+design; see the guide for how-to.
 
 ### Deltas from the proposal
 - The consumer-facing hook kept the name `useAuth0` (alias `useAuth`) instead of being

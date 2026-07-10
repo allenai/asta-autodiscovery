@@ -24,11 +24,16 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      # For AUTH_PROVIDER=password_file, mount the store and point AUTH_PASSWORD_FILE at it:
-      # - type: bind
-      #   source: ./secrets/users.json
-      #   target: /secrets/users.json
-      #   read_only: true
+      # The host's AUTH_PASSWORD_FILE selects the password_file store to mount; the API
+      # always reads it at the static path (see AUTH_PASSWORD_FILE below). Defaults to
+      # /dev/null when unset (auth0/none) so `docker compose up` still works — the file
+      # is only read when AUTH_PROVIDER=password_file.
+      - type: bind
+        source: ${AUTH_PASSWORD_FILE:-/dev/null}
+        target: /secrets/passwd.db
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
@@ -40,8 +45,9 @@ services:
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://asta-core.allen.ai}
       # Served to the UI via /api/auth/config so the SPA client can be built at runtime.
       - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
-      # password_file provider: path to the mounted store + HS256 session signing secret.
-      - AUTH_PASSWORD_FILE=${AUTH_PASSWORD_FILE}
+      # password_file provider: static in-container path (the host file is bind-mounted
+      # here above) + HS256 session signing secret.
+      - AUTH_PASSWORD_FILE=/secrets/passwd.db
       - AUTH_SESSION_SECRET=${AUTH_SESSION_SECRET}
       - AUTH_SESSION_TTL=${AUTH_SESSION_TTL}
       # GCS and Google Cloud credentials

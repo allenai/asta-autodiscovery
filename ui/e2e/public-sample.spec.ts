@@ -11,7 +11,7 @@ test.describe('Public shared sample', () => {
         await page.goto('/shared/samples/nls_bmi');
 
         // Wait for experiment rows to appear - confirms page fully rendered and API data loaded
-        await page.waitForSelector('[data-track-name="run_details__experiment-row"]', {
+        await page.waitForSelector('.MuiDataGrid-row', {
             timeout: 20000,
         });
 
@@ -22,7 +22,7 @@ test.describe('Public shared sample', () => {
         await expect(page.locator('text=Top Surprisals')).toBeVisible();
 
         // Click first experiment row and verify Belief Shift chart appears
-        await page.locator('[data-track-name="run_details__experiment-row"]').first().click();
+        await page.locator('.MuiDataGrid-row').first().click();
         await expect(page.locator('text=Belief Shift')).toBeVisible({ timeout: 10000 });
         await expect(page.locator('[data-testid="belief-distribution-plot"]')).toBeVisible();
     });

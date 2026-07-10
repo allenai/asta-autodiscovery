@@ -13,6 +13,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "bcrypt",
     "pyright",
     "pytest",
     "pytest-cov",

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Administer the password_file auth store.
 
-The PasswordFileProvider re-reads the file on every request, so changes made
+The PasswordFileProvider re-reads the store on every request, so changes made
 here take effect immediately — no web-stack restart required.
 
-The file path comes from --file or the AUTH_PASSWORD_FILE environment variable.
+The store directory comes from --dir or the AUTH_PASSWORD_DIR environment variable;
+the store file within it is fixed (passwddb.json).
 
 Usage:
     # From the api/ directory (or with PYTHONPATH=api):
@@ -19,7 +20,7 @@ Usage:
     python scripts/auth_admin.py list
 
     # From the project root with uv:
-    uv run --env-file .env api/scripts/auth_admin.py list --file path/to/users.json
+    uv run --env-file .env api/scripts/auth_admin.py list --dir path/to/store-dir
 """
 
 import argparse
@@ -38,11 +39,11 @@ from utils.auth.password_store import (  # noqa: E402
 )
 
 
-def _resolve_path(args) -> str:
-    path = args.file or os.environ.get("AUTH_PASSWORD_FILE")
-    if not path:
-        sys.exit("error: provide --file or set AUTH_PASSWORD_FILE")
-    return path
+def _resolve_store(args) -> PasswordStore:
+    directory = args.dir or os.environ.get("AUTH_PASSWORD_DIR")
+    if not directory:
+        sys.exit("error: provide --dir or set AUTH_PASSWORD_DIR")
+    return PasswordStore.in_dir(directory)
 
 
 def _prompt_password(username: str) -> str:
@@ -130,7 +131,9 @@ def cmd_list(store: PasswordStore, args) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Administer the password_file auth store.")
-    parser.add_argument("--file", help="Path to the store (default: $AUTH_PASSWORD_FILE)")
+    parser.add_argument(
+        "--dir", help="Store directory containing passwddb.json (default: $AUTH_PASSWORD_DIR)"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("useradd", help="Create a user")
@@ -174,7 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> None:
     args = build_parser().parse_args(argv)
-    store = PasswordStore(_resolve_path(args))
+    store = _resolve_store(args)
     args.func(store, args)
 
 

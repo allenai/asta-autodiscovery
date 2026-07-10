@@ -40,19 +40,21 @@ effect immediately — no restart.
 
 ```bash
 AUTH_PROVIDER=password_file
-AUTH_PASSWORD_FILE=/secrets/users.json
+AUTH_PASSWORD_DIR=./secrets       # dir holding passwddb.json (fixed filename)
 AUTH_SESSION_SECRET="$(openssl rand -hex 32)"   # ≥ 32 random bytes
 # AUTH_SESSION_TTL=43200                          # optional, seconds (default 12h)
 ```
 
-Mount the store read-only into the API container (see the commented bind mount in
-`docker-compose.yaml`).
+`docker-compose.yaml` bind-mounts `AUTH_PASSWORD_DIR` as a directory into the API
+container (read-only). Mounting the directory — rather than the file — means edits
+(which write the store atomically) are picked up live without restarting the container.
 
 ### Managing users
 
-Administer the file with `api/scripts/auth_admin.py` (path from `--file` or
-`$AUTH_PASSWORD_FILE`). It shares the store/hashing code with the running API, so formats
-never drift, and changes are live immediately.
+Administer the store with `api/scripts/auth_admin.py` (directory from `--dir` or
+`$AUTH_PASSWORD_DIR`; the file inside is always `passwddb.json`). It shares the
+store/hashing code with the running API, so formats never drift, and changes are live
+immediately.
 
 ```bash
 # create a user (prompts for password if --password is omitted)

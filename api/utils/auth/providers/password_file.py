@@ -32,8 +32,8 @@ class PasswordFileProvider(AuthProvider):
 
     name = "password_file"
 
-    def __init__(self, file_path: str | None, secret: str | None, ttl_seconds: int):
-        self.file_path = file_path
+    def __init__(self, store_dir: str | None, secret: str | None, ttl_seconds: int):
+        self.store_dir = store_dir
         self.secret = secret
         self.ttl_seconds = ttl_seconds
 
@@ -41,17 +41,17 @@ class PasswordFileProvider(AuthProvider):
     def from_env(cls) -> PasswordFileProvider:
         ttl = os.environ.get("AUTH_SESSION_TTL")
         return cls(
-            file_path=os.environ.get("AUTH_PASSWORD_FILE"),
+            store_dir=os.environ.get("AUTH_PASSWORD_DIR"),
             secret=os.environ.get("AUTH_SESSION_SECRET"),
             ttl_seconds=int(ttl) if ttl else _DEFAULT_TTL_SECONDS,
         )
 
     def _store(self) -> PasswordStore:
-        if not self.file_path or not self.secret:
+        if not self.store_dir or not self.secret:
             raise AuthConfigError(
-                "password_file provider requires AUTH_PASSWORD_FILE and AUTH_SESSION_SECRET"
+                "password_file provider requires AUTH_PASSWORD_DIR and AUTH_SESSION_SECRET"
             )
-        return PasswordStore(self.file_path)
+        return PasswordStore.in_dir(self.store_dir)
 
     def authenticate(self, request) -> AuthenticatedUser:
         store = self._store()

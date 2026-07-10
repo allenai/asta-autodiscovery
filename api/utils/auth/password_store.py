@@ -20,6 +20,8 @@ File schema (JSON)::
     }
 """
 
+from __future__ import annotations
+
 import json
 import os
 import tempfile
@@ -28,6 +30,10 @@ from pathlib import Path
 import bcrypt
 
 SCHEMA_VERSION = 1
+
+# Fixed filename within AUTH_PASSWORD_DIR. The store dir (not the file) is what gets
+# mounted, so atomic replaces are visible without a bind-mount inode swap.
+STORE_FILENAME = "passwddb.json"
 
 
 class UserExistsError(Exception):
@@ -52,6 +58,11 @@ def verify_password(plain: str, password_hash: str) -> bool:
 class PasswordStore:
     def __init__(self, path: str | os.PathLike):
         self.path = Path(path)
+
+    @classmethod
+    def in_dir(cls, directory: str | os.PathLike) -> PasswordStore:
+        """Store located at ``<directory>/passwddb.json`` (the mounted store dir)."""
+        return cls(Path(directory) / STORE_FILENAME)
 
     # --- read path (used by the provider on every request) ---
 

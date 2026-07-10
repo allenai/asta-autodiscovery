@@ -32,7 +32,7 @@ def create() -> Blueprint:
         except NotImplementedError:
             return jsonify({"error": "Password login is not enabled"}), 404
         except AuthConfigError as e:
-            # e.g. AUTH_PASSWORD_FILE / AUTH_SESSION_SECRET not configured.
+            # e.g. AUTH_PASSWORD_DIR / AUTH_SESSION_SECRET not configured.
             current_app.logger.error(f"Auth misconfigured during login: {e}")
             return jsonify({"error": str(e)}), 500
         except Exception as e:

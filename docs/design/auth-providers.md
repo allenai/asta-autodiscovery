@@ -200,7 +200,8 @@ AuthenticatedUser(
 
 A script at `api/scripts/auth_admin.py` (the API isn't an installed package), run via
 `uv run api/scripts/auth_admin.py ...` or `python scripts/auth_admin.py ...` from `api/`.
-The file path comes from `--file` or `$AUTH_PASSWORD_FILE`:
+The store directory comes from `--dir` or `$AUTH_PASSWORD_DIR` (the file inside is the
+fixed `passwddb.json`):
 
 ```
 uv run api/scripts/auth_admin.py useradd alice --email a@x.org --name Alice \
@@ -228,7 +229,7 @@ and runs **offline**, not in the request path. Out of scope for swapping; left a
 | Var | Provider | Notes |
 |---|---|---|
 | `AUTH_PROVIDER` | all | `auth0` (default) \| `password_file` \| `none` |
-| `AUTH_PASSWORD_FILE` | password_file | path to mounted JSON |
+| `AUTH_PASSWORD_DIR` | password_file | dir holding the store (fixed `passwddb.json`); mounted as a directory |
 | `AUTH_SESSION_SECRET` | password_file | HS256 signing secret |
 | `AUTH_SESSION_TTL` | password_file | token lifetime (default e.g. 12h) |
 | `AUTH0_*` | auth0 | unchanged |

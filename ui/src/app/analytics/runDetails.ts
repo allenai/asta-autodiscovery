@@ -3,8 +3,7 @@ import { mkTrackAttrs } from '@/analytics/track';
 const RUN_DETAILS = 'run_details' as const;
 
 // Experiment Row
-export const mkExperimentRowAttrs = (props: {} = {}) =>
-    mkTrackAttrs(`${RUN_DETAILS}__experiment-row`, props);
+export const experimentRowEventName = `${RUN_DETAILS}__experiment-row` as const;
 
 // Session Configuration Button
 export const mkSessionConfigBtnAttrs = (props: { runId: string }) =>

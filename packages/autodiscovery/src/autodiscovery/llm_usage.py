@@ -538,6 +538,50 @@ def _response_reasoning_content_tokens(response: Any, model_name: str | None = N
     )
 
 
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
+
+
+def _reasoning_before_think(text: str) -> str:
+    """Return the reasoning text before the first ``</think>`` in ``text`` ("" if none).
+
+    When vLLM serves a Qwen reasoning model WITHOUT ``--reasoning-parser``, the whole
+    generation stays in ``message.content`` as ``[<think>]reasoning</think>answer``.
+    The opening ``<think>`` is usually injected into the prompt by the chat template
+    (so it is absent from the output); a leading one is stripped if present.
+    """
+    if not text or _THINK_CLOSE not in text:
+        return ""
+    head = text.partition(_THINK_CLOSE)[0]
+    return head.split(_THINK_OPEN, 1)[-1].strip()
+
+
+def _response_inline_reasonings(response: Any) -> list[str]:
+    """Per-choice reasoning parsed from the pre-``</think>`` part of ``message.content``.
+
+    Fallback for vLLM served without the reasoning parser, where thinking is inline in
+    content rather than in ``reasoning_content``. Returns [] when no choice has a
+    ``</think>`` in its content.
+    """
+    choices = getattr(response, "choices", None)
+    if choices is None and isinstance(response, dict):
+        choices = response.get("choices")
+    if not choices:
+        return []
+    reasonings: list[str] = []
+    for choice in choices:
+        message = getattr(choice, "message", None)
+        if message is None and isinstance(choice, dict):
+            message = choice.get("message")
+        content = getattr(message, "content", None)
+        if content is None and isinstance(message, dict):
+            content = message.get("content")
+        reasoning = _reasoning_before_think(content) if isinstance(content, str) else ""
+        if reasoning:
+            reasonings.append(reasoning)
+    return reasonings
+
+
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""
     usage_obj = getattr(response, "usage", None)
@@ -560,8 +604,17 @@ def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
             _get_usage_value(usage_obj, "completion_tokens_details"), "reasoning_tokens"
         )
     )
+    # OpenAI reports reasoning in usage.completion_tokens_details (left untouched
+    # above). When the provider reports none, recover it from the response: first
+    # message.reasoning_content (vLLM WITH --reasoning-parser), then the inline
+    # pre-</think> text in message.content (vLLM WITHOUT the parser -> thinking stays
+    # in content as "reasoning</think>answer").
     if provider_reasoning <= 0:
+        source = "reasoning_content"
         reasoning_parts = _response_reasoning_contents(response)
+        if not reasoning_parts:
+            reasoning_parts = _response_inline_reasonings(response)
+            source = "content_before_</think>"
         content_reasoning = sum(_count_text_tokens(r, model) for r in reasoning_parts)
         if content_reasoning > 0 and isinstance(usage_payload, dict):
             usage_payload["reasoning_tokens"] = content_reasoning
@@ -570,7 +623,8 @@ def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
             joined = "".join(reasoning_parts)
             preview = joined[:200] + "…" if len(joined) > 200 else joined
             _LOGGER.info(
-                "reasoning_content extracted: model=%s choices=%d reasoning_tokens=%d preview=%r",
+                "reasoning extracted (%s): model=%s choices=%d reasoning_tokens=%d preview=%r",
+                source,
                 model,
                 len(reasoning_parts),
                 content_reasoning,

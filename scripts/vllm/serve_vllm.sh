@@ -112,11 +112,6 @@ VLLM_CMD=( uvx --with "fastapi<0.137" "vllm==${VLLM_VERSION}" serve "$MODEL"
 # set here — the client passes it (project default: medium).
 [ -n "${REASONING_PARSER:-}" ] && VLLM_CMD+=( --reasoning-parser "$REASONING_PARSER" )
 [ "${ENABLE_THINKING:-1}" = "1" ] && VLLM_CMD+=( --default-chat-template-kwargs '{"enable_thinking": true}' )
-# Let the model reason BEFORE the structured-output (guided JSON) constraint kicks
-# in. Without this, guided decoding for response_format constrains generation from
-# the first token, leaving no room for a <think> block -> no reasoning_content. The
-# theorizer uses response_format, so this is required for it to think.
-[ -n "${REASONING_PARSER:-}" ] && VLLM_CMD+=( --structured-outputs-config.enable_in_reasoning=True )
 [ -n "${MAX_MODEL_LEN:-}" ] && VLLM_CMD+=( --max-model-len "$MAX_MODEL_LEN" )
 # Log each request's generated text (incl. reasoning tokens) to vLLM stdout.
 # --enable-log-outputs requires --enable-log-requests (vLLM validates this pair).

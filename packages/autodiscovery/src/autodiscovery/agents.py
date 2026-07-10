@@ -662,15 +662,6 @@ def get_openai_config(
         else:
             config["logprobs"] = True
 
-        # A local vLLM server serving a Qwen reasoning model only populates
-        # message.reasoning_content when its chat template runs with
-        # enable_thinking=True. The server-level --default-chat-template-kwargs
-        # default is not reliably applied per request (Qwen3.5 produced no thinking
-        # in practice), so request it explicitly via extra_body.chat_template_kwargs
-        # — AG2 forwards extra_body straight through to the OpenAI SDK create call.
-        if base_url is not None:
-            config["extra_body"] = {"chat_template_kwargs": {"enable_thinking": True}}
-
     return config
 
 

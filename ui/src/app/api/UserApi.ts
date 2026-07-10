@@ -25,25 +25,10 @@ export interface GetViewerCreditsResponseBody {
     credits: ViewerCreditsFromApi;
 }
 
-export interface GetViewerEnrollmentResponseBody {
-    enrolled: boolean;
-    enrollment_date: string | null;
-    status: string | null;
-    experiments_count: number | null;
-    user_id: string | null;
-}
-
 export class UserApi extends BaseApi {
     async getViewer() {
         return this.request<GetViewerUserResponseBody>({
             url: `${USER_URL_PREFIX}/me`,
-            method: 'GET',
-        });
-    }
-
-    async getViewerEnrollmentStatus() {
-        return this.request<GetViewerEnrollmentResponseBody>({
-            url: `${USER_URL_PREFIX}/me/enrollment-status`,
             method: 'GET',
         });
     }

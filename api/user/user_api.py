@@ -91,25 +91,4 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to fetch credits for user {user_id}: {str(e)}")
             return jsonify({"error": f"Failed to fetch credits: {str(e)}"}), 500
 
-    # Example protected endpoint - requires special permission
-    @api.route("/me/enrollment-status")
-    @requires_auth()
-    def enrollment_status():  # pyright: ignore reportUnusedFunction
-        """Example endpoint that requires the enroll:autodiscovery_v0 permission.
-        Returns enrollment status for the authenticated user.
-        """
-        user_id = request.user.get("sub")
-
-        # Example data - in real implementation, this would query a database
-        enrollment_data = {
-            "enrolled": True,
-            "enrollment_date": "2024-01-15",
-            "status": "active",
-            "experiments_count": 12,
-            "user_id": user_id,
-        }
-
-        current_app.logger.info(f"Enrollment status requested by user: {user_id}")
-        return jsonify(enrollment_data)
-
     return api

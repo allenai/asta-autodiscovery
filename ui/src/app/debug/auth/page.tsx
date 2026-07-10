@@ -2,7 +2,6 @@
 
 import { styled, Typography } from '@mui/material';
 
-import EnrollmentStatus from '@/components/EnrollmentStatus';
 import UserProfile from '@/components/UserProfile';
 
 export default function DebugAuthPage() {
@@ -10,7 +9,6 @@ export default function DebugAuthPage() {
         <Wrapper>
             <Typography variant="h1">Auth Debug</Typography>
             <UserProfile />
-            <EnrollmentStatus />
         </Wrapper>
     );
 }

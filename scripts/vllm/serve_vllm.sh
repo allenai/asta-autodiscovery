@@ -23,7 +23,7 @@
 #   TP_SIZE         tensor-parallel size             (default: = GPU_COUNT)
 #   MAX_MODEL_LEN   --max-model-len                  (default: vLLM auto)
 #   GPU_MEM_UTIL    --gpu-memory-utilization         (default: 0.85)
-#   VLLM_VERSION    vLLM version for uvx             (default: 0.19.1)
+#   VLLM_VERSION    vLLM version for uvx             (default: 0.23.0)
 #   GDN_PREFILL_BACKEND  --gdn-prefill-backend value (default: unset; set to e.g.
 #                                                     "triton" for Qwen3.5 GDN to
 #                                                     avoid the flashinfer nvcc JIT)
@@ -61,7 +61,7 @@ MODEL="${MODEL:-Qwen/Qwen3.5-4B}"
 SERVED_NAME="${SERVED_NAME:-$MODEL}"
 PORT="${PORT:-8000}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.85}"
-VLLM_VERSION="${VLLM_VERSION:-0.19.1}"
+VLLM_VERSION="${VLLM_VERSION:-0.23.0}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-1800}"
 HEARTBEAT_INTERVAL="${HEARTBEAT_INTERVAL:-5}"
 # If set, vLLM stdout (already streamed inline) is ALSO tee'd to this file.

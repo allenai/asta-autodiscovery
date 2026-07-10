@@ -5,6 +5,7 @@ import {
     GridRenderCellParams,
     GridRowSelectionModel,
     GridSortModel,
+    useGridApiRef,
 } from '@mui/x-data-grid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -14,6 +15,7 @@ import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { useExperimentBookmarks } from '@/contexts/ExperimentBookmarksContext';
 import { getPriorAndPosteriorLabel, getSurprisalDirection } from '@/runs/utils/ExperimentUtils';
 import {
+    experimentRowEventName,
     mkExperimentRowAttrs,
     mkExploreWithAstaTableLinkAttrs,
     sortColumnEventName,
@@ -37,6 +39,7 @@ export function ExperimentsTable({
     surprisalWidth,
     datasetExpired,
 }: ExperimentsTableProps) {
+    const apiRef = useGridApiRef();
     const { canExploreWithAsta } = useAuth0();
     const {
         experiments,
@@ -378,6 +381,12 @@ export function ExperimentsTable({
             // Don't allow clicking on skeleton rows
             if (params.row.isSkeleton) return;
 
+            // Send the row index as a custom prop to Heap
+            track(experimentRowEventName, {
+                rowindex: apiRef.current?.getRowIndexRelativeToVisibleRows(params.id),
+                experimentId: params.id,
+            });
+
             setVisitedIds((prev) => new Set(prev).add(params.id));
 
             const exp = experiments.find((exp) => exp.idInRun === params.id);
@@ -385,7 +394,7 @@ export function ExperimentsTable({
                 selectExperiment(exp, { scroll: false });
             }
         },
-        [experiments, selectExperiment]
+        [apiRef, experiments, selectExperiment]
     );
 
     // Scroll to the selected experiment when it changes, unless the caller opted out
@@ -485,6 +494,7 @@ export function ExperimentsTable({
                     onSortModelChange={handleSortModelChange}
                     getRowHeight={() => 'auto'}
                     rowSelectionModel={rowSelectionModel}
+                    apiRef={apiRef}
                     slotProps={{
                         row: mkExperimentRowAttrs(),
                         toolbar: {

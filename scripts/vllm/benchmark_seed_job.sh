@@ -30,8 +30,13 @@ export SERVED_NAME="${SERVED_NAME:-$MODEL}"
 
 cd "$REPO_ROOT"
 
+# Optional per-call generation cap (bounds runaway when thinking + guided decoding
+# fail to terminate); omit for the model's default.
+MAX_TOKENS_ARG=""
+[ -n "${MAX_TOKENS:-}" ] && MAX_TOKENS_ARG="--max_tokens $MAX_TOKENS"
+
 BENCH="uv run --package asta-autodiscovery python scripts/vllm/benchmark_seed.py \
-    --model $MODEL --base_url http://localhost:${PORT}/v1 --seed $SEED --n $N"
+    --model $MODEL --base_url http://localhost:${PORT}/v1 --seed $SEED --n $N $MAX_TOKENS_ARG"
 
 # Run both passes against a single served model. serve_vllm.sh starts the server,
 # waits for readiness, runs the '--' command, then tears the server down.

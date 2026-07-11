@@ -755,22 +755,47 @@ def get_agents(
         system_message=(
             "You are a research scientist who is interested in doing open-ended, data-driven research using the provided dataset(s). "
             f"{_user_query_or_empty}"
-            f"Be creative and think of new and interesting verifiable {'experiments' if experiment_first else 'hypotheses'} and corresponding {'hypotheses' if experiment_first else 'experiments'}. "
+            f"Be creative and think of new and interesting verifiable {'experiments' if experiment_first else 'hypotheses'}. "
             "The hypothesis should be a falsifiable statement that can be sufficiently tested by an experiment using the provided data. "
-            "Explain in natural language what this experiment plan is so that a programmer can implement it (do not provide the code yourself). "
             "Remember, you are interested in open-ended research, so your proposals may be exploratory in nature and may have only an indirect connection to the previous explorations provided. "
             "Here are some instructions that you must follow:\n"
             "1. Strictly use only the dataset(s) provided and do not simulate dummy/synthetic data or columns that cannot be derived from the existing columns.\n"
-            "2. Each hypothesis (and experiment plan) should be creative, independent, and self-contained.\n"
-            "3. Use the prior experiments/hypotheses as inspiration to think of interesting and creative new experiments/hypotheses. However, do not repeat the same experiments/hypotheses.\n\n"
-            "Here is a possible approach to coming up with a new hypothesis and experiment plan:\n"
+            "2. Each hypothesis should be creative, independent, and self-contained.\n"
+            "3. Use the prior experiments/hypotheses as inspiration to think of interesting and creative new hypotheses. However, do not repeat the same hypotheses.\n\n"
+            "Here is a possible approach to coming up with a new hypothesis:\n"
             "1. Find an interesting context: this could be a specific subset of the data. E.g., if the dataset has multiple categorical variables, you could split the data based on specific values of such variables, which would then allow you to validate a hypothesis in the specific contexts defined by the values of those variables.\n"
             "2. Find interesting variables: these could be the columns in the dataset that you find interesting or relevant to the context. You are allowed and encouraged to create composite variables derived from the existing variables.\n"
             "3. Find interesting relationships: these are interactions between the variables that you find interesting or relevant to the context. You are encouraged to propose experiments involving complex predictive or causal models.\n"
             "4. You must require that your proposed hypotheses are verifiable using robust statistical tests. Remember, your programmer can install python packages via pip which can allow it to write code for complex statistical analyses.\n"
             "5. Multiple datasets: If you are provided with more than one dataset, then try to also propose hypotheses that utilize contexts, variables, and relationships across datasets, e.g., this may involve using join or similar operations.\n\n"
             "Generally, in typical data-driven research, you will need to explore and visualize the data for possible high-level insights, clean, transform, or derive new variables from the dataset to be suited for the investigation, deep-dive into specific parts of the data for fine-grained analysis, perform data modeling, and run statistical tests. "
-            f"Now, generate exactly {branching_factor} new hypotheses with their experiment plans."
+            f"Now, generate exactly {branching_factor} new hypotheses."
+        ),
+        human_input_mode="NEVER",
+    )
+
+    experiment_planner = ConversableAgent(
+        name="experiment_planner",
+        llm_config={**execution_llm_config},
+        system_message=(
+            "You are a research scientist skilled at designing rigorous, informative, and implementable data-analysis experiments. "
+            "You are given a hypothesis and your goal is to produce a self-contained and detailed experiment plan for that hypothesis. "
+            "Explain in natural language what this experiment plan is so that a programmer can implement it (do not provide the code yourself). "
+            "Here are some instructions that you must follow:\n"
+            "1. Use only the provided dataset(s). Do not invent, simulate, or assume access to variables that are unavailable or cannot be deterministically derived from existing columns.\n"
+            "2. Preserve the central hypothesis. Use prior experiments only to avoid redundancy and identify useful controls, failure modes, and follow-up analyses.\n"
+            "3. Prefer the simplest analysis that can reliably test the hypothesis. Do not add models, visualizations, subgroup analyses, or statistical tests unless they serve a clear purpose.\n"
+            "4. Do not make causal claims from observational data unless the proposed design and assumptions support causal identification.\n"
+            "5. If the hypothesis cannot be adequately tested with the available data, clearly explain why and propose the closest valid analysis without changing the hypothesis silently.\n\n"
+            "Here is a possible approach to constructing an experiment plan given a hypothesis:\n"
+            "1. Translate the hypothesis into one or more precise, falsifiable predictions. Clearly identify the outcome variable(s), explanatory variable(s), target population or context, and the expected relationship.\n"
+            "2. Verify that the hypothesis can be tested using only the provided dataset(s). Specify any required filtering, joins, feature engineering, or derived variables without inventing new data.\n"
+            "3. Design the primary analysis needed to test the hypothesis. Choose appropriate statistical tests or predictive/causal models, explain why they are suitable, and define what evidence would support or refute the hypothesis.\n"
+            "4. Identify potential confounders, alternative explanations, and sources of bias. Include appropriate controls, robustness checks, subgroup analyses, or sensitivity analyses to distinguish genuine effects from artifacts.\n"
+            "5. Specify the expected workflow, including data preparation, exploratory analyses, model fitting, diagnostics, statistical validation, and the final interpretation of results. Organize the steps so that a programmer can implement them directly.\n"
+            "6. Clearly state the possible conclusions of the experiment, including what results would support the hypothesis, refute it, or remain inconclusive, and discuss any important limitations of the analysis.\n\n"
+            "Generally, in typical data-driven research, you will need to explore and visualize the data for possible high-level insights, clean, transform, or derive new variables from the dataset to be suited for the investigation, deep-dive into specific parts of the data for fine-grained analysis, perform data modeling, and run statistical tests. "
+            "Now, generate the experiment plan for the given hypothesis."
         ),
         human_input_mode="NEVER",
     )
@@ -985,6 +1010,7 @@ def install(package):
 
     agents = [
         experiment_generator,
+        experiment_planner,
         experiment_programmer,
         experiment_analyst,
         experiment_reviewer,
@@ -1003,6 +1029,7 @@ def install(package):
     # and user_proxy have llm_config=False), so hook just those.
     llm_agents = [
         experiment_generator,
+        experiment_planner,
         experiment_programmer,
         experiment_analyst,
         experiment_reviewer,

@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';
 import { Header } from '@/components/Header';
-import { ToS } from '@/components/ToS';
+import { UserMenuFooter } from '@/components/UserMenuFooter';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { mkLogoTrackAttrs } from '@/analytics/run';
 import { scrollbarStyles } from '@/utils/scrollbar';
@@ -58,7 +58,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                                     </ScrollContainer>
                                 </ScrollArea>
                                 <SidebarFooter>
-                                    <ToS />
+                                    <UserMenuFooter />
                                 </SidebarFooter>
                             </Sidebar>
                         )}
@@ -72,7 +72,7 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
                                         {children}
                                         {isAuthenticated && (
                                             <MobileFooter>
-                                                <ToS />
+                                                <UserMenuFooter />
                                             </MobileFooter>
                                         )}
                                     </ScrollContent>

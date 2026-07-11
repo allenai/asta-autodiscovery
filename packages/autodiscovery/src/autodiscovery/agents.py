@@ -747,7 +747,7 @@ def get_agents(
     _theorizer_llm_config = {**theorizer_llm_config}
     if base_url is None:
         _theorizer_llm_config["response_format"] = (
-            ExperimentList if not experiment_first else ExperimentHypothesisList
+            ExperimentList if not experiment_first else HypothesisList
         )
     experiment_generator = ConversableAgent(
         name="experiment_generator",
@@ -776,7 +776,7 @@ def get_agents(
 
     experiment_planner = ConversableAgent(
         name="experiment_planner",
-        llm_config={**execution_llm_config},
+        llm_config={**execution_llm_config, "response_format": ExperimentHypothesisList},
         system_message=(
             "You are a research scientist skilled at designing rigorous, informative, and implementable data-analysis experiments. "
             "You are given a hypothesis and your goal is to produce a self-contained and detailed experiment plan for that hypothesis. "

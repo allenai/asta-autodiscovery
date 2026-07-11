@@ -61,6 +61,9 @@ class SpeakerSelector:
             return groupchat.agent_by_name("experiment_programmer")
 
         elif last_speaker.name == "experiment_generator":
+            return groupchat.agent_by_name("experiment_planner")
+        
+        elif last_speaker.name == "experiment_planner":
             return None
 
         return None

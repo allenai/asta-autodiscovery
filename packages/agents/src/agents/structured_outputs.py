@@ -51,6 +51,16 @@ class Hypothesis(StrictBaseModel):
     dimensions: HypothesisDimensions
 
 
+class HypothesisList(StrictBaseModel):
+    """A collection of hypotheses.
+
+    Attributes:
+        hypotheses: List of Hypothesis objects.
+    """
+
+    hypotheses: list[Hypothesis]
+
+
 class ExperimentPlan(StrictBaseModel):
     """Represents the experiment plan with a title, objective, steps, and deliverables.
 

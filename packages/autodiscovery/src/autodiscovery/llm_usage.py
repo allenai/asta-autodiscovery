@@ -607,14 +607,11 @@ def _print_vllm_call_output(model: str, response: Any, reasoning_tokens: int, so
     many reasoning tokens we recovered, per call, in the job logs.
     """
     content = _first_choice_content(response)
-    oneline = content.replace("\n", " ")
-    head = oneline[:400]
-    tail = oneline[-200:] if len(oneline) > 600 else ""
+    reasoning_text = content.replace("\n", " ")
     print(
         f"[vllm-call] model={model} content_len={len(content)} "
         f"reasoning_tokens={reasoning_tokens} src={source}\n"
-        f"  head: {head}\n"
-        f"  tail: {tail}",
+        f"  reasoning_text: {reasoning_text}\n",
         flush=True,
     )
 

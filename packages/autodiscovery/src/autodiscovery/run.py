@@ -529,6 +529,7 @@ def run_mcts(
                 )
 
                 experiment_generator = agent_objs["experiment_generator"]
+                experiment_planner = agent_objs["experiment_planner"]
                 user_proxy_local = agent_objs["user_proxy"]
                 parent_node = node
                 parent_lock = _get_node_mutation_lock(parent_node)
@@ -540,6 +541,7 @@ def run_mcts(
                     with parent_lock:
                         new_experiment, new_query = parent_node.get_next_experiment(
                             experiment_generator=experiment_generator,
+                            experiment_planner=experiment_planner,
                             expected_experiments=branching_factor,
                         )
                         if new_query is None:

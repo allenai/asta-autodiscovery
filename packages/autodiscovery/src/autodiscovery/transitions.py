@@ -61,8 +61,10 @@ class SpeakerSelector:
             return groupchat.agent_by_name("experiment_programmer")
 
         elif last_speaker.name == "experiment_generator":
+            # Two-step generation: after the generator proposes plan-free
+            # hypotheses, the planner turns them into full experiment plans.
             return groupchat.agent_by_name("experiment_planner")
-        
+
         elif last_speaker.name == "experiment_planner":
             return None
 

@@ -168,13 +168,24 @@ class MCTSNode:
         self.normalized_surprisal = data.get("normalized_surprisal", self.normalized_surprisal)
         self.kl_divergence = data.get("kl_divergence", self.kl_divergence)
 
-    def get_next_experiment(self, experiment_generator=None, n_retry=3, expected_experiments=None):
-        """Returns the next untried experiment. If none left and generating experiments is allowed, generates more using
-        the experiment generator agent.
+    def get_next_experiment(
+        self,
+        experiment_generator=None,
+        experiment_planner=None,
+        n_retry=3,
+        expected_experiments=None,
+    ):
+        """Returns the next untried experiment, generating more on demand.
+
+        When the queue is empty and generation is allowed, experiments are
+        produced in two steps: the experiment_generator proposes plan-free
+        hypotheses, then the experiment_planner turns them into full experiments
+        (hypothesis + experiment_plan). The resulting experiments are stored in
+        ``untried_experiments`` just as single-step generation did before.
 
         expected_experiments: the branching factor (k_experiments). When set, a
-        warning is logged if an on-demand generation returns no parseable
-        experiments or a count that differs from this expectation.
+        warning is logged if generation returns no parseable experiments or a
+        count that differs from this expectation.
         """
         new_experiment, new_query = None, None
 
@@ -184,18 +195,19 @@ class MCTSNode:
                 new_experiment = self.untried_experiments.pop(idx)
                 self.tried_experiments.append(new_experiment)
             elif self.allow_generate_experiments and experiment_generator is not None:
-                # Generate new experiments on-demand, providing all previous experiments as context
+                # Two-step generation: propose hypotheses, then plan each one.
                 _messages = self.messages + [
                     {
                         "role": "user",
-                        "content": f"Generate new experiments given these previously attempted experiments: {json.dumps(self.tried_experiments)}",
+                        "content": f"Generate new hypotheses given these previously attempted experiments: {json.dumps(self.tried_experiments)}",
                     }
                 ]
-                _reply = experiment_generator.generate_reply(messages=_messages)
+                gen_reply = experiment_generator.generate_reply(messages=_messages)
                 try:
-                    experiments = try_loading_dict(_reply).get("experiments", [])
+                    hypotheses = try_loading_dict(gen_reply).get("hypotheses", [])
                 except (json.JSONDecodeError, TypeError):
-                    experiments = []
+                    hypotheses = []
+                experiments = self._plan_hypotheses(hypotheses, experiment_planner, _messages)
                 _warn_experiment_count(len(experiments), expected_experiments, self.id, "on-demand")
                 self.untried_experiments = experiments.copy()
                 if self.untried_experiments:
@@ -206,16 +218,57 @@ class MCTSNode:
             if new_experiment is not None:
                 try:
                     new_query = get_query_from_experiment(new_experiment)
-                except:
+                except Exception:
                     pass
             if new_query is None:
                 return self.get_next_experiment(
                     experiment_generator=experiment_generator,
+                    experiment_planner=experiment_planner,
                     n_retry=n_retry - 1,
                     expected_experiments=expected_experiments,
                 )
 
         return new_experiment, new_query
+
+    def _plan_hypotheses(self, hypotheses, experiment_planner, context_messages=None):
+        """Turn a batch of plan-free hypotheses into full experiments via the planner.
+
+        Returns a list of ``{hypothesis, experiment_plan}`` dicts (empty if the
+        planner is unavailable or produced nothing parseable).
+        """
+        if not hypotheses or experiment_planner is None:
+            return []
+        _messages = (context_messages or self.messages) + [
+            {
+                "role": "user",
+                "content": (
+                    "You are a research scientist skilled at designing rigorous, informative, and implementable data-analysis experiments. "
+                    "You are given one or more hypotheses and your goal is to produce a self-contained and detailed experiment plan for each hypothesis. "
+                    "Explain in natural language what this experiment plan is so that a programmer can implement it (do not provide the code yourself). "
+                    "Here are some instructions that you must follow:\n"
+                    "1. Use only the provided dataset(s). Do not invent, simulate, or assume access to variables that are unavailable or cannot be deterministically derived from existing columns.\n"
+                    "2. Preserve the central hypothesis. Use prior experiments only to avoid redundancy and identify useful controls, failure modes, and follow-up analyses.\n"
+                    "3. Prefer the simplest analysis that can reliably test the hypothesis. Do not add models, visualizations, subgroup analyses, or statistical tests unless they serve a clear purpose.\n"
+                    "4. Do not make causal claims from observational data unless the proposed design and assumptions support causal identification.\n"
+                    "5. If the hypothesis cannot be adequately tested with the available data, clearly explain why and propose the closest valid analysis without changing the hypothesis silently.\n\n"
+                    "Here is a possible approach to constructing an experiment plan given a hypothesis:\n"
+                    "1. Translate the hypothesis into one or more precise, falsifiable predictions. Clearly identify the outcome variable(s), explanatory variable(s), target population or context, and the expected relationship.\n"
+                    "2. Verify that the hypothesis can be tested using only the provided dataset(s). Specify any required filtering, joins, feature engineering, or derived variables without inventing new data.\n"
+                    "3. Design the primary analysis needed to test the hypothesis. Choose appropriate statistical tests or predictive/causal models, explain why they are suitable, and define what evidence would support or refute the hypothesis.\n"
+                    "4. Identify potential confounders, alternative explanations, and sources of bias. Include appropriate controls, robustness checks, subgroup analyses, or sensitivity analyses to distinguish genuine effects from artifacts.\n"
+                    "5. Specify the expected workflow, including data preparation, exploratory analyses, model fitting, diagnostics, statistical validation, and the final interpretation of results. Organize the steps so that a programmer can implement them directly.\n"
+                    "6. Clearly state the possible conclusions of the experiment, including what results would support the hypothesis, refute it, or remain inconclusive, and discuss any important limitations of the analysis.\n\n"
+                    "Generally, in typical data-driven research, you will need to explore and visualize the data for possible high-level insights, clean, transform, or derive new variables from the dataset to be suited for the investigation, deep-dive into specific parts of the data for fine-grained analysis, perform data modeling, and run statistical tests. "
+                    "Now, generate one experiment plan for each of the given hypotheses, returning one experiment per hypothesis."
+                    f"Hypotheses: {json.dumps({'hypotheses': hypotheses})}"
+                ),
+            }
+        ]
+        _reply = experiment_planner.generate_reply(messages=_messages)
+        try:
+            return try_loading_dict(_reply).get("experiments", [])
+        except (json.JSONDecodeError, TypeError):
+            return []
 
     def has_untried_experiments(self):
         return bool(self.untried_experiments) or self.allow_generate_experiments
@@ -287,7 +340,10 @@ class MCTSNode:
                 if latest_reviewer_feedback == "":
                     latest_reviewer_feedback = "N/A"
                 latest_reviewer_success = latest_reviewer.get("success", False)
-            elif not latest_experiment_generator and msg.get("name") == "experiment_generator":
+            elif not latest_experiment_generator and msg.get("name") == "experiment_planner":
+                # Two-step generation: the generator emits plan-free hypotheses and
+                # the planner (running right after it in the chat) turns them into
+                # full experiments. Harvest the planner's experiments for the queue.
                 latest_experiment_generator = try_loading_dict(msg.get("content")).get(
                     "experiments", []
                 )

@@ -44,6 +44,17 @@ class Hypothesis(BaseModel):
     dimensions: HypothesisDimensions
 
 
+class HypothesisList(BaseModel):
+    """A declarative sentence about the state of the world whose truth value may be inferred from the given dataset(s) using an experiment.
+
+    Attributes:
+        hypothesis (str): The hypothesis statement
+        dimensions (HypothesisDimensions): Structured dimensions of the hypothesis
+    """
+
+    hypotheses: list[Hypothesis]
+
+
 class ExperimentPlan(BaseModel):
     """Represents the experiment plan with a title, objective, steps, and deliverables.
 

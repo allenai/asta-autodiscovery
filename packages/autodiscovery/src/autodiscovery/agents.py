@@ -21,9 +21,9 @@ from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
     ExperimentCode,
-    ExperimentHypothesisList,
     ExperimentList,
     ExperimentReviewer,
+    HypothesisList,
 )
 from autodiscovery.utils import (
     get_vertex_access_token,
@@ -744,18 +744,18 @@ def get_agents(
     # never emits valid JSON and runs away. Drop response_format there so the model
     # reasons then emits JSON in content; try_loading_dict tolerates the leading
     # "reasoning</think>" prefix. OpenAI theorizers keep the structured schema.
+    # The theorizer now always emits plan-free hypotheses (HypothesisList); the
+    # experiment_planner turns each one into a full experiment plan on demand.
     _theorizer_llm_config = {**theorizer_llm_config}
     if base_url is None:
-        _theorizer_llm_config["response_format"] = (
-            ExperimentList if not experiment_first else HypothesisList
-        )
+        _theorizer_llm_config["response_format"] = HypothesisList
     experiment_generator = ConversableAgent(
         name="experiment_generator",
         llm_config=_theorizer_llm_config,
         system_message=(
             "You are a research scientist who is interested in doing open-ended, data-driven research using the provided dataset(s). "
             f"{_user_query_or_empty}"
-            f"Be creative and think of new and interesting verifiable {'experiments' if experiment_first else 'hypotheses'}. "
+            "Be creative and think of new and interesting verifiable hypotheses. "
             "The hypothesis should be a falsifiable statement that can be sufficiently tested by an experiment using the provided data. "
             "Remember, you are interested in open-ended research, so your proposals may be exploratory in nature and may have only an indirect connection to the previous explorations provided. "
             "Here are some instructions that you must follow:\n"
@@ -776,10 +776,10 @@ def get_agents(
 
     experiment_planner = ConversableAgent(
         name="experiment_planner",
-        llm_config={**execution_llm_config, "response_format": ExperimentHypothesisList},
+        llm_config={**execution_llm_config, "response_format": ExperimentList},
         system_message=(
             "You are a research scientist skilled at designing rigorous, informative, and implementable data-analysis experiments. "
-            "You are given a hypothesis and your goal is to produce a self-contained and detailed experiment plan for that hypothesis. "
+            "You are given one or more hypotheses and your goal is to produce a self-contained and detailed experiment plan for each hypothesis. "
             "Explain in natural language what this experiment plan is so that a programmer can implement it (do not provide the code yourself). "
             "Here are some instructions that you must follow:\n"
             "1. Use only the provided dataset(s). Do not invent, simulate, or assume access to variables that are unavailable or cannot be deterministically derived from existing columns.\n"
@@ -795,7 +795,7 @@ def get_agents(
             "5. Specify the expected workflow, including data preparation, exploratory analyses, model fitting, diagnostics, statistical validation, and the final interpretation of results. Organize the steps so that a programmer can implement them directly.\n"
             "6. Clearly state the possible conclusions of the experiment, including what results would support the hypothesis, refute it, or remain inconclusive, and discuss any important limitations of the analysis.\n\n"
             "Generally, in typical data-driven research, you will need to explore and visualize the data for possible high-level insights, clean, transform, or derive new variables from the dataset to be suited for the investigation, deep-dive into specific parts of the data for fine-grained analysis, perform data modeling, and run statistical tests. "
-            "Now, generate the experiment plan for the given hypothesis."
+            "Now, generate one experiment plan for each of the given hypotheses, returning one experiment per hypothesis."
         ),
         human_input_mode="NEVER",
     )

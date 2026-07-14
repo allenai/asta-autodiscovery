@@ -8,29 +8,25 @@ import {
     CardContent,
     CircularProgress,
     Alert,
-    Chip,
     Avatar,
+    Chip,
     styled,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import LockIcon from '@mui/icons-material/Lock';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 
 import { getUserApi } from '@/api/UserApi';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import MetricCard from '@/metrics/components/MetricCard';
-import type {
-    GetViewerUserResponseBody,
-    GetViewerEnrollmentResponseBody,
-    GetViewerCreditsResponseBody,
-} from '@/api/UserApi';
+import type { GetViewerUserResponseBody, GetViewerCreditsResponseBody } from '@/api/UserApi';
 
 export default function DebugUserPage() {
     return (
         <Wrapper>
             <Typography variant="h1">User Debug</Typography>
             <UserProfileSection />
-            <EnrollmentSection />
+            <PermissionsSection />
             <CreditsSection />
         </Wrapper>
     );
@@ -167,16 +163,24 @@ function UserProfileSection() {
     return null;
 }
 
-function EnrollmentSection() {
-    const userApi = getUserApi();
-    const { isAuthenticated } = useAuth0();
-    const [data, setData] = useState<GetViewerEnrollmentResponseBody | null>(null);
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const payloadPart = token.split('.')[1];
+    if (!payloadPart) {
+        return null;
+    }
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(atob(`${normalized}${padding}`)) as Record<string, unknown>;
+}
+
+function PermissionsSection() {
+    const { isAuthenticated, getAccessToken } = useAuth0();
+    const [permissions, setPermissions] = useState<string[] | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [permissionDenied, setPermissionDenied] = useState(false);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchPermissions = async () => {
             if (!isAuthenticated) {
                 setLoading(false);
                 return;
@@ -184,28 +188,24 @@ function EnrollmentSection() {
 
             setLoading(true);
             setError(null);
-            setPermissionDenied(false);
 
             try {
-                const { response, data: responseData } = await userApi.getViewerEnrollmentStatus();
-                if (response.status === 403) {
-                    setPermissionDenied(true);
-                    const errorData = await response.json();
-                    setError(errorData.error || 'Access denied');
-                } else if (!response.ok) {
-                    throw new Error('Failed to fetch enrollment status');
-                } else if (responseData) {
-                    setData(responseData);
-                }
+                // Permissions live in the access token's `permissions` claim, not in
+                // /userinfo. Decode (not validate — the backend validates) to display them.
+                const token = await getAccessToken();
+                const payload = decodeJwtPayload(token);
+                setPermissions(
+                    Array.isArray(payload?.permissions) ? (payload.permissions as string[]) : []
+                );
             } catch (err) {
-                console.error('Error fetching enrollment status:', err);
-                setError(err instanceof Error ? err.message : 'Failed to load enrollment status');
+                console.error('Error decoding permissions:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load permissions');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
+        fetchPermissions();
     }, [isAuthenticated]);
 
     if (loading) {
@@ -225,7 +225,7 @@ function EnrollmentSection() {
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Typography variant="h6" sx={{ mb: 2 }}>
-                        Enrollment Status
+                        Permissions
                     </Typography>
                     <Alert severity="info">Please log in to view this information.</Alert>
                 </CardContent>
@@ -233,37 +233,12 @@ function EnrollmentSection() {
         );
     }
 
-    if (permissionDenied) {
-        return (
-            <Card sx={{ mb: 3, borderLeft: 4, borderColor: 'warning.main' }}>
-                <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <LockIcon sx={{ mr: 1, color: 'warning.main' }} />
-                        <Typography variant="h6">Enrollment Status</Typography>
-                    </Box>
-                    <Alert severity="warning">
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                            <strong>Permission Required</strong>
-                        </Typography>
-                        <Typography variant="body2">
-                            You do not have permission to view enrollment status. This feature
-                            requires the <code>enroll:autodiscovery_v0</code> permission.
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                            Contact your administrator to request access.
-                        </Typography>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (error && !permissionDenied) {
+    if (error) {
         return (
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Typography variant="h6" sx={{ mb: 2 }}>
-                        Enrollment Status
+                        Permissions
                     </Typography>
                     <Alert severity="error">{error}</Alert>
                 </CardContent>
@@ -271,64 +246,31 @@ function EnrollmentSection() {
         );
     }
 
-    if (data) {
-        return (
-            <Card sx={{ mb: 3, borderLeft: 4, borderColor: 'success.main' }}>
-                <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <CheckCircleIcon sx={{ mr: 1, color: 'success.main' }} />
-                        <Typography variant="h6">Enrollment Status</Typography>
-                        {data.status && (
+    return (
+        <Card sx={{ mb: 3, borderLeft: 4, borderColor: 'success.main' }}>
+            <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <VpnKeyIcon sx={{ mr: 1, color: 'success.main' }} />
+                    <Typography variant="h6">Permissions</Typography>
+                </Box>
+
+                {permissions && permissions.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {permissions.map((permission) => (
                             <Chip
-                                label={data.status.toUpperCase()}
-                                color="success"
+                                key={permission}
+                                label={permission}
                                 size="small"
-                                sx={{ ml: 2 }}
+                                sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
                             />
-                        )}
+                        ))}
                     </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Enrolled:
-                            </Typography>
-                            <Typography variant="body2">{data.enrolled ? 'Yes' : 'No'}</Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Enrollment Date:
-                            </Typography>
-                            <Typography variant="body2">{data.enrollment_date || 'N/A'}</Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Experiments Completed:
-                            </Typography>
-                            <Typography variant="body2">
-                                {data.experiments_count ?? 'N/A'}
-                            </Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">
-                                User ID:
-                            </Typography>
-                            <Typography
-                                variant="body2"
-                                sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                                {data.user_id || 'N/A'}
-                            </Typography>
-                        </Box>
-                    </Box>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    return null;
+                ) : (
+                    <Alert severity="info">This user has no permissions in the access token.</Alert>
+                )}
+            </CardContent>
+        </Card>
+    );
 }
 
 function CreditsSection() {

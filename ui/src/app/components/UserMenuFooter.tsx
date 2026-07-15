@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { MenuLinks } from './MenuLinks';
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { mkLogoutBtnTrackAttrs } from '@/analytics/run';
+import { mkLogoutBtnTrackAttrs, mkUserMenuBtnTrackAttrs } from '@/analytics/run';
 import { TEST_ID_SIGN_OUT_BUTTON, TEST_ID_USER_MENU_BUTTON } from '@/testIds';
 
 /**
@@ -25,7 +25,8 @@ export const UserMenuFooter = () => {
         <FooterWrapper>
             <UserProfileButton
                 onClick={(event) => setAnchorEl(event.currentTarget)}
-                data-test-id={TEST_ID_USER_MENU_BUTTON}>
+                data-test-id={TEST_ID_USER_MENU_BUTTON}
+                {...mkUserMenuBtnTrackAttrs()}>
                 <UserAvatar>{avatarLetter}</UserAvatar>
                 <UserName>{displayName}</UserName>
                 <MoreVertIcon />

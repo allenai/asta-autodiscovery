@@ -39,7 +39,6 @@ export const MenuLinks = () => {
                     href={FEEDBACK_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="Leave Feedback"
                     data-test-id={TEST_ID_FEEDBACK_BUTTON}
                     {...mkFeedbackBtnTrackAttrs()}>
                     Leave Feedback
@@ -49,7 +48,7 @@ export const MenuLinks = () => {
             <LinksSection>
                 <SettingsButton
                     type="button"
-                    aria-label="Open disclaimer dialog"
+                    aria-haspopup="dialog"
                     onClick={() => setIsDisclaimerOpen(true)}
                     data-test-id={TEST_ID_DISCLAIMER_BUTTON}
                     {...mkDisclaimerBtnTrackAttrs()}>
@@ -57,7 +56,7 @@ export const MenuLinks = () => {
                 </SettingsButton>
                 <SettingsButton
                     type="button"
-                    aria-label="Open attribution dialog"
+                    aria-haspopup="dialog"
                     onClick={() => setIsAttributionOpen(true)}
                     data-test-id={TEST_ID_ATTRIBUTION_BUTTON}
                     {...mkAttributionBtnTrackAttrs()}>
@@ -67,7 +66,6 @@ export const MenuLinks = () => {
                     href="https://allenai.org/privacy-policy"
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="Privacy Policy"
                     data-test-id={TEST_ID_PRIVACY_POLICY_LINK}
                     {...mkPrivacyLinkTrackAttrs()}>
                     Privacy Policy
@@ -76,7 +74,6 @@ export const MenuLinks = () => {
                     href="https://allenai.org/terms"
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="Terms of Use"
                     data-test-id={TEST_ID_TERMS_OF_USE_LINK}
                     {...mkTosLinkTrackAttrs()}>
                     Terms of Use
@@ -85,7 +82,6 @@ export const MenuLinks = () => {
                     href="https://allenai.org/responsible-use"
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="Responsible Use"
                     data-test-id={TEST_ID_RESPONSIBLE_USE_LINK}
                     {...mkResponsibleUseLinkTrackAttrs()}>
                     Responsible Use

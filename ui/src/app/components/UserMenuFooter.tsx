@@ -11,8 +11,7 @@ import { mkLogoutBtnTrackAttrs, mkUserMenuBtnTrackAttrs } from '@/analytics/run'
 import { TEST_ID_SIGN_OUT_BUTTON, TEST_ID_USER_MENU_BUTTON } from '@/testIds';
 
 /**
- * Sidebar footer: a user-profile button that opens a popover menu with the
- * app's policy/feedback links and a Sign Out action. Mirrors the Asta footer.
+ * Sidebar footer: a user-profile button that opens a popover menu
  */
 export const UserMenuFooter = () => {
     const { user, logout } = useAuth0();

@@ -21,6 +21,10 @@ export const mkBookmarkRunBtnAttrs = (props: { runId: string; isBookmarked: bool
 // Create new run button
 export const mkCreateNewRunBtnAttrs = () => mkTrackAttrs(`${SIDE_BAR_PREFIX}__create-run-btn`);
 
+// User menu button (opens the footer menu popover)
+export const mkUserMenuBtnTrackAttrs = (props: {} = {}) =>
+    mkTrackAttrs(`${SIDE_BAR_PREFIX}__user_menu_btn`, props);
+
 // Responsible Use Link
 export const mkResponsibleUseLinkTrackAttrs = (props: {} = {}) =>
     mkTrackAttrs(`${SIDE_BAR_PREFIX}__responsible_use_link`, props);

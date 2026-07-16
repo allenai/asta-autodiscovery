@@ -22,6 +22,8 @@ export const TEST_ID_ATTRIBUTION_BUTTON = 'attribution-button';
 export const TEST_ID_PRIVACY_POLICY_LINK = 'privacy-policy-link';
 export const TEST_ID_TERMS_OF_USE_LINK = 'terms-of-use-link';
 export const TEST_ID_RESPONSIBLE_USE_LINK = 'responsible-use-link';
+export const TEST_ID_USER_MENU_BUTTON = 'user-menu-button';
+export const TEST_ID_SIGN_OUT_BUTTON = 'sign-out-button';
 
 // Dialogs
 export const TEST_ID_DISCLAIMER_DIALOG = 'disclaimer-dialog';

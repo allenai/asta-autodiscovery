@@ -1,4 +1,5 @@
 import { Paper, styled, Box, Alert, Tooltip, Skeleton, GlobalStyles } from '@mui/material';
+import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import {
     DataGrid,
     GridColDef,
@@ -76,7 +77,6 @@ export function ExperimentsTable({
     }, [selectedExperiment?.idInRun]);
     const { getSearchParam, setSearchParam, deleteSearchParam } = useURLSearchParams();
     const [continueExperiment, setContinueExperiment] = useState<Experiment | null>(null);
-    const [exploredExperimentIds, setExploredExperimentIds] = useState<Set<string>>(new Set());
     const columns = useMemo(() => {
         const DEFAULT_COLUMNS: GridColDef[] = [
             {
@@ -215,11 +215,9 @@ export function ExperimentsTable({
                 cellClassName: 'exploration-cell',
                 renderCell: (params: GridRenderCellParams) => {
                     if (params.row.isSkeleton) return null;
-                    const isExplored = exploredExperimentIds.has(params.row.id as string);
                     return (
                         <ExplorationLink
                             href="#"
-                            className={isExplored ? 'explored' : 'not-explored'}
                             {...mkExploreWithAstaTableLinkAttrs({
                                 runId: runid ?? '',
                                 experimentId: params.row.experiment?.experimentId,
@@ -227,12 +225,10 @@ export function ExperimentsTable({
                             onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                setExploredExperimentIds((prev) =>
-                                    new Set(prev).add(params.row.id as string)
-                                );
                                 setContinueExperiment(params.row.experiment);
                             }}>
                             Explore with Asta
+                            <ArrowOutwardIcon />
                         </ExplorationLink>
                     );
                 },
@@ -245,13 +241,7 @@ export function ExperimentsTable({
         return isExperimentBookmarksEnabled
             ? visibleColumns
             : visibleColumns.filter((col) => col.field !== 'isBookmarked');
-    }, [
-        isExperimentBookmarksEnabled,
-        visitedIds,
-        exploredExperimentIds,
-        datasetExpired,
-        canExploreWithAsta,
-    ]);
+    }, [isExperimentBookmarksEnabled, visitedIds, datasetExpired, canExploreWithAsta]);
 
     const [sortModel, setSortModel] = useState<GridSortModel>([]);
 
@@ -712,20 +702,13 @@ const ExplorationLink = styled('a')`
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
+    color: ${({ theme }) => theme.color['green-100'].hex};
 
-    &.not-explored {
-        color: ${({ theme }) => theme.color['cream-100'].hex};
-
-        &:hover {
-            color: ${({ theme }) => theme.color['green-100'].hex};
-        }
+    &:hover {
+        text-decoration: underline;
     }
 
-    &.explored {
-        color: ${({ theme }) => theme.color['green-100'].hex};
-
-        &:hover {
-            color: ${({ theme }) => theme.color['green-40'].hex};
-        }
+    svg {
+        font-size: 14px;
     }
 `;

@@ -97,4 +97,4 @@ jobs:
           # trunk), which is where the submodule bump + deploy should land. This
           # follows the trunk automatically if the default branch ever changes.
           gh workflow run process-public-main-change.yml \
-            --repo allenai/asta-autodiscovery-private --ref dev
+            --repo allenai/asta-autodiscovery-private --ref main

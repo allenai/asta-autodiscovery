@@ -6,7 +6,7 @@ _PROVIDER_CACHE: AuthProvider | None = None
 
 
 def _build_provider() -> AuthProvider:
-    kind = os.environ.get("AUTH_PROVIDER", "auth0").strip().lower()
+    kind = os.environ.get("AUTH_PROVIDER", "none").strip().lower()
 
     # Imported lazily so a deployment only needs the dependencies of the
     # provider it actually uses.

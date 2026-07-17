@@ -12,16 +12,20 @@ architecture see the [design doc](design/auth-providers.md).
 
 | Provider | Use when | Login UX | Needs |
 | --- | --- | --- | --- |
-| `auth0` (default) | Hosted, multi-user deployments (SSO). | Redirect to Auth0. | An Auth0 tenant + application. |
-| `password_file` | Self-hosted / small teams without Auth0. | Username + password form. | A mounted user file + a session secret. |
-| `none` | Local "desktop" mode / single-user dev. | None — always signed in. | Nothing. |
+| `none` (default) | Local runs / single-user dev — zero config. | None — always signed in. | Nothing. |
+| `auth0` | Hosted, multi-user deployments (SSO). | Redirect to Auth0. | An Auth0 tenant + application. |
+| `password_file` | Self-hosted / small teams without Auth0. | Username + password form. | A mounted store dir + a session secret. |
 
-## `auth0` (default)
+The default is **`none`** so the app runs out of the box with no auth configuration.
+**Any real or multi-user deployment must set `AUTH_PROVIDER` explicitly** to `auth0` or
+`password_file` — `none` grants everyone full access as a single shared local user.
+
+## `auth0`
 
 Validates Auth0-issued JWTs and drives the Auth0 login redirect.
 
 ```bash
-AUTH_PROVIDER=auth0            # (default; may be omitted)
+AUTH_PROVIDER=auth0
 AUTH0_DOMAIN=your-tenant.auth0.com
 AUTH0_AUDIENCE=https://your-api-identifier
 AUTH0_CLIENT_ID=your-spa-client-id   # served to the UI via /api/auth/config
@@ -70,12 +74,12 @@ uv run api/scripts/auth_admin.py list
 In a deployed environment, `kubectl exec` into the API container (which has the store
 mounted) and run the same command.
 
-## `none` (desktop mode)
+## `none` (desktop mode) — default
 
-Every request is a fixed `local` user with all permissions; there is no login UI.
-Intended for single-user local runs and development — **do not use in a shared or
-production deployment**, as it grants everyone full access.
+The default provider. Every request is a fixed `local` user with all permissions; there
+is no login UI. Zero configuration, so the app runs out of the box — but **do not use in
+a shared or production deployment**, as it grants everyone full access.
 
 ```bash
-AUTH_PROVIDER=none            # no other configuration
+AUTH_PROVIDER=none            # the default; no other configuration
 ```

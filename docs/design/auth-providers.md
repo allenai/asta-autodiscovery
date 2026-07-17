@@ -10,7 +10,7 @@ Status: **Implemented** · Branch: `swappable-auth-providers`
 Make authentication pluggable across the Flask API backend and the Next.js UI,
 with three interchangeable providers selected by configuration:
 
-1. **`auth0`** — the current Auth0 OIDC/JWT implementation (default; unchanged behavior).
+1. **`auth0`** — the current Auth0 OIDC/JWT implementation (unchanged behavior when selected).
 2. **`password_file`** — a `user:password` file administered by a Python CLI, mounted
    into the API container and **re-read on every auth check** so new/changed users take
    effect without restarting the web stack.
@@ -132,7 +132,7 @@ use, and the `none` provider covers the "run as a fixed user" case.)
 ```python
 # api/utils/auth/factory.py
 def get_auth_provider() -> AuthProvider:   # cached singleton
-    kind = os.environ.get("AUTH_PROVIDER", "auth0")
+    kind = os.environ.get("AUTH_PROVIDER", "none")
     return {
         "auth0": Auth0Provider,
         "password_file": PasswordFileProvider,
@@ -140,7 +140,8 @@ def get_auth_provider() -> AuthProvider:   # cached singleton
     }[kind].from_env()
 ```
 
-New env var **`AUTH_PROVIDER`** (`auth0` default → no behavior change on existing deploys).
+New env var **`AUTH_PROVIDER`** (defaults to `none` for zero-config local runs; existing
+and production deploys must set `AUTH_PROVIDER=auth0` explicitly).
 Each provider reads only its own settings via `from_env()`.
 
 ### 4. The three providers
@@ -228,7 +229,7 @@ and runs **offline**, not in the request path. Out of scope for swapping; left a
 
 | Var | Provider | Notes |
 |---|---|---|
-| `AUTH_PROVIDER` | all | `auth0` (default) \| `password_file` \| `none` |
+| `AUTH_PROVIDER` | all | `none` (default) \| `auth0` \| `password_file` |
 | `AUTH_PASSWORD_DIR` | password_file | dir holding the store (fixed `passwddb.json`); mounted as a directory |
 | `AUTH_SESSION_SECRET` | password_file | HS256 signing secret |
 | `AUTH_SESSION_TTL` | password_file | token lifetime (default e.g. 12h) |

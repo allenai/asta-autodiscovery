@@ -39,8 +39,9 @@ services:
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      # Active auth provider: auth0 (default) | password_file | none
-      - AUTH_PROVIDER=${AUTH_PROVIDER:-auth0}
+      # Active auth provider: none (default — zero-config, unauthenticated local user)
+      # | auth0 | password_file. Set explicitly for any real/multi-user deployment.
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-none}
       - AUTH0_DOMAIN=${AUTH0_DOMAIN:-auth0.allenai.org}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://asta-core.allen.ai}
       # Served to the UI via /api/auth/config so the SPA client can be built at runtime.

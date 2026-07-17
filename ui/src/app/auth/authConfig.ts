@@ -16,7 +16,7 @@ export interface AuthConfig {
 // Build-time fallbacks (used if the config endpoint is unreachable). Keeps the
 // app working in the historical Auth0 setup even without the new endpoint.
 export const fallbackAuthConfig: AuthConfig = {
-    provider: (process.env.NEXT_PUBLIC_AUTH_PROVIDER as AuthProviderKind) || 'auth0',
+    provider: (process.env.NEXT_PUBLIC_AUTH_PROVIDER as AuthProviderKind) || 'none',
     domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || 'auth0.allenai.org',
     clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || '6EQ7FtDfVFMdGCWa8SMnGGX3W7p6XVNa',
     audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://asta-core.allen.ai',

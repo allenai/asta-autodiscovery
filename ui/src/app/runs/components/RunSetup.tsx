@@ -327,6 +327,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         hypothesis space, but can consider your areas of interest during generation.
                     </HelperText>
                     <TextField
+                        multiline
+                        rows={3}
                         value={settings.intent}
                         onChange={(e) => {
                             updateSettings('intent', e.target.value);

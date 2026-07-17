@@ -1,5 +1,11 @@
 // Header
 export const TEST_ID_SIGN_IN_BUTTON = 'sign-in-button';
+
+// Login dialog (password_file provider)
+export const TEST_ID_LOGIN_USERNAME = 'login-username';
+export const TEST_ID_LOGIN_PASSWORD = 'login-password';
+export const TEST_ID_LOGIN_SUBMIT = 'login-submit';
+export const TEST_ID_LOGIN_ERROR = 'login-error';
 export const TEST_ID_FEEDBACK_BUTTON = 'feedback-button';
 export const TEST_ID_ABOUT_BUTTON = 'about-button';
 export const TEST_ID_CREDITS_CHIP = 'credits-chip';

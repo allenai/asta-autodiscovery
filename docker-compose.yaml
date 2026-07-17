@@ -24,13 +24,33 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # The host's AUTH_PASSWORD_DIR is mounted as a directory (so the store's fixed
+      # passwddb.json is re-read live even across atomic replaces). The API reads it at
+      # the static dir below. Defaults to /tmp when unset (auth0/none) so `docker compose
+      # up` still works — the store is only read when AUTH_PROVIDER=password_file.
+      - type: bind
+        source: ${AUTH_PASSWORD_DIR:-/tmp}
+        target: /secrets/auth
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      # Active auth provider: none (default — zero-config, unauthenticated local user)
+      # | auth0 | password_file. Set explicitly for any real/multi-user deployment.
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-none}
       - AUTH0_DOMAIN=${AUTH0_DOMAIN:-auth0.allenai.org}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://asta-core.allen.ai}
+      # Served to the UI via /api/auth/config so the SPA client can be built at runtime.
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      # password_file provider: static in-container store dir (the host dir is
+      # bind-mounted here above) + HS256 session signing secret.
+      - AUTH_PASSWORD_DIR=/secrets/auth
+      - AUTH_SESSION_SECRET=${AUTH_SESSION_SECRET}
+      - AUTH_SESSION_TTL=${AUTH_SESSION_TTL}
       # GCS and Google Cloud credentials
       - GCS_BUCKET=${GCS_BUCKET}
       - GCP_PROJECT=${GCP_PROJECT}

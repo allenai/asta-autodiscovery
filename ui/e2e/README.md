@@ -63,6 +63,20 @@ cd ui
 E2E_BASE_URL=https://your-custom-host.example.com yarn test:e2e
 ```
 
+## Public subset (`@public`)
+
+Tests that require **no third-party credentials** (no Auth0/GCP/Modal) are tagged
+`@public`. This is the subset safe to run in the public repo / on PRs. Run just that set:
+
+```bash
+# Start the stack under the auth backend you want to exercise, then:
+AUTH_PROVIDER=password_file docker compose up --build   # or AUTH_PROVIDER=none
+E2E_AUTH_PROVIDER=password_file yarn test:e2e:public     # matches the running stack
+```
+
+The full suite (all tags), including the credentialed integration tests, runs on internal
+infra (triggered from the private repo) against real dependencies.
+
 ## Test Suites
 
 ### 1. Public Sample Test (`public-sample.spec.ts`)
@@ -71,7 +85,23 @@ Tests that the public shared sample run at `/shared/samples/nls_bmi` loads corre
 
 **No environment variables required.**
 
-### 2. Authenticated Flow Test (`authenticated-flow.spec.ts`)
+### 2. Auth Provider Tests (`auth-providers.spec.ts`) — `@public`
+
+Exercises the login UX of the swappable auth backends without any third-party
+credentials. Select the backend with `E2E_AUTH_PROVIDER` (must match how the stack was
+started):
+
+- `password_file`: opens the login form, shows an inline error on a wrong password
+  (and asserts the global "Access Denied" dialog is *not* triggered), and — with a seeded
+  user — signs in and out.
+- `none`: asserts there is no sign-in affordance and the app is already authenticated.
+
+**Environment variables:**
+- `E2E_AUTH_PROVIDER`: `password_file` | `none` (non-matching blocks skip)
+- `E2E_TEST_USER` / `E2E_TEST_PASSWORD`: only for the `password_file` happy-path sign-in.
+  Seed the user first: `uv run api/scripts/auth_admin.py useradd "$E2E_TEST_USER" --password "$E2E_TEST_PASSWORD"`. These are ephemeral test creds, not secrets.
+
+### 3. Authenticated Flow Test (`authenticated-flow.spec.ts`)
 
 Tests the complete user workflow including:
 - Login with Auth0

@@ -1,6 +1,7 @@
 import logging
 import os
 
+from auth import auth_api
 from flask import Flask
 from metrics import metrics_api
 from root import root_api
@@ -22,6 +23,7 @@ def create_app() -> ProxyFix:
     app = Flask("api")
     userid_logging.instrument(app, logging.root)
     app.register_blueprint(root_api.create(), url_prefix="/")
+    app.register_blueprint(auth_api.create(), url_prefix="/api/auth")
     app.register_blueprint(user_api.create(), url_prefix="/api/user")
     app.register_blueprint(runs_api.create(), url_prefix="/api/runs")
     app.register_blueprint(metrics_api.create(), url_prefix="/api/metrics")

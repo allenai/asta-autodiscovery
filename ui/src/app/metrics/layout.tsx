@@ -1,58 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Tab, Tabs, Typography, styled } from '@mui/material';
 import { useRouter, usePathname } from 'next/navigation';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import AuthButton from '@/components/AuthButton';
-import { auth0Client } from '@/auth/Auth0Client';
 import { scrollbarStyles } from '@/utils/scrollbar';
 
 const ADMIN_PERMISSION = 'enroll:autodiscovery_admin';
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-    const parts = token.split('.');
-    const payloadPart = parts[1];
-    if (!payloadPart) {
-        return null;
-    }
-
-    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
-    const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
-    return JSON.parse(atob(`${normalized}${padding}`)) as Record<string, unknown>;
-}
-
 export default function MetricsLayout({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading } = useAuth0();
+    const { isAuthenticated, isLoading, hasPermission } = useAuth0();
     const router = useRouter();
     const pathname = usePathname();
-    const [hasAdminPermission, setHasAdminPermission] = useState<boolean | null>(null);
+    const hasAdminPermission = isAuthenticated && hasPermission(ADMIN_PERMISSION);
 
-    useEffect(() => {
-        const checkAdminPermission = async () => {
-            if (!isAuthenticated || !auth0Client) {
-                setHasAdminPermission(false);
-                return;
-            }
-            try {
-                const token = await auth0Client.getTokenSilently();
-                const payload = decodeJwtPayload(token);
-                const permissions = Array.isArray(payload?.permissions)
-                    ? (payload.permissions as string[])
-                    : [];
-                setHasAdminPermission(permissions.includes(ADMIN_PERMISSION));
-            } catch {
-                setHasAdminPermission(false);
-            }
-        };
-
-        if (!isLoading) {
-            checkAdminPermission();
-        }
-    }, [isAuthenticated, isLoading]);
-
-    if (isLoading || hasAdminPermission === null) {
+    if (isLoading) {
         return (
             <CenteredBox>
                 <CircularProgress />

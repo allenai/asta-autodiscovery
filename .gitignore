@@ -34,3 +34,6 @@ UI_DESIGN_GUIDE.md
 # macOS
 .DS_Store
 **/.DS_Store
+
+# mkdocs build output
+/site/

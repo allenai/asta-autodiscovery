@@ -1,4 +1,4 @@
-import { auth0Client } from '@/auth/Auth0Client';
+import { authBridge } from '@/auth/authBridge';
 
 const DEFAULT_HEADERS = {
     'Content-Type': 'application/json',
@@ -6,17 +6,12 @@ const DEFAULT_HEADERS = {
 
 export class BaseApi {
     /**
-     * Get the current authenticated user's ID from Auth0.
+     * Get the current authenticated user's ID from the active auth provider.
      * Returns null if not authenticated or if user data is not available.
      */
     protected getUserId = async (): Promise<string | null> => {
-        if (!auth0Client) {
-            return null;
-        }
-
         try {
-            const user = await auth0Client.getUser();
-            return user?.sub ?? null;
+            return await authBridge.getUserId();
         } catch (error) {
             console.error('Error getting user ID:', error);
             return null;
@@ -27,22 +22,11 @@ export class BaseApi {
         'Content-Type': string;
         Authorization?: string;
     }> => {
-        if (!auth0Client) {
-            return DEFAULT_HEADERS;
-        }
-
-        const client = auth0Client;
-
-        // No cached user profile means the visitor never logged in — skip token fetch
-        // entirely so public pages work without auth.
-        const user = await client.getUser();
-        if (!user) {
-            return DEFAULT_HEADERS;
-        }
-
-        const token = await client.getTokenSilently().catch((error: unknown) => {
-            console.error('Error getting token silently: ', error);
-            return undefined;
+        // No token means anonymous (public pages) or the "none" desktop provider —
+        // send no Authorization header and let the backend decide.
+        const token = await authBridge.getToken().catch((error: unknown) => {
+            console.error('Error getting access token: ', error);
+            return null;
         });
 
         return {
@@ -106,17 +90,12 @@ export class BaseApi {
 
         const resp = await fetch(url, init);
 
-        // A 401 means the server rejected our credentials. If the user has a cached
-        // profile they were previously authenticated — redirect through login to renew
-        // their session. Anonymous visitors browsing public pages never get a 401 from
-        // the API, so they are unaffected.
-        if (resp.status === 401 && auth0Client) {
-            const user = await auth0Client.getUser();
-            if (user) {
-                auth0Client.loginWithRedirect({
-                    appState: { returnTo: window.location.pathname + window.location.search },
-                });
-            }
+        // A 401 means the server rejected our credentials. Let the active provider
+        // decide how to recover (Auth0 re-login redirect, clear stored session, etc.).
+        // Anonymous visitors browsing public pages never get a 401, so they are
+        // unaffected.
+        if (resp.status === 401) {
+            authBridge.onUnauthorized();
         }
 
         if (!resp.ok) {

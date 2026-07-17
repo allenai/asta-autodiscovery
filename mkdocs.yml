@@ -36,6 +36,7 @@ plugins:
 nav:
   - Home: index.md
   - Configuration: configuration.md
+  - Authentication: authentication.md
   - Autodiscovery:
       - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:
@@ -46,6 +47,8 @@ nav:
   - API Reference:
       - AutoDiscovery Modal: api/autodiscovery_modal.md
       - Code Execution: api/code_execution.md
+  - Design:
+      - Swappable Auth Providers: design/auth-providers.md
 
 markdown_extensions:
   - pymdownx.highlight:

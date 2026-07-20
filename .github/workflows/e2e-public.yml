@@ -26,15 +26,14 @@ jobs:
       GCS_BUCKET: ""
       GCP_PROJECT: ""
       GOOGLE_APPLICATION_CREDENTIALS: /dev/null
-      # password_file config (ignored by the none provider). Ephemeral test values,
-      # not secrets.
+      # password_file store dir (ignored by the none provider). The session secret
+      # and test password are generated per-run (see the step below) rather than
+      # hard-coded, so no secret-shaped literals live in the repo.
       AUTH_PASSWORD_DIR: ./secrets
-      AUTH_SESSION_SECRET: ci-e2e-session-secret-not-a-real-secret-0123456789
       # Test hooks read by the specs.
       E2E_AUTH_PROVIDER: ${{ matrix.provider }}
       E2E_BASE_URL: http://localhost:8080
       E2E_TEST_USER: e2e
-      E2E_TEST_PASSWORD: e2e-pass-123
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,6 +47,13 @@ jobs:
           : > .env
           # Mount source for AUTH_PASSWORD_DIR must exist for both providers.
           mkdir -p secrets
+
+      - name: Generate ephemeral test credentials
+        run: |
+          # Per-run values so nothing secret-shaped is committed. Used by the
+          # password_file session signing + the seeded test user.
+          echo "AUTH_SESSION_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "E2E_TEST_PASSWORD=$(openssl rand -hex 12)" >> "$GITHUB_ENV"
 
       - name: Set up Python (seed helper)
         if: matrix.provider == 'password_file'

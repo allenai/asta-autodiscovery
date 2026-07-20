@@ -62,13 +62,35 @@ Job data, run metadata, results, and user profiles are stored in Google Cloud St
 | `GOOGLE_ACCESS_KEY_SECRET` | No | *(none)* | HMAC secret paired with `GOOGLE_ACCESS_KEY_ID`. |
 | `GCS_ENDPOINT_URL` | No | `https://storage.googleapis.com` | Storage endpoint the Modal sandbox uses to read dataset files. Override to point at an alternative/compatible endpoint. |
 
-## Job execution (Cloud Run)
+## Job execution
 
-AutoDiscovery runs are executed as Google Cloud Run job executions.
+Each AutoDiscovery run is launched by a swappable **job backend**, selected with `JOB_BACKEND`:
+
+- `gcp` (default) — runs the job as a Google Cloud Run job execution.
+- `docker` — runs the job as a local Docker container on the host daemon. Intended for local
+  development and single-user/on-prem deployments.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+| `JOB_BACKEND` | No | `gcp` | Job backend: `gcp` (Cloud Run) or `docker` (local containers). |
+| `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | **gcp backend.** Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+| `AUTODISCOVERY_IMAGE` | docker | `autodiscovery:dev` | **docker backend.** Image the backend launches per job. Build it locally with `docker compose build autodiscovery`. |
+| `GCP_KEY_HOST_PATH` | docker | *(none)* | **docker backend.** Absolute *host* path to the GCP key file, bind-mounted into each job container. Required because the API runs docker-out-of-docker, so the bind source must be a host path rather than the API container's `/secrets` path. Point it at the same key file as `GOOGLE_APPLICATION_CREDENTIALS`. |
+
+### Enabling the docker backend (local)
+
+The docker backend needs the API container to reach the host Docker daemon. That access is **not**
+granted by the default stack — apply the opt-in overlay, which mounts the Docker socket and sets
+`JOB_BACKEND=docker` together:
+
+```sh
+docker compose build autodiscovery
+docker compose -f docker-compose.yaml -f docker-compose.docker-backend.yaml up
+```
+
+The job container mounts the GCS bucket at `/mnt/gcs` itself via gcsfuse (triggered by
+`GCSFUSE_BUCKET`, which the backend sets from `GCS_BUCKET`); on Cloud Run the platform provides
+that mount instead.
 
 ## Modal (code-execution sandbox)
 

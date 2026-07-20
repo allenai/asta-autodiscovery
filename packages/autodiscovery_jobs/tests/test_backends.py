@@ -23,6 +23,11 @@ def test_get_backend_docker():
     assert isinstance(get_backend(config), DockerBackend)
 
 
+def test_get_backend_default_is_docker():
+    # backend unset -> the JobConfig default (docker) is used.
+    assert isinstance(get_backend(JobConfig(bucket="test-bucket")), DockerBackend)
+
+
 def test_get_backend_case_insensitive():
     config = JobConfig(backend="Docker", bucket="b", job_image="ad:dev")
     assert isinstance(get_backend(config), DockerBackend)

@@ -8,12 +8,17 @@ from autodiscovery_jobs.config import JobConfig
 
 @pytest.fixture
 def mock_config():
-    """Create a test configuration."""
+    """Create a test configuration.
+
+    Pins the Cloud Run backend explicitly; the JobConfig default is ``docker``,
+    but most fixtures here exercise the GCP/Cloud Run path.
+    """
     return JobConfig(
         bucket="test-bucket",
         project_id="test-project",
         region="us-west1",
         job_name="test-job",
+        backend="gcp",
     )
 
 

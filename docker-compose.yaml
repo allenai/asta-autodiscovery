@@ -34,6 +34,10 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # The default job backend is docker, so the API launches job containers on
+      # the host daemon (docker-out-of-docker). Set JOB_BACKEND=gcp to run jobs on
+      # Cloud Run instead; this socket mount is then unused.
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
@@ -59,9 +63,9 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
       # Cloud Run job name for local dev (use -dev suffix)
       - CLOUDRUN_JOB_NAME=${CLOUDRUN_JOB_NAME:-autodiscovery-job-dev}
-      # Job backend selection. Override via .env/shell to switch the same local
-      # stack between launching jobs on GCP Cloud Run or as local containers.
-      - JOB_BACKEND=${JOB_BACKEND:-gcp}
+      # Job backend selection. Defaults to docker (local containers); set
+      # JOB_BACKEND=gcp in .env to launch jobs on Cloud Run instead.
+      - JOB_BACKEND=${JOB_BACKEND:-docker}
       # Image the docker backend launches per job (built via `docker compose build autodiscovery`).
       - AUTODISCOVERY_IMAGE=${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
       # docker backend: absolute host path of the GCP key, bind-mounted into each job container.

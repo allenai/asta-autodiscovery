@@ -23,8 +23,10 @@ class JobConfig:
     region: str = "us-west1"
     job_name: str = "autodiscovery-job"
 
-    # Job backend selection: "gcp" (Cloud Run, default) or "docker" (local containers)
-    backend: str = "gcp"
+    # Job backend selection: "docker" (local containers, default) or "gcp" (Cloud Run).
+    # Docker is the default to keep the out-of-the-box experience infra-agnostic;
+    # deployments that run jobs on Cloud Run must set JOB_BACKEND=gcp explicitly.
+    backend: str = "docker"
     # AD job image reference used by the Docker backend (ignored for gcp)
     job_image: str | None = None
 

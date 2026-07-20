@@ -1,0 +1,26 @@
+# Opt-in overlay for running AutoDiscovery jobs as local Docker containers.
+#
+# The base docker-compose.yaml keeps the API isolated from the host Docker
+# daemon. This overlay grants the API access to the host daemon (so it can
+# launch job containers) and selects the docker job backend. Apply it
+# explicitly — it is NOT loaded by a bare `docker compose up`:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.docker-backend.yaml up
+#
+# First build the job image once (the base file defines the build-only
+# `autodiscovery` service):
+#
+#   docker compose build autodiscovery
+#
+# See .env for JOB_BACKEND / AUTODISCOVERY_IMAGE / GCP_KEY_HOST_PATH.
+services:
+  api:
+    environment:
+      # This overlay is the single opt-in: selecting it launches jobs as
+      # local containers regardless of the base default.
+      - JOB_BACKEND=docker
+    volumes:
+      # Lets the API launch AutoDiscovery job containers on the host daemon
+      # (docker-out-of-docker). Only present under this overlay, so the default
+      # stack never exposes the host Docker socket to the API.
+      - /var/run/docker.sock:/var/run/docker.sock

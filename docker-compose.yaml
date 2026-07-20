@@ -34,9 +34,6 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      # Lets the API launch AutoDiscovery job containers on the host daemon when
-      # JOB_BACKEND=docker (docker-out-of-docker).
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.

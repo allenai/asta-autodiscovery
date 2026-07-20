@@ -597,7 +597,6 @@ def create() -> Blueprint:
 
             # Check if user has permission for access in the UI
             has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
-            has_asta_integration = PermissionType.ASTA_INTEGRATION.value in permissions
 
             # Compute dataset expiry
             dataset_expires_at = _compute_dataset_expires_at(run_details)
@@ -615,7 +614,7 @@ def create() -> Blueprint:
                 execution_status={},
                 max_file_size=max_file_size,
                 can_view_datasets=has_ai1_datasets,
-                can_explore_with_asta=has_asta_integration,
+                can_explore_with_asta=True,  # Enabled for all users (no longer permission-gated)
                 parent_run_id=(
                     run_metadata_model.parent_run_id if run_metadata_model else None
                 ),

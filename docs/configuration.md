@@ -57,7 +57,7 @@ Job data, run metadata, results, and user profiles are stored in Google Cloud St
 | `GCP_PROJECT` | Yes | *(none)* | Google Cloud project id. Required for GCS and job execution. |
 | `GCS_BUCKET` | No | `autodiscovery` | Name of the bucket holding run data/results/metadata. `AUTODISCOVERY_BUCKET` is accepted as an alias if `GCS_BUCKET` is unset. |
 | `GCP_REGION` | No | `us-west1` | Region used for job execution. |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | *(none)* | Path to the Google service-account key file used by the Google client libraries. In local dev this is bind-mounted into the container. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | *(none)* | Path to the Google service-account key file used by the Google client libraries. In local dev this is bind-mounted into the container. Use an **absolute** path when running the docker job backend (the default): the backend re-mounts this file into each job container and the host daemon needs an absolute bind source. |
 | `GOOGLE_ACCESS_KEY_ID` | No | *(none)* | HMAC access key id, used when generating presigned URLs for direct browser uploads to GCS. |
 | `GOOGLE_ACCESS_KEY_SECRET` | No | *(none)* | HMAC secret paired with `GOOGLE_ACCESS_KEY_ID`. |
 | `GCS_ENDPOINT_URL` | No | `https://storage.googleapis.com` | Storage endpoint the Modal sandbox uses to read dataset files. Override to point at an alternative/compatible endpoint. |
@@ -76,8 +76,11 @@ Each AutoDiscovery run is launched by a swappable **job backend**, selected with
 | --- | --- | --- | --- |
 | `JOB_BACKEND` | No | `docker` | Job backend: `docker` (local containers) or `gcp` (Cloud Run). |
 | `AUTODISCOVERY_IMAGE` | docker | `autodiscovery:dev` | **docker backend.** Image the backend launches per job. Build it locally with `docker compose build autodiscovery`. |
-| `GCP_KEY_HOST_PATH` | docker | *(none)* | **docker backend.** Absolute *host* path to the GCP key file, bind-mounted into each job container. Required because the API runs docker-out-of-docker, so the bind source must be a host path rather than the API container's `/secrets` path. Point it at the same key file as `GOOGLE_APPLICATION_CREDENTIALS`. |
 | `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | **gcp backend.** Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+
+The docker backend bind-mounts the GCP key into each job container using the **host** path of
+`GOOGLE_APPLICATION_CREDENTIALS` (compose forwards it internally as `GCP_KEY_HOST_PATH`), which is
+why that variable must be an absolute path for the docker backend.
 
 ### Docker backend (default)
 

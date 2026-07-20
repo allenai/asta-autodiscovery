@@ -68,8 +68,11 @@ services:
       - JOB_BACKEND=${JOB_BACKEND:-docker}
       # Image the docker backend launches per job (built via `docker compose build autodiscovery`).
       - AUTODISCOVERY_IMAGE=${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
-      # docker backend: absolute host path of the GCP key, bind-mounted into each job container.
-      - GCP_KEY_HOST_PATH=${GCP_KEY_HOST_PATH:-}
+      # Host path of the GCP key, derived from GOOGLE_APPLICATION_CREDENTIALS so the
+      # docker backend can bind-mount it into each job container (the in-container
+      # GOOGLE_APPLICATION_CREDENTIALS above is a container path, unusable as a host
+      # bind source). Requires GOOGLE_APPLICATION_CREDENTIALS to be an absolute path.
+      - GCP_KEY_HOST_PATH=${GOOGLE_APPLICATION_CREDENTIALS}
       # Asta context service (artifact storage + metadata)
       - ASTA_CONTEXT_SERVICE_URL=${ASTA_CONTEXT_SERVICE_URL}
       - ASTA_CONTEXT_SERVICE_API_KEY=${ASTA_CONTEXT_SERVICE_API_KEY}

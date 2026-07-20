@@ -6,15 +6,17 @@ WORKDIR /app
 
 # Install system dependencies. gcsfuse + fuse let the container self-mount the
 # GCS bucket at /mnt/gcs when run under the local Docker job backend (on Cloud
-# Run the platform provides that mount instead). Images are built for
-# linux/amd64 (see Makefile), so the amd64 gcsfuse release is used.
+# Run the platform provides that mount instead). The gcsfuse release is selected
+# for the build's target architecture so the image builds natively on both
+# amd64 (Cloud Run) and arm64 (e.g. Apple Silicon local dev).
 ARG GCSFUSE_VERSION=2.4.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     fuse3 \
+    && ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL -o /tmp/gcsfuse.deb \
-        "https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VERSION}/gcsfuse_${GCSFUSE_VERSION}_amd64.deb" \
+        "https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VERSION}/gcsfuse_${GCSFUSE_VERSION}_${ARCH}.deb" \
     && apt-get install -y /tmp/gcsfuse.deb \
     && rm -f /tmp/gcsfuse.deb \
     && rm -rf /var/lib/apt/lists/*

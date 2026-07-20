@@ -96,6 +96,11 @@ that mount instead.
 
 To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then unused).
 
+> **Security note.** The docker backend gives the API access to the host Docker socket, which is
+> effectively root on the host. This is fine for local/single-user use, but for a shared,
+> multi-user deployment (e.g. `AUTH_PROVIDER=password_file`) prefer `JOB_BACKEND=gcp`, where the
+> API only holds scoped cloud credentials. The job's data view is identical either way.
+
 ## Modal (code-execution sandbox)
 
 AutoDiscovery runs execute generated code inside Modal sandboxes.

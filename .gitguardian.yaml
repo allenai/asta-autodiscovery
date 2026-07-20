@@ -7,8 +7,6 @@ version: 2
 
 secret:
   ignored-matches:
-    - name: Public Auth0 SPA client id (NEXT_PUBLIC_*, safe to ship in the browser)
-      match: 6EQ7FtDfVFMdGCWa8SMnGGX3W7p6XVNa
     - name: e2e password_file session secret (throwaway CI value in e2e-public.yml)
       match: ci-e2e-session-secret-not-a-real-secret-0123456789
     - name: e2e test-user password (throwaway CI value in e2e-public.yml)

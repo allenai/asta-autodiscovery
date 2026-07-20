@@ -1,0 +1,101 @@
+name: E2E (public)
+
+# Runs the credential-free @public Playwright subset against a locally-composed,
+# bucket-less stack — one leg per auth provider. Uses no secrets, so it is safe on
+# PRs (including forks). The credentialed integration suite runs on internal infra.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  e2e-public:
+    name: E2E @public (${{ matrix.provider }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [none, password_file]
+    env:
+      # Mirror the public environment: no GCS bucket/credentials. GOOGLE_APPLICATION_
+      # CREDENTIALS points at /dev/null so the (unconditional) compose mount has a
+      # source that exists; GCS is never exercised by the @public tests.
+      AUTH_PROVIDER: ${{ matrix.provider }}
+      GCS_BUCKET: ""
+      GCP_PROJECT: ""
+      GOOGLE_APPLICATION_CREDENTIALS: /dev/null
+      # password_file config (ignored by the none provider). Ephemeral test values,
+      # not secrets.
+      AUTH_PASSWORD_DIR: ./secrets
+      AUTH_SESSION_SECRET: ci-e2e-session-secret-not-a-real-secret-0123456789
+      # Test hooks read by the specs.
+      E2E_AUTH_PROVIDER: ${{ matrix.provider }}
+      E2E_BASE_URL: http://localhost:8080
+      E2E_TEST_USER: e2e
+      E2E_TEST_PASSWORD: e2e-pass-123
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare env
+        run: |
+          # docker-compose lists `.env` as an env_file; the checked-in symlink is
+          # dangling in CI, so replace it with an empty file. All config the stack
+          # needs comes from the compose `environment:` block + this job's env.
+          rm -f .env
+          : > .env
+          # Mount source for AUTH_PASSWORD_DIR must exist for both providers.
+          mkdir -p secrets
+
+      - name: Set up Python (seed helper)
+        if: matrix.provider == 'password_file'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Seed a test user (password_file)
+        if: matrix.provider == 'password_file'
+        run: |
+          pip install bcrypt
+          python api/scripts/auth_admin.py --dir ./secrets \
+            useradd "$E2E_TEST_USER" --email e2e@example.org --password "$E2E_TEST_PASSWORD"
+
+      - name: Start stack (bucket-less)
+        run: docker compose up -d --build proxy
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: ui/yarn.lock
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: yarn install --frozen-lockfile
+
+      - name: Install Playwright (chromium)
+        working-directory: ui
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run @public e2e
+        working-directory: ui
+        run: yarn test:e2e:public
+
+      - name: API logs on failure
+        if: failure()
+        run: docker compose logs api | tail -300
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.provider }}
+          path: ui/playwright-report
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

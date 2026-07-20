@@ -43,7 +43,6 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ASTA_PERMISSION = 'enroll:asta_integration';
 const SESSION_STORAGE_KEY = 'ad_session_token';
 
 // ---------------------------------------------------------------------------
@@ -392,7 +391,9 @@ function useAuthValue(
             loginWithRedirect,
             logout,
             getAccessToken,
-            canExploreWithAsta: hasPermission(ASTA_PERMISSION),
+            // "Explore in Asta" is enabled for all users (no longer gated on
+            // the enroll:asta_integration permission).
+            canExploreWithAsta: true,
             authError,
             provider,
         };

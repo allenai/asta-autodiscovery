@@ -17,7 +17,8 @@ export const UserMenuFooter = () => {
     const { user, logout } = useAuth0();
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
-    const displayName = user?.name || user?.email || 'User';
+    const emailLocal = user?.email?.split('@')[0];
+    const displayName = user?.nickname || emailLocal || user?.name || 'User';
     const avatarLetter = displayName.charAt(0).toUpperCase() || 'U';
 
     return (

@@ -18,7 +18,7 @@ export const UserMenuFooter = () => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
     const emailLocal = user?.email?.split('@')[0];
-    const displayName = user?.nickname || emailLocal || user?.name || 'User';
+    const displayName = emailLocal || user?.name || 'User';
     const avatarLetter = displayName.charAt(0).toUpperCase() || 'U';
 
     return (

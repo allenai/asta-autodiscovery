@@ -867,8 +867,14 @@ def install(package):
     if backend in ("modal", "process"):
         # For sandbox-style backends, use simple transform without image analysis patch
         # (the executor handles image analysis internally)
-        # Pass the working_dir so code can change to that directory
-        sandbox_working_dir = modal_working_dir if backend == "modal" else work_dir
+        # Pass the working_dir so code can change to that directory. Use an
+        # absolute path for the process backend: its subprocess already runs with
+        # cwd=work_dir, so a relative os.chdir(work_dir) injected by the transform
+        # would stack (work_dir/work_dir) and fail. modal uses the absolute mount
+        # path (/data), which is already idempotent.
+        sandbox_working_dir = (
+            modal_working_dir if backend == "modal" else os.path.abspath(work_dir)
+        )
         transform_messages_capability = transform_messages.TransformMessages(
             transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
         )

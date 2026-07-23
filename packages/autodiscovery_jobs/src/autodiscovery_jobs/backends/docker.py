@@ -88,6 +88,12 @@ class DockerBackend(JobBackend):
         }
         environment["GCSFUSE_BUCKET"] = self.config.bucket
         environment["GOOGLE_APPLICATION_CREDENTIALS"] = _CONTAINER_GCP_KEY_PATH
+        # Scope the gcsfuse mount to this job's own prefix (mounted at the same
+        # deep path build_job_args expects, so the args are unchanged) rather than
+        # the whole bucket. This keeps other users' data out of the container even
+        # when code runs in-process (CODE_EXECUTION_BACKEND=process/local). Unlike
+        # Cloud Run's fixed job-level mount, the Docker backend can scope per run.
+        environment["GCSFUSE_ONLY_DIR"] = f"users/{userid}/jobs/{jobid}"
 
         # Bind-mount the GCP credentials file so gcsfuse (and google-cloud
         # clients) can authenticate. In docker-out-of-docker the bind source

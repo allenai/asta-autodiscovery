@@ -45,15 +45,38 @@ def test_get_backend_unknown():
 
 
 def test_build_job_args_required(mock_config):
+    # mock_config leaves code_execution_backend at its default ("process").
     args = build_job_args("testuser", "job1", mock_config, n_experiments=4, model="gpt-4o")
 
     assert "--dataset_metadata=/mnt/gcs/users/testuser/jobs/job1/metadata.json" in args
     assert "--out_dir=/mnt/gcs/users/testuser/jobs/job1/output" in args
-    assert "--bucket_path=gs://test-bucket/users/testuser/jobs/job1/data" in args
     assert "--n_experiments=4" in args
-    assert "--use_modal_sandbox" in args
+    assert "--backend=process" in args
     assert "--no-timestamp_dir" in args
     assert "--model=gpt-4o" in args
+    # bucket_path / modal flag are modal-only
+    assert not any(a.startswith("--bucket_path=") for a in args)
+
+
+@pytest.mark.parametrize(
+    "code_backend,expects_bucket_path",
+    [("process", False), ("local", False), ("modal", True)],
+)
+def test_build_job_args_code_execution_backend(code_backend, expects_bucket_path):
+    config = JobConfig(bucket="test-bucket", code_execution_backend=code_backend)
+    args = build_job_args("u", "j", config, n_experiments=1)
+
+    assert f"--backend={code_backend}" in args
+    has_bucket_path = any(a.startswith("--bucket_path=") for a in args)
+    assert has_bucket_path is expects_bucket_path
+    if expects_bucket_path:
+        assert "--bucket_path=gs://test-bucket/users/u/jobs/j/data" in args
+
+
+def test_build_job_args_rejects_unknown_code_backend():
+    config = JobConfig(bucket="b", code_execution_backend="wasm")
+    with pytest.raises(JobBackendError):
+        build_job_args("u", "j", config, n_experiments=1)
 
 
 def test_build_job_args_requires_n_experiments(mock_config):
@@ -102,6 +125,8 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     assert "--model=gpt-4o" in kwargs["command"]
     # gcsfuse trigger + credentials forwarded
     assert kwargs["environment"]["GCSFUSE_BUCKET"] == "test-bucket"
+    # mount is scoped to this job's own prefix (keeps other users' data out)
+    assert kwargs["environment"]["GCSFUSE_ONLY_DIR"] == "users/testuser/jobs/job1"
     assert kwargs["environment"]["OPENAI_API_KEY"] == "sk-test"
     assert kwargs["environment"]["MODAL_TOKEN_ID"] == "tok"
     assert kwargs["environment"]["GOOGLE_APPLICATION_CREDENTIALS"] == "/secrets/gcp-key.json"

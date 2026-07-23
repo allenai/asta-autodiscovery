@@ -68,6 +68,10 @@ services:
       - JOB_BACKEND=${JOB_BACKEND:-docker}
       # Image the docker backend launches per job (built via `docker compose build autodiscovery`).
       - AUTODISCOVERY_IMAGE=${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
+      # Code-execution backend for the AD job's generated code: process (default,
+      # isolated subprocess, no cloud dep) | local (in-process) | modal (remote
+      # scoped sandbox). See docs/configuration.md for the safe-combination matrix.
+      - CODE_EXECUTION_BACKEND=${CODE_EXECUTION_BACKEND:-process}
       # Host path of the GCP key, derived from GOOGLE_APPLICATION_CREDENTIALS so the
       # docker backend can bind-mount it into each job container (the in-container
       # GOOGLE_APPLICATION_CREDENTIALS above is a container path, unusable as a host

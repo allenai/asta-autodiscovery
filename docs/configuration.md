@@ -93,29 +93,70 @@ docker compose build autodiscovery
 docker compose up
 ```
 
-The job container mounts the GCS bucket at `/mnt/gcs` itself via gcsfuse (triggered by
+The job container mounts its GCS data at `/mnt/gcs` itself via gcsfuse (triggered by
 `GCSFUSE_BUCKET`, which the backend sets from `GCS_BUCKET`); on Cloud Run the platform provides
-that mount instead.
+that mount instead. The docker backend scopes the mount to the run's own prefix
+(`users/<uid>/jobs/<jid>`), so a job container never sees other users' data — see
+[Code-execution backend](#code-execution-backend) for why that matters.
 
 To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then unused).
 
 > **Security note.** The docker backend gives the API access to the host Docker socket, which is
 > effectively root on the host. This is fine for local/single-user use, but for a shared,
 > multi-user deployment (e.g. `AUTH_PROVIDER=password_file`) prefer `JOB_BACKEND=gcp`, where the
-> API only holds scoped cloud credentials. The job's data view is identical either way.
+> API only holds scoped cloud credentials.
 
-## Modal (code-execution sandbox)
+## Code-execution backend
 
-AutoDiscovery runs execute generated code inside Modal sandboxes.
+The AD job runs the LLM-generated experiment code through a configurable executor, selected with
+`CODE_EXECUTION_BACKEND` and forwarded to the job's `--backend` flag:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `MODAL_TOKEN_ID` | Yes | *(none)* | Modal API token id. |
-| `MODAL_TOKEN_SECRET` | Yes | *(none)* | Modal API token secret. |
-| `MODAL_ENVIRONMENT` | Yes | *(none)* | Modal environment name to run sandboxes in. |
+| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (in-process, no isolation), or `modal` (remote sandbox). |
+
+- `process` (default) — runs code in an isolated subprocess inside the job container, in a separate
+  sandbox venv; per-cell package installs are discarded, and no state carries across cells. No cloud
+  dependency (Modal is not required). Reads the dataset from the job's `/mnt/gcs` mount.
+- `local` — runs code in-process with no isolation. Lowest overhead, least safe.
+- `modal` — runs code in a remote Modal sandbox that mounts **only** the per-job data prefix,
+  read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables.
+
+### Choosing a safe combination
+
+`process`/`local` execute untrusted, generated code **inside the job container**, so that code can
+read whatever GCS data the container mounts. `modal` instead runs it on a separate machine with only
+the per-job data mounted read-only. Whether in-process execution is safe therefore depends on the
+job backend (how the mount is scoped) and on whether the deployment is multi-user:
+
+| Job backend | Code backend | Single user (`AUTH_PROVIDER=none`) | Multi-user (`auth0` / `password_file`) |
+| --- | --- | --- | --- |
+| `docker` | `process` / `local` | ✅ safe | ✅ safe — mount is scoped to the job's own prefix |
+| `gcp` | `process` / `local` | ✅ safe | ⚠️ **unsafe** — Cloud Run mounts the whole bucket; executed code can read every user's data |
+| `docker` / `gcp` | `modal` | ✅ safe | ✅ safe — scoped, read-only per-job data mount |
+
+The unsafe combination arises because Cloud Run's GCS mount is fixed per job (it cannot be scoped
+per execution), while the docker backend re-mounts only the current job's prefix each run. The API
+logs a loud warning at startup for the unsafe combination; set `CODE_EXECUTION_BACKEND=modal` for
+multi-user Cloud Run deployments.
+
+> Within a single job, `process`/`local` mount the job's own data read-write (the run also writes its
+> output there), so generated code could overwrite that job's own inputs. This is within-tenant only;
+> `modal` mounts the data read-only.
+
+## Modal (code-execution sandbox backend)
+
+Used only when `CODE_EXECUTION_BACKEND=modal`. With the default `process` (or `local`) backend the
+`MODAL_*` variables are unused.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `MODAL_TOKEN_ID` | modal | *(none)* | Modal API token id. |
+| `MODAL_TOKEN_SECRET` | modal | *(none)* | Modal API token secret. |
+| `MODAL_ENVIRONMENT` | modal | *(none)* | Modal environment name to run sandboxes in. |
 | `MODAL_IMAGE_BUILDER_VERSION` | No | *(Modal default)* | Pins the Modal image builder version used to build sandbox images. |
 | `MODAL_APP_NAME` | No | `asta-autodiscovery` | Modal app name the sandboxes are associated with. Created on demand if it doesn't exist. |
-| `MODAL_BUCKET_SECRET` | Yes | `example-bucket-secret` | Name of the Modal [secret](https://modal.com/docs/guide/secrets) holding the GCS credentials the sandbox uses to mount dataset files. The default is a **placeholder that does not exist** — you must set this to the name of a real secret in your `MODAL_ENVIRONMENT`, or every run fails at sandbox creation with `Secret '…' not found`. |
+| `MODAL_BUCKET_SECRET` | modal | `example-bucket-secret` | Name of the Modal [secret](https://modal.com/docs/guide/secrets) holding the GCS credentials the sandbox uses to mount dataset files. The default is a **placeholder that does not exist** — you must set this to the name of a real secret in your `MODAL_ENVIRONMENT`, or every run fails at sandbox creation with `Secret '…' not found`. |
 
 ## LLM providers
 

@@ -1,6 +1,7 @@
 """High-level interface for managing Cloud Run jobs."""
 
 import logging
+import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,33 @@ from .exceptions import DatasetExpiredError
 from .run_details import RunDetails, create_run_details, get_run_details
 
 logger = logging.getLogger(__name__)
+
+
+def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
+    """Warn when in-process code execution would expose other users' data.
+
+    In-process backends (``process``/``local``) run untrusted, LLM-generated code
+    inside the job container, so that code sees whatever GCS data the container
+    mounts. The Docker backend scopes its mount to the job's own prefix, but Cloud
+    Run mounts the whole bucket (its mount is fixed per job, not per execution). So
+    ``gcp`` + in-process + a multi-user auth provider is a cross-tenant exposure:
+    steer such deployments to ``CODE_EXECUTION_BACKEND=modal`` (scoped, read-only).
+
+    This is a loud warning rather than a hard failure; when the configuration
+    syntax gains cross-field validation (issue #54) it can become a real
+    constraint. Single-user local mode (AUTH_PROVIDER=none) is unaffected.
+    """
+    multi_user = os.environ.get("AUTH_PROVIDER", "none").lower() != "none"
+    in_process = config.code_execution_backend in ("process", "local")
+    if config.backend == "gcp" and in_process and multi_user:
+        logger.warning(
+            "UNSAFE CONFIG: JOB_BACKEND=gcp with CODE_EXECUTION_BACKEND=%s runs "
+            "untrusted code in a container that mounts the entire bucket, and Cloud "
+            "Run cannot scope the mount per run. In a multi-user deployment this "
+            "exposes every user's data to executed code. Set CODE_EXECUTION_BACKEND=modal "
+            "for a scoped, read-only per-job data mount. See docs/configuration.md.",
+            config.code_execution_backend,
+        )
 
 
 @dataclass
@@ -47,6 +75,7 @@ class JobManager:
             config: Configuration (uses default from environment if None)
         """
         self.config = config or JobConfig.from_env()
+        _warn_if_unsafe_code_execution(self.config)
         self.backend = get_backend(self.config)
 
     # User operations

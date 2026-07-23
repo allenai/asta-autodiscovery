@@ -320,6 +320,7 @@ def run_mcts(
     n_threads=1,
     agent_usage_mode: str = "per_response",
     base_url=None,
+    hypothesis_mode: str = "open_ended",
 ):
     """Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
 
@@ -369,6 +370,11 @@ def run_mcts(
             AG2 usage-summary deltas.
         base_url: OpenAI-compatible base URL for the agent model (e.g. a local vLLM
             server). The belief model always uses its default endpoint.
+        hypothesis_mode: How new hypotheses relate to prior explorations.
+            "open_ended" (default) keeps the original exploratory framing;
+            "related" steers the theorizer toward a coherent line of inquiry.
+            Applies to both the in-chat theorizer system message and the
+            on-demand generation prompt.
     """
 
     def _get_executor_rich_outputs(code_executor_agent) -> list:
@@ -454,6 +460,7 @@ def run_mcts(
                 vision_model=vision_model,
                 usage_tracker=usage_tracker,
                 base_url=base_url,
+                hypothesis_mode=hypothesis_mode,
             )
 
         if selection_method is None:
@@ -543,6 +550,7 @@ def run_mcts(
                             experiment_generator=experiment_generator,
                             experiment_planner=experiment_planner,
                             expected_experiments=branching_factor,
+                            hypothesis_mode=hypothesis_mode,
                         )
                         if new_query is None:
                             if not parent_node.untried_experiments:
@@ -766,6 +774,7 @@ def run_mcts(
                             vision_model=vision_model,
                             usage_tracker=usage_tracker,
                             base_url=base_url,
+                            hypothesis_mode=hypothesis_mode,
                         )
                     return thread_local.agent_objs
 
@@ -821,6 +830,7 @@ def run_mcts(
                         vision_model=vision_model,
                         usage_tracker=usage_tracker,
                         base_url=base_url,
+                        hypothesis_mode=hypothesis_mode,
                     )
 
                 next_node_idx_by_level = defaultdict(
@@ -1053,6 +1063,7 @@ def main(args):
         n_threads=args.n_threads,
         agent_usage_mode=args.agent_usage_mode,
         base_url=args.base_url,
+        hypothesis_mode=args.hypothesis_mode,
     )
 
 

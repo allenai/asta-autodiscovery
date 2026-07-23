@@ -48,6 +48,26 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 5. Statistical Insights: Provide insights based on the information presented in the plot."""
 
 
+# Controls how the experiment_generator relates new hypotheses to prior
+# explorations, selected by the --hypothesis_mode config. "open_ended" is the
+# original exploratory framing; "related" steers toward a coherent line of
+# inquiry. The on-demand generation prompt in MCTSNode.get_next_experiment is
+# gated by the same mode (see HYPOTHESIS_RELATEDNESS_ONDEMAND in mcts.py).
+HYPOTHESIS_RELATEDNESS_INSTRUCTION = {
+    "open_ended": (
+        "Remember, you are interested in open-ended research, so your proposals may be "
+        "exploratory in nature and may have only an indirect connection to the previous "
+        "explorations provided. "
+    ),
+    "related": (
+        "Remember, you are building a coherent line of inquiry, so each new hypothesis should "
+        "stay closely related to the previous explorations provided — refining, extending, or "
+        "probing the same phenomena, variables, and mechanisms rather than switching to an "
+        "unrelated topic. Do not repeat the hypotheses that have already been explored. "
+    ),
+}
+
+
 def _run_async(coro):
     """Run a coroutine from a synchronous context.
 
@@ -682,6 +702,7 @@ def get_agents(
     usage_tracker: UsageTracker | None = None,
     base_url: str | None = None,
     seed: int | None = None,
+    hypothesis_mode: str = "open_ended",
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
 
@@ -738,6 +759,14 @@ def get_agents(
     # Experiment Generator
     _user_query_or_empty = f"{user_query}\n\n" if user_query is not None else ""
 
+    # How new hypotheses should relate to prior explorations. "open_ended"
+    # (default) keeps the original exploratory framing; "related" steers the
+    # theorizer toward a coherent line of inquiry (see also the on-demand
+    # prompt in MCTSNode.get_next_experiment, gated by the same mode).
+    _relatedness_instruction = HYPOTHESIS_RELATEDNESS_INSTRUCTION.get(
+        hypothesis_mode, HYPOTHESIS_RELATEDNESS_INSTRUCTION["open_ended"]
+    )
+
     # A vLLM reasoning endpoint (base_url) cannot combine guided JSON decoding with
     # thinking: response_format constrains generation from the first token, so the
     # model either can't reason (0 reasoning_content) or, with reasoning allowed,
@@ -757,7 +786,7 @@ def get_agents(
             f"{_user_query_or_empty}"
             "Be creative and think of new and interesting verifiable hypotheses. "
             "The hypothesis should be a falsifiable statement that can be sufficiently tested by an experiment using the provided data. "
-            "Remember, you are interested in open-ended research, so your proposals may be exploratory in nature and may have only an indirect connection to the previous explorations provided. "
+            f"{_relatedness_instruction}"
             "Here are some instructions that you must follow:\n"
             "1. Strictly use only the dataset(s) provided and do not simulate dummy/synthetic data or columns that cannot be derived from the existing columns.\n"
             "2. Each hypothesis should be creative, independent, and self-contained.\n"

@@ -15,6 +15,28 @@ from autodiscovery.mcts_utils import (
 from autodiscovery.utils import try_loading_dict
 
 
+# On-demand hypothesis-generation prompt, selected by the --hypothesis_mode
+# config. "open_ended" preserves the original neutral framing; "related" anchors
+# generation to the parent hypothesis so follow-ups stay on the same line of
+# inquiry. Both take the parent hypothesis and the JSON of tried experiments.
+# Mirrors HYPOTHESIS_RELATEDNESS_INSTRUCTION (the theorizer system message) in
+# agents.py, which governs the primary in-chat generation path.
+HYPOTHESIS_RELATEDNESS_ONDEMAND = {
+    "open_ended": (
+        "Generate new hypotheses given these previously attempted experiments: {tried}"
+    ),
+    "related": (
+        "Generate new hypotheses that stay closely related to the current line of inquiry "
+        "(parent hypothesis: {parent!r}). Each new hypothesis should probe the same "
+        "phenomenon, variables, or mechanism explored so far — for example by refining it, "
+        "extending it to an adjacent context, or testing a plausible causal driver, "
+        "moderator, or boundary condition of the observed effect — rather than switching to "
+        "an unrelated topic. Do not repeat any previously attempted experiment. "
+        "Previously attempted experiments: {tried}"
+    ),
+}
+
+
 def _warn_experiment_count(n_generated, expected, node_id, source):
     """Log a warning when the experiment_generator yields an unexpected count.
 
@@ -174,6 +196,7 @@ class MCTSNode:
         experiment_planner=None,
         n_retry=3,
         expected_experiments=None,
+        hypothesis_mode="open_ended",
     ):
         """Returns the next untried experiment, generating more on demand.
 
@@ -186,6 +209,8 @@ class MCTSNode:
         expected_experiments: the branching factor (k_experiments). When set, a
         warning is logged if generation returns no parseable experiments or a
         count that differs from this expectation.
+        hypothesis_mode: selects the on-demand generation prompt ("open_ended"
+        or "related"); see HYPOTHESIS_RELATEDNESS_ONDEMAND.
         """
         new_experiment, new_query = None, None
 
@@ -196,10 +221,16 @@ class MCTSNode:
                 self.tried_experiments.append(new_experiment)
             elif self.allow_generate_experiments and experiment_generator is not None:
                 # Two-step generation: propose hypotheses, then plan each one.
+                _prompt_template = HYPOTHESIS_RELATEDNESS_ONDEMAND.get(
+                    hypothesis_mode, HYPOTHESIS_RELATEDNESS_ONDEMAND["open_ended"]
+                )
                 _messages = self.messages + [
                     {
                         "role": "user",
-                        "content": f"Generate new hypotheses given these previously attempted experiments: {json.dumps(self.tried_experiments)}",
+                        "content": _prompt_template.format(
+                            parent=self.hypothesis or "N/A",
+                            tried=json.dumps(self.tried_experiments),
+                        ),
                     }
                 ]
                 gen_reply = experiment_generator.generate_reply(messages=_messages)
@@ -226,6 +257,7 @@ class MCTSNode:
                     experiment_planner=experiment_planner,
                     n_retry=n_retry - 1,
                     expected_experiments=expected_experiments,
+                    hypothesis_mode=hypothesis_mode,
                 )
 
         return new_experiment, new_query

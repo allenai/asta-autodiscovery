@@ -187,6 +187,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="pw",
         help="MCTS selection strategy (default: pw)",
     )
+    exp.add_argument(
+        "--hypothesis_mode",
+        type=str,
+        choices=["open_ended", "related"],
+        default="open_ended",
+        help=(
+            "How new hypotheses relate to prior explorations: 'open_ended' (default, "
+            "exploratory) or 'related' (coherent line of inquiry). Default: open_ended"
+        ),
+    )
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
     adv = parser.add_argument_group("advanced")
@@ -300,6 +310,7 @@ def cli_main(argv: list[str] | None = None) -> None:
         user_query=args.intent,
         exploration_weight=args.exploration_weight,
         surprisal_width=args.surprisal_width,
+        hypothesis_mode=args.hypothesis_mode,
         evidence_weight=args.evidence_weight,
         mcts_selection=args.mcts_selection,
         k_experiments=args.k_experiments,

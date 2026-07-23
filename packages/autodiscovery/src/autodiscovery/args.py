@@ -55,6 +55,19 @@ class ArgParser(argparse.ArgumentParser):
             help="Custom user query to condition experiment generation during exploration.",
         )
         self.add_argument(
+            "--hypothesis_mode",
+            type=str,
+            choices=["open_ended", "related"],
+            default="open_ended",
+            help=(
+                "How new hypotheses relate to prior explorations. 'open_ended' (default) "
+                "keeps the original exploratory framing; 'related' steers the theorizer "
+                "toward a coherent line of inquiry (semantically related follow-ups). "
+                "Affects both the in-chat theorizer system message and the on-demand "
+                "generation prompt."
+            ),
+        )
+        self.add_argument(
             "--temperature",
             type=float,
             default=1.0,

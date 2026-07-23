@@ -193,21 +193,21 @@ class ModalSandboxExecutor(CodeExecutor):
         """
         code = "\n".join(block.code for block in code_blocks)
 
-        print("\n[ModalSandboxExecutor] Executing code in sandbox...")
-        print(f"[ModalSandboxExecutor] Code length: {len(code)} characters")
+        print("\n[CodeExecutor] Executing code in sandbox...")
+        print(f"[CodeExecutor] Code length: {len(code)} characters")
 
         try:
             result = _run_async(self._executor.run_code(code, timeout_seconds=self._timeout))
 
-            print("[ModalSandboxExecutor] Execution completed")
-            print(f"[ModalSandboxExecutor] Success: {result.success}")
+            print("[CodeExecutor] Execution completed")
+            print(f"[CodeExecutor] Success: {result.success}")
 
             output = result.stdout or ""
 
-            print(f"[ModalSandboxExecutor] Stdout length: {len(output)} characters")
+            print(f"[CodeExecutor] Stdout length: {len(output)} characters")
 
             if result.stderr:
-                print(f"[ModalSandboxExecutor] Stderr: {result.stderr[:200]}")
+                print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
                 output += f"\nSTDERR:\n{result.stderr}"
 
             if not result.success:
@@ -223,18 +223,18 @@ class ModalSandboxExecutor(CodeExecutor):
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"
-                print(f"[ModalSandboxExecutor] Error: {error_msg}")
+                print(f"[CodeExecutor] Error: {error_msg}")
                 output += f"\nERROR: {error_msg}"
 
             if not output.strip():
-                output = "[ModalSandboxExecutor] Code executed but produced no output"
-                print("[ModalSandboxExecutor] Warning: No output produced")
+                output = "[CodeExecutor] Code executed but produced no output"
+                print("[CodeExecutor] Warning: No output produced")
 
             # Store rich output data dicts for image analysis
             self._last_rich_outputs = [ro.data for ro in result.rich_outputs]
 
             if self._last_rich_outputs:
-                print(f"[ModalSandboxExecutor] Found {len(self._last_rich_outputs)} rich outputs")
+                print(f"[CodeExecutor] Found {len(self._last_rich_outputs)} rich outputs")
 
             if self._last_rich_outputs:
                 image_analyses = []
@@ -260,8 +260,8 @@ class ModalSandboxExecutor(CodeExecutor):
             import traceback
 
             error_details = traceback.format_exc()
-            print(f"[ModalSandboxExecutor] Exception occurred: {str(e)}")
-            print(f"[ModalSandboxExecutor] Traceback:\n{error_details}")
+            print(f"[CodeExecutor] Exception occurred: {str(e)}")
+            print(f"[CodeExecutor] Traceback:\n{error_details}")
             return CodeResult(
                 exit_code=1, output=f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
             )

@@ -102,7 +102,20 @@ def run_job(
         # Create JobsClient and run the job
         client = run_v2.JobsClient()
 
-        # Create request with container argument overrides
+        # Create request with container argument overrides.
+        #
+        # Known limitation (tenant isolation, issue #49): the GCS bucket is
+        # mounted whole at /mnt/gcs by the shared Cloud Run job definition (see
+        # scripts/rebuild_and_deploy.sh), so a job container can read/write any
+        # user's prefix through the filesystem. We cannot scope the mount to
+        # this run's own users/<uid>/jobs/<jid> prefix here because per-execution
+        # RunJobRequest.Overrides only cover container args/env/task_count/timeout
+        # — NOT volumes or volume mounts (there is no `only-dir` override). Real
+        # per-run scoping would require a distinct per-run job definition
+        # (create/patch), which adds launch latency and lifecycle management.
+        # The Docker backend, which self-mounts, is scoped per-run via
+        # GCSFUSE_ONLY_DIR; the Modal code-execution sandbox is separately
+        # scoped read-only to the per-job .../data prefix.
         request = run_v2.RunJobRequest(
             name=job_name,
             overrides=run_v2.RunJobRequest.Overrides(

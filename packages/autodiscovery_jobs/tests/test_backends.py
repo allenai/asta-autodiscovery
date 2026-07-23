@@ -102,6 +102,8 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     assert "--model=gpt-4o" in kwargs["command"]
     # gcsfuse trigger + credentials forwarded
     assert kwargs["environment"]["GCSFUSE_BUCKET"] == "test-bucket"
+    # mount scoped to this run's own prefix (tenant isolation, issue #49)
+    assert kwargs["environment"]["GCSFUSE_ONLY_DIR"] == "users/testuser/jobs/job1"
     assert kwargs["environment"]["OPENAI_API_KEY"] == "sk-test"
     assert kwargs["environment"]["MODAL_TOKEN_ID"] == "tok"
     assert kwargs["environment"]["GOOGLE_APPLICATION_CREDENTIALS"] == "/secrets/gcp-key.json"
@@ -110,6 +112,20 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     assert "SYS_ADMIN" in kwargs["cap_add"]
     # host credentials bind-mounted into the job container
     assert "/host/secrets/gcp-key.json" in kwargs["volumes"]
+
+
+def test_docker_run_job_scopes_mount_for_pipe_userid(docker_config, monkeypatch):
+    # User ids can contain '|' (e.g. auth0 "oauth2|123"); it must flow through
+    # to GCSFUSE_ONLY_DIR verbatim (the entrypoint quotes it for the shell).
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        backend = DockerBackend(docker_config)
+        backend.run_job("google-oauth2|42", "job1", n_experiments=1)
+
+    kwargs = client.containers.run.call_args.kwargs
+    assert kwargs["environment"]["GCSFUSE_ONLY_DIR"] == "users/google-oauth2|42/jobs/job1"
 
 
 def test_docker_run_job_requires_image(monkeypatch):

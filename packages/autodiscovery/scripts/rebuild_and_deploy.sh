@@ -88,6 +88,13 @@ UPDATE_SECRETS=(
 )
 
 UPDATE_SECRETS_ARG=$(IFS=,; echo "${UPDATE_SECRETS[*]}")
+# NOTE (tenant isolation, issue #49): this mounts the WHOLE bucket at /mnt/gcs,
+# so a job container can read/write any user's prefix via the filesystem. The
+# mount cannot be scoped to a run's own users/<uid>/jobs/<jid> prefix here
+# because it is defined on the shared job resource and per-execution overrides
+# (RunJobRequest.Overrides) cover only container args/env, not volumes/only-dir.
+# Per-run scoping would require a distinct per-run job definition. The local
+# Docker backend, which self-mounts, is scoped per-run via GCSFUSE_ONLY_DIR.
 gcloud run jobs update ${JOB_NAME} \
     --region ${REGION} \
     --image ${IMAGE} \

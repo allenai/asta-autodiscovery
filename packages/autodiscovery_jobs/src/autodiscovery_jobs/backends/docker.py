@@ -7,9 +7,11 @@ continues to use Modal for its code-execution sandboxes — only the process
 launcher differs.
 
 Because there is no Cloud Run GCS FUSE volume locally, the job container mounts
-the real bucket at ``/mnt/gcs`` itself via gcsfuse in its entrypoint. This
-backend enables that by passing ``GCSFUSE_BUCKET`` plus GCP credentials and the
-``/dev/fuse`` device / ``SYS_ADMIN`` capability to the container.
+the bucket itself via gcsfuse in its entrypoint. This backend enables that by
+passing ``GCSFUSE_BUCKET`` plus GCP credentials and the ``/dev/fuse`` device /
+``SYS_ADMIN`` capability to the container. The mount is scoped to this run's own
+``users/<uid>/jobs/<jid>`` prefix (via ``GCSFUSE_ONLY_DIR``) so a job container
+cannot see or modify other users' data through ``/mnt/gcs``.
 """
 
 from __future__ import annotations
@@ -87,6 +89,10 @@ class DockerBackend(JobBackend):
             k: os.environ[k] for k in _JOB_ENV_PASSTHROUGH if os.environ.get(k)
         }
         environment["GCSFUSE_BUCKET"] = self.config.bucket
+        # Scope the gcsfuse mount to just this run's prefix (least privilege /
+        # tenant isolation) — the entrypoint mounts it at /mnt/gcs/<only-dir>,
+        # matching the absolute paths build_job_args() hands the job.
+        environment["GCSFUSE_ONLY_DIR"] = f"users/{userid}/jobs/{jobid}"
         environment["GOOGLE_APPLICATION_CREDENTIALS"] = _CONTAINER_GCP_KEY_PATH
 
         # Bind-mount the GCP credentials file so gcsfuse (and google-cloud

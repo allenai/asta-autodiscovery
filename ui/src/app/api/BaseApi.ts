@@ -18,6 +18,21 @@ export class BaseApi {
         }
     };
 
+    /**
+     * Resolve the user id for a user-scoped request, preferring an explicitly
+     * provided id and falling back to the active auth provider. Throws when the
+     * id is not yet known so callers never interpolate the literal string
+     * "null" into a URL — `encodeURIComponent(null) === "null"`, which the
+     * backend rejects with a spurious 403 before auth hydrates. See issue #51.
+     */
+    protected requireUserId = async (provided?: string): Promise<string> => {
+        const userid = provided ?? (await this.getUserId());
+        if (userid == null || userid === '') {
+            throw new Error('Not signed in yet — user id is unavailable');
+        }
+        return userid;
+    };
+
     protected createDefaultHeaders = async (): Promise<{
         'Content-Type': string;
         Authorization?: string;

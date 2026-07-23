@@ -204,24 +204,24 @@ export class RunsApi extends BaseApi {
     }
 
     async listRuns({ userid, limit }: { userid?: string; limit?: number } = {}) {
-        const effectiveUserid = userid ?? (await this.getUserId());
+        const effectiveUserid = await this.requireUserId(userid);
 
         const query: Record<string, string> = {};
         if (limit) {
             query.limit = limit.toString();
         }
         return this.request<GetViewerRunsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/list`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/list`,
             method: 'GET',
             query,
         });
     }
 
     async getRunMetadata({ userid, runid }: { userid?: string; runid: string }) {
-        const effectiveUserid = userid ?? (await this.getUserId());
+        const effectiveUserid = await this.requireUserId(userid);
 
         return this.request<GetRunMetadataResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/metadata`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/metadata`,
             method: 'GET',
         });
     }
@@ -235,10 +235,10 @@ export class RunsApi extends BaseApi {
         runid: string;
         knownExperimentIds: string[];
     }) {
-        const effectiveUserid = userid ?? (await this.getUserId());
+        const effectiveUserid = await this.requireUserId(userid);
 
         return this.request<GetRunExperimentsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments`,
             method: 'POST',
             body: { known_experiment_ids: knownExperimentIds },
         });
@@ -253,10 +253,10 @@ export class RunsApi extends BaseApi {
         runid: string;
         experimentId: string;
     }) {
-        const effectiveUserid = userid ?? (await this.getUserId());
+        const effectiveUserid = await this.requireUserId(userid);
 
         return this.request<GetRunExperimentDetailsResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments/${encodeURIComponent(
                 experimentId
             )}`,
             method: 'GET',
@@ -264,27 +264,27 @@ export class RunsApi extends BaseApi {
     }
 
     async getRun({ userid, runId }: { userid?: string; runId: string }) {
-        const effectiveUserid = userid ?? (await this.getUserId());
+        const effectiveUserid = await this.requireUserId(userid);
 
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runId)}`,
             method: 'GET',
         });
     }
 
     async getRunStatus({ userid, runId }: { userid?: string; runId: string }) {
-        const effectiveUserid = userid ?? (await this.getUserId());
+        const effectiveUserid = await this.requireUserId(userid);
 
         return this.request<RunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid!)}/${encodeURIComponent(runId)}/status`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runId)}/status`,
             method: 'GET',
         });
     }
 
     async cancelRun(runId: string) {
-        const userid = await this.getUserId();
+        const userid = await this.requireUserId();
         return this.request<void>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/cancel`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid)}/${encodeURIComponent(runId)}/cancel`,
             method: 'POST',
         });
     }
@@ -347,9 +347,9 @@ export class RunsApi extends BaseApi {
     }
 
     async shareRun({ runId, isShared }: { runId: string; isShared: boolean }) {
-        const userid = await this.getUserId();
+        const userid = await this.requireUserId();
         return this.request<ShareRunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/share`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid)}/${encodeURIComponent(runId)}/share`,
             method: 'POST',
             body: { is_shared: isShared },
         });
@@ -363,9 +363,9 @@ export class RunsApi extends BaseApi {
     }
 
     async bookmarkRun({ runId, isBookmarked }: { runId: string; isBookmarked: boolean }) {
-        const userid = await this.getUserId();
+        const userid = await this.requireUserId();
         return this.request<BookmarkRunResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/bookmark`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid)}/${encodeURIComponent(runId)}/bookmark`,
             method: 'POST',
             body: { is_bookmarked: isBookmarked },
         });
@@ -380,9 +380,9 @@ export class RunsApi extends BaseApi {
         experimentId: string;
         isBookmarked: boolean;
     }) {
-        const userid = await this.getUserId();
+        const userid = await this.requireUserId();
         return this.request<BookmarkExperimentResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/bookmark`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/bookmark`,
             method: 'POST',
             body: { is_bookmarked: isBookmarked },
         });
@@ -397,9 +397,9 @@ export class RunsApi extends BaseApi {
         experimentId: string;
         query: string;
     }) {
-        const userid = await this.getUserId();
+        const userid = await this.requireUserId();
         return this.request<DigDeeperResponseBody>({
-            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid!)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/dig-deeper`,
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(userid)}/${encodeURIComponent(runId)}/experiments/${encodeURIComponent(experimentId)}/dig-deeper`,
             method: 'POST',
             body: { query },
         });

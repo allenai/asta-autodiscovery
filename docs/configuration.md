@@ -114,8 +114,8 @@ AutoDiscovery runs execute generated code inside Modal sandboxes.
 | `MODAL_TOKEN_SECRET` | Yes | *(none)* | Modal API token secret. |
 | `MODAL_ENVIRONMENT` | Yes | *(none)* | Modal environment name to run sandboxes in. |
 | `MODAL_IMAGE_BUILDER_VERSION` | No | *(Modal default)* | Pins the Modal image builder version used to build sandbox images. |
-| `MODAL_APP_NAME` | No | `asta-autodiscovery` | Modal app name the sandboxes are associated with. |
-| `MODAL_BUCKET_SECRET` | No | `example-bucket-secret` | Name of the Modal secret holding the bucket credentials the sandbox uses to mount dataset files. |
+| `MODAL_APP_NAME` | No | `asta-autodiscovery` | Modal app name the sandboxes are associated with. Created on demand if it doesn't exist. |
+| `MODAL_BUCKET_SECRET` | Yes | `example-bucket-secret` | Name of the Modal [secret](https://modal.com/docs/guide/secrets) holding the GCS credentials the sandbox uses to mount dataset files. The default is a **placeholder that does not exist** — you must set this to the name of a real secret in your `MODAL_ENVIRONMENT`, or every run fails at sandbox creation with `Secret '…' not found`. |
 
 ## LLM providers
 

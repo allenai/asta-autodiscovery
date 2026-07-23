@@ -288,7 +288,12 @@ function PasswordFileAuthProvider({ children }: { children: ReactNode }) {
         return token;
     }, [token]);
 
-    useEffect(() => {
+    // Wire the bridge during render (not in a useEffect) so it reflects the
+    // restored session before children commit and fire requests. Wiring in an
+    // effect leaves the same null-user-id window as the "none" provider had: the
+    // commit that flips isAuthenticated true runs child effects (which fetch)
+    // before this provider's bridge effect updates getUserId. See #51.
+    useMemo(() => {
         setAuthBridge({
             getToken: async () => token,
             getUserId: async () => user?.sub ?? null,
@@ -335,13 +340,20 @@ const LOCAL_USER: AuthUser = {
 };
 
 function NoneAuthProvider({ children }: { children: ReactNode }) {
-    useEffect(() => {
+    // Wire the bridge synchronously on the first render — before any child effect
+    // can fire a user-id-bearing request. This provider reports `isAuthenticated:
+    // true, isLoading: false` synchronously, so if the bridge were wired in a
+    // useEffect (which runs after the first commit) a hard navigation to
+    // /runs/<id> would issue /api/runs/null/... and get a spurious 403 while the
+    // bridge still returned the default null. The values are static, so wiring
+    // once via a lazy state initializer (runs during render) is enough. See #51.
+    useState(() => {
         setAuthBridge({
             getToken: async () => null,
             getUserId: async () => LOCAL_USER.sub ?? null,
             onUnauthorized: () => {},
         });
-    }, []);
+    });
 
     const value = useMemo<AuthContextType>(
         () => ({

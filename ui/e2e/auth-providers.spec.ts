@@ -88,4 +88,41 @@ test.describe('Auth: none provider (desktop mode)', { tag: '@public' }, () => {
         // And the logged-out intro CTA is not shown.
         await expect(page.getByRole('button', { name: /Sign in to get started/i })).toHaveCount(0);
     });
+
+    // Regression for issue #51: on a hard navigation to a run, the UI fired
+    // user-scoped requests with the literal string "null" as the user id before
+    // the auth bridge was wired (encodeURIComponent(null) === "null"), producing
+    // a spurious 403. Uses a synthetic run id so the test is data-independent —
+    // the bug fired the null request regardless of whether the run exists.
+    test('hard navigation to a run never issues /api/runs/null/...', async ({ page }) => {
+        const nullUserRequests: string[] = [];
+        const userIdSegments: string[] = [];
+        page.on('request', (req) => {
+            const { pathname } = new URL(req.url());
+            if (/^\/api\/runs\/null(\/|$)/.test(pathname)) {
+                nullUserRequests.push(pathname);
+            }
+            const match = pathname.match(/^\/api\/runs\/([^/]+)\//);
+            if (match && match[1] !== 'shared') {
+                userIdSegments.push(match[1]);
+            }
+        });
+
+        await page.goto('/runs/00000000-0000-0000-0000-000000000000', {
+            waitUntil: 'domcontentloaded',
+        });
+        // Wait until at least one user-scoped runs request has resolved, then a
+        // short buffer, so we observe what the page fired once auth hydrated.
+        await page.waitForResponse((r) => /^\/api\/runs\//.test(new URL(r.url()).pathname), {
+            timeout: 15000,
+        });
+        await page.waitForTimeout(500);
+
+        expect(
+            nullUserRequests,
+            `spurious "null" user-id requests: ${nullUserRequests.join(', ')}`
+        ).toEqual([]);
+        // The resolved id was the desktop local user, proving auth was ready.
+        expect(userIdSegments).toContain('local');
+    });
 });

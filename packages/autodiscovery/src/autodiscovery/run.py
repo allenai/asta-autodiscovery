@@ -420,11 +420,23 @@ def run_mcts(
         if backend != "modal":
             for dataset_fpath in dataset_paths:
                 abs_src = os.path.abspath(dataset_fpath)
+                # get_datasets_fpaths resolves dataset names relative to the
+                # metadata file's directory, but the webstack stores uploads in a
+                # `data/` subdirectory alongside metadata.json (the same convention
+                # modal's bucket_path uses). When the direct path is absent, fall
+                # back to that data/ copy so we symlink the real file rather than a
+                # dangling path.
+                if not os.path.exists(abs_src):
+                    alt_src = os.path.join(
+                        os.path.dirname(abs_src), "data", os.path.basename(abs_src)
+                    )
+                    if os.path.exists(alt_src):
+                        abs_src = alt_src
                 # Skip if already inside work_dir (e.g. easy.py already symlinked)
                 if abs_src.startswith(os.path.abspath(work_dir) + os.sep):
                     continue
                 dst = os.path.join(work_dir, os.path.basename(dataset_fpath))
-                if not os.path.exists(dst):
+                if not os.path.lexists(dst):
                     os.symlink(abs_src, dst)
 
         base_agent_objs = None

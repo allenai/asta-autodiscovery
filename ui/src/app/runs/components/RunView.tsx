@@ -73,6 +73,7 @@ import {
 } from '@/runs/components/RunViewPanels';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { mkBookmarkRunBtnAttrs } from '@/analytics/run';
+import { filterTransientProps } from '@/utils/styledProps';
 import {
     TEST_ID_SESSION_CONFIG_BUTTON,
     TEST_ID_SESSION_CONFIG_MODAL,
@@ -1059,7 +1060,9 @@ const RunHeaderName = styled('h1')`
     flex: 1 1 auto;
 `;
 
-const BookmarkButton = styled(IconButton)<{ $isBookmarked?: boolean }>`
+const BookmarkButton = styled(IconButton, {
+    shouldForwardProp: filterTransientProps,
+})<{ $isBookmarked?: boolean }>`
     color: ${({ theme, $isBookmarked }) =>
         $isBookmarked ? theme.color['green-100'].hex : theme.color['gray-50'].hex};
     padding: 0;

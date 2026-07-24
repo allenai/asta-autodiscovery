@@ -159,6 +159,24 @@ def get_asta_description(dataset_metadata_path: str) -> str:
     return "\n".join(description)
 
 
+def resolve_local_dataset_source(dataset_fpath: str) -> str:
+    """Resolve a dataset path to an existing local file.
+
+    ``get_datasets_fpaths`` resolves dataset names relative to the metadata
+    file's directory, but the webstack stores uploads in a ``data/`` subdirectory
+    alongside ``metadata.json`` (the same convention modal's ``bucket_path``
+    uses). When the metadata-relative path does not exist, fall back to that
+    ``data/`` copy so process/local backends symlink the real file rather than a
+    dangling path. Returns the absolute path (original if no ``data/`` copy).
+    """
+    abs_src = os.path.abspath(dataset_fpath)
+    if not os.path.exists(abs_src):
+        alt_src = os.path.join(os.path.dirname(abs_src), "data", os.path.basename(abs_src))
+        if os.path.exists(alt_src):
+            return alt_src
+    return abs_src
+
+
 def get_datasets_fpaths(dataset_metadata: str, is_blade=False) -> (list, str):
     is_s3 = dataset_metadata.startswith("s3")
     _dataset_metadata = dataset_metadata

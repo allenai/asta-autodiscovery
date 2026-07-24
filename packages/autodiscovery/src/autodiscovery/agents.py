@@ -496,6 +496,22 @@ class CodeBlockWrapperTransform(transforms.MessageTransform):
         return "CodeBlockWrapperTransform", True
 
 
+def code_transform_working_dir(
+    backend: str, work_dir: str, modal_working_dir: str | None
+) -> str:
+    """Return the directory the code transform should ``os.chdir`` into per cell.
+
+    For the process/local backends this must be **absolute**: their subprocess
+    already starts with ``cwd=work_dir``, so a relative path injected by
+    :class:`SimpleCodeBlockTransform` would stack (``work_dir/work_dir``) and
+    raise ``FileNotFoundError``. modal uses its absolute mount path (``/data``),
+    which is idempotent regardless of the sandbox's starting directory.
+    """
+    if backend == "modal":
+        return modal_working_dir
+    return os.path.abspath(work_dir)
+
+
 class SimpleCodeBlockTransform(transforms.MessageTransform):
     """Simple transform that extracts code from JSON and wraps it in markdown code blocks."""
 
@@ -867,14 +883,8 @@ def install(package):
     if backend in ("modal", "process"):
         # For sandbox-style backends, use simple transform without image analysis patch
         # (the executor handles image analysis internally)
-        # Pass the working_dir so code can change to that directory. Use an
-        # absolute path for the process backend: its subprocess already runs with
-        # cwd=work_dir, so a relative os.chdir(work_dir) injected by the transform
-        # would stack (work_dir/work_dir) and fail. modal uses the absolute mount
-        # path (/data), which is already idempotent.
-        sandbox_working_dir = (
-            modal_working_dir if backend == "modal" else os.path.abspath(work_dir)
-        )
+        # Pass the working_dir so code can change to that directory.
+        sandbox_working_dir = code_transform_working_dir(backend, work_dir, modal_working_dir)
         transform_messages_capability = transform_messages.TransformMessages(
             transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
         )

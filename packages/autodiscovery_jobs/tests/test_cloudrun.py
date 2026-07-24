@@ -9,7 +9,7 @@ from autodiscovery_jobs.exceptions import CloudRunError
 
 def test_run_job_basic(mock_config):
     """Test basic job execution."""
-    with patch("autodiscovery_jobs.cloudrun.run_v2.JobsClient") as mock_jobs_client:
+    with patch("autodiscovery_jobs.backends.gcp.run_v2.JobsClient") as mock_jobs_client:
         # Mock the client and operation
         mock_client = Mock()
         mock_jobs_client.return_value = mock_client
@@ -40,7 +40,7 @@ def test_run_job_basic(mock_config):
 
 def test_run_job_with_optional_params(mock_config):
     """Test job execution with optional parameters."""
-    with patch("autodiscovery_jobs.cloudrun.run_v2.JobsClient") as mock_jobs_client:
+    with patch("autodiscovery_jobs.backends.gcp.run_v2.JobsClient") as mock_jobs_client:
         mock_client = Mock()
         mock_jobs_client.return_value = mock_client
 
@@ -76,7 +76,7 @@ def test_run_job_with_optional_params(mock_config):
 
 def test_run_job_failure(mock_config):
     """Test job execution failure."""
-    with patch("autodiscovery_jobs.cloudrun.run_v2.JobsClient") as mock_jobs_client:
+    with patch("autodiscovery_jobs.backends.gcp.run_v2.JobsClient") as mock_jobs_client:
         mock_client = Mock()
         mock_jobs_client.return_value = mock_client
         mock_client.run_job.side_effect = Exception("API Error")
@@ -87,7 +87,7 @@ def test_run_job_failure(mock_config):
 
 def test_get_job_status(mock_config):
     """Test getting job status."""
-    with patch("autodiscovery_jobs.cloudrun.run_v2.ExecutionsClient") as mock_executions_client:
+    with patch("autodiscovery_jobs.backends.gcp.run_v2.ExecutionsClient") as mock_executions_client:
         mock_client = Mock()
         mock_executions_client.return_value = mock_client
 
@@ -117,7 +117,7 @@ def test_get_job_status(mock_config):
 
 def test_get_job_status_failure(mock_config):
     """Test getting job status failure."""
-    with patch("autodiscovery_jobs.cloudrun.run_v2.ExecutionsClient") as mock_executions_client:
+    with patch("autodiscovery_jobs.backends.gcp.run_v2.ExecutionsClient") as mock_executions_client:
         mock_client = Mock()
         mock_executions_client.return_value = mock_client
         mock_client.get_execution.side_effect = Exception("Not found")
@@ -128,7 +128,7 @@ def test_get_job_status_failure(mock_config):
 
 def test_cancel_job(mock_config):
     """Test canceling a job."""
-    with patch("autodiscovery_jobs.cloudrun.run_v2.ExecutionsClient") as mock_executions_client:
+    with patch("autodiscovery_jobs.backends.gcp.run_v2.ExecutionsClient") as mock_executions_client:
         mock_client = Mock()
         mock_executions_client.return_value = mock_client
 
@@ -146,7 +146,7 @@ def test_cancel_job(mock_config):
 
 def test_get_job_logs(mock_config):
     """Test getting job logs."""
-    with patch("autodiscovery_jobs.cloudrun.cloud_logging.Client") as mock_logging_client:
+    with patch("autodiscovery_jobs.backends.gcp.cloud_logging.Client") as mock_logging_client:
         mock_client = Mock()
         mock_logging_client.return_value = mock_client
 
@@ -173,7 +173,7 @@ def test_get_job_logs(mock_config):
 
 def test_get_job_logs_no_execution_id(mock_config):
     """Test getting logs without execution ID filter."""
-    with patch("autodiscovery_jobs.cloudrun.cloud_logging.Client") as mock_logging_client:
+    with patch("autodiscovery_jobs.backends.gcp.cloud_logging.Client") as mock_logging_client:
         mock_client = Mock()
         mock_logging_client.return_value = mock_client
         mock_client.list_entries.return_value = []

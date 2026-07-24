@@ -34,6 +34,10 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # The default job backend is docker, so the API launches job containers on
+      # the host daemon (docker-out-of-docker). Set JOB_BACKEND=gcp to run jobs on
+      # Cloud Run instead; this socket mount is then unused.
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
@@ -59,9 +63,29 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
       # Cloud Run job name for local dev (use -dev suffix)
       - CLOUDRUN_JOB_NAME=${CLOUDRUN_JOB_NAME:-autodiscovery-job-dev}
+      # Job backend selection. Defaults to docker (local containers); set
+      # JOB_BACKEND=gcp in .env to launch jobs on Cloud Run instead.
+      - JOB_BACKEND=${JOB_BACKEND:-docker}
+      # Image the docker backend launches per job (built via `docker compose build autodiscovery`).
+      - AUTODISCOVERY_IMAGE=${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
+      # Host path of the GCP key, derived from GOOGLE_APPLICATION_CREDENTIALS so the
+      # docker backend can bind-mount it into each job container (the in-container
+      # GOOGLE_APPLICATION_CREDENTIALS above is a container path, unusable as a host
+      # bind source). Requires GOOGLE_APPLICATION_CREDENTIALS to be an absolute path.
+      - GCP_KEY_HOST_PATH=${GOOGLE_APPLICATION_CREDENTIALS}
       # Asta context service (artifact storage + metadata)
       - ASTA_CONTEXT_SERVICE_URL=${ASTA_CONTEXT_SERVICE_URL}
       - ASTA_CONTEXT_SERVICE_API_KEY=${ASTA_CONTEXT_SERVICE_API_KEY}
+  # Build-only: produces the AD job image that the API launches per run when
+  # JOB_BACKEND=docker. Not started by `docker compose up` (guarded by a profile);
+  # build it explicitly with `docker compose build autodiscovery`. The `image:`
+  # tag must match AUTODISCOVERY_IMAGE so the API can launch it by name.
+  autodiscovery:
+    profiles: ["jobs"]
+    image: ${AUTODISCOVERY_IMAGE:-autodiscovery:dev}
+    build:
+      context: .
+      dockerfile: ./packages/autodiscovery/Dockerfile
   ui:
     build:
       context: ./ui

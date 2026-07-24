@@ -4,9 +4,21 @@ FROM python:3.13-slim
 # Set working directory at repo root
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies. gcsfuse + fuse let the container self-mount the
+# GCS bucket at /mnt/gcs when run under the local Docker job backend (on Cloud
+# Run the platform provides that mount instead). The gcsfuse release is selected
+# for the build's target architecture so the image builds natively on both
+# amd64 (Cloud Run) and arm64 (e.g. Apple Silicon local dev).
+ARG GCSFUSE_VERSION=2.4.0
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
+    fuse3 \
+    && ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL -o /tmp/gcsfuse.deb \
+        "https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VERSION}/gcsfuse_${GCSFUSE_VERSION}_${ARCH}.deb" \
+    && apt-get install -y /tmp/gcsfuse.deb \
+    && rm -f /tmp/gcsfuse.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv and set PATH
@@ -23,5 +35,8 @@ RUN /root/.local/bin/uv sync --frozen --package asta-autodiscovery
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# Default entry point - can be overridden
-ENTRYPOINT ["/root/.local/bin/uv", "run", "python", "-m", "autodiscovery.run"]
+# Entrypoint wrapper: optionally gcsfuse-mounts /mnt/gcs (when GCSFUSE_BUCKET is
+# set), then runs the AD job with the provided args.
+COPY packages/autodiscovery/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

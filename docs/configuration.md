@@ -57,18 +57,52 @@ Job data, run metadata, results, and user profiles are stored in Google Cloud St
 | `GCP_PROJECT` | Yes | *(none)* | Google Cloud project id. Required for GCS and job execution. |
 | `GCS_BUCKET` | No | `autodiscovery` | Name of the bucket holding run data/results/metadata. `AUTODISCOVERY_BUCKET` is accepted as an alias if `GCS_BUCKET` is unset. |
 | `GCP_REGION` | No | `us-west1` | Region used for job execution. |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | *(none)* | Path to the Google service-account key file used by the Google client libraries. In local dev this is bind-mounted into the container. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | *(none)* | Path to the Google service-account key file used by the Google client libraries. In local dev this is bind-mounted into the container. Use an **absolute** path when running the docker job backend (the default): the backend re-mounts this file into each job container and the host daemon needs an absolute bind source. |
 | `GOOGLE_ACCESS_KEY_ID` | No | *(none)* | HMAC access key id, used when generating presigned URLs for direct browser uploads to GCS. |
 | `GOOGLE_ACCESS_KEY_SECRET` | No | *(none)* | HMAC secret paired with `GOOGLE_ACCESS_KEY_ID`. |
 | `GCS_ENDPOINT_URL` | No | `https://storage.googleapis.com` | Storage endpoint the Modal sandbox uses to read dataset files. Override to point at an alternative/compatible endpoint. |
 
-## Job execution (Cloud Run)
+## Job execution
 
-AutoDiscovery runs are executed as Google Cloud Run job executions.
+Each AutoDiscovery run is launched by a swappable **job backend**, selected with `JOB_BACKEND`:
+
+- `docker` (default) — runs the job as a local Docker container on the host daemon. Keeps the
+  out-of-the-box experience infra-agnostic; intended for local development and
+  single-user/on-prem deployments.
+- `gcp` — runs the job as a Google Cloud Run job execution. Deployments that run jobs on Cloud
+  Run must set `JOB_BACKEND=gcp` explicitly.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+| `JOB_BACKEND` | No | `docker` | Job backend: `docker` (local containers) or `gcp` (Cloud Run). |
+| `AUTODISCOVERY_IMAGE` | docker | `autodiscovery:dev` | **docker backend.** Image the backend launches per job. Build it locally with `docker compose build autodiscovery`. |
+| `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | **gcp backend.** Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+
+The docker backend bind-mounts the GCP key into each job container using the **host** path of
+`GOOGLE_APPLICATION_CREDENTIALS` (compose forwards it internally as `GCP_KEY_HOST_PATH`), which is
+why that variable must be an absolute path for the docker backend.
+
+### Docker backend (default)
+
+With the default backend, `docker compose up` launches each run as a local container. The compose
+stack mounts the host Docker socket into the API so it can start those containers
+(docker-out-of-docker). Build the job image once first:
+
+```sh
+docker compose build autodiscovery
+docker compose up
+```
+
+The job container mounts the GCS bucket at `/mnt/gcs` itself via gcsfuse (triggered by
+`GCSFUSE_BUCKET`, which the backend sets from `GCS_BUCKET`); on Cloud Run the platform provides
+that mount instead.
+
+To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then unused).
+
+> **Security note.** The docker backend gives the API access to the host Docker socket, which is
+> effectively root on the host. This is fine for local/single-user use, but for a shared,
+> multi-user deployment (e.g. `AUTH_PROVIDER=password_file`) prefer `JOB_BACKEND=gcp`, where the
+> API only holds scoped cloud credentials. The job's data view is identical either way.
 
 ## Modal (code-execution sandbox)
 
@@ -80,8 +114,8 @@ AutoDiscovery runs execute generated code inside Modal sandboxes.
 | `MODAL_TOKEN_SECRET` | Yes | *(none)* | Modal API token secret. |
 | `MODAL_ENVIRONMENT` | Yes | *(none)* | Modal environment name to run sandboxes in. |
 | `MODAL_IMAGE_BUILDER_VERSION` | No | *(Modal default)* | Pins the Modal image builder version used to build sandbox images. |
-| `MODAL_APP_NAME` | No | `asta-autodiscovery` | Modal app name the sandboxes are associated with. |
-| `MODAL_BUCKET_SECRET` | No | `example-bucket-secret` | Name of the Modal secret holding the bucket credentials the sandbox uses to mount dataset files. |
+| `MODAL_APP_NAME` | No | `asta-autodiscovery` | Modal app name the sandboxes are associated with. Created on demand if it doesn't exist. |
+| `MODAL_BUCKET_SECRET` | Yes | `example-bucket-secret` | Name of the Modal [secret](https://modal.com/docs/guide/secrets) holding the GCS credentials the sandbox uses to mount dataset files. The default is a **placeholder that does not exist** — you must set this to the name of a real secret in your `MODAL_ENVIRONMENT`, or every run fails at sandbox creation with `Secret '…' not found`. |
 
 ## LLM providers
 

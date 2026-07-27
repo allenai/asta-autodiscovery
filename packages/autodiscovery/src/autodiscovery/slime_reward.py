@@ -215,7 +215,22 @@ class SurpriseRewardScorer:
             except Exception as e:  # noqa: BLE001 - reward calls must not crash training
                 result = self._failed_result(hypothesis, f"{type(e).__name__}: {e}")
             self._log_result(result)
+            self._log_observability(result)
             return result
+
+    def _log_observability(self, result: dict) -> None:
+        """Emit a compact per-hypothesis line to stdout so, when the reward server
+        log is streamed, both API failures (e.g. gpt rate limits -> errors) and the
+        belief-sample spread (n_belief_samples category counts) are visible live."""
+        if result.get("error"):
+            print(f"[reward-error] {result['error']}", flush=True)  # noqa: T201
+        else:
+            print(  # noqa: T201
+                f"[belief] change={result.get('belief_change')} "
+                f"kl={result.get('kl_divergence')} reward={result.get('reward')} "
+                f"prior={result.get('prior_belief')} posterior={result.get('posterior_belief')}",
+                flush=True,
+            )
 
     # -- internals -----------------------------------------------------------
 
@@ -293,6 +308,10 @@ class SurpriseRewardScorer:
             kl_scale=config.kl_scale,
             mode=config.reward_mode,
         )
+        # Belief distributions (n_belief_samples category/true-false counts) expose
+        # how the samples split -> the sample-level variance behind the surprise.
+        prior_belief = prior.to_dict() if hasattr(prior, "to_dict") else None
+        posterior_belief = posterior.to_dict() if hasattr(posterior, "to_dict") else None
         return {
             "reward": float(reward),
             "success": True,
@@ -301,6 +320,8 @@ class SurpriseRewardScorer:
             "kl_divergence": float(kl_divergence),
             "prior_mean": float(prior.get_mean_belief()),
             "posterior_mean": float(posterior.get_mean_belief(prior=prior)),
+            "prior_belief": prior_belief,
+            "posterior_belief": posterior_belief,
             "hypothesis": hypothesis,
             "execution_log": execution_log,
             "error": None,
@@ -325,6 +346,8 @@ class SurpriseRewardScorer:
             "kl_divergence": None,
             "prior_mean": None,
             "posterior_mean": None,
+            "prior_belief": None,
+            "posterior_belief": None,
             "hypothesis": hypothesis,
             "execution_log": execution_log,
             "error": error,

@@ -4,14 +4,18 @@
         show-version set-version push-version-tag
 
 # Test targets
+# --all-packages installs every workspace member (the root project has no
+# dependencies, so a plain `uv run` would omit each package's own deps, e.g.
+# IPython / asta_sandbox). This makes the targets work from a cold environment,
+# so CI can invoke `make test` directly.
 test:
-	uv run pytest -m "not modal and not adc"
+	uv run --all-packages pytest -m "not modal and not adc"
 
 test-modal:
-	uv run pytest -m "modal"
+	uv run --all-packages pytest -m "modal"
 
 test-all:
-	uv run pytest
+	uv run --all-packages pytest
 
 # Code quality targets
 lint:

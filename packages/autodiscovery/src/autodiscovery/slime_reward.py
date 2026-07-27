@@ -119,6 +119,11 @@ class SurpriseRewardConfig:
     code_timeout: int = 30 * 60
     max_rounds: int = 50
     run_data_loading: bool = True
+    # When True, the scored result carries an ``execution_log`` string: the
+    # experiment trace (hypothesis/plan query + code output + analysis + review)
+    # that produced the surprise. Returned alongside the scalar so a slime run
+    # can log it per sample or fold it into training.
+    include_execution_log: bool = True
 
     @classmethod
     def from_env(cls) -> SurpriseRewardConfig:
@@ -245,8 +250,14 @@ class SurpriseRewardScorer:
         # Keep the policy's hypothesis verbatim rather than the query round-trip.
         node.hypothesis = hypothesis
 
+        execution_log = self._build_execution_log(node) if config.include_execution_log else None
+
         if not node.success:
-            return self._failed_result(hypothesis, "experiment failed executor/reviewer checks")
+            return self._failed_result(
+                hypothesis,
+                "experiment failed executor/reviewer checks",
+                execution_log=execution_log,
+            )
 
         # Same evidence construction as compute_and_store_reward (offline beliefs).
         evidence_msg = [
@@ -291,10 +302,21 @@ class SurpriseRewardScorer:
             "prior_mean": float(prior.get_mean_belief()),
             "posterior_mean": float(posterior.get_mean_belief(prior=prior)),
             "hypothesis": hypothesis,
+            "execution_log": execution_log,
             "error": None,
         }
 
-    def _failed_result(self, hypothesis: str, error: str) -> dict:
+    def _build_execution_log(self, node) -> str:
+        """Assemble the experiment trace (query + code output + analysis + review)."""
+        return get_context_string(
+            hyp_exp_query=node.query,
+            code_output=node.code_output,
+            analysis=node.analysis,
+            review=node.review,
+            include_code_output=True,
+        )
+
+    def _failed_result(self, hypothesis: str, error: str, execution_log: str | None = None) -> dict:
         return {
             "reward": float(self.config.failed_reward),
             "success": False,
@@ -304,6 +326,7 @@ class SurpriseRewardScorer:
             "prior_mean": None,
             "posterior_mean": None,
             "hypothesis": hypothesis,
+            "execution_log": execution_log,
             "error": error,
         }
 
@@ -642,6 +665,9 @@ def cli_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--code_timeout", type=int, default=None)
     parser.add_argument(
         "--run_data_loading", action=argparse.BooleanOptionalAction, default=None
+    )
+    parser.add_argument(
+        "--include_execution_log", action=argparse.BooleanOptionalAction, default=None
     )
     args = parser.parse_args(argv)
 

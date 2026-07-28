@@ -1,0 +1,118 @@
+{
+  "archaeology": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/archaeology/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "introduction_pathways_non-native_plants": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/introduction_pathways_non-native_plants/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "meta_regression": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/meta_regression/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "meta_regression_raw": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/meta_regression_raw/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "nls_incarceration": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/nls_incarceration/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "nls_raw": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/nls_raw/metadata_2.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "nls_ses": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/nls_ses/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "requirements_engineering_for_ML_enabled_systems": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/requirements_engineering_for_ML_enabled_systems/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "worldbank_education_gdp": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/worldbank_education_gdp/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "worldbank_education_gdp_indicators": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/test/worldbank_education_gdp_indicators/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "evolution_freshwater_fish": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/train/evolution_freshwater_fish/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "immigration_offshoring_effect_on_employment": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/train/immigration_offshoring_effect_on_employment/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "nls_bmi": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/train/nls_bmi/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "nls_bmi_raw": {
+    "dataset_metadata": "${DATA_ROOT}/discoverybench/real/train/nls_bmi_raw/metadata_0.json",
+    "dataset_metadata_type": "dbench"
+  },
+  "affairs": {
+    "dataset_metadata": "${DATA_ROOT}/blade/affairs/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "amtl": {
+    "dataset_metadata": "${DATA_ROOT}/blade/amtl/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "boxes": {
+    "dataset_metadata": "${DATA_ROOT}/blade/boxes/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "caschools": {
+    "dataset_metadata": "${DATA_ROOT}/blade/caschools/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "conversation": {
+    "dataset_metadata": "${DATA_ROOT}/blade/conversation/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "crofoot": {
+    "dataset_metadata": "${DATA_ROOT}/blade/crofoot/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "fertility": {
+    "dataset_metadata": "${DATA_ROOT}/blade/fertility/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "fish": {
+    "dataset_metadata": "${DATA_ROOT}/blade/fish/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "hurricane": {
+    "dataset_metadata": "${DATA_ROOT}/blade/hurricane/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "mortgage": {
+    "dataset_metadata": "${DATA_ROOT}/blade/mortgage/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "panda_nuts": {
+    "dataset_metadata": "${DATA_ROOT}/blade/panda_nuts/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "reading": {
+    "dataset_metadata": "${DATA_ROOT}/blade/reading/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "soccer": {
+    "dataset_metadata": "${DATA_ROOT}/blade/soccer/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "teachingratings": {
+    "dataset_metadata": "${DATA_ROOT}/blade/teachingratings/info.json",
+    "dataset_metadata_type": "blade"
+  },
+  "toy": {
+    "dataset_metadata": "${DATA_ROOT}/blade/toy/info.json",
+    "dataset_metadata_type": "blade"
+  }
+}

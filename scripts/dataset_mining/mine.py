@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Scrape datasets from awesomedata/awesome-public-datasets into a GCS bucket.
+"""Mine public research datasets into a GCS bucket, from three source types.
+
+Two source shapes, one tool:
+
+A) URL directory -- awesomedata/awesome-public-datasets (a README.rst of dataset
+   homepages). Pipeline: catalog -> classify -> fetch (below).
+
+B) Data repos -- allenai/discoverybench and behavioral-data/BLADE ship the data
+   files inside the repo with a fixed layout the autodiscovery loaders need.
+   `repo` clones the subtree and mirrors it to GCS verbatim; `registry` emits a
+   dataset_id -> metadata map the reward server consumes.
+
+    repo      clone <source> subtree      -> GCS (layout preserved) + manifest
+    registry  enumerate mirrored data     -> registry.json {id: {dataset_metadata, type}}
+
+Scrape datasets from awesomedata/awesome-public-datasets into a GCS bucket.
 
 Pipeline (each stage reads the previous stage's jsonl, so you can inspect/edit
 between stages):
@@ -308,6 +323,137 @@ def cmd_fetch(args) -> None:
           + (f" -> {args.manifest}" if args.execute and args.manifest else ""))
 
 
+# -- repo sources: clone a data repo subtree and mirror it to GCS -------------
+
+# DiscoveryBench and BLADE ship the actual data files inside the repo, with a
+# fixed layout the autodiscovery loaders require. Mirror the subtree verbatim.
+REPO_SOURCES = {
+    "discoverybench": {
+        "clone": "https://github.com/allenai/discoverybench.git",
+        "subtree": "discoverybench/real",   # <split>/<dataset>/metadata_<i>.json + data files
+        "gcs_sub": "discoverybench/real",
+        "sparse": None,
+        "type": "dbench",
+    },
+    "blade": {
+        "clone": "https://github.com/behavioral-data/BLADE.git",
+        "subtree": "blade_bench/datasets",  # <dataset>/info.json + data.csv
+        "gcs_sub": "blade",
+        "sparse": "blade_bench/datasets",   # avoid pulling the benchmark code
+        "type": "blade",
+    },
+}
+
+
+def cmd_repo(args) -> None:
+    manifest = []
+    for source in args.sources:
+        cfg = REPO_SOURCES[source]
+        gcs = f"{args.gcs.rstrip('/')}/{cfg['gcs_sub']}"
+        work = tempfile.mkdtemp(prefix=f"mine_{source}_")
+        clone_dir = os.path.join(work, source)
+        try:
+            clone_cmd = ["git", "clone", "--depth", "1", "-q"]
+            if cfg["sparse"]:
+                clone_cmd += ["--filter=blob:none", "--sparse"]
+            clone_cmd += [cfg["clone"], clone_dir]
+            print(f"[repo] cloning {source} ...")
+            subprocess.run(clone_cmd, check=True)
+            if cfg["sparse"]:
+                subprocess.run(
+                    ["git", "-C", clone_dir, "sparse-checkout", "set", cfg["sparse"], "-q"], check=True
+                )
+            subtree = os.path.join(clone_dir, cfg["subtree"])
+            if not os.path.isdir(subtree):
+                print(f"[repo] {source}: subtree {cfg['subtree']} missing", file=sys.stderr)
+                continue
+            if args.dry_run:
+                n = sum(len(fs) for _, _, fs in os.walk(subtree))
+                print(f"[repo] (dry-run) would rsync {n} files: {cfg['subtree']} -> {gcs}")
+            else:
+                print(f"[repo] rsync {source} -> {gcs}")
+                subprocess.run(["gcloud", "storage", "rsync", "-r", subtree, gcs], check=True)
+            for dp, _, files in os.walk(subtree):
+                for fn in sorted(files):
+                    fp = os.path.join(dp, fn)
+                    rel = os.path.relpath(fp, subtree)
+                    manifest.append(
+                        {"source": source, "rel_path": rel, "gcs_uri": f"{gcs}/{rel}",
+                         "bytes": os.path.getsize(fp), "type": cfg["type"]}
+                    )
+        finally:
+            subprocess.run(["rm", "-rf", work], check=False)
+    if args.manifest and not args.dry_run:
+        with open(args.manifest, "w", encoding="utf-8") as f:
+            for m in manifest:
+                f.write(json.dumps(m) + "\n")
+    tally: dict[str, list] = {}
+    for m in manifest:
+        t = tally.setdefault(m["source"], [0, 0]); t[0] += 1; t[1] += m["bytes"]
+    for s, (n, tot) in tally.items():
+        print(f"[repo] {s}: {n} files, {tot/1e6:.1f} MB")
+    if args.manifest and not args.dry_run:
+        print(f"[repo] manifest -> {args.manifest}")
+
+
+# -- registry: emit a slime/autodiscovery dataset registry from mirrored data -
+
+
+def _gcs_ls_recursive(prefix: str) -> list[str]:
+    out = subprocess.run(
+        ["gcloud", "storage", "ls", "-r", prefix.rstrip("/") + "/**"],
+        capture_output=True, text=True,
+    )
+    return [l.strip() for l in out.stdout.splitlines() if l.strip().startswith("gs://")]
+
+
+def cmd_registry(args) -> None:
+    """Build a dataset_id -> metadata registry the reward server consumes.
+
+    Paths are parameterized by a root placeholder (default ${DATA_ROOT}) because
+    the autodiscovery loader opens local/weka paths, not gs:// URIs -- sync the
+    mirrored GCS data to that root on the reward-server node.
+    """
+    root = args.root_var
+    registry: dict[str, dict] = {}
+    collisions = []
+
+    if "discoverybench" in args.sources:
+        objs = _gcs_ls_recursive(f"{args.gcs.rstrip('/')}/discoverybench/real")
+        per_ds: dict[tuple, list[str]] = {}
+        for uri in objs:
+            m = re.search(r"/discoverybench/real/(train|test)/([^/]+)/(metadata_\d+\.json)$", uri)
+            if m:
+                per_ds.setdefault((m.group(1), m.group(2)), []).append(m.group(3))
+        for (split, dataset), metas in sorted(per_ds.items()):
+            meta = sorted(metas, key=lambda s: int(re.search(r"\d+", s).group()))[0]
+            ds_id = dataset if dataset not in registry else f"{split}-{dataset}"
+            if dataset in registry:
+                collisions.append(dataset)
+            registry[ds_id] = {
+                "dataset_metadata": f"{root}/discoverybench/real/{split}/{dataset}/{meta}",
+                "dataset_metadata_type": "dbench",
+            }
+
+    if "blade" in args.sources:
+        objs = _gcs_ls_recursive(f"{args.gcs.rstrip('/')}/blade")
+        for uri in sorted(objs):
+            m = re.search(r"/blade/([^/]+)/info\.json$", uri)
+            if m:
+                ds_id = m.group(1)
+                registry[ds_id] = {
+                    "dataset_metadata": f"{root}/blade/{ds_id}/info.json",
+                    "dataset_metadata_type": "blade",
+                }
+
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(registry, f, indent=2)
+        f.write("\n")
+    print(f"[registry] {len(registry)} datasets -> {args.out} (root={root})")
+    if collisions:
+        print(f"[registry] note: split-prefixed ids for collisions: {collisions}", file=sys.stderr)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -335,6 +481,20 @@ def main() -> None:
     fp.add_argument("--manifest", default="manifest.jsonl")
     fp.add_argument("--execute", action="store_true", help="actually download+upload (default: dry-run plan)")
     fp.set_defaults(func=cmd_fetch)
+
+    rp = sub.add_parser("repo", help="clone a data repo (discoverybench/blade) subtree -> GCS")
+    rp.add_argument("--sources", nargs="+", choices=list(REPO_SOURCES), default=list(REPO_SOURCES))
+    rp.add_argument("--gcs", required=True, help="gs://bucket/prefix (source subdir appended)")
+    rp.add_argument("--manifest", default="manifest_repos.jsonl")
+    rp.add_argument("--dry-run", action="store_true", help="clone + count, no rsync")
+    rp.set_defaults(func=cmd_repo)
+
+    rg = sub.add_parser("registry", help="emit slime dataset registry from mirrored repo data")
+    rg.add_argument("--sources", nargs="+", choices=list(REPO_SOURCES), default=list(REPO_SOURCES))
+    rg.add_argument("--gcs", required=True, help="gs://bucket/prefix the data was mirrored under")
+    rg.add_argument("--root-var", default="${DATA_ROOT}", help="path root placeholder in emitted paths")
+    rg.add_argument("--out", default="registry.json")
+    rg.set_defaults(func=cmd_registry)
 
     args = p.parse_args()
     args.func(args)

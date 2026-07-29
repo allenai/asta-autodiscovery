@@ -48,16 +48,42 @@ each provider; the table below is the variable reference.
 | `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
 | `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
 
-## Google Cloud & storage
+## Persistence
 
-Job data, run metadata, results, and user profiles are stored in Google Cloud Storage.
+Run metadata, uploaded datasets, results, and user profiles are held in a swappable
+**object store**, selected with `STORAGE_BACKEND`:
+
+- `local` (default) — a directory on the host, bind-mounted into the containers. No cloud
+  account, bucket, or credentials required; the stack persists real data out of the box.
+- `gcs` — a Google Cloud Storage bucket. Required by `JOB_BACKEND=gcp` and
+  `CODE_EXECUTION_BACKEND=modal` (see [Choosing a workable
+  combination](#choosing-a-workable-combination)).
+
+Both backends use the same key layout, so a bucket and a data directory are
+interchangeable (`gsutil rsync` moves data either way). See
+[Swappable Persistence Backends](design/storage-backends.md) for the design.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `GCP_PROJECT` | Yes | *(none)* | Google Cloud project id. Required for GCS and job execution. |
-| `GCS_BUCKET` | No | `autodiscovery` | Name of the bucket holding run data/results/metadata. `AUTODISCOVERY_BUCKET` is accepted as an alias if `GCS_BUCKET` is unset. |
+| `STORAGE_BACKEND` | No | `local` | Persistence backend: `local` (host directory) or `gcs` (Cloud Storage bucket). Set explicitly for any deployment that keeps data in GCS. |
+| `STORAGE_DIR` | No | `/mnt/data` | **local backend.** Root directory of the store as the process sees it. In `.env` this is the **host** directory to keep run data in (default `./data`); compose mounts it at `/mnt/data`. Use an **absolute** path: the docker job backend bind-mounts each run's subtree into its job container and the host daemon needs an absolute bind source. |
+| `STORAGE_HOST_DIR` | No | *(unset)* | **local backend.** Host path of the store, used as the bind source for job containers. Set automatically by `docker-compose.yaml`; when unset, `STORAGE_DIR` is assumed to already be a host path. |
+
+> **Uploads.** With `gcs`, the browser uploads datasets straight to a presigned URL and the
+> bytes never reach the API. With `local` there is no such capability URL, so uploads are
+> streamed through the API (`PUT /api/runs/<runid>/datasets/<filename>`) — which is why the
+> proxy's `client_max_body_size` for `/api` matters for this backend.
+
+### Google Cloud
+
+Required when `STORAGE_BACKEND=gcs`, `JOB_BACKEND=gcp`, or `CODE_EXECUTION_BACKEND=modal`.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `GCP_PROJECT` | gcs / gcp | *(none)* | Google Cloud project id. Required for GCS and Cloud Run job execution. |
+| `GCS_BUCKET` | gcs | `autodiscovery` | Name of the bucket holding run data/results/metadata. `AUTODISCOVERY_BUCKET` is accepted as an alias if `GCS_BUCKET` is unset. |
 | `GCP_REGION` | No | `us-west1` | Region used for job execution. |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | *(none)* | Path to the Google service-account key file used by the Google client libraries. In local dev this is bind-mounted into the container. Use an **absolute** path when running the docker job backend (the default): the backend re-mounts this file into each job container and the host daemon needs an absolute bind source. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | gcs / gcp | *(none)* | Path to the Google service-account key file used by the Google client libraries. In local dev this is bind-mounted into the container. Use an **absolute** path when running the docker job backend against `gcs`: the backend re-mounts this file into each job container and the host daemon needs an absolute bind source. |
 | `GOOGLE_ACCESS_KEY_ID` | No | *(none)* | HMAC access key id, used when generating presigned URLs for direct browser uploads to GCS. |
 | `GOOGLE_ACCESS_KEY_SECRET` | No | *(none)* | HMAC secret paired with `GOOGLE_ACCESS_KEY_ID`. |
 | `GCS_ENDPOINT_URL` | No | `https://storage.googleapis.com` | Storage endpoint the Modal sandbox uses to read dataset files. Override to point at an alternative/compatible endpoint. |
@@ -93,13 +119,17 @@ docker compose build autodiscovery
 docker compose up
 ```
 
-The job container mounts its GCS data at `/mnt/gcs` itself via gcsfuse (triggered by
-`GCSFUSE_BUCKET`, which the backend sets from `GCS_BUCKET`); on Cloud Run the platform provides
-that mount instead. The docker backend scopes the mount to the run's own prefix
+The job container gets the run's data as a filesystem mount at `/mnt/gcs`, supplied
+according to `STORAGE_BACKEND`: a bind mount of the run's directory under `STORAGE_HOST_DIR`
+(`local`), or a gcsfuse mount the container makes itself (`gcs`, triggered by
+`GCSFUSE_BUCKET` which the backend sets from `GCS_BUCKET`). On Cloud Run the platform
+provides that mount instead. Either way the docker backend scopes it to the run's own prefix
 (`users/<uid>/jobs/<jid>`), so a job container never sees other users' data — see
 [Code-execution backend](#code-execution-backend) for why that matters.
 
-To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then unused).
+To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then
+unused). That requires `STORAGE_BACKEND=gcs`, since Cloud Run cannot mount a directory on
+your host.
 
 > **Security note.** The docker backend gives the API access to the host Docker socket, which is
 > effectively root on the host. This is fine for local/single-user use, but for a shared,
@@ -117,15 +147,29 @@ The AD job runs the LLM-generated experiment code through a configurable executo
 
 - `process` (default) — runs code in an isolated subprocess inside the job container, in a separate
   sandbox venv; per-cell package installs are discarded, and no state carries across cells. No cloud
-  dependency (Modal is not required). Reads the dataset from the job's `/mnt/gcs` mount.
+  dependency (Modal is not required). Reads the dataset from the job's data mount.
 - `local` — runs code in-process with no isolation. Lowest overhead, least safe.
 - `modal` — runs code in a remote Modal sandbox that mounts **only** the per-job data prefix,
-  read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables.
+  read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables and
+  `STORAGE_BACKEND=gcs` (the sandbox mounts the dataset from `gs://`).
+
+### Choosing a workable combination
+
+Two backends need the run's data reachable from outside the API process, so they only work with
+`STORAGE_BACKEND=gcs`. The API **fails to start** on either mismatch rather than running against
+data the job or sandbox cannot see:
+
+| Setting | Works with `STORAGE_BACKEND=local` | Works with `STORAGE_BACKEND=gcs` |
+| --- | --- | --- |
+| `JOB_BACKEND=docker` | ✅ | ✅ |
+| `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
+| `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
+| `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
 ### Choosing a safe combination
 
 `process`/`local` execute untrusted, generated code **inside the job container**, so that code can
-read whatever GCS data the container mounts. `modal` instead runs it on a separate machine with only
+read whatever run data the container mounts. `modal` instead runs it on a separate machine with only
 the per-job data mounted read-only. Whether in-process execution is safe therefore depends on the
 job backend (how the mount is scoped) and on whether the deployment is multi-user:
 

@@ -8,7 +8,7 @@ import threading
 from typing import Any
 
 from autodiscovery_jobs import JobConfig
-from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
+from autodiscovery_jobs.persistence import list_experiment_files, read_experiment_node
 
 
 class ExperimentNode:

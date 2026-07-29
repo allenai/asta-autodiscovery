@@ -1,8 +1,13 @@
 /**
- * GCS Upload Module
+ * Dataset Upload Module
  *
- * Handles direct uploads to Google Cloud Storage using presigned URLs
- * with progress tracking via XMLHttpRequest.
+ * Uploads a file with a single PUT and progress tracking via XMLHttpRequest.
+ *
+ * The destination comes from the API's generate-upload-url call and is either a
+ * presigned cloud-storage URL (the upload bypasses our API entirely) or, for
+ * storage backends without presigning, a same-origin API path. Only the latter
+ * gets an Authorization header: sending our bearer token to a third-party storage
+ * host would leak it, and presigned URLs carry their own authorization.
  */
 
 export interface UploadProgressEvent {
@@ -16,6 +21,8 @@ export interface UploadOptions {
     file: File;
     uploadUrl: string;
     uploadStartTime: number;
+    /** Bearer token to attach; only set for same-origin (our own API) uploads. */
+    authToken?: string | null;
     onProgress?: (event: UploadProgressEvent) => void;
     onComplete?: () => void;
     onError?: (error: Error) => void;
@@ -23,14 +30,22 @@ export interface UploadOptions {
 }
 
 /**
- * Upload a file directly to GCS using a presigned URL
+ * Upload a file with a single PUT to the URL the API handed back
  *
  * @param options - Upload configuration options
  * @returns Promise that resolves when upload completes or rejects on error
  */
 export function uploadToGCS(options: UploadOptions): Promise<void> {
-    const { file, uploadUrl, uploadStartTime, onProgress, onComplete, onError, abortSignal } =
-        options;
+    const {
+        file,
+        uploadUrl,
+        uploadStartTime,
+        authToken,
+        onProgress,
+        onComplete,
+        onError,
+        abortSignal,
+    } = options;
 
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -92,6 +107,9 @@ export function uploadToGCS(options: UploadOptions): Promise<void> {
         // Open connection and send
         xhr.open('PUT', uploadUrl, true);
         xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        if (authToken) {
+            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+        }
         xhr.send(file);
     });
 }

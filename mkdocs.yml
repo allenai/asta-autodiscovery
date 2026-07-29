@@ -49,6 +49,7 @@ nav:
       - Code Execution: api/code_execution.md
   - Design:
       - Swappable Auth Providers: design/auth-providers.md
+      - Swappable Persistence Backends: design/storage-backends.md
 
 markdown_extensions:
   - pymdownx.highlight:

@@ -19,8 +19,25 @@ class JobAlreadyExistsError(AutodiscoveryJobError):
     pass
 
 
-class GCSError(AutodiscoveryJobError):
-    """Raised when GCS operations fail."""
+class StorageError(AutodiscoveryJobError):
+    """Raised when a persistence (object store) operation fails."""
+
+    pass
+
+
+# Historical name from when persistence was GCS-only. Retained as an alias so
+# existing `except GCSError` / import sites keep working across both backends.
+GCSError = StorageError
+
+
+class ObjectNotFoundError(StorageError):
+    """Raised when a specific object/key does not exist in the store."""
+
+    pass
+
+
+class StorageBackendError(AutodiscoveryJobError):
+    """Raised when a storage backend is misconfigured or unknown."""
 
     pass
 

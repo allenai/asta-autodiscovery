@@ -97,9 +97,23 @@ def test_build_job_args_boolean_kwargs(mock_config):
 
 @pytest.fixture
 def docker_config():
+    """Docker job backend over the gcs store (job container gcsfuse-mounts it)."""
     return JobConfig(
         backend="docker",
+        storage_backend="gcs",
         bucket="test-bucket",
+        job_name="autodiscovery-job",
+        job_image="autodiscovery:dev",
+    )
+
+
+@pytest.fixture
+def docker_local_config():
+    """Docker job backend over the local store (job container bind-mounts it)."""
+    return JobConfig(
+        backend="docker",
+        storage_backend="local",
+        storage_dir="/mnt/data",
         job_name="autodiscovery-job",
         job_image="autodiscovery:dev",
     )
@@ -135,6 +149,54 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     assert "SYS_ADMIN" in kwargs["cap_add"]
     # host credentials bind-mounted into the job container
     assert "/host/secrets/gcp-key.json" in kwargs["volumes"]
+
+
+def test_docker_run_job_bind_mounts_local_store(docker_local_config, monkeypatch):
+    monkeypatch.setenv("STORAGE_HOST_DIR", "/host/ad-data")
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        DockerBackend(docker_local_config).run_job("testuser", "job1", n_experiments=4)
+
+    kwargs = client.containers.run.call_args.kwargs
+    # The run's own host subtree is mounted where the job args expect it, so the
+    # command is identical to the gcsfuse case.
+    assert kwargs["volumes"] == {
+        "/host/ad-data/users/testuser/jobs/job1": {
+            "bind": "/mnt/gcs/users/testuser/jobs/job1",
+            "mode": "rw",
+        }
+    }
+    assert "--dataset_metadata=/mnt/gcs/users/testuser/jobs/job1/metadata.json" in kwargs[
+        "command"
+    ]
+    # No gcsfuse, so none of its privileges or triggers.
+    assert "GCSFUSE_BUCKET" not in kwargs["environment"]
+    assert kwargs["devices"] == []
+    assert kwargs["cap_add"] == []
+    assert kwargs["security_opt"] == []
+
+
+def test_docker_local_store_falls_back_to_storage_dir(docker_local_config, monkeypatch):
+    """Without STORAGE_HOST_DIR the API isn't containerized, so storage_dir is a host path."""
+    monkeypatch.delenv("STORAGE_HOST_DIR", raising=False)
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        DockerBackend(docker_local_config).run_job("testuser", "job1", n_experiments=1)
+
+    volumes = client.containers.run.call_args.kwargs["volumes"]
+    assert "/mnt/data/users/testuser/jobs/job1" in volumes
+
+
+def test_docker_local_store_requires_absolute_host_dir(monkeypatch):
+    monkeypatch.setenv("STORAGE_HOST_DIR", "./data")
+    config = JobConfig(backend="docker", storage_backend="local", job_image="ad:dev")
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        with pytest.raises(DockerBackendError, match="absolute"):
+            DockerBackend(config).run_job("u", "j", n_experiments=1)
 
 
 def test_docker_run_job_requires_image(monkeypatch):

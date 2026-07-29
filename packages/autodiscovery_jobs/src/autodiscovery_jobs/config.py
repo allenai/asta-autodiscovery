@@ -15,7 +15,16 @@ DATASET_EXPIRY_DAYS: int = 7
 class JobConfig:
     """Configuration for Cloud Run job management."""
 
-    # GCS Configuration
+    # Persistence backend selection: "local" (a directory on the host, default) or
+    # "gcs" (a Cloud Storage bucket). Local is the default so the stack persists
+    # data out of the box with no cloud account; deployments that keep data in GCS
+    # must set STORAGE_BACKEND=gcs explicitly.
+    storage_backend: str = "local"
+    # Root directory for the local backend. In containers this is where the host
+    # data directory is mounted (see docker-compose.yaml); ignored for gcs.
+    storage_dir: str = "/mnt/data"
+
+    # GCS Configuration (used when storage_backend == "gcs")
     bucket: str = "autodiscovery"
     project_id: str | None = None  # Auto-detect from gcloud if None
 
@@ -56,6 +65,8 @@ class JobConfig:
             config = JobConfig.from_env(bucket="my-custom-bucket")
         """
         config = cls(
+            storage_backend=os.environ.get("STORAGE_BACKEND", cls.storage_backend),
+            storage_dir=os.environ.get("STORAGE_DIR", cls.storage_dir),
             bucket=os.environ.get("GCS_BUCKET")
             or os.environ.get("AUTODISCOVERY_BUCKET", cls.bucket),
             project_id=os.environ.get("GCP_PROJECT"),

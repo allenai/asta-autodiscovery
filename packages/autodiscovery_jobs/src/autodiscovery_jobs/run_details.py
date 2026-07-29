@@ -1,8 +1,9 @@
-"""Service for managing run_details.json files in GCS.
+"""Service for managing run_details.json documents.
 
 This module provides a RunDetails data class and functions for creating,
-reading, and updating run details stored in GCS. Each run has a run_details.json
-file that tracks execution state.
+reading, and updating run details in the configured object store
+(:mod:`autodiscovery_jobs.storage`). Each run has a run_details.json object that
+tracks execution state.
 """
 
 from __future__ import annotations
@@ -12,8 +13,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from .client import get_storage_client
 from .config import JobConfig
+from .storage import get_store
 
 
 # Terminal statuses that indicate job completion
@@ -22,7 +23,7 @@ TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 
 @dataclass
 class RunDetails:
-    """Data class representing run details stored in GCS.
+    """Data class representing a run's persisted execution state.
 
     Attributes:
         execution_id: Cloud Run execution ID
@@ -85,14 +86,14 @@ class RunDetails:
 
 
 def get_run_details_path(userid: str, runid: str) -> str:
-    """Get the GCS blob path for run_details.json.
+    """Get the object key for run_details.json.
 
     Args:
         userid: User identifier
         runid: Run identifier
 
     Returns:
-        Blob path for run_details.json
+        Object key for run_details.json
     """
     return f"users/{userid}/jobs/{runid}/run_details.json"
 
@@ -113,14 +114,15 @@ def create_run_details(
         The created RunDetails object
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store = get_store(config)
 
     run_details = RunDetails.create_new()
 
-    blob_path = get_run_details_path(userid, runid)
-    blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(run_details.to_dict(), indent=2))
+    store.write_text(
+        get_run_details_path(userid, runid),
+        json.dumps(run_details.to_dict(), indent=2),
+        content_type="application/json",
+    )
 
     return run_details
 
@@ -130,7 +132,7 @@ def get_run_details(
     runid: str,
     config: JobConfig | None = None,
 ) -> RunDetails | None:
-    """Get run details from GCS.
+    """Get run details from the object store.
 
     Args:
         userid: User identifier
@@ -141,16 +143,11 @@ def get_run_details(
         RunDetails object, or None if not found
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    blob_path = get_run_details_path(userid, runid)
-    blob = bucket.blob(blob_path)
+    store = get_store(config)
 
     try:
-        content = blob.download_as_text()
-        data = json.loads(content)
-        return RunDetails.from_dict(data)
+        content = store.read_text(get_run_details_path(userid, runid))
+        return RunDetails.from_dict(json.loads(content))
     except Exception:
         return None
 
@@ -161,7 +158,7 @@ def update_run_details(
     updates: dict[str, Any],
     config: JobConfig | None = None,
 ) -> RunDetails:
-    """Update run details in GCS.
+    """Update run details in the object store.
 
     Args:
         userid: User identifier
@@ -173,8 +170,7 @@ def update_run_details(
         Updated RunDetails object
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store = get_store(config)
 
     # Get existing details
     run_details = get_run_details(userid, runid, config)
@@ -186,10 +182,12 @@ def update_run_details(
     # Update fields
     run_details_dict.update(updates)
 
-    # Save back to GCS
-    blob_path = get_run_details_path(userid, runid)
-    blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(run_details_dict, indent=2))
+    # Save back to the store
+    store.write_text(
+        get_run_details_path(userid, runid),
+        json.dumps(run_details_dict, indent=2),
+        content_type="application/json",
+    )
 
     return RunDetails.from_dict(run_details_dict)
 
@@ -202,7 +200,7 @@ def refresh_run_status(
     """Get run details, refreshing status from the job backend if not yet finished.
 
     This function:
-    1. Fetches run details from GCS
+    1. Fetches run details from the object store
     2. If the run is already finished (terminal status), returns as-is
     3. If not finished and has an execution_id, queries the configured job
        backend (Cloud Run or Docker) for current status

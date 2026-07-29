@@ -1,8 +1,9 @@
-"""Service for managing email_state.json files in GCS.
+"""Service for managing email_state.json documents.
 
-This module tracks email notification state for completed runs.
-Each run can have an email_state.json file that records whether
-a completion email was sent and what content was included.
+This module tracks email notification state for completed runs in the configured
+object store (:mod:`autodiscovery_jobs.storage`). Each run can have an
+email_state.json object that records whether a completion email was sent and
+what content was included.
 
 Schema:
     {
@@ -21,19 +22,19 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from .client import get_storage_client
 from .config import JobConfig
+from .storage import get_store
 
 
 def get_email_state_path(userid: str, runid: str) -> str:
-    """Get the GCS blob path for email_state.json.
+    """Get the object key for email_state.json.
 
     Args:
         userid: User identifier
         runid: Run identifier
 
     Returns:
-        Blob path for email_state.json
+        Object key for email_state.json
     """
     return f"users/{userid}/jobs/{runid}/email_state.json"
 
@@ -43,7 +44,7 @@ def get_email_state(
     runid: str,
     config: JobConfig | None = None,
 ) -> dict[str, Any] | None:
-    """Get email state from GCS.
+    """Get email state from the object store.
 
     Args:
         userid: User identifier
@@ -54,15 +55,10 @@ def get_email_state(
         Email state dictionary, or None if not found
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    blob_path = get_email_state_path(userid, runid)
-    blob = bucket.blob(blob_path)
+    store = get_store(config)
 
     try:
-        content = blob.download_as_text()
-        return json.loads(content)
+        return json.loads(store.read_text(get_email_state_path(userid, runid)))
     except Exception:
         pass
 
@@ -93,8 +89,7 @@ def record_email_sent(
         The created email state dictionary
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store = get_store(config)
 
     email_state = {
         "sent": True,
@@ -105,9 +100,11 @@ def record_email_sent(
         "body_html": body_html,
     }
 
-    blob_path = get_email_state_path(userid, runid)
-    blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(email_state, indent=2))
+    store.write_text(
+        get_email_state_path(userid, runid),
+        json.dumps(email_state, indent=2),
+        content_type="application/json",
+    )
 
     return email_state
 

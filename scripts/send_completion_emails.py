@@ -5,10 +5,11 @@ This script scans for successfully completed runs and sends email notifications 
 Failed and cancelled runs do not trigger notifications.
 It tracks sent emails in email_state.json to avoid duplicates.
 
-Uses a GCS-based lock to prevent concurrent executions when scheduled frequently.
+Uses a lock object in the configured store to prevent concurrent executions when
+scheduled frequently.
 
 Environment variables required:
-    - GCS credentials (for reading/writing job state)
+    - STORAGE_BACKEND (plus GCS credentials when it is "gcs") for reading/writing job state
     - AUTH0_MGMT_DOMAIN, AUTH0_MGMT_CLIENT_ID, AUTH0_MGMT_CLIENT_SECRET (for user email lookup)
     - SMTP_SERVER, SENDER_EMAIL (mail server and from-address; SMTP_PORT optional, defaults to 25)
 """
@@ -20,7 +21,6 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from google.cloud import storage
 from jinja2 import Environment, FileSystemLoader
 
 from autodiscovery_jobs import (
@@ -33,7 +33,8 @@ from autodiscovery_jobs import (
     send_email,
     was_email_sent,
 )
-from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
+from autodiscovery_jobs.persistence import list_experiment_files, read_experiment_node
+from autodiscovery_jobs.storage import get_store
 
 # Set up Jinja2 environment for email templates
 TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
@@ -47,7 +48,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Lock configuration
-LOCK_BLOB_PATH = "scripts/send_emails.lock"
+LOCK_OBJECT_KEY = "scripts/send_emails.lock"
 LOCK_MAX_AGE_HOURS = 2  # Fail if lock older than this (something is wrong)
 
 
@@ -58,30 +59,21 @@ class LockError(Exception):
 
 
 def acquire_lock(config: JobConfig) -> bool:
-    """Acquire distributed lock via GCS using atomic operations.
+    """Acquire a distributed lock via an atomic create in the store.
 
     Returns True if lock acquired, False if lock held by another run.
     Raises LockError if lock is older than LOCK_MAX_AGE_HOURS (indicates a problem).
     """
-    from google.api_core.exceptions import PreconditionFailed
-
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
-    blob = bucket.blob(LOCK_BLOB_PATH)
+    store = get_store(config)
 
     lock_data = json.dumps({"locked_at": datetime.now(UTC).isoformat()})
 
-    # Try atomic create (fails if lock exists)
-    try:
-        blob.upload_from_string(lock_data, if_generation_match=0)
+    if store.create_exclusive(LOCK_OBJECT_KEY, lock_data.encode("utf-8")):
         logger.info("Lock acquired")
         return True
-    except PreconditionFailed:
-        pass  # Lock exists, check age
 
     # Lock exists - check how old it is
-    blob.reload()
-    content = json.loads(blob.download_as_text())
+    content = json.loads(store.read_text(LOCK_OBJECT_KEY))
     locked_at = datetime.fromisoformat(content["locked_at"])
     lock_age = datetime.now(UTC) - locked_at
 
@@ -93,12 +85,9 @@ def acquire_lock(config: JobConfig) -> bool:
 
 
 def release_lock(config: JobConfig) -> None:
-    """Release distributed lock."""
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
-    blob = bucket.blob(LOCK_BLOB_PATH)
+    """Release the distributed lock."""
     try:
-        blob.delete()
+        get_store(config).delete(LOCK_OBJECT_KEY)
         logger.info("Lock released")
     except Exception:
         logger.warning("Lock already released or missing")

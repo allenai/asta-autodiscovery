@@ -44,7 +44,14 @@ def test_unsafe_code_execution_warning(
     from autodiscovery_jobs.config import JobConfig
 
     monkeypatch.setenv("AUTH_PROVIDER", auth_provider)
-    config = JobConfig(backend=backend, code_execution_backend=code_backend)
+    # Cloud Run jobs and Modal sandboxes both require the gcs store, so pin it
+    # rather than tripping the storage validation this test isn't about.
+    storage_backend = "gcs" if backend == "gcp" or code_backend == "modal" else "local"
+    config = JobConfig(
+        backend=backend,
+        code_execution_backend=code_backend,
+        storage_backend=storage_backend,
+    )
     with (
         patch("autodiscovery_jobs.manager.get_backend"),
         caplog.at_level("WARNING", logger="autodiscovery_jobs.manager"),
@@ -52,6 +59,51 @@ def test_unsafe_code_execution_warning(
         JobManager(config)
     warned = any("UNSAFE CONFIG" in r.message for r in caplog.records)
     assert warned is expect_warning
+
+
+@pytest.mark.parametrize(
+    "storage_backend,backend,code_backend",
+    [
+        # Cloud Run cannot mount a directory on this host.
+        ("local", "gcp", "process"),
+        # The Modal sandbox mounts the dataset from gs://.
+        ("local", "docker", "modal"),
+        # Unknown backend name.
+        ("s3", "docker", "process"),
+    ],
+)
+def test_rejects_unworkable_storage_config(storage_backend, backend, code_backend):
+    from autodiscovery_jobs.config import JobConfig
+    from autodiscovery_jobs.exceptions import StorageBackendError
+
+    config = JobConfig(
+        storage_backend=storage_backend,
+        backend=backend,
+        code_execution_backend=code_backend,
+    )
+    with pytest.raises(StorageBackendError):
+        JobManager(config)
+
+
+@pytest.mark.parametrize(
+    "storage_backend,backend,code_backend",
+    [
+        ("local", "docker", "process"),  # the out-of-the-box default
+        ("gcs", "docker", "process"),
+        ("gcs", "gcp", "modal"),
+    ],
+)
+def test_accepts_workable_storage_config(storage_backend, backend, code_backend):
+    from autodiscovery_jobs.config import JobConfig
+
+    config = JobConfig(
+        storage_backend=storage_backend,
+        backend=backend,
+        code_execution_backend=code_backend,
+        job_image="ad:test",
+    )
+    with patch("autodiscovery_jobs.manager.get_backend"):
+        JobManager(config)
 
 
 def test_get_user_path(mock_config):
@@ -63,7 +115,7 @@ def test_get_user_path(mock_config):
 
 def test_list_jobs(mock_config):
     """Test list_jobs method."""
-    with patch("autodiscovery_jobs.gcs.list_user_jobs") as mock_list:
+    with patch("autodiscovery_jobs.persistence.list_user_jobs") as mock_list:
         mock_list.return_value = ["job1", "job2"]
 
         manager = JobManager(mock_config)
@@ -75,7 +127,7 @@ def test_list_jobs(mock_config):
 
 def test_job_exists(mock_config):
     """Test job_exists method."""
-    with patch("autodiscovery_jobs.gcs.job_exists") as mock_exists:
+    with patch("autodiscovery_jobs.persistence.job_exists") as mock_exists:
         mock_exists.return_value = True
 
         manager = JobManager(mock_config)
@@ -87,7 +139,7 @@ def test_job_exists(mock_config):
 
 def test_create_job(mock_config):
     """Test create_job method."""
-    with patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create:
+    with patch("autodiscovery_jobs.persistence.create_job_directory") as mock_create:
         mock_create.return_value = "gs://test-bucket/users/testuser/jobs/job1/"
 
         manager = JobManager(mock_config)
@@ -99,7 +151,7 @@ def test_create_job(mock_config):
 
 def test_delete_job(mock_config):
     """Test delete_job method."""
-    with patch("autodiscovery_jobs.gcs.delete_job_directory") as mock_delete:
+    with patch("autodiscovery_jobs.persistence.delete_job_directory") as mock_delete:
         manager = JobManager(mock_config)
         manager.delete_job("testuser", "job1")
 
@@ -111,7 +163,7 @@ def test_upload_dataset(mock_config, tmp_path):
     test_file = tmp_path / "data.csv"
     test_file.write_text("col1,col2\n1,2")
 
-    with patch("autodiscovery_jobs.gcs.upload_dataset") as mock_upload:
+    with patch("autodiscovery_jobs.persistence.upload_dataset") as mock_upload:
         mock_upload.return_value = "gs://test-bucket/users/testuser/jobs/job1/data/"
 
         manager = JobManager(mock_config)
@@ -125,7 +177,7 @@ def test_upload_metadata(mock_config):
     """Test upload_metadata method."""
     metadata = {"datasets": [{"name": "test.csv"}]}
 
-    with patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload:
+    with patch("autodiscovery_jobs.persistence.upload_metadata") as mock_upload:
         mock_upload.return_value = "gs://test-bucket/users/testuser/jobs/job1/metadata.json"
 
         manager = JobManager(mock_config)
@@ -137,8 +189,8 @@ def test_upload_metadata(mock_config):
 
 def test_get_shared_run_owner_index_hit(mock_config):
     """Test get_shared_run_owner returns userid immediately on index hit (fast path)."""
-    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid:
+    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid:
         mock_index.return_value = "testuser"
 
         manager = JobManager(mock_config)
@@ -151,10 +203,10 @@ def test_get_shared_run_owner_index_hit(mock_config):
 
 def test_get_shared_run_owner_success(mock_config):
     """Test get_shared_run_owner falls back to glob scan on index miss and lazily populates index."""
-    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata, \
-         patch("autodiscovery_jobs.gcs.write_shared_run_index") as mock_write_index:
+    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
+         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata, \
+         patch("autodiscovery_jobs.persistence.write_shared_run_index") as mock_write_index:
         mock_index.return_value = None  # index miss
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"is_shared": True, "name": "Test Run"}
@@ -171,10 +223,10 @@ def test_get_shared_run_owner_success(mock_config):
 
 def test_get_shared_run_owner_not_shared(mock_config):
     """Test get_shared_run_owner returns None when run is not shared."""
-    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata, \
-         patch("autodiscovery_jobs.gcs.write_shared_run_index") as mock_write_index:
+    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
+         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata, \
+         patch("autodiscovery_jobs.persistence.write_shared_run_index") as mock_write_index:
         mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"is_shared": False, "name": "Private Run"}
@@ -188,8 +240,8 @@ def test_get_shared_run_owner_not_shared(mock_config):
 
 def test_get_shared_run_owner_not_found(mock_config):
     """Test get_shared_run_owner returns None when run doesn't exist."""
-    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid:
+    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid:
         mock_index.return_value = None
         mock_get_userid.return_value = None
 
@@ -202,9 +254,9 @@ def test_get_shared_run_owner_not_found(mock_config):
 
 def test_get_shared_run_owner_metadata_missing_is_shared(mock_config):
     """Test get_shared_run_owner returns None when metadata lacks is_shared."""
-    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata:
+    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
+         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata:
         mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"name": "Old Run"}
@@ -217,9 +269,9 @@ def test_get_shared_run_owner_metadata_missing_is_shared(mock_config):
 
 def test_get_shared_run_owner_metadata_error(mock_config):
     """Test get_shared_run_owner returns None when metadata read fails."""
-    with patch("autodiscovery_jobs.gcs.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.gcs.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_metadata:
+    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
+         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
+         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata:
         mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.side_effect = Exception("GCS error")
@@ -279,7 +331,7 @@ def test_get_job_logs(mock_config):
 
 def test_get_results(mock_config):
     """Test get_results method."""
-    with patch("autodiscovery_jobs.gcs.get_job_results") as mock_results:
+    with patch("autodiscovery_jobs.persistence.get_job_results") as mock_results:
         mock_results.return_value = [
             "gs://test-bucket/users/testuser/jobs/job1/output/result1.json",
             "gs://test-bucket/users/testuser/jobs/job1/output/result2.csv",
@@ -296,7 +348,7 @@ def test_download_results(mock_config, tmp_path):
     """Test download_results method."""
     local_dir = tmp_path / "results"
 
-    with patch("autodiscovery_jobs.gcs.download_job_results") as mock_download:
+    with patch("autodiscovery_jobs.persistence.download_job_results") as mock_download:
         mock_download.return_value = [
             local_dir / "result1.json",
             local_dir / "result2.csv",
@@ -316,9 +368,9 @@ def test_setup_and_run(mock_config, tmp_path):
     metadata = {"datasets": [{"name": "data.csv"}]}
 
     with (
-        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
-        patch("autodiscovery_jobs.gcs.upload_dataset") as mock_upload_data,
-        patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload_meta,
+        patch("autodiscovery_jobs.persistence.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.persistence.upload_dataset") as mock_upload_data,
+        patch("autodiscovery_jobs.persistence.upload_metadata") as mock_upload_meta,
         patch("autodiscovery_jobs.backends.gcp.run_job") as mock_run,
     ):
         mock_create.return_value = "gs://test-bucket/users/testuser/jobs/job1/"
@@ -368,11 +420,11 @@ def test_fork_job_success(mock_config):
     )
 
     with (
-        patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta,
-        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
-        patch("autodiscovery_jobs.gcs.has_data_files") as mock_has_data,
-        patch("autodiscovery_jobs.gcs.copy_job_data_files") as mock_copy,
-        patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_meta,
+        patch("autodiscovery_jobs.persistence.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.persistence.has_data_files") as mock_has_data,
+        patch("autodiscovery_jobs.persistence.copy_job_data_files") as mock_copy,
+        patch("autodiscovery_jobs.persistence.upload_metadata") as mock_upload,
         patch("autodiscovery_jobs.manager.create_run_details") as mock_create_details,
     ):
         mock_get_meta.return_value = PARENT_METADATA
@@ -420,11 +472,11 @@ def test_fork_job_skips_metadata_read_when_provided(mock_config):
     )
 
     with (
-        patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta,
-        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
-        patch("autodiscovery_jobs.gcs.has_data_files") as mock_has_data,
-        patch("autodiscovery_jobs.gcs.copy_job_data_files") as mock_copy,
-        patch("autodiscovery_jobs.gcs.upload_metadata") as mock_upload,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_meta,
+        patch("autodiscovery_jobs.persistence.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.persistence.has_data_files") as mock_has_data,
+        patch("autodiscovery_jobs.persistence.copy_job_data_files") as mock_copy,
+        patch("autodiscovery_jobs.persistence.upload_metadata") as mock_upload,
         patch("autodiscovery_jobs.manager.create_run_details") as mock_create_details,
     ):
         mock_create.return_value = "gs://test-bucket/users/forking-user/jobs/new-id/"
@@ -450,7 +502,7 @@ def test_fork_job_skips_metadata_read_when_provided(mock_config):
 
 def test_fork_job_no_parent_metadata(mock_config):
     """Test fork_job raises ValueError when parent has no metadata."""
-    with patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta:
+    with patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_meta:
         mock_get_meta.return_value = None
 
         manager = JobManager(mock_config)
@@ -461,9 +513,9 @@ def test_fork_job_no_parent_metadata(mock_config):
 def test_fork_job_dataset_expired(mock_config):
     """Test fork_job raises DatasetExpiredError when parent data files are gone."""
     with (
-        patch("autodiscovery_jobs.gcs.get_metadata") as mock_get_meta,
-        patch("autodiscovery_jobs.gcs.create_job_directory") as mock_create,
-        patch("autodiscovery_jobs.gcs.has_data_files") as mock_has_data,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_meta,
+        patch("autodiscovery_jobs.persistence.create_job_directory") as mock_create,
+        patch("autodiscovery_jobs.persistence.has_data_files") as mock_has_data,
     ):
         mock_get_meta.return_value = PARENT_METADATA
         mock_create.return_value = "gs://test-bucket/users/forking-user/jobs/new-id/"

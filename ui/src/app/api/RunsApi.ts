@@ -74,6 +74,12 @@ export interface UploadDatasetResponseBody {
 
 export interface GenerateUploadUrlResponseBody {
     upload_url: string;
+    /**
+     * True when upload_url points back at this API rather than at cloud storage,
+     * which happens for storage backends that cannot issue presigned URLs. The
+     * upload must then carry the caller's credentials.
+     */
+    same_origin?: boolean;
     gcs_path: string;
     filename: string;
     expires_at_unix: number;

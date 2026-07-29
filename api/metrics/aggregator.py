@@ -1,10 +1,12 @@
-"""GCS data aggregation and caching for the metrics dashboard.
+"""Run data aggregation and caching for the metrics dashboard.
 
-Scans all users and jobs in GCS to build an in-memory cache of job snapshots.
+Scans all users and jobs in the configured object store
+(:mod:`autodiscovery_jobs.storage`) to build an in-memory cache of job snapshots.
 Uses a stale-while-revalidate pattern with background refresh.
 Incremental scanning skips terminal jobs that are already cached.
 
-The cache is persisted to GCS so pod restarts don't trigger a full rescan.
+The cache is persisted to the same store so pod restarts don't trigger a full
+rescan.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from autodiscovery_jobs.config import JobConfig
-from google.cloud import storage
+from autodiscovery_jobs.storage import ObjectStore, get_store
 
 from .costs import _lookup_pricing, calculate_llm_cost, get_duration_seconds
 from .models import (
@@ -45,13 +47,13 @@ TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 # Historical runs may use either root filename; both are non-experiment init nodes.
 ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
 
-# Where the persisted metrics cache snapshot lives in the shared GCS bucket.
+# Where the persisted metrics cache snapshot lives in the shared store.
 # Loaded on cold start so pod restarts don't re-scan every job from scratch.
 PERSIST_BLOB_PATH = "_metrics/jobs_cache.json"
 PERSIST_SCHEMA_VERSION = 1
 
-# Per-pod file lock so only one gunicorn worker scans GCS at a time. Other
-# workers wait for the persisted blob and pick it up via warm-start.
+# Per-pod file lock so only one gunicorn worker scans the store at a time. Other
+# workers wait for the persisted snapshot and pick it up via warm-start.
 SCAN_LOCK_PATH = "/tmp/asta_metrics_scan.lock"
 
 
@@ -88,24 +90,21 @@ class AggregatedData:
 
 
 # ---------------------------------------------------------------------------
-# GCS helpers
+# Store helpers
 # ---------------------------------------------------------------------------
 
-def _read_gcs_json(bucket: storage.Bucket, blob_path: str) -> dict | None:
-    """Read and parse a JSON file from GCS. Returns None on any error."""
+def _read_json(store: ObjectStore, key: str) -> dict | None:
+    """Read and parse a JSON object from the store. Returns None on any error."""
     try:
-        blob = bucket.blob(blob_path)
-        content = blob.download_as_text()
-        return json.loads(content)
+        return json.loads(store.read_text(key))
     except Exception:
         return None
 
 
-def _read_gcs_jsonl(bucket: storage.Bucket, blob_path: str) -> list[dict[str, Any]]:
-    """Read and parse a JSONL file from GCS. Returns [] on any error."""
+def _read_jsonl(store: ObjectStore, key: str) -> list[dict[str, Any]]:
+    """Read and parse a JSONL object from the store. Returns [] on any error."""
     try:
-        blob = bucket.blob(blob_path)
-        content = blob.download_as_text()
+        content = store.read_text(key)
     except Exception:
         return []
 
@@ -123,8 +122,8 @@ def _read_gcs_jsonl(bucket: storage.Bucket, blob_path: str) -> list[dict[str, An
     return events
 
 
-def _save_persisted_cache(bucket: storage.Bucket, data: AggregatedData) -> None:
-    """Write the aggregated cache to GCS so future pods can warm-start from it."""
+def _save_persisted_cache(store: ObjectStore, data: AggregatedData) -> None:
+    """Write the aggregated cache to the store so future pods can warm-start from it."""
     try:
         payload = {
             "schema_version": PERSIST_SCHEMA_VERSION,
@@ -132,20 +131,20 @@ def _save_persisted_cache(bucket: storage.Bucket, data: AggregatedData) -> None:
             "scan_duration_seconds": data.scan_duration_seconds,
             "jobs": [dataclasses.asdict(j) for j in data.jobs],
         }
-        blob = bucket.blob(PERSIST_BLOB_PATH)
-        blob.upload_from_string(json.dumps(payload), content_type="application/json")
+        store.write_text(
+            PERSIST_BLOB_PATH, json.dumps(payload), content_type="application/json"
+        )
         logger.warning(
-            f"Persisted metrics cache: {len(data.jobs)} jobs to gs://{bucket.name}/{PERSIST_BLOB_PATH}"
+            f"Persisted metrics cache: {len(data.jobs)} jobs to {store.uri(PERSIST_BLOB_PATH)}"
         )
     except Exception as e:
         logger.warning(f"Failed to persist metrics cache: {e}")
 
 
-def _load_persisted_cache(bucket: storage.Bucket) -> AggregatedData | None:
-    """Load the persisted cache from GCS. Returns None if absent or unreadable."""
+def _load_persisted_cache(store: ObjectStore) -> AggregatedData | None:
+    """Load the persisted cache from the store. Returns None if absent or unreadable."""
     try:
-        blob = bucket.blob(PERSIST_BLOB_PATH)
-        content = blob.download_as_text()
+        content = store.read_text(PERSIST_BLOB_PATH)
     except Exception:
         return None
 
@@ -318,23 +317,21 @@ def _derive_requested_experiments(
 # ---------------------------------------------------------------------------
 
 def _count_experiments_inline(
-    bucket: storage.Bucket,
+    store: ObjectStore,
     userid: str,
     jobid: str,
 ) -> int:
-    """Count completed experiment result files using match_glob on the shared bucket.
+    """Count completed experiment result files with a single globbed listing.
 
     Excludes the root initialisation node (legacy filename variants),
     which is not a real experiment.
     """
+    prefix = f"users/{userid}/jobs/{jobid}/output/"
     try:
-        blobs = bucket.list_blobs(
-            match_glob=f"users/{userid}/jobs/{jobid}/output/mcts_node_*_*.json",
-        )
         return sum(
             1
-            for b in blobs
-            if b.name.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
+            for info in store.list(prefix, match_glob=f"{prefix}mcts_node_*_*.json")
+            if info.key.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
         )
     except Exception:
         return 0
@@ -354,14 +351,14 @@ def _infer_model(llm_summary: dict | None) -> str | None:
 def _scan_job(
     userid: str,
     jobid: str,
-    bucket: storage.Bucket,
+    store: ObjectStore,
 ) -> JobSnapshot | None:
     """Scan a single job and build a snapshot. Returns None on critical failure."""
     try:
         base_path = f"users/{userid}/jobs/{jobid}"
 
         # Read run_details.json
-        run_details = _read_gcs_json(bucket, f"{base_path}/run_details.json")
+        run_details = _read_json(store, f"{base_path}/run_details.json")
         if not run_details:
             return None
 
@@ -371,17 +368,17 @@ def _scan_job(
         duration = get_duration_seconds(created_at, finished_at)
 
         # Read metadata.json
-        metadata = _read_gcs_json(bucket, f"{base_path}/metadata.json")
+        metadata = _read_json(store, f"{base_path}/metadata.json")
         is_shared = bool(metadata.get("is_shared")) if metadata else False
         name = metadata.get("name") if metadata else None
         domain = metadata.get("domain") if metadata else None
         # Read output/args.json as fallback for legacy runs where metadata.json
         # is missing or incomplete.
-        run_args = _read_gcs_json(bucket, f"{base_path}/output/args.json")
+        run_args = _read_json(store, f"{base_path}/output/args.json")
         n_requested = _derive_requested_experiments(metadata, run_args)
 
-        # Count completed experiments using shared bucket
-        n_completed_raw = _count_experiments_inline(bucket, userid, jobid)
+        # Count completed experiments
+        n_completed_raw = _count_experiments_inline(store, userid, jobid)
         if n_requested == 0 and n_completed_raw > 0:
             # Legacy/partial runs may be missing requested counts in both metadata
             # and args. Use completed as a floor so aggregates remain consistent.
@@ -389,8 +386,8 @@ def _scan_job(
         n_completed = min(n_completed_raw, n_requested)
 
         # Read LLM usage summary
-        llm_summary = _read_gcs_json(bucket, f"{base_path}/output/llm_usage_summary.json")
-        llm_events = _read_gcs_jsonl(bucket, f"{base_path}/output/llm_usage_events.jsonl")
+        llm_summary = _read_json(store, f"{base_path}/output/llm_usage_summary.json")
+        llm_events = _read_jsonl(store, f"{base_path}/output/llm_usage_events.jsonl")
 
         # Calculate LLM cost and infer model from usage data
         llm_cost = 0.0
@@ -426,14 +423,13 @@ def _scan_job(
 
 
 def _discover_jobs_via_glob(
-    bucket: storage.Bucket,
+    store: ObjectStore,
 ) -> list[tuple[str, str]]:
-    """Discover all (userid, jobid) pairs with a single glob API call."""
+    """Discover all (userid, jobid) pairs with a single globbed listing."""
     job_keys: list[tuple[str, str]] = []
-    blobs = bucket.list_blobs(match_glob="users/*/jobs/*/run_details.json")
-    for blob in blobs:
-        # blob.name: "users/{userid}/jobs/{jobid}/run_details.json"
-        parts = blob.name.split("/")
+    for info in store.list("users/", match_glob="users/*/jobs/*/run_details.json"):
+        # key: "users/{userid}/jobs/{jobid}/run_details.json"
+        parts = info.key.split("/")
         if len(parts) >= 4:
             job_keys.append((parts[1], parts[3]))
     return job_keys
@@ -443,15 +439,14 @@ def _scan_all_jobs(
     config: JobConfig,
     previous: AggregatedData | None = None,
 ) -> AggregatedData:
-    """Scan all users and jobs in GCS to build the aggregated data.
+    """Scan all users and jobs in the store to build the aggregated data.
 
-    Uses glob-based discovery (single API call) and a global thread pool
+    Uses glob-based discovery (a single listing) and a global thread pool
     for parallel scanning. Terminal jobs from a previous scan are carried
-    forward without re-reading from GCS.
+    forward without re-reading them.
     """
     start_time = time.monotonic()
-    client = storage.Client(project=config.project_id)
-    bucket = client.bucket(config.bucket)
+    store = get_store(config)
 
     # Build index of previously-cached terminal jobs to skip re-scanning.
     cached_terminal: dict[tuple[str, str], JobSnapshot] = {}
@@ -472,7 +467,7 @@ def _scan_all_jobs(
 
     # Discover all jobs in one glob call
     try:
-        all_job_keys = _discover_jobs_via_glob(bucket)
+        all_job_keys = _discover_jobs_via_glob(store)
     except Exception as e:
         logger.error(f"Failed to discover jobs via glob: {e}")
         return AggregatedData(
@@ -502,7 +497,7 @@ def _scan_all_jobs(
     if to_scan:
         with ThreadPoolExecutor(max_workers=16) as executor:
             futures = {
-                executor.submit(_scan_job, userid, jobid, bucket): (userid, jobid)
+                executor.submit(_scan_job, userid, jobid, store): (userid, jobid)
                 for userid, jobid in to_scan
             }
             for future in as_completed(futures):
@@ -555,13 +550,13 @@ class MetricsCache:
     def get_data(self) -> AggregatedData:
         """Get cached data, triggering refresh if stale or empty.
 
-        On cold start, attempts to warm-start from the GCS-persisted snapshot
+        On cold start, attempts to warm-start from the persisted snapshot
         so the HTTP request never blocks on a full scan. If no persisted
         snapshot exists, returns empty data immediately and refreshes in the
         background; callers should treat ``refreshed_at is None`` as a
         "warming up" signal.
 
-        While still warming up, re-checks GCS on each call so that as soon as
+        While still warming up, re-checks the store on each call so that as soon as
         *any* worker (in this pod or another) finishes its scan and persists
         the blob, all other workers pick it up on their next request rather
         than waiting for their own independent scan to finish.
@@ -580,17 +575,15 @@ class MetricsCache:
             return self._data
 
     def _warm_start(self, initial: bool) -> AggregatedData:
-        """Try to populate the cache from GCS; fall back to empty.
+        """Try to populate the cache from the store; fall back to empty.
 
         ``initial`` controls log verbosity: the very first attempt logs the
         outcome at WARNING so it's visible operationally; subsequent retries
-        during the warming-up window are silent on the "blob still missing"
+        during the warming-up window are silent on the "snapshot still missing"
         path to avoid spamming on every poll.
         """
         try:
-            client = storage.Client(project=self._config.project_id)
-            bucket = client.bucket(self._config.bucket)
-            loaded = _load_persisted_cache(bucket)
+            loaded = _load_persisted_cache(get_store(self._config))
         except Exception as e:
             if initial:
                 logger.warning(f"Warm-start load failed: {e}")
@@ -598,7 +591,7 @@ class MetricsCache:
 
         if loaded is not None:
             logger.warning(
-                f"Warm-started metrics cache from GCS: {len(loaded.jobs)} jobs "
+                f"Warm-started metrics cache from the store: {len(loaded.jobs)} jobs "
                 f"(refreshed_at={loaded.refreshed_at})"
             )
             return loaded
@@ -671,9 +664,7 @@ class MetricsCache:
             with self._lock:
                 self._data = data
             try:
-                client = storage.Client(project=self._config.project_id)
-                bucket = client.bucket(self._config.bucket)
-                _save_persisted_cache(bucket, data)
+                _save_persisted_cache(get_store(self._config), data)
             except Exception as e:
                 logger.warning(f"Failed to persist metrics cache after refresh: {e}")
         except Exception as e:

@@ -30,6 +30,14 @@ class JobConfig:
     # AD job image reference used by the Docker backend (ignored for gcp)
     job_image: str | None = None
 
+    # Code-execution backend the AD job uses for LLM-generated code, forwarded to
+    # the job's --backend flag. "process" (default): isolated subprocess inside the
+    # job container (no cloud dependency); "local": in-process, no isolation;
+    # "modal": remote Modal sandbox with a scoped, read-only per-job data mount.
+    # See docs/configuration.md for the safe-combination matrix (this interacts with
+    # the job backend and auth/tenancy — untrusted code runs where the data is mounted).
+    code_execution_backend: str = "process"
+
     # Modal Configuration (for sandbox execution)
     modal_app_name: str = "asta-autodiscovery"
     modal_bucket_secret: str = "example-bucket-secret"
@@ -55,6 +63,9 @@ class JobConfig:
             job_name=os.environ.get("CLOUDRUN_JOB_NAME", cls.job_name),
             backend=os.environ.get("JOB_BACKEND", cls.backend),
             job_image=os.environ.get("AUTODISCOVERY_IMAGE"),
+            code_execution_backend=os.environ.get(
+                "CODE_EXECUTION_BACKEND", cls.code_execution_backend
+            ),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),
             modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
         )

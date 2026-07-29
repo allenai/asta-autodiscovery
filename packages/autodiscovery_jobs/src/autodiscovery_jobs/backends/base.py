@@ -18,6 +18,11 @@ from typing import Any
 from ..config import JobConfig
 from ..exceptions import JobBackendError
 
+# Code-execution backends the AD job understands (its --backend choices). "modal"
+# runs code in a remote Modal sandbox with a scoped, read-only per-job data mount;
+# "process"/"local" run it inside the job container (subprocess / in-process).
+_CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
+
 
 def build_job_args(
     userid: str,
@@ -64,16 +69,23 @@ def build_job_args(
         The list of CLI arguments for ``python -m autodiscovery.run``.
 
     Raises:
-        JobBackendError: If ``n_experiments`` is not provided.
+        JobBackendError: If ``n_experiments`` is not provided, or the configured
+            code-execution backend is not one of ``process``/``local``/``modal``.
     """
     if n_experiments is None:
         raise JobBackendError("n_experiments is required to run a job")
+
+    code_backend = config.code_execution_backend
+    if code_backend not in _CODE_EXECUTION_BACKENDS:
+        raise JobBackendError(
+            f"Unknown code_execution_backend {code_backend!r}; "
+            f"expected one of {', '.join(_CODE_EXECUTION_BACKENDS)}"
+        )
 
     # Construct paths
     job_base = f"users/{userid}/jobs/{jobid}"
     metadata_path = f"/mnt/gcs/{job_base}/metadata.json"
     output_path = f"/mnt/gcs/{job_base}/output"
-    bucket_path = f"gs://{config.bucket}/{job_base}/data"
 
     # Build arguments - required ones first
     args = [
@@ -81,10 +93,15 @@ def build_job_args(
         f"--out_dir={output_path}",
         f"--n_experiments={n_experiments}",
         "--work_dir=work",
-        "--use_modal_sandbox",
-        f"--bucket_path={bucket_path}",
+        f"--backend={code_backend}",
         "--no-timestamp_dir",
     ]
+
+    # --bucket_path is only consumed by the modal sandbox (it mounts gs://.../data
+    # read-only as the code-execution data source). The process/local backends read
+    # the dataset straight from the /mnt/gcs job mount, so it is omitted for them.
+    if code_backend == "modal":
+        args.append(f"--bucket_path=gs://{config.bucket}/{job_base}/data")
 
     # Add optional explicit parameters if provided
     if belief_model is not None:

@@ -20,6 +20,38 @@ def test_manager_default_config():
     manager = JobManager()
     assert manager.config is not None
     assert manager.config.bucket == "autodiscovery"
+    # Low-barrier default: in-process code execution, no cloud dependency.
+    assert manager.config.code_execution_backend == "process"
+
+
+@pytest.mark.parametrize(
+    "backend,code_backend,auth_provider,expect_warning",
+    [
+        # Unsafe: Cloud Run can't scope its mount, in-process code, multi-user.
+        ("gcp", "process", "password_file", True),
+        ("gcp", "local", "auth0", True),
+        # Safe: docker scopes the mount per job.
+        ("docker", "process", "password_file", False),
+        # Safe: modal mounts only the per-job data.
+        ("gcp", "modal", "password_file", False),
+        # Safe: single-user (no multi-tenant exposure).
+        ("gcp", "process", "none", False),
+    ],
+)
+def test_unsafe_code_execution_warning(
+    backend, code_backend, auth_provider, expect_warning, monkeypatch, caplog
+):
+    from autodiscovery_jobs.config import JobConfig
+
+    monkeypatch.setenv("AUTH_PROVIDER", auth_provider)
+    config = JobConfig(backend=backend, code_execution_backend=code_backend)
+    with (
+        patch("autodiscovery_jobs.manager.get_backend"),
+        caplog.at_level("WARNING", logger="autodiscovery_jobs.manager"),
+    ):
+        JobManager(config)
+    warned = any("UNSAFE CONFIG" in r.message for r in caplog.records)
+    assert warned is expect_warning
 
 
 def test_get_user_path(mock_config):

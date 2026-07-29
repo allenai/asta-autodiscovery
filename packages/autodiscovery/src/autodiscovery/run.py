@@ -12,7 +12,11 @@ from time import time
 from autodiscovery.agents import get_agents
 from autodiscovery.args import ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
-from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
+from autodiscovery.dataset import (
+    get_datasets_fpaths,
+    get_load_dataset_experiment,
+    resolve_local_dataset_source,
+)
 from autodiscovery.future_utils import gather_completed_futures
 from autodiscovery.llm_retry import apply_openai_wrapper_usage_tracking
 from autodiscovery.llm_usage import (
@@ -419,12 +423,13 @@ def run_mcts(
         # We symlink anything that isn't already under work_dir.
         if backend != "modal":
             for dataset_fpath in dataset_paths:
-                abs_src = os.path.abspath(dataset_fpath)
+                # Resolve to the real file (handles the webstack's data/ layout).
+                abs_src = resolve_local_dataset_source(dataset_fpath)
                 # Skip if already inside work_dir (e.g. easy.py already symlinked)
                 if abs_src.startswith(os.path.abspath(work_dir) + os.sep):
                     continue
                 dst = os.path.join(work_dir, os.path.basename(dataset_fpath))
-                if not os.path.exists(dst):
+                if not os.path.lexists(dst):
                     os.symlink(abs_src, dst)
 
         base_agent_objs = None

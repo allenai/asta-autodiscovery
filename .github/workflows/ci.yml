@@ -57,11 +57,33 @@ jobs:
       - name: Build project
         run: yarn build
 
-  # Notify the private repo once, but only after both builds succeed on a
-  # push to main. `needs` guarantees this runs only on success of both jobs.
+  # Runs the credential-free Python unit tests (the `not modal and not adc`
+  # subset — everything that needs no Modal account or GCS/ADC credentials).
+  # `make test` uses `uv run --all-packages`, so no secrets are required and it
+  # is safe on PRs (including forks).
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    env:
+      # Pin the interpreter (requires-python is >=3.13); uv installs it on demand.
+      UV_PYTHON: "3.13"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run unit tests (credential-free subset)
+        run: make test
+
+  # Notify the private repo once, but only after the builds and unit tests
+  # succeed on a push to main. `needs` guarantees this runs only on their success.
   notify-private:
     name: Process public main change
-    needs: [docker-build, ui-build]
+    needs: [docker-build, ui-build, unit-tests]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:

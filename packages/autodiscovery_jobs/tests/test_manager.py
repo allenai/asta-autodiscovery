@@ -15,8 +15,14 @@ def test_manager_initialization(mock_config):
     assert manager.config == mock_config
 
 
-def test_manager_default_config():
-    """Test JobManager with default config."""
+def test_manager_default_config(monkeypatch):
+    """Test JobManager with default config.
+
+    Clears the env vars ``JobConfig.from_env`` reads so this asserts the built-in
+    defaults regardless of the developer's/CI's ambient environment.
+    """
+    for var in ("GCS_BUCKET", "AUTODISCOVERY_BUCKET", "JOB_BACKEND", "CODE_EXECUTION_BACKEND"):
+        monkeypatch.delenv(var, raising=False)
     manager = JobManager()
     assert manager.config is not None
     assert manager.config.bucket == "autodiscovery"
@@ -99,11 +105,15 @@ def test_create_job(mock_config):
 
 def test_delete_job(mock_config):
     """Test delete_job method."""
-    with patch("autodiscovery_jobs.gcs.delete_job_directory") as mock_delete:
+    with (
+        patch("autodiscovery_jobs.gcs.delete_job_directory") as mock_delete,
+        patch("autodiscovery_jobs.gcs.delete_shared_run_index") as mock_delete_index,
+    ):
         manager = JobManager(mock_config)
         manager.delete_job("testuser", "job1")
 
         mock_delete.assert_called_once_with("testuser", "job1", mock_config)
+        mock_delete_index.assert_called_once_with("job1", mock_config)
 
 
 def test_upload_dataset(mock_config, tmp_path):

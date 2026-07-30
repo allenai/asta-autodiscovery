@@ -6,6 +6,13 @@ docker job backend re-mounts the current run's subtree into the job container at
 the same path the Cloud Run GCS FUSE volume would appear at. So the AD job reads
 and writes ordinary files either way and needs no cloud credentials.
 
+The root is just a POSIX tree, so this is also the zero-code path to running on
+storage this package has never heard of: mount it (NFS, s3fs, Azure Files,
+JuiceFS, ...) and point ``STORAGE_DIR`` at the mount. See
+``docs/design/storage-backends.md`` for what that costs you versus a native
+backend — chiefly presigned uploads, single-call globs, server-side copy, and the
+cross-process lock's atomicity guarantee.
+
 Two behaviors exist to match GCS closely enough that the rest of the codebase
 cannot tell the difference:
 
@@ -29,7 +36,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from ..exceptions import ObjectNotFoundError, StorageError
-from .base import ObjectInfo, ObjectStore, glob_to_regex
+from .base import JobDataMount, ObjectInfo, ObjectStore, glob_to_regex
 
 # Filename prefix for in-flight writes staged next to their destination. Listings
 # skip these so a concurrent reader never sees a half-written object as an object
@@ -37,8 +44,16 @@ from .base import ObjectInfo, ObjectStore, glob_to_regex
 _STAGING_PREFIX = ".ad-staging."
 
 
-class LocalStore(ObjectStore):
-    """:class:`ObjectStore` backed by a directory on the local filesystem."""
+class FilesystemStore(ObjectStore):
+    """:class:`ObjectStore` backed by a directory tree on the local filesystem.
+
+    "Local" means reachable as a path by *this* process, which includes a network
+    filesystem the operator has mounted — not necessarily a physically local disk.
+    """
+
+    #: A job container gets the run's data as a plain bind mount of its directory:
+    #: no FUSE, no credentials, no cloud dependency.
+    job_data_mount = JobDataMount.HOST_PATH
 
     def __init__(self, root: str | Path):
         """Bind the store to a root directory, creating it if needed.

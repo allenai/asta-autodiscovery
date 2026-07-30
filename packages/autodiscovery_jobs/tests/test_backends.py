@@ -189,6 +189,38 @@ def test_docker_local_store_falls_back_to_storage_dir(docker_local_config, monke
     assert "/mnt/data/users/testuser/jobs/job1" in volumes
 
 
+def test_docker_refuses_a_store_with_no_mount_mechanism(monkeypatch):
+    """A backend that declares no JobDataMount must fail loudly.
+
+    Before the store declared this, an unrecognized backend fell through to the
+    bind-mount branch and launched a job against a host path that doesn't exist.
+    """
+    from autodiscovery_jobs.storage import ObjectStore
+
+    class UnmountableStore(ObjectStore):
+        """A backend that never declared how a container could mount it.
+
+        Left abstract on purpose: the backend must refuse before it would need an
+        instance, so this class is only ever asked for its class attributes.
+        """
+
+        @property
+        def root_uri(self) -> str:
+            return "mem://"
+
+    monkeypatch.setattr(
+        "autodiscovery_jobs.backends.docker.get_store_class",
+        lambda name: UnmountableStore,
+    )
+    config = JobConfig(backend="docker", storage_backend="whatever", job_image="ad:dev")
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        with pytest.raises(DockerBackendError, match="job_data_mount"):
+            DockerBackend(config).run_job("u", "j", n_experiments=1)
+    client.containers.run.assert_not_called()
+
+
 def test_docker_local_store_requires_absolute_host_dir(monkeypatch):
     monkeypatch.setenv("STORAGE_HOST_DIR", "./data")
     config = JobConfig(backend="docker", storage_backend="local", job_image="ad:dev")

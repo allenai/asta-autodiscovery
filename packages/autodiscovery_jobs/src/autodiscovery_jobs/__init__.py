@@ -99,11 +99,13 @@ from .run_details import (
 # Storage backends
 from .storage import (
     STORAGE_BACKENDS,
+    FilesystemStore,
     GcsStore,
-    LocalStore,
+    JobDataMount,
     ObjectInfo,
     ObjectStore,
     get_store,
+    get_store_class,
 )
 
 # User profile management
@@ -141,9 +143,11 @@ __all__ = [
     "STORAGE_BACKENDS",
     "ObjectStore",
     "ObjectInfo",
+    "JobDataMount",
     "GcsStore",
-    "LocalStore",
+    "FilesystemStore",
     "get_store",
+    "get_store_class",
     # Job backends
     "JobBackend",
     "CloudRunBackend",

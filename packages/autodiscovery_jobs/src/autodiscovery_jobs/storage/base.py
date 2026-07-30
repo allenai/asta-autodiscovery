@@ -21,8 +21,35 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import BinaryIO
+
+
+class JobDataMount(Enum):
+    """How a job container can be handed one run's subtree of a store as files.
+
+    The AD job reads its inputs and writes its results as ordinary files, so every
+    store must be presentable to a container as a filesystem mount. Only the job
+    backend knows how to build a container, so a store declares *which mechanism*
+    applies and the backend implements it.
+
+    This deliberately enumerates the mechanisms this codebase implements rather
+    than pretending to be open-ended: a new store either reuses one of them or is
+    rejected with a clear error instead of silently getting the wrong mount.
+    """
+
+    #: The store is a POSIX directory tree on this host; bind-mount the run's
+    #: subdirectory. Covers anything the operator has mounted locally — a plain
+    #: directory, NFS, s3fs, JuiceFS — with no code and no credentials in the job.
+    HOST_PATH = "host_path"
+
+    #: The container mounts the bucket itself with gcsfuse, scoped to the run's
+    #: prefix. Needs GCP credentials, `/dev/fuse`, and `CAP_SYS_ADMIN`.
+    GCSFUSE = "gcsfuse"
+
+    #: No known way to present this store to a job container.
+    UNSUPPORTED = "unsupported"
 
 
 @dataclass(frozen=True)
@@ -91,7 +118,29 @@ class ObjectStore(ABC):
     Reads of a missing key raise :class:`~autodiscovery_jobs.exceptions.ObjectNotFoundError`;
     any other failure raises :class:`~autodiscovery_jobs.exceptions.StorageError`.
     Deletes of a missing key are a no-op, so cleanup paths are idempotent.
+
+    A subclass must implement the nine abstract members below. ``upload_file``,
+    ``download_file``, and ``copy`` have working (if unoptimized) defaults derived
+    from those, so a minimal backend can skip them and override only the ones its
+    service can do better — GCS, for instance, copies server-side.
+
+    The two class attributes are *capabilities*: they let the job backend and the
+    startup validator ask what a store can do instead of comparing its name, so a
+    third backend fails loudly rather than inheriting whichever branch happened to
+    be the fallback.
     """
+
+    #: How a job container can be given a run's data as files. Declaring
+    #: :attr:`JobDataMount.UNSUPPORTED` (the default) means jobs cannot run against
+    #: this store, and the job backend says so instead of guessing.
+    job_data_mount: JobDataMount = JobDataMount.UNSUPPORTED
+
+    #: Whether objects are addressable as ``gs://<bucket>/<key>``. This is narrower
+    #: than "is remote" on purpose: the two consumers that read run data from off
+    #: this host — Cloud Run's GCS volume mount and the Modal sandbox's
+    #: ``--bucket_path`` — both understand Google Cloud Storage specifically, not
+    #: object storage in general.
+    gs_addressable: bool = False
 
     @property
     @abstractmethod
@@ -137,17 +186,19 @@ class ObjectStore(ABC):
         """Return whether an object exists at ``key``."""
         ...
 
-    @abstractmethod
     def download_file(self, key: str, local_path: Path) -> None:
         """Write an object's contents to a local file.
 
         The parent directory of ``local_path`` must already exist.
 
+        Buffers the whole object in memory; override when the backend can stream
+        or has a native download.
+
         Raises:
             ObjectNotFoundError: If the key does not exist.
             StorageError: If the download fails for any other reason.
         """
-        ...
+        local_path.write_bytes(self.read_bytes(key))
 
     # Writes
 
@@ -168,10 +219,14 @@ class ObjectStore(ABC):
         """
         ...
 
-    @abstractmethod
     def upload_file(self, key: str, local_path: Path) -> None:
-        """Copy a local file's contents to ``key``."""
-        ...
+        """Copy a local file's contents to ``key``.
+
+        Streams through :meth:`write_stream`; override when the backend has a
+        native upload-from-path.
+        """
+        with open(local_path, "rb") as fh:
+            self.write_stream(key, fh)
 
     @abstractmethod
     def create_exclusive(self, key: str, data: bytes) -> bool:
@@ -196,17 +251,17 @@ class ObjectStore(ABC):
         """Delete ``key``. Missing keys are not an error."""
         ...
 
-    @abstractmethod
     def copy(self, source_key: str, dest_key: str) -> None:
         """Copy ``source_key`` to ``dest_key`` within this store.
 
-        Backends copy without routing bytes through the caller where they can
-        (GCS does a server-side copy).
+        Reads and re-writes the bytes. **Override this** if the backend can copy
+        server-side: forking a run copies its whole dataset, so the default sends
+        every byte through this process twice.
 
         Raises:
             ObjectNotFoundError: If ``source_key`` does not exist.
         """
-        ...
+        self.write_bytes(dest_key, self.read_bytes(source_key))
 
     @abstractmethod
     def list(

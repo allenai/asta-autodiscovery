@@ -6,14 +6,16 @@ runs the same AD image with the same CLI arguments as the Cloud Run backend —
 only the process launcher differs.
 
 Cloud Run provides the job's data as a GCS FUSE volume; locally this backend has
-to supply the equivalent mount itself, and how it does that depends on
-``STORAGE_BACKEND``:
+to supply the equivalent mount itself. Which mechanism to use comes from the
+store's declared :class:`~autodiscovery_jobs.storage.JobDataMount`:
 
-- ``local`` — bind-mounts the run's own directory from the host data directory.
-  No credentials, no FUSE, no cloud dependency.
-- ``gcs`` — has the container gcsfuse-mount the bucket itself, by passing
+- ``HOST_PATH`` — bind-mounts the run's own directory from the host data
+  directory. No credentials, no FUSE, no cloud dependency.
+- ``GCSFUSE`` — has the container gcsfuse-mount the bucket itself, by passing
   ``GCSFUSE_BUCKET`` plus GCP credentials and the ``/dev/fuse`` device /
   ``SYS_ADMIN`` capability.
+- ``UNSUPPORTED`` — refused with a clear error, rather than launching a job whose
+  data directory would be empty.
 
 Either way the mount is **scoped to the current run's prefix** and appears at
 :data:`JOB_MOUNT_ROOT` under the same deep path, so the job arguments are
@@ -28,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from ..exceptions import DockerBackendError
+from ..storage import JobDataMount, get_store_class
 from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args, job_prefix
 
 # Environment variables forwarded from the API container to each job container.
@@ -103,7 +106,21 @@ class DockerBackend(JobBackend):
         # job-level mount, the Docker backend can scope per run.
         prefix = job_prefix(userid, jobid)
         container_mount = f"{JOB_MOUNT_ROOT}/{prefix}"
-        needs_fuse = self.config.storage_backend == "gcs"
+
+        # Ask the store how its data can be mounted rather than assuming from its
+        # name, so a backend this method has no mechanism for is rejected instead of
+        # silently getting the wrong kind of mount. Read from the class: constructing
+        # a store here would create the filesystem backend's root as a side effect.
+        mount = get_store_class(self.config.storage_backend).job_data_mount
+        needs_fuse = mount is JobDataMount.GCSFUSE
+
+        if mount is JobDataMount.UNSUPPORTED:
+            raise DockerBackendError(
+                f"Storage backend {self.config.storage_backend!r} does not declare how a job "
+                "container can mount run data (job_data_mount is UNSUPPORTED), so the job "
+                "would start against an empty directory. Expose the data as a POSIX tree and "
+                "use STORAGE_BACKEND=local, or declare a supported JobDataMount on the store."
+            )
 
         if needs_fuse:
             # The container gcsfuse-mounts the bucket itself in its entrypoint.
@@ -118,8 +135,8 @@ class DockerBackend(JobBackend):
             if host_key_path:
                 volumes[host_key_path] = {"bind": _CONTAINER_GCP_KEY_PATH, "mode": "ro"}
         else:
-            # Bind-mount the run's directory straight off the host. No FUSE, no
-            # credentials — the job just reads and writes files.
+            # HOST_PATH: bind-mount the run's directory straight off the host. No
+            # FUSE, no credentials — the job just reads and writes files.
             volumes[self._host_run_dir(prefix)] = {"bind": container_mount, "mode": "rw"}
 
         client = _docker_client()

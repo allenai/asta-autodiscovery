@@ -25,6 +25,27 @@ _DEFAULT_SANDBOX_PACKAGES = [
     "scikit-learn",
     "scipy",
     "statsmodels",
+    # Commonly imported by generated analysis code. These were the top causes of
+    # "No module named 'X'" failures in training runs, so they are pre-installed
+    # into the base sandbox venv to avoid per-cell install churn. (PyPI names;
+    # import name in parentheses where it differs.)
+    "biopython",  # Bio
+    "tqdm",
+    "openpyxl",
+    "setuptools",  # pkg_resources
+    "tabulate",
+    "dendropy",
+    "libpysal",
+    "beautifulsoup4",  # bs4
+    "pyreadstat",
+    "nltk",
+    "lxml",
+    "ete3",
+    "XlsxWriter",  # xlsxwriter
+    "xlrd",
+    "html5lib",
+    # NOTE: rpy2 is intentionally omitted -- it requires a system R installation
+    # and would otherwise break sandbox venv resolution / import at runtime.
 ]
 
 _SANDBOX_RUNNER = """\

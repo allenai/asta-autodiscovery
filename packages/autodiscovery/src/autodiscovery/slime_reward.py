@@ -59,6 +59,30 @@ from autodiscovery.mcts_utils import (
 from autodiscovery.transitions import SpeakerSelector
 
 
+def _theoretical_max_boolean_cat(
+    n_samples: int, evidence_weight: float, prior_params: tuple[float, float] = (0.5, 0.5)
+) -> float:
+    """Maximum possible |mu_posterior - mu_prior| for boolean_cat beliefs.
+
+    Mirrors ``autodiscovery.run._theoretical_max_boolean_cat`` (kept local to avoid
+    importing the run.py CLI module). Used to turn a raw belief-mean shift into a
+    normalized surprisal in [0, ~1].
+    """
+    import math
+
+    n = float(n_samples)
+    w = float(evidence_weight)
+    if n <= 0 or w <= 0:
+        return 0.0
+    alpha, beta = prior_params
+    s = alpha + beta
+    d = min(alpha, beta)
+    t = w * n
+    u_star = d + math.sqrt(d * (d + t))
+    u_opt = min(max(u_star, s), s + n)
+    return (t * (u_opt - d)) / (u_opt * (u_opt + t))
+
+
 class _ExperimentOnlySelector(SpeakerSelector):
     """Speaker selector that ends the chat after the reviewer.
 
@@ -113,6 +137,10 @@ class SurpriseRewardConfig:
     kl_scale: float = 5.0
     reward_mode: str = "belief"
     use_binary_reward: bool = False
+    # When True (default) the reward is |normalized surprisal| (belief-mean shift
+    # normalized by the node's theoretical-max shift, ~[0,1]). When False, the reward
+    # is the get_self_value belief_change reward (belief_change / surprisal_width).
+    use_normalized_surprisal: bool = True
     failed_reward: float = 0.0
     # Execution
     backend: str = "process"
@@ -308,6 +336,26 @@ class SurpriseRewardScorer:
             kl_scale=config.kl_scale,
             mode=config.reward_mode,
         )
+        # Normalized surprisal: normalize the signed belief-mean shift by the
+        # theoretical-max shift for this node (which accounts for n_belief_samples and
+        # the prior). Always computed for logging; it drives the reward only when
+        # use_normalized_surprisal is set. Same quantity run.py stores diagnostically.
+        prior_mean_val = prior.get_mean_belief(recompute=True)
+        posterior_mean_val = posterior.get_mean_belief(prior=prior, recompute=True)
+        normalized_surprisal = None
+        if config.belief_mode == "boolean_cat":
+            prior_params = getattr(prior, "prior_params", (0.5, 0.5))
+            tmax = _theoretical_max_boolean_cat(
+                config.n_belief_samples, config.evidence_weight, prior_params
+            )
+            if tmax:
+                normalized_surprisal = (posterior_mean_val - prior_mean_val) / tmax
+        # Reward signal. Default: |normalized surprisal| (abs, so a swing toward false
+        # is as rewarding as one toward true), giving a ~[0, 1] surprise. When
+        # use_normalized_surprisal is off, fall back to the get_self_value reward
+        # (belief_change / width) for the belief-change comparison arm.
+        if config.use_normalized_surprisal and normalized_surprisal is not None:
+            reward = abs(normalized_surprisal)
         # Belief distributions (n_belief_samples category/true-false counts) expose
         # how the samples split -> the sample-level variance behind the surprise.
         prior_belief = prior.to_dict() if hasattr(prior, "to_dict") else None
@@ -317,9 +365,10 @@ class SurpriseRewardScorer:
             "success": True,
             "surprising": bool(surprising),
             "belief_change": float(belief_change),
+            "normalized_surprisal": None if normalized_surprisal is None else float(normalized_surprisal),
             "kl_divergence": float(kl_divergence),
-            "prior_mean": float(prior.get_mean_belief()),
-            "posterior_mean": float(posterior.get_mean_belief(prior=prior)),
+            "prior_mean": float(prior_mean_val),
+            "posterior_mean": float(posterior_mean_val),
             "prior_belief": prior_belief,
             "posterior_belief": posterior_belief,
             "hypothesis": hypothesis,
@@ -684,6 +733,7 @@ def cli_main(argv: list[str] | None = None) -> None:
         "--reward_mode", type=str, choices=["belief", "kl", "belief_and_kl"], default=None
     )
     parser.add_argument("--use_binary_reward", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--use_normalized_surprisal", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--backend", type=str, choices=["local", "process", "modal"], default=None)
     parser.add_argument("--code_timeout", type=int, default=None)
     parser.add_argument(

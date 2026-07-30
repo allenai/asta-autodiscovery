@@ -22,6 +22,7 @@ from autodiscovery.structured_outputs import (
     ExperimentHypothesisList,
     ExperimentList,
     ExperimentReviewer,
+    ImageAnalysis,
 )
 from autodiscovery.utils import get_vertex_access_token, is_gemini_model, normalize_vertex_model_name
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
@@ -96,6 +97,7 @@ class ModalSandboxExecutor(CodeExecutor):
         backend,
         timeout: int = 30 * 60,
         vision_model: str = "gpt-4o",
+        llm_provider: str = "current",
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
@@ -104,11 +106,13 @@ class ModalSandboxExecutor(CodeExecutor):
             backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
             timeout: Timeout in seconds (for Autogen compatibility)
             vision_model: Model to use for image analysis
+            llm_provider: LLM provider used for image analysis.
             usage_tracker: Optional usage tracker for image analysis calls.
         """
         self._executor = backend
         self._timeout = timeout
         self.vision_model = vision_model
+        self.llm_provider = llm_provider
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
 
@@ -141,6 +145,48 @@ class ModalSandboxExecutor(CodeExecutor):
         Returns:
             Analysis text
         """
+        if self.llm_provider == "copilot":
+            from autodiscovery.copilot_provider import get_copilot_runtime
+
+            completion = get_copilot_runtime().complete(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a research scientist responsible for analyzing plots and "
+                            "figures from experiments."
+                        ),
+                    },
+                    {"role": "user", "content": IMAGE_ANALYST_PROMPT},
+                ],
+                model=self.vision_model,
+                response_format=ImageAnalysis,
+                attachments=[
+                    {
+                        "type": "blob",
+                        "data": image_data,
+                        "mimeType": "image/png",
+                        "displayName": "experiment-plot.png",
+                    }
+                ],
+            )
+            if self._usage_tracker is not None:
+                self._usage_tracker.record_event(
+                    source="copilot",
+                    component="image_analysis.modal",
+                    model=completion.usage.model,
+                    prompt_tokens=completion.usage.input_tokens,
+                    completion_tokens=completion.usage.output_tokens,
+                    total_tokens=completion.usage.total_tokens,
+                    agent_name="code_executor",
+                    node_id=self._usage_node_id,
+                    metadata={
+                        "provider_cost": completion.usage.provider_cost,
+                        "reasoning_tokens": completion.usage.reasoning_tokens,
+                    },
+                )
+            return completion.content
+
         client, error_msg = self._get_vision_client()
         if client is None:
             return error_msg
@@ -615,6 +661,7 @@ def get_openai_config(
 def get_agents(
     work_dir,
     model_name="o4-mini",
+    llm_provider="current",
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -632,6 +679,7 @@ def get_agents(
     Args:
         work_dir: Working directory for code execution.
         model_name: Model used for AG2 conversational agents.
+        llm_provider: LLM provider. ``current`` preserves OpenAI/Vertex routing.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
         branching_factor: Number of experiment candidates to request.
@@ -647,14 +695,36 @@ def get_agents(
     Returns:
         Dictionary mapping agent name to agent instance.
     """
-    is_gemini = is_gemini_model(model_name)
-    api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
-    llm_config = get_openai_config(
-        api_key=api_key,
-        model_name=model_name,
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
-    )
+    if llm_provider not in {"current", "copilot"}:
+        raise ValueError(f"Unknown LLM provider: {llm_provider}")
+    if llm_provider == "copilot" and backend == "local":
+        raise ValueError(
+            "Copilot requires the process or modal backend so plot analysis does not "
+            "fall back to an in-experiment OpenAI client"
+        )
+
+    if llm_provider == "copilot":
+        copilot_model_config = {
+            "model": model_name,
+            "model_client_cls": "CopilotAG2Client",
+        }
+        if reasoning_effort is not None:
+            copilot_model_config["reasoning_effort"] = reasoning_effort
+        llm_config = {
+            "config_list": [copilot_model_config],
+            "cache_seed": None,
+        }
+        if temperature is not None:
+            llm_config["temperature"] = temperature
+    else:
+        is_gemini = is_gemini_model(model_name)
+        api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
+        llm_config = get_openai_config(
+            api_key=api_key,
+            model_name=model_name,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+        )
 
     # Create token limit transform
     token_limit_capability = transform_messages.TransformMessages(
@@ -846,6 +916,7 @@ def install(package):
             modal_executor,
             timeout=code_timeout,
             vision_model=vision_model,
+            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         print(
@@ -861,6 +932,7 @@ def install(package):
             _ProcessBackendAdapter(process_backend),
             timeout=code_timeout,
             vision_model=vision_model,
+            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         print(f"Using process backend with work_dir: {work_dir}")
@@ -912,6 +984,13 @@ def install(package):
         code_executor,
         user_proxy,
     ]
+
+    if llm_provider == "copilot":
+        from autodiscovery.copilot_provider import CopilotAG2Client
+
+        for agent in agents:
+            if agent.llm_config is not False:
+                agent.register_model_client(CopilotAG2Client)
 
     # Apply token limit to all agents
     for agent in agents:

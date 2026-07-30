@@ -82,6 +82,7 @@ def _theoretical_max_boolean_cat(
 def compute_and_store_reward(
     node,
     belief_model_name,
+    llm_provider,
     belief_temperature,
     belief_reasoning_effort,
     n_belief_samples,
@@ -102,6 +103,7 @@ def compute_and_store_reward(
     Args:
         node: Node whose reward will be computed.
         belief_model_name: Model name for belief elicitation.
+        llm_provider: LLM provider for belief elicitation.
         belief_temperature: Temperature for belief sampling.
         belief_reasoning_effort: Reasoning effort for belief-model calls.
         n_belief_samples: Number of belief samples.
@@ -141,6 +143,7 @@ def compute_and_store_reward(
             pt_prior, s_conditioned_prior, _, _ = calculate_prior_and_posterior_beliefs(
                 node,
                 model=belief_model_name,
+                llm_provider=llm_provider,
                 temperature=belief_temperature,
                 reasoning_effort=belief_reasoning_effort,
                 n_samples=n_belief_samples,
@@ -191,6 +194,7 @@ def compute_and_store_reward(
         prior, posterior, belief_change, kl_divergence = calculate_prior_and_posterior_beliefs(
             node,
             model=belief_model_name,
+            llm_provider=llm_provider,
             temperature=belief_temperature,
             reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
@@ -226,6 +230,7 @@ def compute_and_store_reward(
         _, _posterior, _belief_change, _kl_divergence = calculate_prior_and_posterior_beliefs(
             node,
             model=belief_model_name,
+            llm_provider=llm_provider,
             temperature=belief_temperature,
             reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
@@ -289,6 +294,10 @@ def run_mcts(
     log_dirname,
     work_dir,
     model_name="gpt-4o",
+    llm_provider="current",
+    embedding_provider="current",
+    embedding_model=None,
+    embedding_dimensions=None,
     belief_model_name="gemini-3-flash-preview",
     max_iterations=100,
     branching_factor=8,
@@ -331,6 +340,10 @@ def run_mcts(
         log_dirname: Directory to save logs and MCTS nodes.
         work_dir: Working directory for agents.
         model_name: LLM model name for agents.
+        llm_provider: LLM provider. ``current`` preserves OpenAI/Vertex routing.
+        embedding_provider: Provider used for deduplication embeddings.
+        embedding_model: Optional deduplication embedding model override.
+        embedding_dimensions: Optional deduplication embedding dimensions.
         belief_model_name: LLM model name for belief distribution agent.
         max_iterations: Maximum number of MCTS iterations.
         branching_factor: Maximum number of children per node.
@@ -437,6 +450,7 @@ def run_mcts(
             base_agent_objs = get_agents(
                 work_dir,
                 model_name=model_name,
+                llm_provider=llm_provider,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
                 branching_factor=branching_factor,
@@ -664,6 +678,7 @@ def run_mcts(
                         compute_and_store_reward(
                             node,
                             belief_model_name,
+                            llm_provider,
                             belief_temperature,
                             belief_reasoning_effort,
                             n_belief_samples,
@@ -742,6 +757,7 @@ def run_mcts(
                         thread_local.agent_objs = get_agents(
                             thread_work_dir,
                             model_name=model_name,
+                            llm_provider=llm_provider,
                             temperature=temperature,
                             reasoning_effort=reasoning_effort,
                             branching_factor=branching_factor,
@@ -794,6 +810,7 @@ def run_mcts(
                     base_agent_objs = get_agents(
                         work_dir,
                         model_name=model_name,
+                        llm_provider=llm_provider,
                         temperature=temperature,
                         reasoning_effort=reasoning_effort,
                         branching_factor=branching_factor,
@@ -861,6 +878,10 @@ def run_mcts(
         log_dirname,
         run_dedupe,
         belief_model_name,
+        llm_provider=llm_provider,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+        embedding_dimensions=embedding_dimensions,
         time_elapsed=time_elapsed,
         usage_tracker=usage_tracker,
     )
@@ -929,7 +950,16 @@ def main(args):
 
         if args.only_save_results:
             # Save nodes to JSON and exit
-            save_nodes(nodes_by_level, log_dirname, run_dedupe=args.dedupe, model=args.belief_model)
+            save_nodes(
+                nodes_by_level,
+                log_dirname,
+                run_dedupe=args.dedupe,
+                model=args.belief_model,
+                llm_provider=getattr(args, "llm_provider", "current"),
+                embedding_provider=getattr(args, "embedding_provider", "current"),
+                embedding_model=getattr(args, "embedding_model", None),
+                embedding_dimensions=getattr(args, "embedding_dimensions", None),
+            )
             return
 
         if args.continue_from_dir is not None:
@@ -1008,6 +1038,10 @@ def main(args):
         n_belief_samples=args.n_belief_samples,
         k_parents=args.k_parents,
         model_name=args.model,
+        llm_provider=getattr(args, "llm_provider", "current"),
+        embedding_provider=getattr(args, "embedding_provider", "current"),
+        embedding_model=getattr(args, "embedding_model", None),
+        embedding_dimensions=getattr(args, "embedding_dimensions", None),
         belief_model_name=args.belief_model,
         temperature=args.temperature,
         belief_temperature=args.belief_temperature,

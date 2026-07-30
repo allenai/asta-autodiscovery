@@ -24,6 +24,11 @@ dependencies = [
     "asta-code-execution",
 ]
 
+[project.optional-dependencies]
+copilot = [
+    "github-copilot-sdk>=1.0.7,<2",
+]
+
 [project.scripts]
 auto-discovery = "autodiscovery.easy:cli_main"
 

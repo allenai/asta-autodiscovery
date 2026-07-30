@@ -193,6 +193,18 @@ def build_parser() -> argparse.ArgumentParser:
     adv.add_argument("--model", type=str, default="gemini-3.1-pro-preview")
     adv.add_argument("--belief_model", type=str, default="gemini-3-flash-preview")
     adv.add_argument("--vision_model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument(
+        "--llm_provider",
+        choices=["current", "copilot"],
+        default="current",
+    )
+    adv.add_argument(
+        "--embedding_provider",
+        choices=["current", "copilot"],
+        default="current",
+    )
+    adv.add_argument("--embedding_model", type=str)
+    adv.add_argument("--embedding_dimensions", type=int)
     adv.add_argument("--temperature", type=float, default=1.0)
     adv.add_argument("--belief_temperature", type=float, default=1.0)
     adv.add_argument(
@@ -216,6 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     adv.add_argument("--run_eda", action=argparse.BooleanOptionalAction, default=False)
     adv.add_argument("--experiment_first", action=argparse.BooleanOptionalAction, default=False)
+    adv.add_argument("--dedupe", action=argparse.BooleanOptionalAction, default=False)
     adv.add_argument(
         "--backend",
         type=str,
@@ -283,6 +296,10 @@ def cli_main(argv: list[str] | None = None) -> None:
         model=args.model,
         belief_model=args.belief_model,
         vision_model=args.vision_model,
+        llm_provider=args.llm_provider,
+        embedding_provider=args.embedding_provider,
+        embedding_model=args.embedding_model,
+        embedding_dimensions=args.embedding_dimensions,
         temperature=args.temperature,
         belief_temperature=args.belief_temperature,
         reasoning_effort=args.reasoning_effort,
@@ -314,7 +331,7 @@ def cli_main(argv: list[str] | None = None) -> None:
         k_parents=10,
         implicit_bayes_posterior=False,
         use_binary_reward=False,
-        dedupe=False,
+        dedupe=args.dedupe,
         use_online_beliefs=False,
         warmstart_experiments=None,
         bucket_path=None,

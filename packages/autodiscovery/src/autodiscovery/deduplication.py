@@ -137,7 +137,9 @@ def get_hypotheses(in_nodes_list):
 
 def get_embedding(
     texts,
-    model="text-embedding-3-large",
+    model=None,
+    embedding_provider="current",
+    dimensions=None,
     batch_size=128,
     client=None,
     n_attempts=1,
@@ -147,13 +149,47 @@ def get_embedding(
 
     Args:
         texts (list): A list of text strings to be embedded.
-        model (str, optional): The identifier for the embedding model to use.
+        model (str, optional): Embedding model override. Defaults by provider.
+        embedding_provider: Embedding provider. ``current`` preserves OpenAI.
+        dimensions: Optional output dimensions for providers that support it.
         batch_size (int, optional): The number of texts to process in one API call.
         usage_tracker: Optional usage tracker for embedding requests.
 
     Returns:
         numpy.ndarray: An array of embeddings for the input texts.
     """
+    if embedding_provider == "copilot":
+        from autodiscovery.copilot_provider import (
+            DEFAULT_EMBEDDING_DIMENSIONS,
+            DEFAULT_EMBEDDING_MODEL,
+            get_copilot_runtime,
+        )
+
+        selected_model = model or DEFAULT_EMBEDDING_MODEL
+        selected_dimensions = (
+            DEFAULT_EMBEDDING_DIMENSIONS if dimensions is None else dimensions
+        )
+        result = get_copilot_runtime().embed(
+            texts,
+            model=selected_model,
+            dimensions=selected_dimensions,
+        )
+        if usage_tracker is not None:
+            usage_tracker.record_event(
+                source="copilot",
+                component="dedupe.embeddings",
+                model=result.model,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=0,
+                total_tokens=result.total_tokens,
+                agent_name="dedupe",
+                metadata={"dimensions": result.dimensions},
+            )
+        return np.array(result.vectors)
+    if embedding_provider != "current":
+        raise ValueError(f"Unknown embedding provider: {embedding_provider}")
+
+    selected_model = model or "text-embedding-3-large"
     if client is None:
         client = OpenAI()
     all_embeddings = []
@@ -164,7 +200,7 @@ def get_embedding(
             for i in range(0, len(texts), batch_size):
                 batch = texts[i : i + batch_size]
                 # Request embeddings for the current batch from the API
-                response = client.embeddings.create(input=batch, model=model)
+                response = client.embeddings.create(input=batch, model=selected_model)
                 if usage_tracker is not None:
                     usage_tracker.record_response(
                         response,
@@ -190,6 +226,7 @@ def get_llm_merge_decision(
     n_samples: int = 30,
     threshold: float = 0.7,
     model: str = "gpt-4o",
+    llm_provider: str = "current",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -202,6 +239,7 @@ def get_llm_merge_decision(
         n_samples: Number of LLM samples to draw.
         threshold: Proportion threshold for merging decisions.
         model: LLM model identifier.
+        llm_provider: LLM provider for merge decisions.
         temperature: Sampling temperature.
         reasoning_effort: Reasoning effort for the model.
         usage_tracker: Optional usage tracker for merge decision calls.
@@ -224,6 +262,7 @@ def get_llm_merge_decision(
     response = query_llm(
         all_msgs,
         model=model,
+        llm_provider=llm_provider,
         n_samples=n_samples,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
@@ -244,6 +283,10 @@ def dedupe(
     seed=42,
     rep_mode="biggest",
     model="gpt-4o",
+    llm_provider="current",
+    embedding_provider="current",
+    embedding_model=None,
+    embedding_dimensions=None,
     n_nodes=None,
     verbose=False,
     log_comparisons_fname=None,
@@ -258,6 +301,10 @@ def dedupe(
         seed: Random seed.
         rep_mode: Representative selection mode for merged clusters.
         model: LLM model identifier.
+        llm_provider: LLM provider for merge decisions.
+        embedding_provider: Provider for candidate embeddings.
+        embedding_model: Optional embedding model override.
+        embedding_dimensions: Optional embedding dimensions override.
         n_nodes: Optional cap on nodes processed.
         verbose: Whether to print verbose details.
         log_comparisons_fname: Optional JSON path to log LLM comparisons.
@@ -287,7 +334,15 @@ def dedupe(
     n_dedup = len(dedup_hyp)
 
     # Generate embeddings for deduplicated hypotheses
-    embeds = np.array(get_embedding(dedup_hyp, n_attempts=3, usage_tracker=usage_tracker))
+    embedding_kwargs = {
+        "embedding_provider": embedding_provider,
+        "dimensions": embedding_dimensions,
+        "n_attempts": 3,
+        "usage_tracker": usage_tracker,
+    }
+    if embedding_model is not None:
+        embedding_kwargs["model"] = embedding_model
+    embeds = np.array(get_embedding(dedup_hyp, **embedding_kwargs))
 
     # Initialize assignment structures
     clusters = {i: [i] for i in range(n_dedup)}
@@ -347,6 +402,7 @@ def dedupe(
             n_samples=n_samples,
             threshold=merge_threshold,
             model=model,
+            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         if verbose:

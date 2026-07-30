@@ -26,6 +26,52 @@ export VERTEX_ACCESS_TOKEN=$(gcloud auth print-access-token)
 
 To use OpenAI models instead, pass `--model gpt-...` and export `OPENAI_API_KEY`.
 
+### GitHub Copilot
+
+GitHub Copilot is an optional provider. Install the extra and authenticate the
+Copilot CLI with an account that has an active Copilot seat:
+
+```sh
+pip install 'asta-autodiscovery[copilot]'
+copilot login
+python -m autodiscovery.copilot doctor --json
+```
+
+If the SDK cannot download its runtime, install the Copilot CLI separately and
+point the SDK at it:
+
+```sh
+export COPILOT_CLI_PATH=/path/to/copilot
+```
+
+Select Copilot independently for chat and embeddings:
+
+```sh
+auto-discovery \
+   --llm_provider copilot \
+   --model claude-haiku-4.5 \
+   --belief_model claude-haiku-4.5 \
+   --vision_model claude-haiku-4.5 \
+   --embedding_provider copilot \
+   --embedding_model text-embedding-3-small \
+   --embedding_dimensions 1536 \
+   --backend process \
+   --dedupe \
+   data/measurements.csv
+```
+
+`--llm_provider current` and `--embedding_provider current` are the defaults and
+preserve the existing Vertex/OpenAI behavior. Copilot honors `--temperature`
+and `--belief_temperature` when the selected model permits that value. Some
+reasoning modes constrain temperature at the provider.
+
+Copilot deduplication defaults to `text-embedding-3-small` with 1536 dimensions.
+This is not numerically identical to the existing OpenAI
+`text-embedding-3-large` default, so use `--embedding_provider current` when
+exact embedding geometry must be preserved. Copilot currently requires the
+`process` or `modal` execution backend; the `local` backend's generated image
+analysis code is tied to an OpenAI client.
+
 ## Run
 
 ```sh

@@ -28,6 +28,28 @@ class ArgParser(argparse.ArgumentParser):
             help="Model to use for image analysis during code execution.",
         )
         self.add_argument(
+            "--llm_provider",
+            choices=["current", "copilot"],
+            default="current",
+            help="LLM provider. 'current' preserves OpenAI/Vertex model-name routing.",
+        )
+        self.add_argument(
+            "--embedding_provider",
+            choices=["current", "copilot"],
+            default="current",
+            help="Embedding provider used by optional deduplication.",
+        )
+        self.add_argument(
+            "--embedding_model",
+            type=str,
+            help="Optional embedding model override for the selected embedding provider.",
+        )
+        self.add_argument(
+            "--embedding_dimensions",
+            type=int,
+            help="Optional embedding dimensions override for models that support it.",
+        )
+        self.add_argument(
             "--user_query",
             type=str,
             help="Custom user query to condition experiment generation during exploration.",

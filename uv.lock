@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -236,12 +236,18 @@ dependencies = [
     { name = "tenacity" },
 ]
 
+[package.optional-dependencies]
+copilot = [
+    { name = "github-copilot-sdk" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "ag2", extras = ["openai", "gemini"], specifier = "==0.10" },
     { name = "asta-autodiscovery-modal", editable = "packages/autodiscovery_modal" },
     { name = "asta-code-execution", editable = "packages/code_execution" },
     { name = "boto3" },
+    { name = "github-copilot-sdk", marker = "extra == 'copilot'", specifier = ">=1.0.7,<2" },
     { name = "google-cloud-aiplatform" },
     { name = "h5py" },
     { name = "ipython", specifier = ">=9.9.0" },
@@ -254,6 +260,7 @@ requires-dist = [
     { name = "statsmodels" },
     { name = "tenacity", specifier = ">=9.1.2" },
 ]
+provides-extras = ["copilot"]
 
 [[package]]
 name = "asta-autodiscovery-jobs"
@@ -318,6 +325,7 @@ docs = [
 [package.dev-dependencies]
 dev = [
     { name = "bcrypt" },
+    { name = "github-copilot-sdk" },
     { name = "matplotlib" },
     { name = "pyright" },
     { name = "pytest" },
@@ -338,6 +346,7 @@ provides-extras = ["docs"]
 [package.metadata.requires-dev]
 dev = [
     { name = "bcrypt" },
+    { name = "github-copilot-sdk", specifier = ">=1.0.7,<2" },
     { name = "matplotlib" },
     { name = "pyright" },
     { name = "pytest" },
@@ -1107,6 +1116,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d9/29/d40217cbe2f6b1359e00c6c307bb3fc876ba74068cbab3dde77f03ca0dc4/ghp-import-2.1.0.tar.gz", hash = "sha256:9c535c4c61193c2df8871222567d7fd7e5014d835f97dc7b7439069e2413d343", size = 10943, upload-time = "2022-05-02T15:47:16.11Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/ec/67fbef5d497f86283db54c22eec6f6140243aae73265799baaaa19cd17fb/ghp_import-2.1.0-py3-none-any.whl", hash = "sha256:8337dd7b50877f163d4c0289bc1f1c7f127550241988d568c1db512c4324a619", size = 11034, upload-time = "2022-05-02T15:47:14.552Z" },
+]
+
+[[package]]
+name = "github-copilot-sdk"
+version = "1.0.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "python-dateutil" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/ec/734b0d28abbf7d26eb1a60810deedbcc0719910d64f018477010baf3e3f3/github_copilot_sdk-1.0.7-py3-none-any.whl", hash = "sha256:6f3e74e1779a4508dd6636e06fd0aa55eb6244805a66d61a4f21b30c958e2985", size = 421447, upload-time = "2026-07-16T15:21:04.636Z" },
 ]
 
 [[package]]

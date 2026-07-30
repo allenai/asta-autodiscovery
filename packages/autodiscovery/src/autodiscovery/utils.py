@@ -119,6 +119,7 @@ def query_llm(
     messages: list[dict[str, str]],
     n_samples: int,
     model: str = "gpt-4o",
+    llm_provider: str = "current",
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,
@@ -136,6 +137,7 @@ def query_llm(
         messages: Chat messages to send to the model.
         n_samples: Number of samples to request.
         model: Model name to use.
+        llm_provider: LLM provider. ``current`` preserves OpenAI/Vertex routing.
         temperature: Sampling temperature.
         reasoning_effort: Optional reasoning effort for reasoning-capable models.
         response_format: Optional structured output schema.
@@ -151,6 +153,51 @@ def query_llm(
     Returns:
         A list of parsed response objects.
     """
+    if llm_provider == "copilot":
+        if response_format is None:
+            raise ValueError("Copilot queries require a Pydantic response_format")
+        from autodiscovery.copilot_provider import get_copilot_runtime
+
+        runtime = get_copilot_runtime()
+
+        def _sample() -> dict[str, Any]:
+            completion = runtime.complete(
+                messages=messages,
+                model=model,
+                response_format=response_format,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+            )
+            if usage_tracker is not None:
+                metadata = dict(usage_metadata or {})
+                metadata["n"] = 1
+                metadata["provider_cost"] = completion.usage.provider_cost
+                metadata["reasoning_tokens"] = completion.usage.reasoning_tokens
+                metadata["cache_read_tokens"] = completion.usage.cache_read_tokens
+                metadata["cache_write_tokens"] = completion.usage.cache_write_tokens
+                usage_tracker.record_event(
+                    source="copilot",
+                    component=usage_component,
+                    model=completion.usage.model,
+                    prompt_tokens=completion.usage.input_tokens,
+                    completion_tokens=completion.usage.output_tokens,
+                    total_tokens=completion.usage.total_tokens,
+                    agent_name=usage_agent_name,
+                    node_id=usage_node_id,
+                    metadata=metadata,
+                )
+            return response_format.model_validate_json(completion.content).model_dump()
+
+        if n_samples <= 0:
+            return []
+        responses = [_sample()]
+        if n_samples > 1:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, n_samples - 1)) as executor:
+                responses.extend(executor.map(lambda _: _sample(), range(n_samples - 1)))
+        return responses
+    if llm_provider != "current":
+        raise ValueError(f"Unknown LLM provider: {llm_provider}")
+
     if client is None:
         client = get_openai_client_for_model(model)
     is_gemini = is_gemini_model(model)

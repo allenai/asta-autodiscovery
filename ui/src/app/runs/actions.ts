@@ -23,12 +23,6 @@ export interface Run {
     run_details?: RunDetails;
 }
 
-export interface UploadDatasetResponse {
-    path: string;
-    filename: string;
-    message: string;
-}
-
 export interface SubmitRunResponse {
     execution_id: string;
     message: string;
@@ -57,34 +51,6 @@ export async function deleteRun(runid: string, token: string): Promise<{ message
     if (!response.ok) {
         const error: ApiError = await response.json();
         throw new Error(error.error || 'Failed to delete run');
-    }
-
-    return await response.json();
-}
-
-/**
- * Upload a dataset file for a run.
- *
- * @param formData - FormData containing file and runid
- * @param token - Auth0 access token
- * @returns Upload confirmation
- * @throws Error if request fails
- */
-export async function uploadDataset(
-    formData: FormData,
-    token: string
-): Promise<UploadDatasetResponse> {
-    const response = await fetch(`${API_ORIGIN}/api/runs/upload-dataset`, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-    });
-
-    if (!response.ok) {
-        const error: ApiError = await response.json();
-        throw new Error(error.error || 'Failed to upload dataset');
     }
 
     return await response.json();

@@ -66,12 +66,6 @@ export interface RunFromApi {
     can_explore_with_asta?: boolean;
 }
 
-export interface UploadDatasetResponseBody {
-    path: string;
-    filename: string;
-    message: string;
-}
-
 export interface GenerateUploadUrlResponseBody {
     /**
      * Presigned storage URL to PUT the file to, or null when the storage backend
@@ -298,18 +292,6 @@ export class RunsApi extends BaseApi {
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/metadata`,
             method: 'POST',
             body: { metadata },
-        });
-    }
-
-    async uploadDataset(runId: string, file: File) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('runid', runId);
-
-        return this.request<UploadDatasetResponseBody>({
-            url: `${RUNS_URL_PREFIX}/upload-dataset`,
-            method: 'POST',
-            body: formData,
         });
     }
 

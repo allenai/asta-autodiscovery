@@ -104,6 +104,9 @@ FORMATS = {
     # _w_verdict pairs with open (fmt2) and related (fmt3) generate prompts.
     "fmt2_w_verdict": {"scores": True, "prompt": "open", "verdict": True},
     "fmt3_w_verdict": {"scores": True, "prompt": "related", "verdict": True},
+    # fmt1 + verdict: history = (hypothesis, verdict) with no surprise magnitude,
+    # open generate prompt. Isolates the verdict (outcome direction) on its own.
+    "fmt1_w_verdict": {"scores": False, "prompt": "open", "verdict": True},
 }
 
 # Five-bucket verdict on the posterior belief mean in [0, 1]. Encodes the
@@ -240,8 +243,10 @@ def history_block(ancestors: list[pd.Series], with_scores: bool, with_verdict: b
     hyps = [a for a in ancestors if clean(a["hypothesis"])]
     if not hyps:
         return "No hypotheses have been explored along this line of inquiry yet."
-    if with_verdict:
+    if with_verdict and with_scores:
         suffix = ", each with its measured surprise score and outcome verdict:"
+    elif with_verdict:
+        suffix = ", each with its outcome verdict:"
     elif with_scores:
         suffix = ", each with its measured surprise score:"
     else:

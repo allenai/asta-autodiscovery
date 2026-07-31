@@ -68,10 +68,14 @@ export interface RunFromApi {
 
 export interface GenerateUploadUrlResponseBody {
     /**
-     * Presigned storage URL to PUT the file to, or null when the storage backend
-     * cannot issue one — then the file goes through our own upload endpoint.
+     * The complete upload request to perform: a presigned storage URL, or a URL on
+     * this API when the storage backend cannot issue one. Clients don't need to know
+     * which — see datasetUpload.ts.
      */
-    upload_url: string | null;
+    upload_url: string;
+    upload_method: string;
+    /** When set, send multipart/form-data with these fields plus the file. */
+    upload_fields?: Record<string, string> | null;
     gcs_path: string;
     filename: string;
     expires_at_unix: number;

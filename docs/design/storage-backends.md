@@ -89,25 +89,39 @@ resolves outside its root rather than normalizing it away.
 ### Direct browser uploads
 
 GCS lets the browser `PUT` a dataset straight to a presigned URL, bypassing the API. A
-filesystem has no equivalent capability URL, so `signed_upload_url()` returns `None`, and
-the response says so rather than inventing a substitute:
+filesystem has no equivalent capability URL, so `signed_upload_url()` returns `None` and the
+upload has to come through the API instead. Those two requests differ in more than their
+URL — method, body encoding, and whether credentials are attached — so
+`generate-upload-url` returns the **whole request** rather than a URL the client has to
+interpret:
 
 ```
 POST /api/runs/<runid>/generate-upload-url
-  → { upload_url: "https://storage.googleapis.com/…" }   # gcs   → PUT there
-  → { upload_url: null }                                 # local → POST to our API
+
+  { upload_url: "https://storage.googleapis.com/…?X-Goog-Signature=…",   # gcs
+    upload_method: "PUT", upload_fields: null }
+
+  { upload_url: "/api/runs/upload-dataset",                              # local
+    upload_method: "POST", upload_fields: { runid: "…" } }
 ```
 
-When it is null the client posts the file to the **existing** authenticated
-`POST /api/runs/upload-dataset`, so no second upload route was added. The client keeps
-calling `generate-upload-url` first either way, because that is where the run is checked to
-exist and the requested size is screened.
+The client performs what it is handed: `fields` present means multipart with the file
+appended, absent means the raw body. So it holds no per-backend knowledge and no endpoint
+path, and there is no sentinel value to interpret. The second case targets the **existing**
+authenticated `POST /api/runs/upload-dataset`, so no upload route was added.
 
-Reporting *absence* rather than returning a URL with a "and attach your credentials to
-this one" flag matters: a server should never be in a position to tell a client where it
-may send its bearer token. Here the client's rule is local and unconditional — presigned
-URL, no header; our own endpoint, header — and it lives in one module
-(`ui/src/app/api/datasetUpload.ts`) so callers just forward `upload_url`.
+This shape is also what a presigned-POST backend needs — S3's `generate_presigned_post`
+returns exactly a url plus form fields — so a future store fits without changing the client.
+
+The one thing the client decides for itself is credentials: it attaches its bearer token
+only when the URL resolves to its own origin. That rule stays client-side deliberately. An
+earlier draft had the server send a `same_origin: true` flag, which amounts to the server
+telling the client where its bearer token may be sent — if that value were ever wrong, the
+token would go to a third party. All of this lives in one module
+(`ui/src/app/api/datasetUpload.ts`).
+
+Clients should still call `generate-upload-url` first in both cases, because that is where
+the run is checked to exist and the requested size is screened.
 
 Two things were fixed on `upload-dataset` when it became the default backend's real upload
 path: it enforced **no size limit at all** (the check in `generate-upload-url` is on a
@@ -276,10 +290,11 @@ backend raises a clear error if it is relative.
 - `GCSError` is now an alias of the new `StorageError` rather than being renamed, so
   existing `except GCSError` sites and imports keep working.
 - The `generate-upload-url` response keeps its `gcs_path` field name (now carrying a
-  `file://` URI under the local backend) rather than breaking the wire format. `upload_url`
-  became nullable; an earlier draft added a `same_origin` boolean plus a dedicated
-  streaming route, both dropped in review once it was clear `upload-dataset` already did
-  this job.
+  `file://` URI under the local backend) rather than breaking the wire format. It gained
+  `upload_method` / `upload_fields` so the response describes a complete request. Two
+  earlier drafts — a dedicated streaming route, then a `same_origin` boolean, then a
+  nullable `upload_url` — were dropped in review: `upload-dataset` already did the job, and
+  a sentinel still left the client interpreting instead of just executing.
 - The in-container mount point stays `/mnt/gcs` even for the local backend. The deployed
   Cloud Run job definition pins that path (`--add-volume-mount` in
   `rebuild_and_deploy.sh`), so renaming it would couple this change to a Cloud Run

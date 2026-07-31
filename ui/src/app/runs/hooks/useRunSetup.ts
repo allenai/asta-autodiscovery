@@ -6,7 +6,7 @@ import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
-import { uploadDatasetFile } from '@/api/datasetUpload';
+import { uploadDatasetFile, type UploadTarget } from '@/api/datasetUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 export const MCTS_SELECTION = {
@@ -362,7 +362,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
     const uploadFile = async (
         index: number,
-        uploadUrl: string | null,
+        target: UploadTarget,
         file: File,
         uploadStartTime: number
     ): Promise<void> => {
@@ -371,8 +371,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         await uploadDatasetFile({
             file,
-            uploadUrl,
-            runid,
+            target,
             uploadStartTime,
             onProgress: (progressEvent) => {
                 updateUploadState(index, {
@@ -438,7 +437,16 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                     gcsPath: data.gcs_path,
                 });
 
-                await uploadFile(index, data.upload_url, file, uploadStartTime);
+                await uploadFile(
+                    index,
+                    {
+                        url: data.upload_url,
+                        method: data.upload_method,
+                        fields: data.upload_fields,
+                    },
+                    file,
+                    uploadStartTime
+                );
             } catch (err) {
                 console.error('Upload failed:', err);
                 const errorMessage = err instanceof Error ? err.message : 'Upload failed';

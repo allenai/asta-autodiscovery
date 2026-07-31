@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 import logging
 
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, url_for
 from utils.auth import (
     PermissionType,
     optional_enrollment,
@@ -769,12 +769,13 @@ def create() -> Blueprint:
     @api.route("/<runid>/generate-upload-url", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def generate_upload_url(runid: str):
-        """Get a URL the browser can upload a dataset file to, if there is one.
+        """Describe how to upload a dataset file.
 
-        When the storage backend can issue capability URLs (GCS presigned URLs) this
-        returns one, so upload bytes bypass the Flask server entirely. Backends
-        without presigning get ``upload_url: null``, and the client posts the file to
-        the authenticated `/api/runs/upload-dataset` endpoint instead.
+        Always returns a complete upload request — url, method, and any form fields —
+        so the client does not need to know which storage backend is configured. When
+        the backend can issue capability URLs (GCS presigned URLs) that request goes
+        straight to storage and never touches this API; otherwise it points at this
+        API's own `upload-dataset` endpoint.
 
         Either way this call is where the run is checked to exist and the requested
         size is screened, so clients should keep calling it before uploading.
@@ -788,8 +789,8 @@ def create() -> Blueprint:
             file_size_bytes: Size of file in bytes
 
         Returns:
-            JSON with upload_url (null when the backend has none), gcs_path,
-            filename, and expires_at_unix (Unix timestamp)
+            JSON with upload_url, upload_method, upload_fields, gcs_path, filename,
+            and expires_at_unix (Unix timestamp)
 
         Raises:
             BadRequest: If required fields are missing or validation fails
@@ -834,12 +835,24 @@ def create() -> Blueprint:
             expires_at = datetime.now(UTC) + timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS)
             expires_at_unix = int(expires_at.timestamp())
 
-            # A null upload_url means this backend has no direct-upload URL to give;
-            # the client posts the file to /api/runs/upload-dataset instead. Reporting
-            # its absence beats inventing one here — the client then never has to be
-            # told where it is allowed to send its credentials.
+            # Always describe a complete upload request, so the client is a generic
+            # uploader rather than something that knows which storage backend is
+            # configured. A presigned URL takes the raw body; our own endpoint takes
+            # multipart with the run id, so the fields travel with the URL instead of
+            # being knowledge the client has to carry.
+            if result["upload_url"]:
+                upload_url = result["upload_url"]
+                upload_method = "PUT"
+                upload_fields = None
+            else:
+                upload_url = url_for(".upload_dataset")
+                upload_method = "POST"
+                upload_fields = {"runid": req.runid}
+
             resp = GenerateUploadUrlResponseModel(
-                upload_url=result["upload_url"],
+                upload_url=upload_url,
+                upload_method=upload_method,
+                upload_fields=upload_fields,
                 gcs_path=result["storage_path"],
                 filename=req.filename,
                 expires_at_unix=expires_at_unix,

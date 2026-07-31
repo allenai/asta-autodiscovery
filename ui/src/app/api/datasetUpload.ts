@@ -1,26 +1,19 @@
 /**
  * Dataset Upload Module
  *
- * Uploads a dataset file with progress tracking. Uses XMLHttpRequest rather than
- * fetch because only XHR reports upload progress, which the run-setup UI displays.
+ * Performs the upload request that `generate-upload-url` describes, with progress
+ * tracking. Uses XMLHttpRequest rather than fetch because only XHR reports upload
+ * progress, which the run-setup UI displays.
  *
- * There are two destinations, decided by whether generate-upload-url gave us a
- * presigned URL:
- *
- * - `uploadUrl` set — PUT the bytes straight to cloud storage, bypassing our API.
- *   No Authorization header: the presigned URL carries its own, and sending our
- *   bearer token to a third-party host would leak it.
- * - `uploadUrl` null — the backend has no presigning, so POST the file as
- *   multipart to our own authenticated upload endpoint.
- *
- * Both live here so callers just forward `upload_url` and never decide where it is
- * safe to send credentials.
+ * The destination may be cloud storage (a presigned URL, bypassing our API) or our
+ * own API, and this module does not need to know which: the response carries the
+ * url, method, and any form fields. The one thing decided here is credentials —
+ * our bearer token is attached only when the destination is our own origin, since
+ * sending it to a third-party storage host would leak it. That rule is deliberately
+ * the client's own and not something the server can ask for.
  */
 
 import { authBridge } from '@/auth/authBridge';
-
-/** Endpoint that receives uploads when the storage backend cannot presign. */
-const API_UPLOAD_PATH = '/api/runs/upload-dataset';
 
 export interface UploadProgressEvent {
     progress: number; // 0-100
@@ -29,12 +22,17 @@ export interface UploadProgressEvent {
     secondsRemaining: number | null; // seconds, null while calculating
 }
 
+/** The upload request to perform, as described by generate-upload-url. */
+export interface UploadTarget {
+    url: string;
+    method: string;
+    /** When set, send multipart/form-data with these fields plus the file. */
+    fields?: Record<string, string> | null;
+}
+
 export interface UploadOptions {
     file: File;
-    /** Presigned URL from generate-upload-url, or null to upload via our API. */
-    uploadUrl: string | null;
-    /** Run the file belongs to; needed for the API upload path. */
-    runid: string;
+    target: UploadTarget;
     uploadStartTime: number;
     onProgress?: (event: UploadProgressEvent) => void;
     onComplete?: () => void;
@@ -43,25 +41,20 @@ export interface UploadOptions {
 }
 
 /**
- * Upload a dataset file, direct to storage when possible and through our API otherwise
+ * Perform the described upload request
  *
  * @param options - Upload configuration options
  * @returns Promise that resolves when upload completes or rejects on error
  */
 export async function uploadDatasetFile(options: UploadOptions): Promise<void> {
-    const {
-        file,
-        uploadUrl,
-        runid,
-        uploadStartTime,
-        onProgress,
-        onComplete,
-        onError,
-        abortSignal,
-    } = options;
+    const { file, target, uploadStartTime, onProgress, onComplete, onError, abortSignal } = options;
 
-    // Only fetched for the API path; a presigned URL must not receive our token.
-    const authToken = uploadUrl ? null : await authBridge.getToken().catch(() => null);
+    // Resolves relative URLs (our own API) as well as absolute ones (cloud storage).
+    const url = new URL(target.url, window.location.origin);
+    const authToken =
+        url.origin === window.location.origin
+            ? await authBridge.getToken().catch(() => null)
+            : null;
 
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -121,21 +114,22 @@ export async function uploadDatasetFile(options: UploadOptions): Promise<void> {
         }
 
         // Open connection and send
-        if (uploadUrl) {
-            xhr.open('PUT', uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-            xhr.send(file);
-        } else {
+        xhr.open(target.method, url.toString(), true);
+        if (authToken) {
+            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+        }
+
+        if (target.fields) {
             const form = new FormData();
+            // Fields precede the file: presigned POST policies require that ordering.
+            Object.entries(target.fields).forEach(([name, value]) => form.append(name, value));
             form.append('file', file);
-            form.append('runid', runid);
-            xhr.open('POST', API_UPLOAD_PATH, true);
-            if (authToken) {
-                xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
-            }
             // Content-Type is deliberately unset: the browser adds the multipart
             // boundary, which we cannot compute here.
             xhr.send(form);
+        } else {
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+            xhr.send(file);
         }
     });
 }

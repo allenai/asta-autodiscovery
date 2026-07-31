@@ -41,6 +41,8 @@ import DatasetUpload, {
 } from '@/runs/components/DatasetUpload';
 import { mkExpandAdvancedSettingsTrackAttrs, mkSubmitRunBtnTrackAttrs } from '@/analytics/runSetup';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
+import { estimateLocalRunCost } from '@/runs/utils/localCostEstimate';
+import LocalDatasetPicker from '@/runs/components/LocalDatasetPicker';
 
 const DEBOUNCE_SAVE_MS = 3000;
 
@@ -61,6 +63,8 @@ interface RunSetupProps {
 export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
         settings,
+        providers,
+        isLocal,
         creditsAvailable,
         fileUploads,
         maxFileSize,
@@ -81,10 +85,62 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         selectedDatasetIds,
         togglePreloadedDataset,
         updatePreloadedDescription,
+        localDatasets,
+        localCatalogPath,
+        selectedLocalDataset,
+        localFolderPath,
+        setLocalFolderPath,
+        activeLocalDataset,
+        isSelectingLocalDataset,
+        localDatasetError,
+        importLocalDataset,
+        browseLocalDatasetFolder,
+        importLocalFolderPath,
     } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
 
     const isFormDisabled = isSubmitting || isLoading;
     const datasetErrors = fieldErrors.datasets;
+    const selectedProvider = providers.find((provider) => provider.id === settings.llmProvider);
+    const providerError =
+        fieldErrors.provider ||
+        (selectedProvider && selectedProvider.status !== 'ready'
+            ? selectedProvider.remediation || 'Provider is not ready.'
+            : undefined);
+    const selectedEmbeddingProvider = providers.find(
+        (provider) => provider.id === settings.embeddingProvider
+    );
+    const embeddingProviderError =
+        fieldErrors.embeddingProvider ||
+        (selectedEmbeddingProvider && !selectedEmbeddingProvider.embedding_ready
+            ? selectedEmbeddingProvider.remediation || 'Embedding provider is not ready.'
+            : undefined);
+    const selectedAgentModel = selectedProvider?.models.find(
+        (model) => model.id === settings.model
+    );
+    const selectedBeliefModel = selectedProvider?.models.find(
+        (model) => model.id === settings.beliefModel
+    );
+    const toEstimatePrice = (pricing?: {
+        input_per_million_usd: number;
+        output_per_million_usd: number;
+    }) =>
+        pricing
+            ? {
+                  inputPerMillion: pricing.input_per_million_usd,
+                  outputPerMillion: pricing.output_per_million_usd,
+              }
+            : undefined;
+    const localEstimate = estimateLocalRunCost(
+        settings.nExperiments,
+        settings.model,
+        settings.beliefModel,
+        toEstimatePrice(selectedAgentModel?.pricing),
+        toEstimatePrice(selectedBeliefModel?.pricing)
+    );
+    const estimatedTokens =
+        localEstimate.totalTokens >= 1_000_000
+            ? `${(localEstimate.totalTokens / 1_000_000).toFixed(1)}M`
+            : `${Math.round(localEstimate.totalTokens / 1_000)}K`;
 
     if (isLoading) {
         return (
@@ -104,9 +160,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         <Box sx={{ maxWidth: 'md', mx: 'auto', p: 3 }}>
             <SectionHeader>
                 <SectionHeaderTitle>Create a new discovery session</SectionHeaderTitle>
-                Define your context and upload source files. AutoDiscovery will use your data to
-                generate hypotheses, run experiments to statistically refute or accept them and
-                reveal surprising insights.
+                {isLocal
+                    ? 'Define your context and select a dataset. AutoDiscovery will use your data to generate hypotheses, run experiments to statistically refute or accept them and reveal surprising insights.'
+                    : 'Define your context and upload source files. AutoDiscovery will use your data to generate hypotheses, run experiments to statistically refute or accept them and reveal surprising insights.'}
             </SectionHeader>
 
             <ConfigurationBox className={settings.parentRunId ? 'forked' : ''}>
@@ -185,14 +241,18 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     />
                 </FormControl>
                 <FormControl fullWidth>
-                    <StyledFormLabel error={!!datasetErrors}>Source files</StyledFormLabel>
+                    <StyledFormLabel error={!!datasetErrors}>
+                        {isLocal ? 'Dataset' : 'Source files'}
+                    </StyledFormLabel>
                     <HelperText>
-                        {hasAi1Permission
-                            ? 'Select preloaded datasets and/or upload source files.'
-                            : 'Upload source files for your discovery session.'}
+                        {isLocal
+                            ? `Choose from the datasets in ${localCatalogPath || 'your local data folder'}, or choose another dataset on this computer.`
+                            : hasAi1Permission
+                              ? 'Select preloaded datasets and/or upload source files.'
+                              : 'Upload source files for your discovery session.'}
                     </HelperText>
 
-                    {hasAi1Permission && (
+                    {!isLocal && hasAi1Permission && (
                         <>
                             <Box sx={{ display: 'flex', gap: 1, mb: 1, width: '100%' }}>
                                 {PRELOADED_DATASETS.map((dataset) => (
@@ -274,17 +334,34 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                             </Box>
                         </>
                     )}
-                    <DatasetUpload
-                        fileUploads={fileUploads}
-                        maxFileSize={maxFileSize}
-                        onFileSelect={handleFileSelect}
-                        onRemoveFileUpload={handleRemoveFileUpload}
-                        onDescriptionChange={handleFileDescriptionChange}
-                        onCancelUpload={cancelUpload}
-                        onRetryUpload={retryUpload}
-                        disabled={isFormDisabled}
-                        error={datasetErrors}
-                    />
+                    {isLocal ? (
+                        <LocalDatasetPicker
+                            datasets={localDatasets}
+                            selectedDataset={selectedLocalDataset}
+                            folderPath={localFolderPath}
+                            activeDataset={activeLocalDataset}
+                            selectedFileCount={fileUploads.length}
+                            loading={isSelectingLocalDataset}
+                            error={localDatasetError}
+                            disabled={isFormDisabled}
+                            onDatasetChange={importLocalDataset}
+                            onFolderPathChange={setLocalFolderPath}
+                            onBrowse={browseLocalDatasetFolder}
+                            onUseFolderPath={importLocalFolderPath}
+                        />
+                    ) : (
+                        <DatasetUpload
+                            fileUploads={fileUploads}
+                            maxFileSize={maxFileSize}
+                            onFileSelect={handleFileSelect}
+                            onRemoveFileUpload={handleRemoveFileUpload}
+                            onDescriptionChange={handleFileDescriptionChange}
+                            onCancelUpload={cancelUpload}
+                            onRetryUpload={retryUpload}
+                            disabled={isFormDisabled}
+                            error={datasetErrors}
+                        />
+                    )}
                 </FormControl>
             </ConfigurationBox>
 
@@ -298,11 +375,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         Experiment budget
                     </StyledFormLabel>
                     <HelperText>
-                        Set the maximum number of experiments to generate (
-                        <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
-                        your first session, we recommend starting with a small budget ({'<'}10
-                        experiments) to learn how the system works. Once you're familiar with the
-                        output, you can confidently scale up to 50–100 experiments per session.
+                        {isLocal
+                            ? 'Set the maximum number of experiments to run on this computer. Start with 2–5 while validating a dataset and model combination.'
+                            : 'Set the maximum number of experiments to generate during the exploration.'}
                     </HelperText>
                     <TextField
                         type="number"
@@ -313,9 +388,25 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         error={!!fieldErrors.nExperiments}
                         fullWidth
                     />
-                    <RemainingCreditsChip
-                        label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
-                    />
+                    {isLocal ? (
+                        <LocalEstimateRow>
+                            <span>{localEstimate.experiments} experiments</span>
+                            <span>~{estimatedTokens} model tokens</span>
+                            <strong>
+                                ~${localEstimate.lowUSD.toFixed(2)}–$
+                                {localEstimate.highUSD.toFixed(2)} estimated usage
+                            </strong>
+                            <small>
+                                {localEstimate.livePricing
+                                    ? 'Live Copilot token rates; range reflects observed run variability.'
+                                    : 'Bundled model rate card; range reflects observed run variability.'}
+                            </small>
+                        </LocalEstimateRow>
+                    ) : (
+                        <RemainingCreditsChip
+                            label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
+                        />
+                    )}
                 </FormControl>
                 <FormControl fullWidth>
                     <StyledFormLabel>
@@ -347,6 +438,137 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         {...mkExpandAdvancedSettingsTrackAttrs({ runId: runid })}>
                         <Typography component="span">Advanced settings</Typography>
                     </AccordionSummary>
+
+                    {!isLocal && (
+                        <FormControl fullWidth error={!!providerError}>
+                            <StyledFormLabel error={!!providerError}>
+                                Model provider
+                            </StyledFormLabel>
+                            <HelperText>
+                                Provider used for agents, belief sampling, vision, and merge
+                                decisions.
+                            </HelperText>
+                            <Select
+                                value={settings.llmProvider}
+                                onChange={(e) => {
+                                    const provider = e.target.value as 'current' | 'copilot';
+                                    const selected = providers.find((item) => item.id === provider);
+                                    const nextModel =
+                                        (provider === 'copilot'
+                                            ? selected?.models.find(
+                                                  (model) => model.id === 'claude-sonnet-4.6'
+                                              )?.id
+                                            : selected?.models[0]?.id) || settings.model;
+                                    updateSettings('llmProvider', provider);
+                                    updateSettings('model', nextModel);
+                                    updateSettings('beliefModel', nextModel);
+                                    updateSettings('visionModel', nextModel);
+                                    debouncedSaveMetadata();
+                                }}>
+                                {providers.map((provider) => (
+                                    <MenuItem
+                                        key={provider.id}
+                                        value={provider.id}
+                                        disabled={provider.status !== 'ready'}>
+                                        {provider.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                            {providerError ? (
+                                <FormHelperText error>{providerError}</FormHelperText>
+                            ) : (
+                                <FormHelperText>
+                                    {providers.find(
+                                        (provider) => provider.id === settings.llmProvider
+                                    )?.message || 'Choose where model requests are sent.'}
+                                </FormHelperText>
+                            )}
+                        </FormControl>
+                    )}
+
+                    <FormControl fullWidth>
+                        <ModelFormLabel>Agent model</ModelFormLabel>
+                        <Select
+                            value={settings.model}
+                            onChange={(e) => {
+                                updateSettings('model', e.target.value);
+                                updateSettings('visionModel', e.target.value);
+                                debouncedSaveMetadata();
+                            }}>
+                            {(
+                                providers.find((provider) => provider.id === settings.llmProvider)
+                                    ?.models || []
+                            ).map((model) => (
+                                <MenuItem key={model.id} value={model.id}>
+                                    {model.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth>
+                        <ModelFormLabel>Belief model</ModelFormLabel>
+                        <Select
+                            value={settings.beliefModel}
+                            onChange={(e) => {
+                                updateSettings('beliefModel', e.target.value);
+                                debouncedSaveMetadata();
+                            }}>
+                            {(
+                                providers.find((provider) => provider.id === settings.llmProvider)
+                                    ?.models || []
+                            ).map((model) => (
+                                <MenuItem key={model.id} value={model.id}>
+                                    {model.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    {isLocal ? (
+                        <FormControl fullWidth>
+                            <ModelFormLabel>Embedding model</ModelFormLabel>
+                            <TextField value="text-embedding-3-small (1536 dimensions)" disabled />
+                            <HelperText>
+                                Used to nominate similar hypotheses for deduplication.
+                            </HelperText>
+                        </FormControl>
+                    ) : (
+                        <FormControl fullWidth error={!!embeddingProviderError}>
+                            <StyledFormLabel>Embedding provider</StyledFormLabel>
+                            <Select
+                                value={settings.embeddingProvider}
+                                onChange={(e) => {
+                                    const provider = e.target.value as 'current' | 'copilot';
+                                    updateSettings('embeddingProvider', provider);
+                                    updateSettings(
+                                        'embeddingModel',
+                                        provider === 'copilot'
+                                            ? 'text-embedding-3-small'
+                                            : 'text-embedding-3-large'
+                                    );
+                                    updateSettings(
+                                        'embeddingDimensions',
+                                        provider === 'copilot' ? 1536 : 3072
+                                    );
+                                    debouncedSaveMetadata();
+                                }}>
+                                {providers.map((provider) => (
+                                    <MenuItem
+                                        key={provider.id}
+                                        value={provider.id}
+                                        disabled={!provider.embedding_ready}>
+                                        {provider.id === 'current'
+                                            ? 'OpenAI embeddings (API key)'
+                                            : provider.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                            {embeddingProviderError && (
+                                <FormHelperText error>{embeddingProviderError}</FormHelperText>
+                            )}
+                        </FormControl>
+                    )}
 
                     <FormControl fullWidth>
                         <StyledFormLabel>Exploration weight</StyledFormLabel>
@@ -572,6 +794,10 @@ const StyledFormLabel = styled(FormLabel)(({ theme }) => ({
     },
 }));
 
+const ModelFormLabel = styled(StyledFormLabel)(({ theme }) => ({
+    marginBottom: theme.spacing(1),
+}));
+
 const HelperText = styled(FormHelperText)(({ theme }) => ({
     color: theme.color['cream-80'].rgba.toString(),
     margin: theme.spacing(0.5, 0, 1, 0),
@@ -680,6 +906,24 @@ const RemainingCreditsChip = styled(Chip)(({ theme }) => ({
     borderRadius: theme.shape.borderRadius + 'px',
     color: theme.color['cream-100'].hex,
     marginTop: theme.spacing(1),
+}));
+
+const LocalEstimateRow = styled(Box)(({ theme }) => ({
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: theme.spacing(0.75, 2),
+    marginTop: theme.spacing(1),
+    color: theme.color['cream-80'].rgba.toString(),
+    fontSize: '0.875rem',
+    lineHeight: 1.5,
+    '& span, & strong': {
+        minWidth: 0,
+    },
+    '& small': {
+        flexBasis: '100%',
+        color: theme.color['cream-60'].rgba.toString(),
+        fontSize: '0.875rem',
+    },
 }));
 
 const SurpriseSlider = styled(Slider)(({ theme }) => ({

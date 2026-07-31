@@ -3,10 +3,13 @@
 import { Button, Popover, styled } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { MenuLinks } from './MenuLinks';
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { mkLogoutBtnTrackAttrs, mkUserMenuBtnTrackAttrs } from '@/analytics/run';
 import { TEST_ID_SIGN_OUT_BUTTON, TEST_ID_USER_MENU_BUTTON } from '@/testIds';
 
@@ -15,11 +18,23 @@ import { TEST_ID_SIGN_OUT_BUTTON, TEST_ID_USER_MENU_BUTTON } from '@/testIds';
  */
 export const UserMenuFooter = () => {
     const { user, logout } = useAuth0();
+    const { isLocal } = useRuntimeConfig();
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
     const emailLocal = user?.email?.split('@')[0];
     const displayName = emailLocal || user?.name || 'User';
     const avatarLetter = displayName.charAt(0).toUpperCase() || 'U';
+
+    if (isLocal) {
+        return (
+            <FooterWrapper>
+                <LocalSettingsLink href="/runs/settings" aria-label="Settings">
+                    <SettingsOutlinedIcon />
+                    <UserName>Settings</UserName>
+                </LocalSettingsLink>
+            </FooterWrapper>
+        );
+    }
 
     return (
         <FooterWrapper>
@@ -82,6 +97,21 @@ const UserProfileButton = styled(Button)`
             color: ${({ theme }) => theme.color['cream-40'].rgba.toString()};
             font-size: 1.25rem;
         }
+    }
+`;
+
+const LocalSettingsLink = styled(Link)`
+    align-items: center;
+    background-color: ${({ theme }) => theme.color['cream-4'].rgba.toString()};
+    border-radius: ${({ theme }) => theme.shape.borderRadius}px;
+    color: ${({ theme }) => theme.color['cream-100'].hex};
+    display: flex;
+    gap: ${({ theme }) => theme.spacing(1.5)};
+    padding: ${({ theme }) => theme.spacing(1.5, 2)};
+    text-decoration: none;
+
+    &:hover {
+        background-color: ${({ theme }) => theme.color['cream-10'].rgba.toString()};
     }
 `;
 

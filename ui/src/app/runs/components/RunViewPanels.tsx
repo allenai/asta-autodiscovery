@@ -214,7 +214,9 @@ export const ExperimentPanel = styled('div')<{ $isExpanded: boolean; $isClosing?
     max-width: ${({ $isExpanded }) =>
         $isExpanded ? 'initial' : 'var(--experiment-panel-width, 500px)'};
     background-color: #163638f9;
+    border: 1px solid ${({ theme }) => theme.color['cream-20'].rgba.toString()};
     border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
     position: ${({ $isExpanded }) => ($isExpanded ? 'absolute' : 'relative')};
     overflow-y: auto;
     z-index: 2;

@@ -22,7 +22,8 @@ export default function RunsLayout({ children }: { children: React.ReactNode }) 
     const { isAuthenticated } = useAuth0();
 
     // Extract runId from pathname if we're on a run detail page
-    const runIdMatch = pathname.match(/^\/runs\/([^/]+)/);
+    const isSettings = pathname === '/runs/settings';
+    const runIdMatch = isSettings ? null : pathname.match(/^\/runs\/([^/]+)/);
     const selectedRunId = runIdMatch ? runIdMatch[1] : null;
 
     const handleSelectRun = (runid: string) => {
@@ -148,6 +149,11 @@ const MainContent = styled('div')`
 
 const Logo = styled('a')`
     padding: ${({ theme }) => theme.spacing(2)};
+
+    html.autodiscovery-desktop & {
+        padding-top: ${({ theme }) => theme.spacing(6)};
+        -webkit-app-region: no-drag;
+    }
 
     svg {
         width: 100%;

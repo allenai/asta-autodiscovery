@@ -28,7 +28,7 @@ const FEEDBACK_URL =
 /**
  * The link/action list rendered inside the user menu popover.
  */
-export const MenuLinks = () => {
+export const MenuLinks = ({ layout = 'menu' }: { layout?: 'menu' | 'settings' }) => {
     const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
     const [isAttributionOpen, setIsAttributionOpen] = useState(false);
 
@@ -43,50 +43,96 @@ export const MenuLinks = () => {
                     {...mkFeedbackBtnTrackAttrs()}>
                     Leave Feedback
                 </SettingsLink>
+                {layout === 'settings' && (
+                    <>
+                        <SettingsButton
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={() => setIsDisclaimerOpen(true)}
+                            data-test-id={TEST_ID_DISCLAIMER_BUTTON}
+                            {...mkDisclaimerBtnTrackAttrs()}>
+                            Disclaimer
+                        </SettingsButton>
+                        <SettingsButton
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={() => setIsAttributionOpen(true)}
+                            data-test-id={TEST_ID_ATTRIBUTION_BUTTON}
+                            {...mkAttributionBtnTrackAttrs()}>
+                            Attribution
+                        </SettingsButton>
+                        <SettingsLink
+                            href="https://allenai.org/privacy-policy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-test-id={TEST_ID_PRIVACY_POLICY_LINK}
+                            {...mkPrivacyLinkTrackAttrs()}>
+                            Privacy Policy
+                        </SettingsLink>
+                        <SettingsLink
+                            href="https://allenai.org/terms"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-test-id={TEST_ID_TERMS_OF_USE_LINK}
+                            {...mkTosLinkTrackAttrs()}>
+                            Terms of Use
+                        </SettingsLink>
+                        <SettingsLink
+                            href="https://allenai.org/responsible-use"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-test-id={TEST_ID_RESPONSIBLE_USE_LINK}
+                            {...mkResponsibleUseLinkTrackAttrs()}>
+                            Responsible Use
+                        </SettingsLink>
+                    </>
+                )}
             </LinksSection>
 
-            <LinksSection>
-                <SettingsButton
-                    type="button"
-                    aria-haspopup="dialog"
-                    onClick={() => setIsDisclaimerOpen(true)}
-                    data-test-id={TEST_ID_DISCLAIMER_BUTTON}
-                    {...mkDisclaimerBtnTrackAttrs()}>
-                    Disclaimer
-                </SettingsButton>
-                <SettingsButton
-                    type="button"
-                    aria-haspopup="dialog"
-                    onClick={() => setIsAttributionOpen(true)}
-                    data-test-id={TEST_ID_ATTRIBUTION_BUTTON}
-                    {...mkAttributionBtnTrackAttrs()}>
-                    Attribution
-                </SettingsButton>
-                <SettingsLink
-                    href="https://allenai.org/privacy-policy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-test-id={TEST_ID_PRIVACY_POLICY_LINK}
-                    {...mkPrivacyLinkTrackAttrs()}>
-                    Privacy Policy
-                </SettingsLink>
-                <SettingsLink
-                    href="https://allenai.org/terms"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-test-id={TEST_ID_TERMS_OF_USE_LINK}
-                    {...mkTosLinkTrackAttrs()}>
-                    Terms of Use
-                </SettingsLink>
-                <SettingsLink
-                    href="https://allenai.org/responsible-use"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-test-id={TEST_ID_RESPONSIBLE_USE_LINK}
-                    {...mkResponsibleUseLinkTrackAttrs()}>
-                    Responsible Use
-                </SettingsLink>
-            </LinksSection>
+            {layout === 'menu' && (
+                <LinksSection>
+                    <SettingsButton
+                        type="button"
+                        aria-haspopup="dialog"
+                        onClick={() => setIsDisclaimerOpen(true)}
+                        data-test-id={TEST_ID_DISCLAIMER_BUTTON}
+                        {...mkDisclaimerBtnTrackAttrs()}>
+                        Disclaimer
+                    </SettingsButton>
+                    <SettingsButton
+                        type="button"
+                        aria-haspopup="dialog"
+                        onClick={() => setIsAttributionOpen(true)}
+                        data-test-id={TEST_ID_ATTRIBUTION_BUTTON}
+                        {...mkAttributionBtnTrackAttrs()}>
+                        Attribution
+                    </SettingsButton>
+                    <SettingsLink
+                        href="https://allenai.org/privacy-policy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-test-id={TEST_ID_PRIVACY_POLICY_LINK}
+                        {...mkPrivacyLinkTrackAttrs()}>
+                        Privacy Policy
+                    </SettingsLink>
+                    <SettingsLink
+                        href="https://allenai.org/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-test-id={TEST_ID_TERMS_OF_USE_LINK}
+                        {...mkTosLinkTrackAttrs()}>
+                        Terms of Use
+                    </SettingsLink>
+                    <SettingsLink
+                        href="https://allenai.org/responsible-use"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-test-id={TEST_ID_RESPONSIBLE_USE_LINK}
+                        {...mkResponsibleUseLinkTrackAttrs()}>
+                        Responsible Use
+                    </SettingsLink>
+                </LinksSection>
+            )}
 
             <DisclaimerDialog
                 isOpen={isDisclaimerOpen}

@@ -15,6 +15,7 @@ import {
     Collapse,
 } from '@mui/material';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -23,7 +24,7 @@ import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import prettyBytes from 'pretty-bytes';
 import prettyMs from 'pretty-ms';
 
-import { FileUploadState, UploadStatus } from '@/runs/hooks/useRunSetup';
+import { FileUploadState, getLocalFilePath, UploadStatus } from '@/runs/hooks/useRunSetup';
 import { getFriendlyMimeType, getMimeType } from '@/utils/mimeType';
 
 export interface Dataset {
@@ -72,6 +73,7 @@ interface DatasetUploadProps {
     onRetryUpload: (index: number) => void;
     disabled?: boolean;
     error?: string;
+    localMode?: boolean;
 }
 
 /**
@@ -93,8 +95,10 @@ export default function DatasetUpload({
     onRetryUpload,
     disabled = false,
     error,
+    localMode = false,
 }: DatasetUploadProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const folderInputRef = useRef<HTMLInputElement>(null);
     const [isDragging, setIsDragging] = useState(false);
 
     const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
@@ -129,7 +133,8 @@ export default function DatasetUpload({
         }
     };
 
-    const handleClick = () => {
+    const handleClick = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
         if (!disabled) {
             fileInputRef.current?.click();
         }
@@ -142,6 +147,13 @@ export default function DatasetUpload({
         }
     };
 
+    const handleFolderClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!disabled) {
+            folderInputRef.current?.click();
+        }
+    };
+
     return (
         <Box>
             <input
@@ -151,6 +163,19 @@ export default function DatasetUpload({
                 style={{ display: 'none' }}
                 multiple
             />
+            {localMode && (
+                <input
+                    ref={folderInputRef}
+                    type="file"
+                    onChange={handleFileInputChange}
+                    style={{ display: 'none' }}
+                    multiple
+                    {...({
+                        webkitdirectory: '',
+                        directory: '',
+                    } as React.InputHTMLAttributes<HTMLInputElement>)}
+                />
+            )}
 
             <DropZone
                 onClick={handleClick}
@@ -163,13 +188,35 @@ export default function DatasetUpload({
                 hasError={!!error}>
                 <CloudUploadOutlinedIcon />
                 <Typography variant="body1" gutterBottom>
-                    Drop files here or browse
+                    {localMode
+                        ? 'Drop files here or choose files from this computer'
+                        : 'Drop files here or browse'}
                 </Typography>
-                <Typography variant="caption" sx={{ mt: 1, opacity: 0.6 }}>
-                    {maxFileSize
-                        ? `Max ${maxFileSize} per file`
-                        : 'Max 10GB per file, 20GB total session limit'}
-                </Typography>
+                {localMode ? (
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Button variant="outlined" size="small" onClick={handleClick}>
+                            Choose files
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FolderOpenOutlinedIcon />}
+                            onClick={handleFolderClick}>
+                            Choose folder
+                        </Button>
+                    </Stack>
+                ) : (
+                    <Typography variant="caption" sx={{ mt: 1, opacity: 0.6 }}>
+                        {maxFileSize
+                            ? `Max ${maxFileSize} per file`
+                            : 'Max 10GB per file, 20GB total session limit'}
+                    </Typography>
+                )}
+                {localMode && (
+                    <Typography variant="caption" sx={{ mt: 1, opacity: 0.7 }}>
+                        Selected files are copied into this run&apos;s local data folder.
+                    </Typography>
+                )}
             </DropZone>
 
             {fileUploads.length > 0 && (
@@ -183,7 +230,11 @@ export default function DatasetUpload({
                                 <File>
                                     <FileHeader>
                                         <DescriptionOutlinedIcon />
-                                        <FileHeaderFilename>{upload.file.name}</FileHeaderFilename>
+                                        <FileHeaderFilename>
+                                            {localMode
+                                                ? getLocalFilePath(upload.file)
+                                                : upload.file.name}
+                                        </FileHeaderFilename>
                                         <FileHeaderFileMeta>
                                             {friendlyType} • {prettyBytes(upload.totalBytes)}
                                         </FileHeaderFileMeta>

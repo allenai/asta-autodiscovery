@@ -4,6 +4,7 @@ import { Box, CircularProgress, styled, Typography } from '@mui/material';
 import Image from 'next/image';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { TEST_ID_AI2_LOGO_LINK, TEST_ID_ASTA_LABS_LOGO_LINK } from '@/testIds';
 import { IntroBox } from '@/runs/components/IntroBox';
 import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
@@ -16,6 +17,8 @@ import { AstaAdBanner } from '@/components/AstaAdBanner';
  */
 export default function RunsPage() {
     const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+    const { config } = useRuntimeConfig();
+    const hostedFeatures = config?.hosted_features === true;
 
     if (isLoading) {
         return (
@@ -69,14 +72,16 @@ export default function RunsPage() {
                             experiment.
                         </Attribution>
                     </Section>
-                    <Section>
-                        <ExamplesRunsBox />
-                    </Section>
+                    {hostedFeatures && (
+                        <Section>
+                            <ExamplesRunsBox />
+                        </Section>
+                    )}
                     <FooterWrapper>
                         <ToS />
                     </FooterWrapper>
                 </LoggedOutLayout>
-                <AstaAdBanner isFullWidth />
+                {hostedFeatures && <AstaAdBanner isFullWidth />}
             </>
         );
     }
@@ -89,10 +94,12 @@ export default function RunsPage() {
             <Section>
                 <ViewerRunsBox />
             </Section>
-            <Section>
-                <ExamplesRunsBox />
-            </Section>
-            <AstaAdBanner />
+            {hostedFeatures && (
+                <Section>
+                    <ExamplesRunsBox />
+                </Section>
+            )}
+            {hostedFeatures && <AstaAdBanner />}
         </Layout>
     );
 }

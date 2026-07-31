@@ -39,6 +39,7 @@ import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from '@/runs/components/ExperimentDetails';
 import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { TopSurprisalsList } from '@/runs/components/TopSurprisalsList';
 import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
@@ -69,6 +70,7 @@ import {
     ExperimentPanelBackdrop,
     LargeScreenAction,
     PanelDragHandle,
+    ExperimentActionButton,
     usePanelWidthPx,
 } from '@/runs/components/RunViewPanels';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
@@ -282,6 +284,8 @@ function RunViewContent({
     const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const showCompactActions = useMediaQuery('(max-width:799px)');
     const { addSuccessToast, addErrorToast } = useToasts();
+    const { isLocal } = useRuntimeConfig();
+    const canShare = !isLocal;
 
     const datasetExpired = isDatasetExpired(run.datasetExpiresAt);
     const datasetExpiryLabel = getDatasetExpiryLabel(run.datasetExpiresAt);
@@ -325,6 +329,15 @@ function RunViewContent({
             setIsClosingPanel(false);
         }, 300);
     }, [selectExperiment]);
+
+    useEffect(() => {
+        if (!selectedExperiment) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') handleClosePanel();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedExperiment, handleClosePanel]);
 
     const onShareClick = useCallback(
         async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -442,6 +455,10 @@ function RunViewContent({
         run.details.status === 'FAILED' ||
         run.details.status === 'ERROR' ||
         run.details.status === 'CANCELLED';
+    const runningCostLabel =
+        run.details.status === 'RUNNING' && run.estimatedCostUSD != null
+            ? `Running · est. $${run.estimatedCostUSD.toFixed(2)}`
+            : toSentenceCase(run.details.status);
 
     return (
         <Container>
@@ -516,20 +533,22 @@ function RunViewContent({
                                                 anchorEl={overflowAnchorEl}
                                                 open={!!overflowAnchorEl}
                                                 onClose={() => setOverflowAnchorEl(null)}>
-                                                <MenuItem
-                                                    onClick={(
-                                                        e: React.MouseEvent<HTMLLIElement>
-                                                    ) => {
-                                                        setOverflowAnchorEl(null);
-                                                        onShareClick(
-                                                            e as unknown as React.MouseEvent<HTMLButtonElement>
-                                                        );
-                                                    }}>
-                                                    <ListItemIcon>
-                                                        <ShareOutlinedIcon fontSize="small" />
-                                                    </ListItemIcon>
-                                                    <ListItemText>Share session</ListItemText>
-                                                </MenuItem>
+                                                {canShare && (
+                                                    <MenuItem
+                                                        onClick={(
+                                                            e: React.MouseEvent<HTMLLIElement>
+                                                        ) => {
+                                                            setOverflowAnchorEl(null);
+                                                            onShareClick(
+                                                                e as unknown as React.MouseEvent<HTMLButtonElement>
+                                                            );
+                                                        }}>
+                                                        <ListItemIcon>
+                                                            <ShareOutlinedIcon fontSize="small" />
+                                                        </ListItemIcon>
+                                                        <ListItemText>Share session</ListItemText>
+                                                    </MenuItem>
+                                                )}
                                                 <MenuItem
                                                     disabled={experiments.length === 0}
                                                     onClick={(e) => {
@@ -660,17 +679,19 @@ function RunViewContent({
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>
-                                            <Tooltip title="Share session" placement="bottom">
-                                                <ExpandingActionButton
-                                                    onClick={onShareClick}
-                                                    size="small"
-                                                    variant="outlined">
-                                                    <ShareOutlinedIcon fontSize="small" />
-                                                    <ButtonLabel className="button-label">
-                                                        Share session
-                                                    </ButtonLabel>
-                                                </ExpandingActionButton>
-                                            </Tooltip>
+                                            {canShare && (
+                                                <Tooltip title="Share session" placement="bottom">
+                                                    <ExpandingActionButton
+                                                        onClick={onShareClick}
+                                                        size="small"
+                                                        variant="outlined">
+                                                        <ShareOutlinedIcon fontSize="small" />
+                                                        <ButtonLabel className="button-label">
+                                                            Share session
+                                                        </ButtonLabel>
+                                                    </ExpandingActionButton>
+                                                </Tooltip>
+                                            )}
                                         </>
                                     )}
                                 </RunHeaderActions>
@@ -708,11 +729,21 @@ function RunViewContent({
                     </RunHeader>
                     <RunHeaderSubtitle>
                         <StyledListItem>
-                            <StatusChip
-                                label={toSentenceCase(run.details.status)}
-                                size="small"
-                                $status={run.details.status}
-                            />
+                            {run.details.status === 'RUNNING' && run.estimatedCostUSD != null ? (
+                                <Tooltip title="High-end API-equivalent estimate based on actual token usage. Your Copilot charge may be lower or included in your plan.">
+                                    <StatusChip
+                                        label={runningCostLabel}
+                                        size="small"
+                                        $status={run.details.status}
+                                    />
+                                </Tooltip>
+                            ) : (
+                                <StatusChip
+                                    label={runningCostLabel}
+                                    size="small"
+                                    $status={run.details.status}
+                                />
+                            )}
                         </StyledListItem>
                         <StyledListItem>
                             {getRunStatusString(run.details, experiments)}
@@ -804,17 +835,30 @@ function RunViewContent({
                                 datasetExpired={datasetExpired}
                                 actions={
                                     <>
-                                        <Tooltip title="Share experiment" placement="bottom">
-                                            <ExpandingActionButton
-                                                onClick={onShareExperimentClick}
-                                                size="small"
-                                                variant="outlined">
-                                                <ShareOutlinedIcon fontSize="small" />
-                                                <ButtonLabel className="button-label">
-                                                    Share experiment
-                                                </ButtonLabel>
-                                            </ExpandingActionButton>
+                                        <Tooltip title="Close" placement="bottom">
+                                            <ExperimentActionButton
+                                                aria-label="Close experiment details"
+                                                onClick={handleClosePanel}
+                                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
+                                                {...mkCloseExperimentDetailsPanelAttrs({
+                                                    runId: run.id,
+                                                })}>
+                                                <CloseIcon fontSize="small" />
+                                            </ExperimentActionButton>
                                         </Tooltip>
+                                        {canShare && (
+                                            <Tooltip title="Share experiment" placement="bottom">
+                                                <ExpandingActionButton
+                                                    onClick={onShareExperimentClick}
+                                                    size="small"
+                                                    variant="outlined">
+                                                    <ShareOutlinedIcon fontSize="small" />
+                                                    <ButtonLabel className="button-label">
+                                                        Share experiment
+                                                    </ButtonLabel>
+                                                </ExpandingActionButton>
+                                            </Tooltip>
+                                        )}
                                         <LargeScreenAction>
                                             <Tooltip
                                                 title={isExpPanelExpanded ? 'Collapse' : 'Expand'}
@@ -841,22 +885,6 @@ function RunViewContent({
                                                 </ExpandingActionButton>
                                             </Tooltip>
                                         </LargeScreenAction>
-                                        <Tooltip title="Close" placement="bottom">
-                                            <ExpandingActionButton
-                                                aria-label="Close experiment details"
-                                                onClick={handleClosePanel}
-                                                size="small"
-                                                variant="outlined"
-                                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
-                                                {...mkCloseExperimentDetailsPanelAttrs({
-                                                    runId: run.id,
-                                                })}>
-                                                <CloseIcon fontSize="small" />
-                                                <ButtonLabel className="button-label">
-                                                    Close
-                                                </ButtonLabel>
-                                            </ExpandingActionButton>
-                                        </Tooltip>
                                     </>
                                 }
                             />

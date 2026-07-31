@@ -7,6 +7,7 @@ import { ViewerCreditsProvider } from '@/contexts/ViewerCreditsContext';
 import { ToastsContextProvider } from '@/contexts/ToastsContext';
 import { ExampleRunsContextProvider } from '@/contexts/ExampleRunsContext';
 import { ViewerRunsContextProvider } from '@/contexts/ViewerRunsContext';
+import { RuntimeConfigProvider } from '@/contexts/RuntimeConfigContext';
 
 interface ClientProvidersProps {
     children: ReactNode;
@@ -14,14 +15,16 @@ interface ClientProvidersProps {
 
 export default function ClientProviders({ children }: ClientProvidersProps) {
     return (
-        <Auth0Provider>
-            <ToastsContextProvider>
-                <ExampleRunsContextProvider>
-                    <ViewerCreditsProvider>
-                        <ViewerRunsContextProvider>{children}</ViewerRunsContextProvider>
-                    </ViewerCreditsProvider>
-                </ExampleRunsContextProvider>
-            </ToastsContextProvider>
-        </Auth0Provider>
+        <RuntimeConfigProvider>
+            <Auth0Provider>
+                <ToastsContextProvider>
+                    <ExampleRunsContextProvider>
+                        <ViewerCreditsProvider>
+                            <ViewerRunsContextProvider>{children}</ViewerRunsContextProvider>
+                        </ViewerCreditsProvider>
+                    </ExampleRunsContextProvider>
+                </ToastsContextProvider>
+            </Auth0Provider>
+        </RuntimeConfigProvider>
     );
 }

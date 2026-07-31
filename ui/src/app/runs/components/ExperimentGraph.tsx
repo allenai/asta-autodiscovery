@@ -689,7 +689,9 @@ export const ExperimentGraph = memo(function ExperimentGraph({
         return (
             <GraphContainer ref={containerRef} data-test-id={TEST_ID_EXPERIMENT_GRAPH}>
                 <EmptyState>
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography
+                        variant="body2"
+                        sx={(theme) => ({ color: theme.color['cream-80'].rgba.toString() })}>
                         No experiments to display
                     </Typography>
                 </EmptyState>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Run, RunStatus } from '@/types/Run';
 import { RunPills } from '@/runs/components/RunPills';
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 
 export type RunSummaryProps = {
     run: Run;
@@ -13,6 +14,7 @@ export type RunSummaryProps = {
 
 export const RunSummary = ({ run }: RunSummaryProps) => {
     const { user: authUser } = useAuth0();
+    const { isLocal } = useRuntimeConfig();
     const { id, userid, name, description } = run;
     const status = run.details?.status ?? RunStatus.UNKNOWN;
     const shortDescription = description?.includes('.')
@@ -20,7 +22,7 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
         : description;
 
     // If the run belongs to a different user, use the /shared route
-    const isSharedRun = authUser?.sub !== userid;
+    const isSharedRun = !isLocal && authUser?.sub !== userid;
     const href = isSharedRun ? `/shared/${userid}/${id}` : `/runs/${id}`;
 
     return (

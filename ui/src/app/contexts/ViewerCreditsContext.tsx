@@ -12,6 +12,7 @@ import {
 } from 'react';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { getUserApi, ViewerCreditsFromApi } from '@/api/UserApi';
 
 export interface ViewerCreditsState {
@@ -61,12 +62,13 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
     const hasLoadedOnce = useRef(false);
 
     const { isAuthenticated } = useAuth0();
+    const { isLocal, isLoading: isRuntimeLoading } = useRuntimeConfig();
 
     const startPolling = useCallback(() => setIsPolling(true), []);
     const stopPolling = useCallback(() => setIsPolling(false), []);
 
     const updateViewerCredits = useCallback(async () => {
-        if (!isAuthenticated) {
+        if (!isAuthenticated || isLocal || isRuntimeLoading) {
             return;
         }
         setIsLoading(true);
@@ -84,26 +86,26 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
         } finally {
             setIsLoading(false);
         }
-    }, [isAuthenticated, lastError]);
+    }, [isAuthenticated, isLocal, isRuntimeLoading, lastError]);
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && !isLocal && !isRuntimeLoading) {
             setIsPolling(true);
         } else {
             setIsPolling(false);
-            setIsLoadingInitial(true);
+            setIsLoadingInitial(!isLocal);
             hasLoadedOnce.current = false;
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, isLocal, isRuntimeLoading]);
 
     useEffect(() => {
-        if (!isAuthenticated || !isPolling) {
+        if (!isAuthenticated || isLocal || isRuntimeLoading || !isPolling) {
             return;
         }
         updateViewerCredits();
         const interval = setInterval(updateViewerCredits, REFRESH_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [isAuthenticated, isPolling, updateViewerCredits]);
+    }, [isAuthenticated, isLocal, isRuntimeLoading, isPolling, updateViewerCredits]);
 
     const memoizedState = useMemo<ViewerCreditsState>(
         () => ({

@@ -79,8 +79,8 @@ interchangeable (`gsutil rsync` moves data either way). See
 
 > **Uploads.** With `gcs`, the browser uploads datasets straight to a presigned URL and the
 > bytes never reach the API. With `local` there is no such capability URL, so uploads are
-> streamed through the API (`PUT /api/runs/<runid>/datasets/<filename>`) — which is why the
-> proxy's `client_max_body_size` for `/api` matters for this backend.
+> streamed through the API (`POST /api/runs/upload-dataset`) — which is why the proxy's
+> `client_max_body_size` for `/api` matters for this backend.
 
 ### Google Cloud
 

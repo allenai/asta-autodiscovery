@@ -6,8 +6,7 @@ import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
-import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
-import { authBridge } from '@/auth/authBridge';
+import { uploadDatasetFile } from '@/api/datasetUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 export const MCTS_SELECTION = {
@@ -361,26 +360,20 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         }
     }, [api, runid]);
 
-    const uploadToGCS = async (
+    const uploadFile = async (
         index: number,
-        uploadUrl: string,
+        uploadUrl: string | null,
         file: File,
-        uploadStartTime: number,
-        sameOrigin: boolean
+        uploadStartTime: number
     ): Promise<void> => {
         const abortController = new AbortController();
         updateUploadState(index, { abortController });
 
-        // Same-origin uploads land on our own API and so need the caller's token;
-        // presigned storage URLs carry their own authorization and must never
-        // receive it.
-        const authToken = sameOrigin ? await authBridge.getToken().catch(() => null) : null;
-
-        await uploadFileToGCS({
+        await uploadDatasetFile({
             file,
             uploadUrl,
+            runid,
             uploadStartTime,
-            authToken,
             onProgress: (progressEvent) => {
                 updateUploadState(index, {
                     progress: progressEvent.progress,
@@ -445,13 +438,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                     gcsPath: data.gcs_path,
                 });
 
-                await uploadToGCS(
-                    index,
-                    data.upload_url,
-                    file,
-                    uploadStartTime,
-                    Boolean(data.same_origin)
-                );
+                await uploadFile(index, data.upload_url, file, uploadStartTime);
             } catch (err) {
                 console.error('Upload failed:', err);
                 const errorMessage = err instanceof Error ? err.message : 'Upload failed';

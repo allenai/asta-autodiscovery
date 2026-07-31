@@ -89,20 +89,32 @@ resolves outside its root rather than normalizing it away.
 ### Direct browser uploads
 
 GCS lets the browser `PUT` a dataset straight to a presigned URL, bypassing the API. A
-filesystem has no equivalent capability URL, so `signed_upload_url()` returns `None` and
-the API falls back to receiving the upload itself:
+filesystem has no equivalent capability URL, so `signed_upload_url()` returns `None`, and
+the response says so rather than inventing a substitute:
 
 ```
 POST /api/runs/<runid>/generate-upload-url
-  → { upload_url: "https://storage.googleapis.com/…", same_origin: false }   # gcs
-  → { upload_url: "/api/runs/<runid>/datasets/<file>", same_origin: true }   # local
+  → { upload_url: "https://storage.googleapis.com/…" }   # gcs   → PUT there
+  → { upload_url: null }                                 # local → POST to our API
 ```
 
-`same_origin` tells the client to attach its `Authorization` header to the upload — which
-it must **not** do for a third-party storage host, since that would leak the bearer token.
-The new endpoint streams `request.stream` into the store, so large uploads are not
-buffered in memory. This is why the proxy's `client_max_body_size` for `/api` is
-load-bearing again.
+When it is null the client posts the file to the **existing** authenticated
+`POST /api/runs/upload-dataset`, so no second upload route was added. The client keeps
+calling `generate-upload-url` first either way, because that is where the run is checked to
+exist and the requested size is screened.
+
+Reporting *absence* rather than returning a URL with a "and attach your credentials to
+this one" flag matters: a server should never be in a position to tell a client where it
+may send its bearer token. Here the client's rule is local and unconditional — presigned
+URL, no header; our own endpoint, header — and it lives in one module
+(`ui/src/app/api/datasetUpload.ts`) so callers just forward `upload_url`.
+
+Two things were fixed on `upload-dataset` when it became the default backend's real upload
+path: it enforced **no size limit at all** (the check in `generate-upload-url` is on a
+client-asserted size, so it cannot be the only one), and it buffered the whole file to a
+temp file before storing it — a second full copy of a multi-GB upload on the API
+container's disk. It now streams `file.stream` into the store. This is also why the proxy's
+`client_max_body_size` for `/api` is load-bearing again.
 
 ### Capabilities, not backend names
 
@@ -264,8 +276,10 @@ backend raises a clear error if it is relative.
 - `GCSError` is now an alias of the new `StorageError` rather than being renamed, so
   existing `except GCSError` sites and imports keep working.
 - The `generate-upload-url` response keeps its `gcs_path` field name (now carrying a
-  `file://` URI under the local backend) rather than breaking the wire format; `same_origin`
-  was added alongside it.
+  `file://` URI under the local backend) rather than breaking the wire format. `upload_url`
+  became nullable; an earlier draft added a `same_origin` boolean plus a dedicated
+  streaming route, both dropped in review once it was clear `upload-dataset` already did
+  this job.
 - The in-container mount point stays `/mnt/gcs` even for the local backend. The deployed
   Cloud Run job definition pins that path (`--add-volume-mount` in
   `rebuild_and_deploy.sh`), so renaming it would couple this change to a Cloud Run

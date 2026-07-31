@@ -5,12 +5,10 @@ their own autodiscovery experiment runs.
 """
 
 import os
-import tempfile
 import uuid
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from google.cloud import storage
-from urllib.parse import quote, urlparse
+from urllib.parse import urlparse
 import logging
 
 
@@ -692,9 +690,13 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-dataset", methods=["POST"])
-    @requires_auth()
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def upload_dataset():
-        """Upload a dataset file for a run.
+        """Upload a dataset file for a run, through this API.
+
+        This is the upload path for storage backends that cannot issue direct-upload
+        URLs — `generate-upload-url` returns a null ``upload_url`` and the client
+        posts the file here instead. It is also usable directly by scripts.
 
         Expects multipart/form-data with:
         - file: Dataset file
@@ -715,36 +717,50 @@ def create() -> Blueprint:
             raise BadRequest("No file provided")
 
         file = request.files["file"]
-        if file.filename == "":
+        if not file.filename:
             raise BadRequest("No file selected")
 
         runid = request.form.get("runid")
         if not runid:
             raise BadRequest("runid is required")
 
+        # The filename is stored verbatim, because run metadata records dataset names
+        # and the job looks the files up by them — normalizing here would desync the
+        # two. So reject anything that could point outside the run's data prefix
+        # rather than rewriting it. (The filesystem store also refuses to escape its
+        # root, but that would surface as a 500.)
+        if "/" in file.filename or "\\" in file.filename or file.filename in (".", ".."):
+            raise BadRequest("Invalid filename")
+
+        # Enforce the size cap where the bytes actually arrive. The check in
+        # generate-upload-url is on a client-asserted size, so it cannot be the only
+        # one — and for backends without direct uploads every byte comes through here.
+        has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+        max_file_size = (
+            UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
+            if has_higher_limit
+            else UPLOAD_MAX_FILE_SIZE_BYTES
+        )
+        if request.content_length is not None and request.content_length > max_file_size:
+            return jsonify({"error": "File too large."}), 413
+
         try:
             manager = get_job_manager()
+            if not manager.job_exists(userid, runid):
+                return jsonify({"error": f"Run {runid} not found"}), 404
 
-            # Save file temporarily
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=Path(file.filename).suffix
-            ) as tmp:
-                file.save(tmp.name)
-                tmp_path = Path(tmp.name)
+            # Stream straight into the store. Buffering to a temp file first would put
+            # a second full copy of a multi-GB upload on this container's disk.
+            key = dataset_key(userid, runid, file.filename)
+            store = get_store(manager.config)
+            store.write_stream(key, file.stream, content_type=file.content_type)
 
-            try:
-                # Upload to GCS with original filename
-                path = manager.upload_dataset(userid, runid, tmp_path, remote_name=file.filename)
-                resp = UploadDatasetResponseModel(
-                    path=path,
-                    filename=file.filename,
-                    message="Dataset uploaded successfully",
-                )
-                return jsonify(resp.model_dump()), 200
-            finally:
-                # Clean up temp file
-                if tmp_path.exists():
-                    os.unlink(tmp_path)
+            resp = UploadDatasetResponseModel(
+                path=store.uri(key),
+                filename=file.filename,
+                message="Dataset uploaded successfully",
+            )
+            return jsonify(resp.model_dump()), 200
 
         except Exception as e:
             current_app.logger.error(f"Failed to upload dataset: {e}")
@@ -753,13 +769,15 @@ def create() -> Blueprint:
     @api.route("/<runid>/generate-upload-url", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def generate_upload_url(runid: str):
-        """Get a URL the browser can upload a dataset file to.
+        """Get a URL the browser can upload a dataset file to, if there is one.
 
-        When the storage backend can issue capability URLs (GCS presigned URLs)
-        this returns one, so upload bytes bypass the Flask server entirely.
-        Backends without presigning (the filesystem store) get a same-origin URL
-        pointing at :func:`upload_dataset_stream` below; ``same_origin`` tells the
-        client it must attach its ``Authorization`` header to that request.
+        When the storage backend can issue capability URLs (GCS presigned URLs) this
+        returns one, so upload bytes bypass the Flask server entirely. Backends
+        without presigning get ``upload_url: null``, and the client posts the file to
+        the authenticated `/api/runs/upload-dataset` endpoint instead.
+
+        Either way this call is where the run is checked to exist and the requested
+        size is screened, so clients should keep calling it before uploading.
 
         Args:
             runid: Run identifier (from URL path)
@@ -770,8 +788,8 @@ def create() -> Blueprint:
             file_size_bytes: Size of file in bytes
 
         Returns:
-            JSON with upload_url, same_origin, gcs_path, filename, and
-            expires_at_unix (Unix timestamp)
+            JSON with upload_url (null when the backend has none), gcs_path,
+            filename, and expires_at_unix (Unix timestamp)
 
         Raises:
             BadRequest: If required fields are missing or validation fails
@@ -816,20 +834,12 @@ def create() -> Blueprint:
             expires_at = datetime.now(UTC) + timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS)
             expires_at_unix = int(expires_at.timestamp())
 
-            # Backends without presigned URLs fall back to this API receiving the
-            # upload. The URL is relative so it is same-origin for the browser and
-            # goes through the existing proxy; the client must send credentials.
-            upload_url = result["upload_url"]
-            same_origin = upload_url is None
-            if same_origin:
-                upload_url = (
-                    f"/api/runs/{quote(req.runid)}/datasets/{quote(req.filename)}"
-                )
-
-            # Return response using Pydantic model
+            # A null upload_url means this backend has no direct-upload URL to give;
+            # the client posts the file to /api/runs/upload-dataset instead. Reporting
+            # its absence beats inventing one here — the client then never has to be
+            # told where it is allowed to send its credentials.
             resp = GenerateUploadUrlResponseModel(
-                upload_url=upload_url,
-                same_origin=same_origin,
+                upload_url=result["upload_url"],
                 gcs_path=result["storage_path"],
                 filename=req.filename,
                 expires_at_unix=expires_at_unix,
@@ -843,59 +853,6 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 400
         except Exception as e:
             current_app.logger.error(f"Failed to generate upload URL: {e}")
-            return jsonify({"error": str(e)}), 500
-
-    @api.route("/<runid>/datasets/<filename>", methods=["PUT"])
-    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
-    def upload_dataset_stream(runid: str, filename: str):
-        """Receive a dataset file upload for storage backends without presigned URLs.
-
-        This is the destination `generate-upload-url` hands back when the store
-        cannot issue capability URLs. The request body is the raw file, streamed
-        straight into the store so large uploads never buffer in memory or land in
-        a temp file.
-
-        Args:
-            runid: Run identifier (from URL path)
-            filename: Name to store the file under (from URL path)
-
-        Returns:
-            JSON with the storage path the file was written to.
-        """
-        userid = request.user.get("sub")
-        if not userid:
-            return jsonify({"error": "User ID not found in token"}), 401
-
-        # The route converter already excludes "/"; reject the remaining ways a
-        # filename could point somewhere other than this run's data prefix.
-        if filename in (".", "..") or "\\" in filename:
-            raise BadRequest("Invalid filename")
-
-        has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
-        max_file_size = (
-            UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
-            if has_higher_limit
-            else UPLOAD_MAX_FILE_SIZE_BYTES
-        )
-        if request.content_length is not None and request.content_length > max_file_size:
-            return jsonify({"error": "File too large."}), 413
-
-        try:
-            manager = get_job_manager()
-            if not manager.job_exists(userid, runid):
-                return jsonify({"error": f"Run {runid} not found"}), 404
-
-            key = dataset_key(userid, runid, filename)
-            store = get_store(manager.config)
-            store.write_stream(key, request.stream, content_type=request.content_type)
-
-            return jsonify({"path": store.uri(key), "filename": filename}), 200
-
-        except GCSError as e:
-            current_app.logger.error(f"Failed to store uploaded dataset: {e}")
-            return jsonify({"error": str(e)}), 400
-        except Exception as e:
-            current_app.logger.error(f"Failed to store uploaded dataset: {e}")
             return jsonify({"error": str(e)}), 500
 
     @api.route("/<runid>/metadata", methods=["POST"])

@@ -1,14 +1,26 @@
 /**
  * Dataset Upload Module
  *
- * Uploads a file with a single PUT and progress tracking via XMLHttpRequest.
+ * Uploads a dataset file with progress tracking. Uses XMLHttpRequest rather than
+ * fetch because only XHR reports upload progress, which the run-setup UI displays.
  *
- * The destination comes from the API's generate-upload-url call and is either a
- * presigned cloud-storage URL (the upload bypasses our API entirely) or, for
- * storage backends without presigning, a same-origin API path. Only the latter
- * gets an Authorization header: sending our bearer token to a third-party storage
- * host would leak it, and presigned URLs carry their own authorization.
+ * There are two destinations, decided by whether generate-upload-url gave us a
+ * presigned URL:
+ *
+ * - `uploadUrl` set — PUT the bytes straight to cloud storage, bypassing our API.
+ *   No Authorization header: the presigned URL carries its own, and sending our
+ *   bearer token to a third-party host would leak it.
+ * - `uploadUrl` null — the backend has no presigning, so POST the file as
+ *   multipart to our own authenticated upload endpoint.
+ *
+ * Both live here so callers just forward `upload_url` and never decide where it is
+ * safe to send credentials.
  */
+
+import { authBridge } from '@/auth/authBridge';
+
+/** Endpoint that receives uploads when the storage backend cannot presign. */
+const API_UPLOAD_PATH = '/api/runs/upload-dataset';
 
 export interface UploadProgressEvent {
     progress: number; // 0-100
@@ -19,10 +31,11 @@ export interface UploadProgressEvent {
 
 export interface UploadOptions {
     file: File;
-    uploadUrl: string;
+    /** Presigned URL from generate-upload-url, or null to upload via our API. */
+    uploadUrl: string | null;
+    /** Run the file belongs to; needed for the API upload path. */
+    runid: string;
     uploadStartTime: number;
-    /** Bearer token to attach; only set for same-origin (our own API) uploads. */
-    authToken?: string | null;
     onProgress?: (event: UploadProgressEvent) => void;
     onComplete?: () => void;
     onError?: (error: Error) => void;
@@ -30,22 +43,25 @@ export interface UploadOptions {
 }
 
 /**
- * Upload a file with a single PUT to the URL the API handed back
+ * Upload a dataset file, direct to storage when possible and through our API otherwise
  *
  * @param options - Upload configuration options
  * @returns Promise that resolves when upload completes or rejects on error
  */
-export function uploadToGCS(options: UploadOptions): Promise<void> {
+export async function uploadDatasetFile(options: UploadOptions): Promise<void> {
     const {
         file,
         uploadUrl,
+        runid,
         uploadStartTime,
-        authToken,
         onProgress,
         onComplete,
         onError,
         abortSignal,
     } = options;
+
+    // Only fetched for the API path; a presigned URL must not receive our token.
+    const authToken = uploadUrl ? null : await authBridge.getToken().catch(() => null);
 
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -105,11 +121,21 @@ export function uploadToGCS(options: UploadOptions): Promise<void> {
         }
 
         // Open connection and send
-        xhr.open('PUT', uploadUrl, true);
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-        if (authToken) {
-            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+        if (uploadUrl) {
+            xhr.open('PUT', uploadUrl, true);
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+            xhr.send(file);
+        } else {
+            const form = new FormData();
+            form.append('file', file);
+            form.append('runid', runid);
+            xhr.open('POST', API_UPLOAD_PATH, true);
+            if (authToken) {
+                xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+            }
+            // Content-Type is deliberately unset: the browser adds the multipart
+            // boundary, which we cannot compute here.
+            xhr.send(form);
         }
-        xhr.send(file);
     });
 }

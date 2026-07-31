@@ -332,19 +332,12 @@ class GenerateUploadUrlRequestModel(BaseModel):
 class GenerateUploadUrlResponseModel(BaseModel):
     """Model for the response containing the upload URL"""
 
-    upload_url: str = Field(
+    upload_url: str | None = Field(
         ...,
         description=(
-            "URL to PUT the file to. Either a presigned storage URL (uploads bypass this "
-            "API) or, when the storage backend has no presigning, a same-origin API path "
-            "that requires the caller's Authorization header — see same_origin."
-        ),
-    )
-    same_origin: bool = Field(
-        False,
-        description=(
-            "True when upload_url points at this API and the client must attach its "
-            "auth credentials to the upload request."
+            "Presigned storage URL to PUT the file to, so the upload bypasses this API. "
+            "Null when the storage backend cannot issue one, in which case the file "
+            "should be posted to /api/runs/upload-dataset instead."
         ),
     )
     gcs_path: str = Field(..., description="Storage URI where the file will be stored")

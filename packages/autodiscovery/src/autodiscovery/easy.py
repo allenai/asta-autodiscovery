@@ -232,7 +232,7 @@ def build_parser() -> argparse.ArgumentParser:
     adv.add_argument(
         "--backend",
         type=str,
-        choices=["local", "process", "modal"],
+        choices=["local", "process", "modal", "lima"],
         default="process",
     )
     adv.add_argument("--code_timeout", type=int, default=30 * 60)

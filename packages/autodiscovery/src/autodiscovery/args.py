@@ -232,7 +232,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--backend",
             type=str,
-            choices=["local", "process", "modal"],
+            choices=["local", "process", "modal", "lima"],
             default="process",
             help="Code execution backend: local (in-process), process (isolated subprocess, default), or modal (Modal sandbox)",
         )

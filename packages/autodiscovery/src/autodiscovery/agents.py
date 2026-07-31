@@ -923,19 +923,30 @@ def install(package):
             f"Using Modal sandbox with bucket gs://{bucket_name}/{key_prefix} mounted at {modal_mount_path}"
         )
         print(f"Working directory will be: {modal_working_dir}")
-    elif backend == "process":
+    elif backend in {"process", "lima"}:
         # Use isolated subprocess for code execution
-        from code_execution import ProcessIPythonBackend
+        if backend == "lima":
+            from code_execution import LimaIPythonBackend
 
-        process_backend = ProcessIPythonBackend(cwd=work_dir)
+            if not dataset_paths:
+                raise ValueError("dataset_paths are required when backend is 'lima'")
+            isolated_backend = LimaIPythonBackend(
+                cwd=work_dir,
+                dataset_paths=list(dataset_paths),
+            )
+        else:
+            from code_execution import ProcessIPythonBackend
+
+            isolated_backend = ProcessIPythonBackend(cwd=work_dir)
+
         executor = ModalSandboxExecutor(
-            _ProcessBackendAdapter(process_backend),
+            _ProcessBackendAdapter(isolated_backend),
             timeout=code_timeout,
             vision_model=vision_model,
             llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
-        print(f"Using process backend with work_dir: {work_dir}")
+        print(f"Using {backend} backend with work_dir: {work_dir}")
     else:
         # Use local code executor (in-process, no isolation)
         executor = LocalCommandLineCodeExecutor(

@@ -166,6 +166,19 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
+    @api.route("/runtime-config", methods=["GET"])
+    def runtime_config():
+        """Return credential-free deployment capabilities used by local clients."""
+        config = JobConfig.from_env()
+        is_local = config.backend == "local"
+        return jsonify(
+            {
+                "deployment_mode": "local" if is_local else "hosted",
+                "upload_transport": "api" if is_local else "presigned",
+                "hosted_features": not is_local,
+            }
+        )
+
     @api.route("/create", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def create_run():
@@ -192,7 +205,7 @@ def create() -> Blueprint:
             path = manager.create_job(userid, runid)
 
             # Create run_details.json
-            run_details = create_run_details(userid, runid)
+            run_details = create_run_details(userid, runid, manager.config)
 
             # Check if user has HIGHER_UPLOAD_LIMIT permission and return the actual limit
             has_higher_upload_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
@@ -951,7 +964,11 @@ def create() -> Blueprint:
             datasets = metadata.get("datasets", [])
             for ds in datasets:
                 # If the dataset has a URL, it's an S3 preloaded file
-                if ds.get("url") and ds.get("url").startswith("gs://"):
+                if (
+                    manager.config.backend != "local"
+                    and ds.get("url")
+                    and ds.get("url").startswith("gs://")
+                ):
                     if not has_ai1_permission:
                         return jsonify({"error": "Permission denied for preloaded datasets"}), 403
                     filename = ds.get("name")
@@ -975,9 +992,10 @@ def create() -> Blueprint:
                 raise BadRequest("Number of Experiments is required in metadata")
 
             # Validate experiment count and sufficient credits before submission
-            check_experiment_limits(
-                n_experiments=n_experiments, userid=req.userid, config=manager.config
-            )
+            if manager.config.backend != "local":
+                check_experiment_limits(
+                    n_experiments=n_experiments, userid=req.userid, config=manager.config
+                )
 
             # Build job parameters from metadata
             job_params = {
@@ -1015,10 +1033,11 @@ def create() -> Blueprint:
                     "status_checked_at": datetime.now(UTC).isoformat(),
                     "origin_url": origin_url,
                 },
+                manager.config,
             )
 
             # Get updated run_details to return to frontend
-            run_details = get_run_details(req.userid, req.runid)
+            run_details = get_run_details(req.userid, req.runid, manager.config)
             if not run_details:
                 return jsonify({"error": "Failed to retrieve run details after submission"}), 500
 

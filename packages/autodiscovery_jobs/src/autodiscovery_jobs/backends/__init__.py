@@ -37,13 +37,20 @@ def get_backend(config: JobConfig | None = None) -> JobBackend:
         from .docker import DockerBackend
 
         return DockerBackend(config)
+    if backend == "local":
+        from .local import LocalProcessBackend
 
-    raise JobBackendError(f"Unknown job backend '{config.backend}'. Expected 'gcp' or 'docker'.")
+        return LocalProcessBackend(config)
+
+    raise JobBackendError(
+        f"Unknown job backend '{config.backend}'. Expected 'gcp', 'docker', or 'local'."
+    )
 
 
 __all__ = [
     "JobBackend",
     "CloudRunBackend",
+    "LocalProcessBackend",
     "build_job_args",
     "get_backend",
 ]

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
 import threading
+from pathlib import Path
 from typing import Any
 
 from autodiscovery_jobs import JobConfig
@@ -190,13 +192,36 @@ class ExperimentTree:
         """
         config = config or JobConfig()
         filename = f"mcts_{experiment_id}.json"
-        node_data = read_experiment_node(userid, jobid, filename, config)
+        if config.backend == "local":
+            from autodiscovery_jobs.local_storage import LocalStorage
+
+            node_path = LocalStorage(config).get_job_path(userid, jobid) / "output" / filename
+            try:
+                node_data = json.loads(node_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                node_data = None
+        else:
+            node_data = read_experiment_node(userid, jobid, filename, config)
         if node_data is None:
             return None
         return ExperimentNode(node_data, filename)
 
     def _load_from_gcs(self) -> None:
         """Load all experiment nodes from GCS in parallel."""
+        if self.config.backend == "local":
+            from autodiscovery_jobs.local_storage import LocalStorage
+
+            output_path = LocalStorage(self.config).get_job_path(self.userid, self.jobid) / "output"
+            for node_path in sorted(output_path.glob("mcts_node_*.json")):
+                try:
+                    value = json.loads(node_path.read_text(encoding="utf-8"))
+                    if isinstance(value, dict):
+                        node = ExperimentNode(value, node_path.name)
+                        self._nodes[node.id] = node
+                except (OSError, ValueError, json.JSONDecodeError) as exc:
+                    logging.warning("Failed to parse local experiment node %s: %s", node_path, exc)
+            self._build_tree_relationships()
+            return
         try:
             filenames = list_experiment_files(self.userid, self.jobid, self.config)
         except Exception as e:

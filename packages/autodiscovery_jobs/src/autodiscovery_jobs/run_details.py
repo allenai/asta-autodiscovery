@@ -8,12 +8,15 @@ file that tracks execution state.
 from __future__ import annotations
 
 import json
+import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from .client import get_storage_client
 from .config import JobConfig
+from .local_storage import LocalStorage
 
 
 # Terminal statuses that indicate job completion
@@ -113,6 +116,10 @@ def create_run_details(
         The created RunDetails object
     """
     config = config or JobConfig.from_env()
+    if config.backend == "local":
+        run_details = RunDetails.create_new()
+        _write_local_run_details(userid, runid, run_details, config)
+        return run_details
     client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
@@ -141,6 +148,15 @@ def get_run_details(
         RunDetails object, or None if not found
     """
     config = config or JobConfig.from_env()
+    if config.backend == "local":
+        details_path = LocalStorage(config).get_job_path(userid, runid) / "run_details.json"
+        if not details_path.is_file():
+            return None
+        try:
+            value = json.loads(details_path.read_text(encoding="utf-8"))
+            return RunDetails.from_dict(value) if isinstance(value, dict) else None
+        except (OSError, json.JSONDecodeError):
+            return None
     client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
@@ -173,6 +189,13 @@ def update_run_details(
         Updated RunDetails object
     """
     config = config or JobConfig.from_env()
+    if config.backend == "local":
+        run_details = get_run_details(userid, runid, config) or RunDetails.create_new()
+        value = run_details.to_dict()
+        value.update(updates)
+        updated = RunDetails.from_dict(value)
+        _write_local_run_details(userid, runid, updated, config)
+        return updated
     client = get_storage_client(config.project_id)
     bucket = client.bucket(config.bucket)
 
@@ -274,3 +297,27 @@ def refresh_run_status(
         pass
 
     return run_details
+
+
+def _write_local_run_details(
+    userid: str,
+    runid: str,
+    run_details: RunDetails,
+    config: JobConfig,
+) -> None:
+    """Atomically persist local run details beside canonical metadata."""
+    run_path = LocalStorage(config).get_job_path(userid, runid)
+    if not run_path.is_dir():
+        raise FileNotFoundError(f"Run does not exist: {runid}")
+    destination = run_path / "run_details.json"
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=run_path,
+        prefix=".run-details-",
+        suffix=".tmp",
+        delete=False,
+    ) as temp_file:
+        json.dump(run_details.to_dict(), temp_file, indent=2)
+        temp_path = Path(temp_file.name)
+    temp_path.replace(destination)

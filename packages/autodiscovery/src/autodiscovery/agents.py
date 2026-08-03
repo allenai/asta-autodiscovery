@@ -5,6 +5,7 @@ import json
 import os
 import urllib.request
 from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
@@ -685,6 +686,48 @@ def get_openai_config(
     return config
 
 
+# Key scientific packages behind the most common stale-API code failures
+# (e.g. matplotlib boxplot `labels`->`tick_labels`, statsmodels get_robustcov_results
+# removed, pandas/numpy dtype churn). We announce the *actually installed* versions in
+# the programmer prompt so it writes code for the sandbox's version instead of guessing.
+_ANNOUNCED_PACKAGES = (
+    "numpy",
+    "pandas",
+    "scipy",
+    "statsmodels",
+    "patsy",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+)
+
+
+def build_package_version_notice(packages=_ANNOUNCED_PACKAGES) -> str:
+    """Probe the execution environment for installed versions of key packages and
+    return a programmer-prompt snippet announcing them. Returns "" if none are found
+    (e.g. an unexpected image), so the prompt degrades gracefully. Uses distribution
+    metadata (no heavy imports, no side effects)."""
+    detected = []
+    for pkg in packages:
+        try:
+            detected.append(f"{pkg}=={_pkg_version(pkg)}")
+        except PackageNotFoundError:
+            continue
+        except Exception:
+            continue
+    if not detected:
+        return ""
+    return (
+        "\n\nInstalled versions of key packages in THIS execution environment "
+        "(write code that runs against these exact versions — do not call APIs that "
+        "were removed, renamed, or deprecated in them, and do not install or downgrade "
+        "these packages):\n"
+        + "".join(f"  - {d}\n" for d in detected)
+        + "When an API differs across versions (a renamed keyword argument, a removed "
+        "function), use the form valid for the version listed above.\n"
+    )
+
+
 def get_agents(
     work_dir,
     theorizer_model="o4-mini",
@@ -843,6 +886,10 @@ import sys
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", package])\n\n\n"""
 
+    # Announce the sandbox's actual package versions so the programmer targets them
+    # instead of guessing (top source of stale-API code failures).
+    package_version_notice = build_package_version_notice()
+
     # Experiment Programmer
     experiment_programmer = ConversableAgent(
         name="experiment_programmer",
@@ -859,6 +906,7 @@ def install(package):
             "When installing python packages, use the --quiet option to minimize unnecessary output."
             "Prefer using installed libraries over installing new libraries whenever possible. "
             "If possible, instead of downgrading library versions, try to adapt your code to work with a more updated version that is already installed. "
+            f"{package_version_notice}"
             "Never attempt to create a new environment. Always use the current environment. "
             "If the code requires generating plots, use plt.show (not plt.savefig).  "
             "Avoid printing the whole data structure to the console directly if it is large; instead, print concise results that are directly relevant to the experiment. "

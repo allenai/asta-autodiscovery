@@ -181,12 +181,14 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
     """
     store, _ = _store(config)
 
+    # Scans every key under users/. This is the index-miss fallback for shared-run
+    # lookups (see JobManager.get_shared_run_owner), so it is a cold path; filtering
+    # here rather than server-side keeps pattern matching out of the store interface.
     try:
-        matches = store.list("users/", match_glob=f"users/*/jobs/{jobid}/metadata.json")
-        for info in matches:
+        for info in store.list("users/"):
             # key looks like: "users/{userid}/jobs/{jobid}/metadata.json"
             parts = info.key.split("/")
-            if len(parts) >= 4:
+            if len(parts) == 5 and parts[3] == jobid and parts[4] == "metadata.json":
                 return parts[1]
         return None  # Not found
     except StorageError:

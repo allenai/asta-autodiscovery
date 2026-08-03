@@ -26,7 +26,6 @@ from autodiscovery_jobs.storage import (
     get_store,
     get_store_class,
 )
-from autodiscovery_jobs.storage.base import glob_to_regex
 
 # ---------------------------------------------------------------------------
 # Factory
@@ -95,7 +94,7 @@ def test_capabilities_are_readable_without_constructing_a_store():
 
 
 class MinimalStore(ObjectStore):
-    """The smallest useful backend: the 9 abstract members over a dict.
+    """The smallest useful backend: the 8 abstract members over a dict.
 
     Exists to pin the contract a third-party implementation actually has to meet —
     ``upload_file``, ``download_file``, and ``copy`` are deliberately not
@@ -125,22 +124,13 @@ class MinimalStore(ObjectStore):
     def write_stream(self, key, stream, content_type=None):
         self.objects[key] = stream.read()
 
-    def create_exclusive(self, key, data):
-        if key in self.objects:
-            return False
-        self.objects[key] = data
-        return True
-
     def delete(self, key):
         self.objects.pop(key, None)
 
-    def list(self, prefix="", *, match_glob=None, limit=None):
-        pattern = glob_to_regex(match_glob) if match_glob else None
+    def list(self, prefix="", *, limit=None):
         count = 0
         for key in sorted(self.objects):
             if not key.startswith(prefix):
-                continue
-            if pattern is not None and not pattern.match(key):
                 continue
             yield ObjectInfo(key=key, size=len(self.objects[key]))
             count += 1
@@ -152,7 +142,7 @@ class MinimalStore(ObjectStore):
 
 
 def test_minimal_store_is_instantiable():
-    """i.e. the abstract surface really is only those nine members."""
+    """i.e. the abstract surface really is only those eight members."""
     MinimalStore()
 
 
@@ -203,35 +193,6 @@ def test_persistence_api_works_against_a_minimal_store(monkeypatch):
     assert persistence.list_user_ids(config) == ["u1"]
     assert persistence.list_user_jobs("u1", config) == ["j1"]
     assert persistence.get_userid_for_job("j1", config) == "u1"
-
-
-# ---------------------------------------------------------------------------
-# Glob semantics (GCS match_glob parity)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "pattern,key,matches",
-    [
-        # * stops at a path separator, unlike fnmatch
-        ("users/*/user.json", "users/u1/user.json", True),
-        ("users/*/user.json", "users/u1/jobs/j1/user.json", False),
-        ("users/*/jobs/*/run_details.json", "users/u1/jobs/j1/run_details.json", True),
-        ("users/*/jobs/*/run_details.json", "users/u1/jobs/j1/out/run_details.json", False),
-        # ** crosses separators
-        ("users/**/run_details.json", "users/u1/jobs/j1/run_details.json", True),
-        # ? is exactly one non-separator character
-        ("mcts_node_?_0.json", "mcts_node_1_0.json", True),
-        ("mcts_node_?_0.json", "mcts_node_12_0.json", False),
-        # full match, not a prefix match
-        ("users/u1", "users/u1/user.json", False),
-        # regex metacharacters in the literal parts are escaped
-        ("a.b/*.json", "a.b/x.json", True),
-        ("a.b/*.json", "axb/x.json", False),
-    ],
-)
-def test_glob_to_regex(pattern, key, matches):
-    assert bool(glob_to_regex(pattern).match(key)) is matches
 
 
 # ---------------------------------------------------------------------------
@@ -330,12 +291,6 @@ def test_copy_missing_source(store):
         store.copy("nope", "dest")
 
 
-def test_create_exclusive_is_a_lock(store):
-    assert store.create_exclusive("locks/a", b"first") is True
-    assert store.create_exclusive("locks/a", b"second") is False
-    assert store.read_text("locks/a") == "first"
-
-
 def test_upload_and_download_file(store, tmp_path):
     src = tmp_path / "in.csv"
     src.write_text("col1,col2\n1,2")
@@ -389,21 +344,6 @@ def test_list_respects_limit(store):
     assert len(list(store.list("users/u1/", limit=2))) == 2
 
 
-def test_list_match_glob(store):
-    store.write_text("users/u1/jobs/j1/run_details.json", "{}")
-    store.write_text("users/u2/jobs/j2/run_details.json", "{}")
-    store.write_text("users/u1/jobs/j1/output/run_details.json", "{}")
-
-    keys = {
-        info.key
-        for info in store.list("users/", match_glob="users/*/jobs/*/run_details.json")
-    }
-    assert keys == {
-        "users/u1/jobs/j1/run_details.json",
-        "users/u2/jobs/j2/run_details.json",
-    }
-
-
 def test_list_reports_size_and_created_at(store):
     store.write_text("k", "12345")
     (info,) = list(store.list("k"))
@@ -455,32 +395,14 @@ def test_gcs_delete_tolerates_missing(mock_storage_client):
     GcsStore(bucket="test-bucket").delete("missing.json")  # does not raise
 
 
-def test_gcs_create_exclusive_uses_generation_precondition(mock_storage_client):
-    _, bucket = mock_storage_client
-    blob = bucket.blob.return_value
-
-    assert GcsStore(bucket="test-bucket").create_exclusive("lock", b"x") is True
-    assert blob.upload_from_string.call_args.kwargs["if_generation_match"] == 0
-
-
-def test_gcs_create_exclusive_returns_false_when_present(mock_storage_client):
-    from google.api_core.exceptions import PreconditionFailed
-
-    _, bucket = mock_storage_client
-    bucket.blob.return_value.upload_from_string.side_effect = PreconditionFailed("exists")
-
-    assert GcsStore(bucket="test-bucket").create_exclusive("lock", b"x") is False
-
-
-def test_gcs_list_pushes_glob_and_limit_to_the_api(mock_storage_client):
+def test_gcs_list_pushes_prefix_and_limit_to_the_api(mock_storage_client):
     _, bucket = mock_storage_client
     bucket.list_blobs.return_value = iter([])
 
-    list(GcsStore(bucket="test-bucket").list("users/", match_glob="users/*/a.json", limit=3))
+    list(GcsStore(bucket="test-bucket").list("users/", limit=3))
 
     kwargs = bucket.list_blobs.call_args.kwargs
     assert kwargs["prefix"] == "users/"
-    assert kwargs["match_glob"] == "users/*/a.json"
     assert kwargs["max_results"] == 3
 
 

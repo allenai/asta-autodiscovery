@@ -2,7 +2,7 @@
 
 Wraps ``google-cloud-storage`` behind :class:`~autodiscovery_jobs.storage.base.ObjectStore`.
 This is the backend the hosted deployment runs on, so its behavior is the
-reference the filesystem backend matches (glob semantics, exclusive create,
+reference the filesystem backend matches (prefix listing, atomic writes,
 presigned uploads).
 """
 
@@ -13,7 +13,6 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
-from google.api_core.exceptions import PreconditionFailed
 from google.cloud.exceptions import NotFound
 
 from ..client import get_storage_client
@@ -112,16 +111,6 @@ class GcsStore(ObjectStore):
         except Exception as e:
             raise StorageError(f"Failed to upload {local_path} to {self.uri(key)}: {e}") from e
 
-    def create_exclusive(self, key: str, data: bytes) -> bool:
-        """Create ``key`` only if absent, using a generation precondition."""
-        try:
-            self._bucket().blob(key).upload_from_string(data, if_generation_match=0)
-            return True
-        except PreconditionFailed:
-            return False
-        except Exception as e:
-            raise StorageError(f"Failed to create {self.uri(key)}: {e}") from e
-
     # Deletes, copies, listing
 
     def delete(self, key: str) -> None:
@@ -149,14 +138,12 @@ class GcsStore(ObjectStore):
         self,
         prefix: str = "",
         *,
-        match_glob: str | None = None,
         limit: int | None = None,
     ) -> Iterator[ObjectInfo]:
-        """List blobs, pushing the glob and limit down to the GCS API."""
+        """List blobs, pushing the prefix and limit down to the GCS API."""
         try:
             blobs = self._bucket().list_blobs(
                 prefix=prefix or None,
-                match_glob=match_glob,
                 max_results=limit,
             )
             for blob in blobs:

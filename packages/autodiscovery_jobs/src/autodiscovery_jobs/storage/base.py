@@ -16,7 +16,6 @@ backend is a deployment choice rather than a code dependency. See
 
 from __future__ import annotations
 
-import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -69,45 +68,6 @@ class ObjectInfo:
     created_at: datetime | None = None
 
 
-def glob_to_regex(pattern: str) -> re.Pattern[str]:
-    """Compile a GCS-style ``match_glob`` pattern into a full-match regex.
-
-    Mirrors the semantics of the Cloud Storage ``matchGlob`` parameter so the
-    filesystem backend filters keys exactly like GCS does:
-
-    - ``*`` matches any run of characters **except** ``/``
-    - ``**`` matches any run of characters, including ``/``
-    - ``?`` matches exactly one character other than ``/``
-
-    Note this differs from :mod:`fnmatch`, whose ``*`` happily crosses ``/`` and
-    would make ``users/*/jobs/*/run_details.json`` match arbitrarily deep keys.
-
-    Args:
-        pattern: Glob pattern to translate.
-
-    Returns:
-        A compiled regex that full-matches the same keys as the glob.
-    """
-    out: list[str] = []
-    i = 0
-    while i < len(pattern):
-        char = pattern[i]
-        if char == "*":
-            if pattern.startswith("**", i):
-                out.append(".*")
-                i += 2
-            else:
-                out.append("[^/]*")
-                i += 1
-        elif char == "?":
-            out.append("[^/]")
-            i += 1
-        else:
-            out.append(re.escape(char))
-            i += 1
-    return re.compile("".join(out) + r"\Z")
-
-
 class ObjectStore(ABC):
     """Abstract keyed blob store backing all AutoDiscovery persistence.
 
@@ -119,7 +79,7 @@ class ObjectStore(ABC):
     any other failure raises :class:`~autodiscovery_jobs.exceptions.StorageError`.
     Deletes of a missing key are a no-op, so cleanup paths are idempotent.
 
-    A subclass must implement the nine abstract members below. ``upload_file``,
+    A subclass must implement the eight abstract members below. ``upload_file``,
     ``download_file``, and ``copy`` have working (if unoptimized) defaults derived
     from those, so a minimal backend can skip them and override only the ones its
     service can do better — GCS, for instance, copies server-side.
@@ -228,22 +188,6 @@ class ObjectStore(ABC):
         with open(local_path, "rb") as fh:
             self.write_stream(key, fh)
 
-    @abstractmethod
-    def create_exclusive(self, key: str, data: bytes) -> bool:
-        """Atomically create ``key`` only if it does not already exist.
-
-        The atomicity guarantee is what makes this usable as a mutual-exclusion
-        primitive across processes (the completion-email job's lock).
-
-        Args:
-            key: Object key to create.
-            data: Contents to write.
-
-        Returns:
-            True if this call created the object, False if it already existed.
-        """
-        ...
-
     # Deletes, copies, listing
 
     @abstractmethod
@@ -268,15 +212,19 @@ class ObjectStore(ABC):
         self,
         prefix: str = "",
         *,
-        match_glob: str | None = None,
         limit: int | None = None,
     ) -> Iterator[ObjectInfo]:
         """Iterate over objects whose key starts with ``prefix``.
 
+        There is deliberately no server-side pattern filter. GCS has one
+        (``matchGlob``) and S3-compatible stores and filesystems do not, and every
+        caller that wanted one is a rare operation — the metrics scan (once per five
+        minutes) and the shared-run owner lookup's index-miss fallback. They filter
+        the returned keys themselves, which costs a longer listing on a cold path in
+        exchange for one less semantic every backend has to reproduce.
+
         Args:
             prefix: Key prefix to restrict the listing to (``""`` lists all).
-            match_glob: Optional glob filter with the semantics documented on
-                :func:`glob_to_regex` (``*`` does not cross ``/``).
             limit: Stop after this many objects. Callers that only need
                 existence should pass ``limit=1``.
 

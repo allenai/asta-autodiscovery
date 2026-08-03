@@ -19,11 +19,10 @@ filesystem store would create its root directory as a side effect).
 
 1. *No code.* Mount your storage and use ``local``. Anything presentable as a
    POSIX tree works — NFS, s3fs, Azure Files, JuiceFS.
-2. *A subclass.* Implement :class:`ObjectStore` (nine abstract members; three more
+2. *A subclass.* Implement :class:`ObjectStore` (eight abstract members; three more
    have derived defaults) and register it in :data:`_STORES` below. Worth it when
-   you want the things a filesystem cannot express: presigned browser uploads,
-   single-request prefix globs, server-side copy, and a lock whose atomicity holds
-   across machines.
+   you want the things a filesystem cannot express: presigned browser uploads and
+   server-side copy.
 
 See ``docs/design/storage-backends.md`` for the trade-offs between the two.
 """
@@ -32,7 +31,7 @@ from __future__ import annotations
 
 from ..config import JobConfig
 from ..exceptions import StorageBackendError
-from .base import JobDataMount, ObjectInfo, ObjectStore, glob_to_regex
+from .base import JobDataMount, ObjectInfo, ObjectStore
 from .gcs import GcsStore
 from .local import FilesystemStore
 
@@ -103,5 +102,4 @@ __all__ = [
     "ObjectStore",
     "get_store",
     "get_store_class",
-    "glob_to_regex",
 ]

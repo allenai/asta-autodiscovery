@@ -10,8 +10,7 @@ The root is just a POSIX tree, so this is also the zero-code path to running on
 storage this package has never heard of: mount it (NFS, s3fs, Azure Files,
 JuiceFS, ...) and point ``STORAGE_DIR`` at the mount. See
 ``docs/design/storage-backends.md`` for what that costs you versus a native
-backend — chiefly presigned uploads, single-call globs, server-side copy, and the
-cross-process lock's atomicity guarantee.
+backend — chiefly presigned uploads and server-side copy.
 
 Two behaviors exist to match GCS closely enough that the rest of the codebase
 cannot tell the difference:
@@ -36,7 +35,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from ..exceptions import ObjectNotFoundError, StorageError
-from .base import JobDataMount, ObjectInfo, ObjectStore, glob_to_regex
+from .base import JobDataMount, ObjectInfo, ObjectStore
 
 # Filename prefix for in-flight writes staged next to their destination. Listings
 # skip these so a concurrent reader never sees a half-written object as an object
@@ -182,23 +181,6 @@ class FilesystemStore(ObjectStore):
         except OSError as e:
             raise StorageError(f"Failed to upload {local_path} to {self.uri(key)}: {e}") from e
 
-    def create_exclusive(self, key: str, data: bytes) -> bool:
-        """Create ``key`` with ``O_EXCL``, which is atomic on a local filesystem."""
-        path = self._path(key)
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            return False
-        except OSError as e:
-            raise StorageError(f"Failed to create {self.uri(key)}: {e}") from e
-        try:
-            with os.fdopen(fd, "wb") as fh:
-                fh.write(data)
-        except OSError as e:
-            raise StorageError(f"Failed to create {self.uri(key)}: {e}") from e
-        return True
-
     # Deletes, copies, listing
 
     def delete(self, key: str) -> None:
@@ -240,7 +222,6 @@ class FilesystemStore(ObjectStore):
         self,
         prefix: str = "",
         *,
-        match_glob: str | None = None,
         limit: int | None = None,
     ) -> Iterator[ObjectInfo]:
         """Walk the tree under ``prefix``, filtering like a GCS prefix listing.
@@ -254,7 +235,6 @@ class FilesystemStore(ObjectStore):
         if not start.is_dir():
             return
 
-        pattern = glob_to_regex(match_glob) if match_glob else None
         emitted = 0
         for dirpath, dirnames, filenames in os.walk(start):
             dirnames.sort()
@@ -267,8 +247,6 @@ class FilesystemStore(ObjectStore):
                 except ValueError:  # pragma: no cover - symlink pointing outside the root
                     continue
                 if not key.startswith(prefix):
-                    continue
-                if pattern is not None and not pattern.match(key):
                     continue
                 try:
                     info = self._info(path)

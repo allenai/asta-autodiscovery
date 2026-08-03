@@ -52,10 +52,9 @@ ObjectStore
   download_file(key, local_path)
   write_bytes / write_text / write_stream  writes
   upload_file(key, local_path)
-  create_exclusive(key, data) -> bool     atomic create (mutual exclusion)
   delete(key)                             idempotent
   copy(source_key, dest_key)               within the store
-  list(prefix, *, match_glob, limit)      -> Iterator[ObjectInfo]
+  list(prefix, *, limit)                  -> Iterator[ObjectInfo]
   list_dirs(prefix)                       -> immediate child names
   signed_upload_url(...) -> str | None    None when unsupported
 ```
@@ -63,7 +62,7 @@ ObjectStore
 Keys are the existing GCS blob names, unchanged, so **the on-disk layout is the same
 layout as the bucket** and one can be copied to the other with `gsutil rsync`.
 
-Nine of those are abstract. `upload_file`, `download_file`, and `copy` have working
+Eight of those are abstract. `upload_file`, `download_file`, and `copy` have working
 defaults derived from the primitives, so a minimal backend can skip them and override only
 what its service does better — GCS copies server-side, for instance, which matters because
 forking a run copies its whole dataset. `read_text`, `write_text`, `uri`, and
@@ -71,17 +70,34 @@ forking a run copies its whole dataset. `read_text`, `write_text`, `uri`, and
 
 ### Making a filesystem behave like an object store
 
-Three GCS behaviors the rest of the code already depended on had to be reproduced:
+Two GCS behaviors the rest of the code already depended on had to be reproduced:
 
 | GCS behavior | `FilesystemStore` implementation |
 | --- | --- |
-| `matchGlob`, where `*` does not cross `/` | `glob_to_regex()` compiles the glob to a regex (`*` → `[^/]*`, `**` → `.*`). Deliberately **not** `fnmatch`, whose `*` crosses `/` and would make `users/*/jobs/*/x.json` match arbitrarily deep keys. |
 | No directories — a prefix stops existing once its last object is deleted | Deletes prune the directories they empty; `list_dirs` skips directories with no objects beneath them. Otherwise deleted users/runs would linger in listings. |
 | Object writes are atomic; a reader never sees a partial object | Writes stage into a uniquely-named `.ad-staging.*` file in the destination directory and `os.replace` into place; listings skip staging files. This matters because the API polls run files *while the job container writes them*. |
-| `if_generation_match=0` for atomic create | `os.open(..., O_CREAT \| O_EXCL)`. |
 
 `created_at` comes from `st_mtime` (POSIX has no portable creation time); these objects are
 written once, so it is the same instant in practice. Dataset expiry depends on it.
+
+Two further GCS features were deliberately **left off the interface** rather than
+reproduced, because each existed for a handful of rare callers and would have obliged every
+backend to implement — or quietly fake — a guarantee it cannot make:
+
+- **`matchGlob`.** Only GCS has server-side pattern matching; S3-compatible stores and
+  filesystems do not. Its three callers are all cold paths — the metrics scan's job
+  discovery (at most once per five-minute refresh, file-locked to one worker), the
+  per-job experiment count (inside an already-narrow `output/` prefix), and the
+  shared-run owner lookup's index-miss fallback. They now filter returned keys
+  themselves. The cost is a longer listing on a cold path; the benefit is that no
+  backend has to reimplement GCS's specific glob semantics (where `*` does not cross
+  `/` — note `fnmatch` gets this wrong).
+- **Atomic create-if-absent.** One caller: the `--acquire-lock` flag on the
+  completion-email job, which only runs in the hosted deployment. It now uses GCS's
+  generation precondition directly, in `scripts/send_completion_emails.py`, and refuses
+  to run with a non-GCS backend rather than silently degrading. A filesystem can do this
+  with `O_EXCL` locally but cannot promise it across machines, which is exactly the kind
+  of near-miss that makes a shared interface dangerous.
 
 Keys can originate in user-supplied filenames, so `FilesystemStore` rejects any key that
 resolves outside its root rather than normalizing it away.
@@ -204,7 +220,7 @@ daemon, so the host path is passed out-of-band by compose.
 packages/autodiscovery_jobs/src/autodiscovery_jobs/
   storage/
     __init__.py        # get_store(config) factory, STORAGE_BACKENDS
-    base.py            # ObjectStore ABC, ObjectInfo, glob_to_regex()
+    base.py            # ObjectStore ABC, ObjectInfo, JobDataMount
     gcs.py             # GcsStore (google-cloud-storage)
     local.py           # FilesystemStore (atomic writes, prefix pruning)
   persistence.py       # functional job-data API (was gcs.py), owns the key layout
@@ -232,16 +248,16 @@ What you give up, all of it a consequence of a filesystem not being an object st
 | | Cost on a mount |
 | --- | --- |
 | Presigned uploads | Gone. Every dataset upload streams through the API instead of going browser→storage. |
-| `list(match_glob=…)` | Becomes a directory walk. The metrics scan's `users/*/jobs/*/run_details.json` is one request against GCS; over a mount it's one readdir per directory. |
+| Prefix listings | A directory walk rather than one paginated request. The metrics scan lists everything under `users/`; over a mount that's one readdir per directory. |
 | `copy` | No server-side copy, so forking a run pulls its dataset down and pushes it back up through the API. |
-| `create_exclusive` | `O_EXCL` is atomic on a real filesystem, but a FUSE object-store adapter generally can't promise create-if-absent across machines. The completion-email lock quietly stops being a lock. |
-| Atomic replace | Same caveat: `os.replace` is atomic locally; over such an adapter a rename is typically copy+delete, so a reader can observe a partial object. |
+| Atomic replace | `os.replace` is atomic on a real filesystem; over a FUSE object-store adapter a rename is typically copy+delete, so a reader can observe a partial object. |
 
 For a single-operator or on-prem deployment none of those usually bite: uploads through the
-API are fine, one cron process means the lock is uncontended, and a few hundred runs makes a
-directory walk cheap.
+API are fine, and a few hundred runs makes a directory walk cheap. The completion-email job,
+which is the one thing that needs a guarantee a mount can't give, only runs in the hosted
+deployment and now keeps its own GCS-specific lock.
 
-**Tier 2 — a subclass.** Implement the nine abstract members of `ObjectStore` (~150 lines
+**Tier 2 — a subclass.** Implement the eight abstract members of `ObjectStore` (~150 lines
 for S3/MinIO), declare `job_data_mount` and `gs_addressable`, and register the class in
 `_STORES` in `storage/__init__.py`. Worth it when the Tier-1 costs above actually hurt.
 A Tier-2 backend that isn't presentable as a POSIX tree also has to answer the job-container
@@ -249,7 +265,7 @@ question — leaving `job_data_mount` at `UNSUPPORTED` means jobs are refused, s
 backend needs a new `JobDataMount` mechanism (e.g. its own FUSE adapter) implemented in the
 job backend.
 
-`tests/test_storage.py::MinimalStore` is a dict-backed store implementing exactly those nine
+`tests/test_storage.py::MinimalStore` is a dict-backed store implementing exactly those eight
 members; `test_persistence_api_works_against_a_minimal_store` runs the functional layer
 against it, which is the executable statement of the contract.
 
@@ -284,8 +300,10 @@ backend raises a clear error if it is relative.
   tree you can mount", not "local dev only". The configured name stays `local`, which
   remains accurate about the constraint that matters (the data is only reachable from this
   host, which is what rules out Cloud Run and Modal).
-- `upload_file`, `download_file`, and `copy` moved from abstract to defaulted, cutting the
-  required surface from twelve members to nine.
+- `upload_file`, `download_file`, and `copy` moved from abstract to defaulted, and
+  `match_glob` / `create_exclusive` were dropped entirely — cutting the required surface
+  from twelve members to eight. The two dropped ones each served a few rare callers while
+  obliging every backend to reproduce a GCS-specific guarantee; see above.
 
 - `GCSError` is now an alias of the new `StorageError` rather than being renamed, so
   existing `except GCSError` sites and imports keep working.

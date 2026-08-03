@@ -66,8 +66,7 @@ interchangeable (`gsutil rsync` moves data either way). See
 > **Using other storage without writing code.** `local` is a POSIX-directory backend, not a
 > local-disk-only one. If you can *mount* your storage — NFS, s3fs, Azure Files, JuiceFS, a
 > SAN — point `STORAGE_DIR` at the mount and everything works, job containers included. You
-> trade away presigned uploads, single-request prefix listings, server-side copy, and the
-> completion-email lock's cross-machine atomicity; see
+> trade away presigned uploads, single-request prefix listings, and server-side copy; see
 > [Adding a third backend](design/storage-backends.md#adding-a-third-backend) for whether
 > that matters at your scale.
 

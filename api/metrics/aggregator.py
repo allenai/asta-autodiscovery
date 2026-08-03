@@ -15,6 +15,7 @@ import dataclasses
 import fcntl
 import json
 import logging
+import re
 import os
 import statistics
 import threading
@@ -46,6 +47,8 @@ STARTED_STATUSES = {"PENDING", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"}
 TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 # Historical runs may use either root filename; both are non-experiment init nodes.
 ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
+# Experiment result files, matched client-side now that listings are unfiltered.
+_EXPERIMENT_NODE_FILENAME = re.compile(r"mcts_node_\d+_\d+\.json$")
 
 # Where the persisted metrics cache snapshot lives in the shared store.
 # Loaded on cold start so pod restarts don't re-scan every job from scratch.
@@ -321,7 +324,7 @@ def _count_experiments_inline(
     userid: str,
     jobid: str,
 ) -> int:
-    """Count completed experiment result files with a single globbed listing.
+    """Count completed experiment result files under one job's output prefix.
 
     Excludes the root initialisation node (legacy filename variants),
     which is not a real experiment.
@@ -330,8 +333,9 @@ def _count_experiments_inline(
     try:
         return sum(
             1
-            for info in store.list(prefix, match_glob=f"{prefix}mcts_node_*_*.json")
-            if info.key.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
+            for info in store.list(prefix)
+            if _EXPERIMENT_NODE_FILENAME.match(info.key.rsplit("/", 1)[-1])
+            and info.key.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
         )
     except Exception:
         return 0
@@ -422,15 +426,21 @@ def _scan_job(
         return None
 
 
-def _discover_jobs_via_glob(
+def _discover_jobs(
     store: ObjectStore,
 ) -> list[tuple[str, str]]:
-    """Discover all (userid, jobid) pairs with a single globbed listing."""
+    """Discover all (userid, jobid) pairs by scanning for run_details.json keys.
+
+    Lists everything under users/ and picks out the run markers, rather than asking
+    the store for a server-side pattern match: only GCS can do that, and this runs
+    at most once per refresh interval (five minutes, and file-locked to one worker),
+    so the longer listing is not worth a capability every backend must implement.
+    """
     job_keys: list[tuple[str, str]] = []
-    for info in store.list("users/", match_glob="users/*/jobs/*/run_details.json"):
+    for info in store.list("users/"):
         # key: "users/{userid}/jobs/{jobid}/run_details.json"
         parts = info.key.split("/")
-        if len(parts) >= 4:
+        if len(parts) == 5 and parts[2] == "jobs" and parts[4] == "run_details.json":
             job_keys.append((parts[1], parts[3]))
     return job_keys
 
@@ -441,7 +451,7 @@ def _scan_all_jobs(
 ) -> AggregatedData:
     """Scan all users and jobs in the store to build the aggregated data.
 
-    Uses glob-based discovery (a single listing) and a global thread pool
+    Uses a single listing for discovery and a global thread pool
     for parallel scanning. Terminal jobs from a previous scan are carried
     forward without re-reading them.
     """
@@ -467,9 +477,9 @@ def _scan_all_jobs(
 
     # Discover all jobs in one glob call
     try:
-        all_job_keys = _discover_jobs_via_glob(store)
+        all_job_keys = _discover_jobs(store)
     except Exception as e:
-        logger.error(f"Failed to discover jobs via glob: {e}")
+        logger.error(f"Failed to discover jobs: {e}")
         return AggregatedData(
             refreshed_at=datetime.now(UTC).isoformat(),
             scan_duration_seconds=time.monotonic() - start_time,

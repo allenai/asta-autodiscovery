@@ -15,16 +15,52 @@ from typing import Any
 
 from .ipython_session import ExecutionConfig
 
-_DEFAULT_SANDBOX_PACKAGES = [
-    "ipython",
+# Core scientific packages we pin the sandbox venv to the *host* (reward-server)
+# environment's versions. Left unpinned, uv installs the latest release, which drifts
+# ahead of the host (e.g. matplotlib past the host's 3.10) and was the top source of
+# stale-API code failures: generated code targets the host/announced API but runs
+# against a newer one (matplotlib boxplot `labels`->`tick_labels`, statsmodels
+# get_robustcov_results removed). Pinning keeps the sandbox == host == announced.
+_HOST_PINNED_SCI = (
     "numpy",
     "pandas",
     "matplotlib",
-    "matplotlib-inline",
     "seaborn",
     "scikit-learn",
     "scipy",
     "statsmodels",
+    "patsy",
+)
+
+
+def core_sci_package_versions() -> dict[str, str]:
+    """{package: version} for the core sci packages installed in this (reward-server)
+    environment. The sandbox venv is pinned to these exact versions, so this map also
+    describes what generated code runs against -- the programmer prompt announces it
+    (see autodiscovery.agents.build_package_version_notice). Missing packages are
+    omitted so the result degrades gracefully."""
+    versions: dict[str, str] = {}
+    for pkg in _HOST_PINNED_SCI:
+        try:
+            versions[pkg] = importlib.metadata.version(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        except Exception:
+            continue
+    return versions
+
+
+def _pinned_sci_specs() -> list[str]:
+    """`pkg==version` for each core sci package found in the host env (bare name if not)."""
+    versions = core_sci_package_versions()
+    return [f"{pkg}=={versions[pkg]}" if pkg in versions else pkg for pkg in _HOST_PINNED_SCI]
+
+
+_DEFAULT_SANDBOX_PACKAGES = [
+    "ipython",
+    "matplotlib-inline",
+    # Core sci stack, pinned to the host env's versions (see _HOST_PINNED_SCI above).
+    *_pinned_sci_specs(),
     # Commonly imported by generated analysis code. These were the top causes of
     # "No module named 'X'" failures in training runs, so they are pre-installed
     # into the base sandbox venv to avoid per-cell install churn. (PyPI names;

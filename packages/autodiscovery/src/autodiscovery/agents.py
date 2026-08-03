@@ -5,7 +5,6 @@ import json
 import os
 import urllib.request
 from datetime import datetime, timezone
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
@@ -686,39 +685,24 @@ def get_openai_config(
     return config
 
 
-# Key scientific packages behind the most common stale-API code failures
-# (e.g. matplotlib boxplot `labels`->`tick_labels`, statsmodels get_robustcov_results
-# removed, pandas/numpy dtype churn). We announce the *actually installed* versions in
-# the programmer prompt so it writes code for the sandbox's version instead of guessing.
-_ANNOUNCED_PACKAGES = (
-    "numpy",
-    "pandas",
-    "scipy",
-    "statsmodels",
-    "patsy",
-    "scikit-learn",
-    "matplotlib",
-    "seaborn",
-)
+def build_package_version_notice() -> str:
+    """Programmer-prompt snippet announcing the sandbox's key scientific-package
+    versions, behind the most common stale-API code failures (matplotlib boxplot
+    `labels`->`tick_labels`, statsmodels get_robustcov_results removed, pandas/numpy
+    dtype churn). Versions come from `code_execution.process_backend`, which pins the
+    sandbox venv to exactly these -- so what we announce is what the code runs against.
+    Returns "" if none are found, so the prompt degrades gracefully."""
+    try:
+        from code_execution.process_backend import core_sci_package_versions
 
-
-def build_package_version_notice(packages=_ANNOUNCED_PACKAGES) -> str:
-    """Probe the execution environment for installed versions of key packages and
-    return a programmer-prompt snippet announcing them. Returns "" if none are found
-    (e.g. an unexpected image), so the prompt degrades gracefully. Uses distribution
-    metadata (no heavy imports, no side effects)."""
-    detected = []
-    for pkg in packages:
-        try:
-            detected.append(f"{pkg}=={_pkg_version(pkg)}")
-        except PackageNotFoundError:
-            continue
-        except Exception:
-            continue
-    if not detected:
+        versions = core_sci_package_versions()
+    except Exception:
+        versions = {}
+    if not versions:
         return ""
+    detected = [f"{pkg}=={ver}" for pkg, ver in versions.items()]
     return (
-        "\n\nInstalled versions of key packages in THIS execution environment "
+        "\n\nInstalled versions of key packages in the code execution environment "
         "(write code that runs against these exact versions — do not call APIs that "
         "were removed, renamed, or deprecated in them, and do not install or downgrade "
         "these packages):\n"

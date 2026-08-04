@@ -29,8 +29,10 @@ _DEFAULT_SANDBOX_PACKAGES = [
 
 _SANDBOX_RUNNER = """\
 import json
+import os
 import sys
 import traceback
+from pathlib import Path
 
 from code_execution.ipython_session import ExecutionConfig, IPythonSession
 
@@ -65,6 +67,14 @@ def main() -> None:
             "success": False,
             "error": _format_error(exc),
         }
+    result_path = payload.get("result_path")
+    if result_path:
+        destination = Path(result_path)
+        temporary = destination.with_suffix(f"{destination.suffix}.tmp")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with temporary.open("w", encoding="utf-8") as output:
+            json.dump(result, output)
+        os.replace(temporary, destination)
     json.dump(result, sys.stdout)
 
 

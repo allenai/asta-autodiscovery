@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -161,9 +163,110 @@ def test_invalid_vm_output_is_normalized(
     result = backend.run_cell("pass")
 
     assert result["success"] is False
-    assert result["error"]["type"] == "RuntimeError"
-    assert result["error"]["traceback"] == "not-json"
+    assert result["error"]["type"] == "LimaServiceError"
+    assert "invalid JSON" in result["error"]["message"]
+    assert "systemd-run stdout:\nnot-json" in result["error"]["traceback"]
     assert result["stderr"] == "service failed"
+
+
+def test_empty_vm_output_is_reported_as_a_service_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, _, _, _ = _backend(tmp_path)
+
+    def fake_run(arguments: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(arguments, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("code_execution.lima_backend.subprocess.run", fake_run)
+
+    result = backend.run_cell("pass")
+
+    assert result["success"] is False
+    assert result["error"]["type"] == "LimaServiceError"
+    assert "no JSON output" in result["error"]["message"]
+    assert "systemd-run exit code: 0" in result["error"]["traceback"]
+
+
+def test_result_file_recovers_a_dropped_vm_stdout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, _, work, _ = _backend(tmp_path)
+    execution_id = "result-file-fallback"
+    response = {
+        "stdout": "recovered\n",
+        "stderr": "",
+        "rich_outputs": [],
+        "success": True,
+        "error": None,
+    }
+
+    class FixedUuid:
+        hex = execution_id
+
+    def fake_run(arguments: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if "systemd-run" in arguments:
+            result_path = work / "thread_1" / ".runtime-cache" / f"{execution_id}.json"
+            result_path.parent.mkdir(exist_ok=True)
+            result_path.write_text(json.dumps(response), encoding="utf-8")
+        return subprocess.CompletedProcess(arguments, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("code_execution.lima_backend.uuid.uuid4", lambda: FixedUuid())
+    monkeypatch.setattr("code_execution.lima_backend.subprocess.run", fake_run)
+
+    assert backend.run_cell("print('recovered')") == response
+    assert not (work / "thread_1" / ".runtime-cache" / f"{execution_id}.json").exists()
+
+
+def test_nonzero_vm_exit_includes_service_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, _, _, _ = _backend(tmp_path)
+
+    def fake_run(arguments: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if "journalctl" in arguments:
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                stdout="Failed to set up mount namespacing",
+                stderr="",
+            )
+        return subprocess.CompletedProcess(arguments, 226, stdout="", stderr="namespace failed")
+
+    monkeypatch.setattr("code_execution.lima_backend.subprocess.run", fake_run)
+
+    result = backend.run_cell("pass")
+
+    assert result["success"] is False
+    assert result["error"]["type"] == "LimaServiceError"
+    assert "exit 226" in result["error"]["message"]
+    assert "namespace failed" in result["error"]["traceback"]
+    assert "Failed to set up mount namespacing" in result["error"]["traceback"]
+
+
+def test_lima_integration_reports_missing_runner_result(tmp_path: Path) -> None:
+    """A guest exit before JSON serialization must not look like a timeout."""
+    lima_path = os.environ.get("AUTODISCOVERY_LIMA_PATH")
+    lima_home = os.environ.get("AUTODISCOVERY_LIMA_HOME")
+    if not lima_path or not lima_home:
+        pytest.skip("requires a configured Lima runtime")
+
+    source = tmp_path / "dataset.csv"
+    source.write_text("value\n1\n", encoding="utf-8")
+    work = tmp_path / "work" / "thread_integration"
+    work.mkdir(parents=True)
+    backend = LimaIPythonBackend(
+        cwd=str(work),
+        dataset_paths=[str(source)],
+        lima_path=lima_path,
+        lima_home=lima_home,
+    )
+
+    result = backend.run_cell("import os; os._exit(0)", timeout_s=60)
+
+    assert result["success"] is False
+    assert result["error"]["type"] == "LimaServiceError"
+    assert "no JSON output" in result["error"]["message"]
+    assert "systemd-run exit code: 0" in result["error"]["traceback"]
 
 
 def test_unsafe_mount_root_is_rejected(

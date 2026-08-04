@@ -55,6 +55,17 @@ def create() -> Blueprint:
 
         try:
             job_manager = get_job_manager()
+            if job_manager.config.backend == "local":
+                return jsonify(
+                    {
+                        "credits": {
+                            "granted": 0,
+                            "consumed": 0,
+                            "pending": 0,
+                            "available": 0,
+                        }
+                    }
+                ), 200
             user_credits = get_user_credits(userid=user_id, config=job_manager.config)
 
             return jsonify(

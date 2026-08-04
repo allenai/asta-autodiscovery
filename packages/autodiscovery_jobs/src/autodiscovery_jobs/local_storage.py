@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -215,6 +216,7 @@ class LocalStorage:
             "deleted_files": deleted_files,
             "preserved_files": preserved_files,
             "status": "DELETED",
+            "deleted_at": datetime.now(UTC).isoformat(),
         }
 
     def upload_dataset(

@@ -122,6 +122,17 @@ const TopBar = styled(Box)`
     padding: ${({ theme }) => theme.spacing(1.5, 3)};
     border-bottom: 1px solid
         ${({ theme }) => theme.color['cream-10']?.rgba?.toString() || 'rgba(255,255,255,0.1)'};
+
+    html.autodiscovery-desktop & {
+        padding-top: ${({ theme }) => theme.spacing(5.5)};
+        padding-left: 88px;
+        -webkit-app-region: drag;
+    }
+
+    html.autodiscovery-desktop & button,
+    html.autodiscovery-desktop & [role='tab'] {
+        -webkit-app-region: no-drag;
+    }
 `;
 
 const Title = styled(Typography)`

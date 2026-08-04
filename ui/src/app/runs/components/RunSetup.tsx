@@ -10,6 +10,7 @@ import {
     MenuItem,
     CircularProgress,
     FormHelperText,
+    Alert,
     styled,
     Chip,
     FormLabel,
@@ -72,6 +73,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         isSubmitting,
         isLoading,
         isSaving,
+        formError,
         updateSettings,
         debouncedSaveMetadata,
         handleFileSelect,
@@ -149,7 +151,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
+                    height: '100%',
                     minHeight: '400px',
+                    p: 3,
                 }}>
                 <CircularProgress />
             </Box>
@@ -660,6 +664,8 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     </FormControl>
                 </StyledAccordian>
             </ConfigurationBox>
+
+            {formError && <Alert severity="error">{formError}</Alert>}
 
             <SubmitButton
                 variant="contained"

@@ -129,9 +129,10 @@ def test_manager_builds_local_engine_command(tmp_path: Path) -> None:
     runtime_datasets = json.loads(runtime_metadata.read_text(encoding="utf-8"))["datasets"]
     assert runtime_datasets[0]["name"] == "table.csv"
     alias = tmp_path / "runs" / "run-1" / "work" / "table.csv"
-    assert alias.is_symlink()
+    assert not alias.is_symlink()
     assert alias.read_text(encoding="utf-8") == "value\n1\n"
-    assert not (tmp_path / "runs" / "run-1" / "data" / "table.csv").stat().st_mode & stat.S_IWUSR
+    assert alias.stat().st_mode & stat.S_IWUSR == 0
+    assert (tmp_path / "runs" / "run-1" / "data" / "table.csv").stat().st_mode & stat.S_IWUSR
     assert manager.get_metadata("local", "run-1")["name"] == "Test run"
 
 
@@ -149,7 +150,7 @@ def test_local_runtime_view_flattens_nested_declared_paths(tmp_path: Path) -> No
     assert json.loads(runtime_metadata.read_text(encoding="utf-8"))["datasets"] == [
         {"name": "table.csv"}
     ]
-    assert (run_path / "work" / "table.csv").resolve() == source.resolve()
+    assert (run_path / "work" / "table.csv").read_text(encoding="utf-8") == "value\n1\n"
 
 
 def test_local_runtime_view_rejects_duplicate_basenames(tmp_path: Path) -> None:

@@ -95,6 +95,63 @@ class LimaIPythonBackend:
     def _systemd_path(path: str | Path) -> str:
         return json.dumps(str(path))
 
+    def _service_diagnostics(self, execution_id: str) -> str:
+        """Return a bounded journal excerpt for a failed transient service."""
+        try:
+            journal = self._run_lima(
+                [
+                    "shell",
+                    self._instance_name,
+                    "--",
+                    "sudo",
+                    "journalctl",
+                    "--no-pager",
+                    "--unit",
+                    f"autodiscovery-{execution_id}.service",
+                    "--lines",
+                    "40",
+                    "--output",
+                    "cat",
+                ],
+                check=False,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+        output = "\n".join(part for part in (journal.stdout, journal.stderr) if part)
+        return output[-8_000:]
+
+    def _service_failure_result(
+        self,
+        *,
+        execution_id: str,
+        result: subprocess.CompletedProcess[str],
+        message: str,
+        raw_stdout: str = "",
+    ) -> dict[str, Any]:
+        """Normalize a systemd-run failure into the code-execution result contract."""
+        diagnostics = [f"systemd-run exit code: {result.returncode}"]
+        if result.stderr:
+            diagnostics.append(f"systemd-run stderr:\n{result.stderr[-8_000:]}")
+        journal = self._service_diagnostics(execution_id)
+        if journal:
+            diagnostics.append(f"systemd journal:\n{journal}")
+        if raw_stdout:
+            diagnostics.append(f"systemd-run stdout:\n{raw_stdout[-8_000:]}")
+        detail = "\n\n".join(diagnostics)
+        return {
+            "stdout": "",
+            "stderr": result.stderr,
+            "rich_outputs": [],
+            "success": False,
+            "error": {
+                "type": "LimaServiceError",
+                "message": message,
+                "traceback": detail,
+            },
+        }
+
     def _run_lima(
         self,
         arguments: list[str],
@@ -165,6 +222,8 @@ class LimaIPythonBackend:
         guest_cwd = f"{workspace}/thread"
         runtime_cache = self._cwd / ".runtime-cache"
         runtime_cache.mkdir(parents=True, exist_ok=True)
+        result_file = runtime_cache / f"{execution_id}.json"
+        guest_result_file = f"{guest_cwd}/.runtime-cache/{execution_id}.json"
 
         setup = self._run_lima(
             [
@@ -280,6 +339,7 @@ class LimaIPythonBackend:
             "timeout_s": None,
             "allow_mime": list(allow_mime) if allow_mime is not None else None,
             "matplotlib_backend": matplotlib_backend,
+            "result_path": guest_result_file,
         }
         try:
             result = self._run_lima(
@@ -306,20 +366,52 @@ class LimaIPythonBackend:
                 check=False,
             )
 
+        stdout = result.stdout or ""
+        if not stdout.strip():
+            try:
+                stdout = result_file.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                pass
         try:
-            parsed = json.loads(result.stdout) if result.stdout.strip() else {}
+            result_file.unlink()
+        except FileNotFoundError:
+            pass
+        if not stdout.strip():
+            message = (
+                "VM execution completed without a structured result. "
+                "The guest service returned no JSON output."
+            )
+            if result.returncode:
+                message = f"VM execution service failed before returning a result (exit {result.returncode})."
+            return self._service_failure_result(
+                execution_id=execution_id,
+                result=result,
+                message=message,
+            )
+
+        try:
+            parsed = json.loads(stdout)
         except json.JSONDecodeError:
-            return {
-                "stdout": "",
-                "stderr": result.stderr,
-                "rich_outputs": [],
-                "success": False,
-                "error": {
-                    "type": "RuntimeError",
-                    "message": "VM subprocess output was not valid JSON.",
-                    "traceback": result.stdout,
-                },
-            }
+            return self._service_failure_result(
+                execution_id=execution_id,
+                result=result,
+                message="VM execution service returned invalid JSON.",
+                raw_stdout=stdout,
+            )
+        if not isinstance(parsed, dict):
+            return self._service_failure_result(
+                execution_id=execution_id,
+                result=result,
+                message="VM execution service returned a non-object JSON result.",
+                raw_stdout=stdout,
+            )
+        if result.returncode:
+            return self._service_failure_result(
+                execution_id=execution_id,
+                result=result,
+                message=f"VM execution service exited with code {result.returncode}.",
+                raw_stdout=stdout,
+            )
         if result.stderr:
             parsed["stderr"] = f"{parsed.get('stderr', '')}{result.stderr}"
         return parsed

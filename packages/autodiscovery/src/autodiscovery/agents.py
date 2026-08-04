@@ -382,7 +382,6 @@ from io import BytesIO
 import base64
 import json
 import os
-from openai import OpenAI
 
 VISION_MODEL = __VISION_MODEL__
 USAGE_MARKER = __USAGE_MARKER__
@@ -436,10 +435,12 @@ def _get_openai_client():
         base_url = _get_vertex_base_url()
         if not api_key or not base_url:
             return None
+        from openai import OpenAI
         return OpenAI(api_key=api_key, base_url=base_url)
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
+    from openai import OpenAI
     return OpenAI(api_key=api_key)
 
 image_analyst_prompt = __IMAGE_ANALYST_PROMPT__

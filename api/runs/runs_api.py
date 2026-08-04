@@ -697,6 +697,8 @@ def create() -> Blueprint:
         )
 
         job_manager = get_job_manager()
+        if job_manager.config.backend == "local" and req.userid in PUBLIC_USERS:
+            return jsonify(GetViewerRunsResponseModel(runs=[]).model_dump()), 200
         run_ids = job_manager.list_jobs(req.userid)
 
         # TODO the order at this point is meaningless (UUID-sorted) so truncating before
@@ -846,12 +848,19 @@ def create() -> Blueprint:
                 current_app.logger.error(f"Failed to refresh run status for {req.runid}: {e}")
                 run_details = get_run_details(req.userid, req.runid, manager.config)
 
-            # Get job stats
-            try:
-                job_stats = get_job_stats(userid=req.userid, jobid=req.runid, config=manager.config)
-            except Exception as e:
-                current_app.logger.error(f"Failed to get job stats for {req.runid}: {e}")
+            # Drafts have no output, and the hosted stats helper would otherwise query GCS.
+            if manager.config.backend == "local" and not (
+                run_details and run_details.execution_id
+            ):
                 job_stats = None
+            else:
+                try:
+                    job_stats = get_job_stats(
+                        userid=req.userid, jobid=req.runid, config=manager.config
+                    )
+                except Exception as e:
+                    current_app.logger.error(f"Failed to get job stats for {req.runid}: {e}")
+                    job_stats = None
 
             # Get metadata
             try:
@@ -1239,6 +1248,27 @@ def create() -> Blueprint:
             if not metadata:
                 raise BadRequest("Run metadata not found. Please save run configuration first.")
 
+            if manager.config.backend == "local":
+                if metadata.get("llm_provider") != "copilot":
+                    raise BadRequest(
+                        "Local runs require GitHub Copilot. Choose a Copilot model in the run settings."
+                    )
+                from autodiscovery.copilot import doctor
+
+                diagnostic = doctor()
+                if diagnostic["status"] != "ready":
+                    raise BadRequest(
+                        diagnostic.get("remediation")
+                        or "GitHub Copilot is not ready. Complete sign-in in Settings."
+                    )
+                available_models = {
+                    model["id"] for model in diagnostic["models"] if model.get("id")
+                }
+                if metadata.get("model") not in available_models:
+                    raise BadRequest(
+                        "Choose an available GitHub Copilot model in the run settings before starting."
+                    )
+
             datasets = metadata.get("datasets", [])
             for ds in datasets:
                 # If the dataset has a URL, it's an S3 preloaded file
@@ -1284,6 +1314,13 @@ def create() -> Blueprint:
             # Add optional parameters if present in metadata
             # Filter out None and empty strings, but allow 0 and other valid values
             optional_params = [
+                "model",
+                "belief_model",
+                "vision_model",
+                "llm_provider",
+                "embedding_provider",
+                "embedding_model",
+                "embedding_dimensions",
                 "exploration_weight",
                 "mcts_selection",
                 "surprisal_width",
@@ -1340,6 +1377,9 @@ def create() -> Blueprint:
             return jsonify(
                 {"error": e.message, "requested": e.requested, "available": e.available}
             ), 402  # Payment Required
+
+        except BadRequest as e:
+            return jsonify({"error": e.description}), 400
 
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")

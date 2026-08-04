@@ -13,6 +13,7 @@ const TOOL_MANIFEST = {
 };
 const PYTHON_VERSION = '3.13.1';
 const VM_INSTANCE_NAME = 'ad';
+const UNIX_PATH_MAX = 104;
 const VM_IMAGE = { url: 'https://cloud-images.ubuntu.com/minimal/releases/noble/release-20260716/ubuntu-24.04-minimal-cloudimg-arm64.img', sha256: '7e938df669e3b1923595eeda97aa28569350c5283e05a835cc912a2486a54934' };
 const GUEST_UV = { version: '0.9.25', url: 'https://github.com/astral-sh/uv/releases/download/0.9.25/uv-aarch64-unknown-linux-gnu.tar.gz', sha256: 'a8f1d71a42c4470251a880348b2d28d530018693324175084fa1749d267c98c6' };
 
@@ -24,6 +25,10 @@ function calculateVmResources({ logicalCpus, totalMemoryBytes, freeDiskBytes }) 
   const gibibyte = 1024 ** 3;
   const totalMemoryGiB = Math.floor(totalMemoryBytes / gibibyte);
   return { cpus: Math.max(2, logicalCpus - 2), memoryGiB: Math.max(4, totalMemoryGiB - Math.max(6, Math.ceil(totalMemoryGiB * 0.25))), diskGiB: Math.max(20, Math.min(100, Math.floor(freeDiskBytes / gibibyte * 0.5))) };
+}
+
+function defaultLimaHome(homeDirectory = os.homedir()) {
+  return path.join(homeDirectory, 'Library', 'Caches', 'org.allenai.autodiscovery', 'lima');
 }
 
 function shellQuote(value) {
@@ -108,7 +113,7 @@ async function ensurePythonEnvironment({ uvPath, runtimeRoot, resourceRoot, appV
 }
 
 async function ensureVmEnvironment({ uvPath, limaPath, runtimeRoot, resourceRoot, appVersion, status }) {
-  const limaHome = path.join(runtimeRoot, 'lima');
+  const limaHome = defaultLimaHome();
   const markerPath = path.join(limaHome, '.autodiscovery-runtime.json');
   const expectedMarker = { appVersion, lima: TOOL_MANIFEST.lima.version, image: VM_IMAGE.sha256, guestUv: GUEST_UV.version, python: PYTHON_VERSION };
   const environment = { ...process.env, LIMA_HOME: limaHome };
@@ -152,4 +157,4 @@ async function bootstrapRuntime({ runtimeRoot, resourceRoot, appVersion, status 
   return { uvPath, copilotPath, pythonPath, ...await ensureVmEnvironment({ uvPath, limaPath, runtimeRoot, resourceRoot, appVersion, status }) };
 }
 
-module.exports = { GUEST_UV, PYTHON_VERSION, TOOL_MANIFEST, VM_IMAGE, assertSupportedPlatform, bootstrapRuntime, buildVmConfig, calculateVmResources, packageSources, sha256File };
+module.exports = { GUEST_UV, PYTHON_VERSION, TOOL_MANIFEST, UNIX_PATH_MAX, VM_IMAGE, assertSupportedPlatform, bootstrapRuntime, buildVmConfig, calculateVmResources, defaultLimaHome, packageSources, sha256File };

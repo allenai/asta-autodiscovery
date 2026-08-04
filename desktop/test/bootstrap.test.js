@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { TOOL_MANIFEST, VM_IMAGE, assertSupportedPlatform, buildVmConfig, calculateVmResources, packageSources } = require('../src/bootstrap');
+const { TOOL_MANIFEST, UNIX_PATH_MAX, VM_IMAGE, assertSupportedPlatform, buildVmConfig, calculateVmResources, defaultLimaHome, packageSources } = require('../src/bootstrap');
 
 test('bootstrap pins verified Apple Silicon artifacts', () => {
   for (const name of ['uv', 'copilot', 'lima']) {
@@ -25,6 +25,13 @@ test('VM configuration preserves host capacity and disables guest networking ser
 test('platform support is limited to Apple Silicon macOS', () => {
   assert.doesNotThrow(() => assertSupportedPlatform('darwin', 'arm64'));
   assert.throws(() => assertSupportedPlatform('darwin', 'x64'), /Apple Silicon/);
+});
+
+test('Lima home leaves room for its Unix socket name', () => {
+  const limaHome = defaultLimaHome('/Users/zachary.reitz');
+  const socketPath = `${limaHome}/ad/ssh.sock.1234567890123456`;
+  assert.equal(limaHome, '/Users/zachary.reitz/Library/Caches/org.allenai.autodiscovery/lima');
+  assert.ok(socketPath.length < UNIX_PATH_MAX);
 });
 
 test('host environment installs the Copilot provider extra without embedding a payload', () => {

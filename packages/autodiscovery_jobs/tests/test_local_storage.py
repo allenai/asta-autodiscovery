@@ -137,6 +137,7 @@ def test_soft_delete_removes_data_and_preserves_results(
     result = manager.soft_delete_job("local", "run-1")
 
     assert result["status"] == "DELETED"
+    assert result["deleted_at"]
     assert not (run_path / "data" / "source.csv").exists()
     assert (run_path / "metadata.json").is_file()
     assert (run_path / "output" / "report.html").is_file()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import sys
 from pathlib import Path
@@ -54,14 +55,14 @@ class LocalProcessBackend(JobBackend):
             dataset["name"] = alias
 
         for alias, source in aliases.items():
-            if data_path in source.parents:
-                source.chmod(source.stat().st_mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
             destination = work_path / alias
             if destination.is_symlink() or destination.exists():
-                if destination.is_symlink() and destination.resolve() == source:
-                    continue
                 raise FileExistsError(f"Local runtime dataset alias already exists: {alias}")
-            destination.symlink_to(source)
+            shutil.copy2(source, destination)
+            destination.chmod(
+                destination.stat().st_mode
+                & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+            )
 
         runtime_metadata_path = work_path / ".autodiscovery-metadata.json"
         runtime_metadata_path.write_text(json.dumps(runtime_metadata, indent=2), encoding="utf-8")

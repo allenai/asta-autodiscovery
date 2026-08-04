@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { TOOL_MANIFEST, UNIX_PATH_MAX, VM_IMAGE, assertSupportedPlatform, buildVmConfig, calculateVmResources, defaultLimaHome, packageSources } = require('../src/bootstrap');
+const { GUEST_PACKAGES, TOOL_MANIFEST, UNIX_PATH_MAX, VM_IMAGE, VM_RUNTIME_SCHEMA, assertSupportedPlatform, buildVmConfig, calculateVmResources, defaultLimaHome, packageSources } = require('../src/bootstrap');
 
 test('bootstrap pins verified Apple Silicon artifacts', () => {
   for (const name of ['uv', 'copilot', 'lima']) {
@@ -34,8 +34,21 @@ test('Lima home leaves room for its Unix socket name', () => {
   assert.ok(socketPath.length < UNIX_PATH_MAX);
 });
 
+test('VM runtime schema changes when its provisioned contract changes', () => {
+  assert.equal(VM_RUNTIME_SCHEMA, 2);
+});
+
 test('host environment installs the Copilot provider extra without embedding a payload', () => {
   const sources = packageSources('/application');
   assert.ok(sources.includes('/application/packages/autodiscovery[copilot]'));
   assert.ok(!sources.some((source) => source.includes('payload') || source.includes('offline')));
+});
+
+test('VM bootstrap installs its scientific stack without a missing requirements artifact', () => {
+  assert.ok(GUEST_PACKAGES.includes('ipython==9.15.0'));
+  assert.ok(GUEST_PACKAGES.includes('numpy==2.4.6'));
+  assert.ok(GUEST_PACKAGES.includes('scikit-learn==1.9.0'));
+  assert.ok(GUEST_PACKAGES.includes('umap-learn==0.5.12'));
+  assert.ok(GUEST_PACKAGES.every((packageName) => packageName.includes('==')));
+  assert.ok(!GUEST_PACKAGES.some((packageName) => packageName.includes('guest-requirements')));
 });

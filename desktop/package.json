@@ -46,7 +46,6 @@
         "to": "app/packages",
         "filter": [
           "*/pyproject.toml",
-          "*/guest-requirements.txt",
           "*/README.md",
           "*/LICENSE",
           "*/src/**/*",

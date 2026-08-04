@@ -13,9 +13,23 @@ const TOOL_MANIFEST = {
 };
 const PYTHON_VERSION = '3.13.1';
 const VM_INSTANCE_NAME = 'ad';
+const VM_RUNTIME_SCHEMA = 2;
 const UNIX_PATH_MAX = 104;
 const VM_IMAGE = { url: 'https://cloud-images.ubuntu.com/minimal/releases/noble/release-20260716/ubuntu-24.04-minimal-cloudimg-arm64.img', sha256: '7e938df669e3b1923595eeda97aa28569350c5283e05a835cc912a2486a54934' };
 const GUEST_UV = { version: '0.9.25', url: 'https://github.com/astral-sh/uv/releases/download/0.9.25/uv-aarch64-unknown-linux-gnu.tar.gz', sha256: 'a8f1d71a42c4470251a880348b2d28d530018693324175084fa1749d267c98c6' };
+const GUEST_PACKAGES = [
+  'ipython==9.15.0',
+  'numpy==2.4.6',
+  'pandas==3.0.5',
+  'matplotlib==3.11.1',
+  'matplotlib-inline==0.2.2',
+  'seaborn==0.13.2',
+  'scikit-learn==1.9.0',
+  'scipy==1.18.0',
+  'statsmodels==0.14.6',
+  'openpyxl==3.1.5',
+  'umap-learn==0.5.12',
+];
 
 function assertSupportedPlatform(platform = process.platform, arch = process.arch) {
   if (platform !== 'darwin' || arch !== 'arm64') throw new Error('This AutoDiscovery build requires Apple Silicon macOS.');
@@ -115,7 +129,7 @@ async function ensurePythonEnvironment({ uvPath, runtimeRoot, resourceRoot, appV
 async function ensureVmEnvironment({ uvPath, limaPath, runtimeRoot, resourceRoot, appVersion, status }) {
   const limaHome = defaultLimaHome();
   const markerPath = path.join(limaHome, '.autodiscovery-runtime.json');
-  const expectedMarker = { appVersion, lima: TOOL_MANIFEST.lima.version, image: VM_IMAGE.sha256, guestUv: GUEST_UV.version, python: PYTHON_VERSION };
+  const expectedMarker = { runtimeSchema: VM_RUNTIME_SCHEMA, appVersion, lima: TOOL_MANIFEST.lima.version, image: VM_IMAGE.sha256, guestUv: GUEST_UV.version, python: PYTHON_VERSION };
   const environment = { ...process.env, LIMA_HOME: limaHome };
   try { if (JSON.stringify(JSON.parse(fs.readFileSync(markerPath, 'utf8'))) === JSON.stringify(expectedMarker) && fs.existsSync(path.join(limaHome, VM_INSTANCE_NAME, 'lima.yaml'))) return { limaHome, limaPath }; } catch {}
   status('Preparing the secure analysis VM...');
@@ -137,8 +151,8 @@ async function ensureVmEnvironment({ uvPath, limaPath, runtimeRoot, resourceRoot
   await run(uvPath, ['build', '--wheel', codeExecutionPath, '--out-dir', artifacts], { env: { ...process.env, UV_CACHE_DIR: path.join(runtimeRoot, 'uv-cache') } });
   const wheelName = fs.readdirSync(artifacts).find((name) => name.endsWith('.whl'));
   if (!wheelName) throw new Error('Failed to build the secure VM execution package.');
-  await run(limaPath, ['copy', '--backend=scp', path.join(artifacts, wheelName), path.join(codeExecutionPath, 'guest-requirements.txt'), `${VM_INSTANCE_NAME}:/tmp/`], { env: environment });
-  await run(limaPath, ['shell', VM_INSTANCE_NAME, '--', 'sudo', '/opt/uv/uv', 'pip', 'install', '--python', '/opt/autodiscovery-venv/bin/python', '--require-hashes', '--requirement', '/tmp/guest-requirements.txt'], { env: environment });
+  await run(limaPath, ['copy', '--backend=scp', path.join(artifacts, wheelName), `${VM_INSTANCE_NAME}:/tmp/`], { env: environment });
+  await run(limaPath, ['shell', VM_INSTANCE_NAME, '--', 'sudo', '/opt/uv/uv', 'pip', 'install', '--python', '/opt/autodiscovery-venv/bin/python', ...GUEST_PACKAGES], { env: environment });
   await run(limaPath, ['shell', VM_INSTANCE_NAME, '--', 'sudo', '/opt/uv/uv', 'pip', 'install', '--python', '/opt/autodiscovery-venv/bin/python', '--no-deps', `/tmp/${wheelName}`], { env: environment });
   await run(limaPath, ['shell', VM_INSTANCE_NAME, '--', 'sudo', 'chmod', '-R', 'a+rX', '/opt/autodiscovery-venv'], { env: environment });
   await run(limaPath, ['shell', VM_INSTANCE_NAME, '--', '/opt/autodiscovery-venv/bin/python', '-c', 'import code_execution, numpy, pandas, scipy, sklearn'], { env: environment });
@@ -157,4 +171,4 @@ async function bootstrapRuntime({ runtimeRoot, resourceRoot, appVersion, status 
   return { uvPath, copilotPath, pythonPath, ...await ensureVmEnvironment({ uvPath, limaPath, runtimeRoot, resourceRoot, appVersion, status }) };
 }
 
-module.exports = { GUEST_UV, PYTHON_VERSION, TOOL_MANIFEST, UNIX_PATH_MAX, VM_IMAGE, assertSupportedPlatform, bootstrapRuntime, buildVmConfig, calculateVmResources, defaultLimaHome, packageSources, sha256File };
+module.exports = { GUEST_PACKAGES, GUEST_UV, PYTHON_VERSION, TOOL_MANIFEST, UNIX_PATH_MAX, VM_IMAGE, VM_RUNTIME_SCHEMA, assertSupportedPlatform, bootstrapRuntime, buildVmConfig, calculateVmResources, defaultLimaHome, packageSources, sha256File };

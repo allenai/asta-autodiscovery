@@ -144,8 +144,8 @@ class SurpriseRewardConfig:
     failed_reward: float = 0.0
     # Execution
     backend: str = "process"
-    code_timeout: int = 30 * 60
-    max_rounds: int = 50
+    code_timeout: int = 5 * 60
+    max_rounds: int = 10
     run_data_loading: bool = True
     # When True, the scored result carries an ``execution_log`` string: the
     # experiment trace (hypothesis/plan query + code output + analysis + review)
@@ -293,6 +293,11 @@ class SurpriseRewardScorer:
         # Keep the policy's hypothesis verbatim rather than the query round-trip.
         node.hypothesis = hypothesis
 
+        # Whether this experiment was cut short by the code-execution timeout or
+        # the GroupChat round cap. Threaded onto every result (success + failure)
+        # so a slime run can log the per-rollout / per-eval hit rate to W&B.
+        gate = self._gate_flags(node)
+
         execution_log = self._build_execution_log(node) if config.include_execution_log else None
 
         if not node.success:
@@ -300,6 +305,7 @@ class SurpriseRewardScorer:
                 hypothesis,
                 "experiment failed executor/reviewer checks",
                 execution_log=execution_log,
+                **gate,
             )
 
         # Same evidence construction as compute_and_store_reward (offline beliefs).
@@ -374,6 +380,29 @@ class SurpriseRewardScorer:
             "hypothesis": hypothesis,
             "execution_log": execution_log,
             "error": None,
+            **gate,
+        }
+
+    def _gate_flags(self, node) -> dict:
+        """Detect whether the experiment hit the code timeout or the round cap.
+
+        ``code_timeout_hit`` scans every chat message for the executor's timeout
+        marker (``agents.py`` appends ``"Execution timed out after <n>s"`` to the
+        code_executor output when a block exceeds ``code_timeout``).
+        ``max_rounds_hit`` compares the realized GroupChat round count against the
+        configured ``max_rounds`` cap; ``n_rounds`` is that realized count.
+        """
+        msgs = getattr(node, "messages", None) or []
+        n_rounds = len(msgs)
+
+        def _content(m):
+            return str(m.get("content", "")) if isinstance(m, dict) else str(m)
+
+        code_timeout_hit = any("Execution timed out after" in _content(m) for m in msgs)
+        return {
+            "n_rounds": int(n_rounds),
+            "max_rounds_hit": bool(n_rounds >= self.config.max_rounds),
+            "code_timeout_hit": bool(code_timeout_hit),
         }
 
     def _build_execution_log(self, node) -> str:
@@ -386,7 +415,15 @@ class SurpriseRewardScorer:
             include_code_output=True,
         )
 
-    def _failed_result(self, hypothesis: str, error: str, execution_log: str | None = None) -> dict:
+    def _failed_result(
+        self,
+        hypothesis: str,
+        error: str,
+        execution_log: str | None = None,
+        n_rounds: int = 0,
+        max_rounds_hit: bool = False,
+        code_timeout_hit: bool = False,
+    ) -> dict:
         return {
             "reward": float(self.config.failed_reward),
             "success": False,
@@ -400,6 +437,9 @@ class SurpriseRewardScorer:
             "hypothesis": hypothesis,
             "execution_log": execution_log,
             "error": error,
+            "n_rounds": int(n_rounds),
+            "max_rounds_hit": bool(max_rounds_hit),
+            "code_timeout_hit": bool(code_timeout_hit),
         }
 
     def _ensure_agents(self) -> dict:

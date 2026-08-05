@@ -382,7 +382,6 @@ from io import BytesIO
 import base64
 import json
 import os
-from openai import OpenAI
 
 VISION_MODEL = __VISION_MODEL__
 USAGE_MARKER = __USAGE_MARKER__
@@ -436,10 +435,12 @@ def _get_openai_client():
         base_url = _get_vertex_base_url()
         if not api_key or not base_url:
             return None
+        from openai import OpenAI
         return OpenAI(api_key=api_key, base_url=base_url)
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
+    from openai import OpenAI
     return OpenAI(api_key=api_key)
 
 image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
@@ -923,19 +924,30 @@ def install(package):
             f"Using Modal sandbox with bucket gs://{bucket_name}/{key_prefix} mounted at {modal_mount_path}"
         )
         print(f"Working directory will be: {modal_working_dir}")
-    elif backend == "process":
+    elif backend in {"process", "lima"}:
         # Use isolated subprocess for code execution
-        from code_execution import ProcessIPythonBackend
+        if backend == "lima":
+            from code_execution import LimaIPythonBackend
 
-        process_backend = ProcessIPythonBackend(cwd=work_dir)
+            if not dataset_paths:
+                raise ValueError("dataset_paths are required when backend is 'lima'")
+            isolated_backend = LimaIPythonBackend(
+                cwd=work_dir,
+                dataset_paths=list(dataset_paths),
+            )
+        else:
+            from code_execution import ProcessIPythonBackend
+
+            isolated_backend = ProcessIPythonBackend(cwd=work_dir)
+
         executor = ModalSandboxExecutor(
-            _ProcessBackendAdapter(process_backend),
+            _ProcessBackendAdapter(isolated_backend),
             timeout=code_timeout,
             vision_model=vision_model,
             llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
-        print(f"Using process backend with work_dir: {work_dir}")
+        print(f"Using {backend} backend with work_dir: {work_dir}")
     else:
         # Use local code executor (in-process, no isolation)
         executor = LocalCommandLineCodeExecutor(

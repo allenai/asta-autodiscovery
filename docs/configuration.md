@@ -113,7 +113,7 @@ The AD job runs the LLM-generated experiment code through a configurable executo
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (in-process, no isolation), or `modal` (remote sandbox). |
+| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (in-process, no isolation), `modal` (remote sandbox), or `lima` (macOS VZ virtual machine). |
 
 - `process` (default) — runs code in an isolated subprocess inside the job container, in a separate
   sandbox venv; per-cell package installs are discarded, and no state carries across cells. No cloud
@@ -121,6 +121,17 @@ The AD job runs the LLM-generated experiment code through a configurable executo
 - `local` — runs code in-process with no isolation. Lowest overhead, least safe.
 - `modal` — runs code in a remote Modal sandbox that mounts **only** the per-job data prefix,
   read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables.
+- `lima` — runs code in a Lima-managed Linux virtual machine backed by Apple
+  Virtualization.framework. Requires `AUTODISCOVERY_LIMA_PATH` to point to `limactl` and
+  `AUTODISCOVERY_LIMA_HOME` to contain a pre-provisioned instance named `ad` with Python at
+  `/opt/autodiscovery-venv/bin/python`.
+
+The Lima backend mounts only dataset parent directories read-only and the run work directory
+writable. Each cell runs as an unprivileged transient systemd service with no network, no Linux
+capabilities, a private temporary directory, a read-only system, resource limits, and an execution
+timeout. Dataset files are rebound individually as read-only paths; broad roots such as `/`,
+`/Users`, `/Volumes`, and the user's home directory are rejected. The code-execution package does
+not install Lima, create the VM, download an image, or provision guest packages.
 
 ### Choosing a safe combination
 

@@ -21,7 +21,7 @@ from ..exceptions import JobBackendError
 # Code-execution backends the AD job understands (its --backend choices). "modal"
 # runs code in a remote Modal sandbox with a scoped, read-only per-job data mount;
 # "process"/"local" run it inside the job container (subprocess / in-process).
-_CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
+_CODE_EXECUTION_BACKENDS = ("process", "local", "modal", "lima")
 
 
 def build_job_args(

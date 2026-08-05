@@ -28,9 +28,9 @@ test('platform support is limited to Apple Silicon macOS', () => {
 });
 
 test('Lima home leaves room for its Unix socket name', () => {
-  const limaHome = defaultLimaHome('/Users/zachary.reitz');
+  const limaHome = defaultLimaHome('/test-home');
   const socketPath = `${limaHome}/ad/ssh.sock.1234567890123456`;
-  assert.equal(limaHome, '/Users/zachary.reitz/Library/Caches/org.allenai.autodiscovery/lima');
+  assert.equal(limaHome, '/test-home/Library/Caches/org.allenai.autodiscovery/lima');
   assert.ok(socketPath.length < UNIX_PATH_MAX);
 });
 

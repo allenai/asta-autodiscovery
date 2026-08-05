@@ -13,14 +13,14 @@ test('desktop services use the local job and Lima execution backends', () => {
       limaPath: '/runtime/limactl',
       uvPath: '/runtime/uv',
     },
-    dataRoot: '/Users/tester/AutoDiscovery',
-    userDataRoot: '/Users/tester/Library/Application Support/AutoDiscovery',
+    dataRoot: '/test-home/AutoDiscovery',
+    userDataRoot: '/test-home/Library/Application Support/AutoDiscovery',
   });
 
   assert.equal(environment.API_ORIGIN, API_ORIGIN);
   assert.equal(environment.AUTH_PROVIDER, 'none');
-  assert.equal(environment.AUTODISCOVERY_LOCAL_ROOT, '/Users/tester/AutoDiscovery');
-  assert.equal(environment.AUTODISCOVERY_COPILOT_HOME, '/Users/tester/Library/Application Support/AutoDiscovery/copilot');
+  assert.equal(environment.AUTODISCOVERY_LOCAL_ROOT, '/test-home/AutoDiscovery');
+  assert.equal(environment.AUTODISCOVERY_COPILOT_HOME, '/test-home/Library/Application Support/AutoDiscovery/copilot');
   assert.equal(environment.AUTODISCOVERY_LIMA_HOME, '/runtime/lima-home');
   assert.equal(environment.AUTODISCOVERY_LIMA_PATH, '/runtime/limactl');
   assert.equal(environment.CODE_EXECUTION_BACKEND, 'lima');
@@ -41,6 +41,6 @@ test('desktop services use the local job and Lima execution backends', () => {
 });
 
 test('desktop defaults keep user datasets in the visible AutoDiscovery directory', () => {
-  assert.equal(defaultDataRoot('/Users/tester'), '/Users/tester/AutoDiscovery');
+  assert.equal(defaultDataRoot('/test-home'), '/test-home/AutoDiscovery');
   assert.equal(UI_ORIGIN, 'http://127.0.0.1:61552');
 });

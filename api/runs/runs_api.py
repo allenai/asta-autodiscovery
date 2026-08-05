@@ -15,6 +15,7 @@ import logging
 
 
 from flask import Blueprint, current_app, jsonify, request
+from utils.asta_context_client import is_configured as asta_integration_enabled
 from utils.auth import (
     PermissionType,
     optional_enrollment,
@@ -614,7 +615,9 @@ def create() -> Blueprint:
                 execution_status={},
                 max_file_size=max_file_size,
                 can_view_datasets=has_ai1_datasets,
-                can_explore_with_asta=True,  # Enabled for all users (no longer permission-gated)
+                # Not permission-gated; gated only on whether this deployment
+                # has an Asta context service configured.
+                can_explore_with_asta=asta_integration_enabled(),
                 parent_run_id=(
                     run_metadata_model.parent_run_id if run_metadata_model else None
                 ),
@@ -1480,6 +1483,11 @@ def create() -> Blueprint:
 
         if not JOBS_AVAILABLE:
             return jsonify({"error": "Job management not available"}), 503
+
+        # The UI hides this feature when unconfigured, but guard here too so a
+        # direct call fails cleanly instead of reaching out to asta.allen.ai.
+        if not asta_integration_enabled():
+            return jsonify({"error": "Asta integration is not configured"}), 503
 
         caller_id = request.user.get("sub")
         if caller_id != userid:

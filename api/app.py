@@ -8,6 +8,7 @@ from root import root_api
 from runs import runs_api
 from user import user_api
 from utils import error, glog, userid_logging
+from utils.provider_credentials import load_provider_credentials
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -19,6 +20,9 @@ def create_app() -> ProxyFix:
     level = os.environ.get("LOG_LEVEL", default=logging.INFO)
     logging.basicConfig(level=level, handlers=handlers, force=True)
     logging.root.setLevel(level)
+
+    if os.environ.get("JOB_BACKEND") == "local":
+        load_provider_credentials()
 
     app = Flask("api")
     userid_logging.instrument(app, logging.root)

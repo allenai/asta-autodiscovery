@@ -9,19 +9,21 @@ import CreditsChip from '@/components/CreditsChip';
 import { AboutButton } from '@/components/AboutButton';
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { filterTransientProps } from '@/utils/styledProps';
 import { TEST_ID_BACK_BUTTON, TEST_ID_CREDITS_CHIP } from '@/testIds';
 
 // Smart component — reads hooks, computes props, delegates rendering
 export function Header() {
     const { isAuthenticated } = useAuth0();
+    const { isLocal, isLoading: isRuntimeLoading } = useRuntimeConfig();
     const router = useRouter();
     const pathname = usePathname();
 
     return (
         <HeaderView
             showBackButton={pathname.includes('/shared') && !isAuthenticated}
-            showCredits={isAuthenticated}
+            showCredits={isAuthenticated && !isLocal && !isRuntimeLoading}
             isSharedSamples={pathname.startsWith('/shared/samples')}
             onBack={() => router.push('/runs')}
         />
@@ -90,6 +92,18 @@ const StyledHeader = styled(Box, { shouldForwardProp: filterTransientProps })<{
     padding: ${({ theme }) => theme.spacing(2)};
     padding-top: ${({ theme, $isSharedSamples }) =>
         $isSharedSamples ? theme.spacing(3) : theme.spacing(2)};
+
+    html.autodiscovery-desktop & {
+        padding-top: ${({ theme }) => theme.spacing(5.5)};
+        padding-left: 88px;
+        -webkit-app-region: drag;
+    }
+
+    html.autodiscovery-desktop & button,
+    html.autodiscovery-desktop & a,
+    html.autodiscovery-desktop & [role='button'] {
+        -webkit-app-region: no-drag;
+    }
 
     @media (max-width: 600px) {
         flex-wrap: nowrap;

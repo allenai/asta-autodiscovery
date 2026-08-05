@@ -275,6 +275,9 @@ class RunModel(BaseModel):
     dataset_expires_at: str | None = Field(
         None, description="ISO timestamp when the dataset expires"
     )
+    estimated_cost_usd: float | None = Field(
+        None, description="API-equivalent estimate from actual local token usage"
+    )
 
 
 class GetRunMetadataRequestModel(BaseModel):

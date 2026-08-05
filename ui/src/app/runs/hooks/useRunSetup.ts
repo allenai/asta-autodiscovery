@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
-import { getRunsApi } from '@/api/RunsApi';
+import { getRunsApi, LocalDatasetFile, LocalDatasetInfo, ProviderInfo } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
@@ -39,6 +40,13 @@ type Settings = {
     evidenceWeight: number;
     warmstartExperiments: string;
     nWarmstart: number;
+    llmProvider: 'current' | 'copilot';
+    embeddingProvider: 'current' | 'copilot';
+    model: string;
+    beliefModel: string;
+    visionModel: string;
+    embeddingModel: string;
+    embeddingDimensions: number;
 
     // Lineage (read-only, preserved across saves)
     parentRunId: string | null;
@@ -65,6 +73,7 @@ export enum UploadStatus {
 
 export interface FileUploadState {
     file: File;
+    relativePath?: string;
     description: string;
     status: UploadStatus;
     progress: number; // 0-100
@@ -78,15 +87,22 @@ export interface FileUploadState {
     abortController: AbortController | null;
 }
 
+export function getLocalFilePath(file: File): string {
+    return file.webkitRelativePath || file.name;
+}
+
 interface FieldErrors {
     name?: string;
     datasets?: string;
     datasetsDescription?: string;
     nExperiments?: string;
+    provider?: string;
+    embeddingProvider?: string;
 }
 
 export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: UseRunSetupProps) {
     const { credits } = useViewerCredits();
+    const { isLocal, isLoading: isRuntimeLoading } = useRuntimeConfig();
     const { updateViewerRun, viewerRuns } = useViewerRuns();
     const { addErrorToast } = useToasts();
     const api = getRunsApi();
@@ -94,14 +110,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const [hasAi1Permission, setHasAi1Permission] = useState(false);
     const [preloadedDescs, setPreloadedDescs] = useState<Record<string, string>>({});
     const selectedPreloadedDatasets = useMemo(() => {
-        if (!hasAi1Permission) return [];
+        if (isLocal || !hasAi1Permission) return [];
         return PRELOADED_DATASETS.filter((d) => selectedIds.has(d.id)).map((d) => ({
             ...d,
             description: preloadedDescs[d.id] ?? d.description,
         }));
-    }, [selectedIds, preloadedDescs, hasAi1Permission]);
+    }, [selectedIds, preloadedDescs, hasAi1Permission, isLocal]);
 
-    const creditsAvailable = credits?.available ?? 0;
+    const experimentLimit = isLocal ? 500 : credits?.available ?? 0;
 
     // Get max file size from the run
     const maxFileSize = viewerRuns?.[runid]?.maxFileSize || null;
@@ -121,9 +137,46 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         evidenceWeight: 2,
         warmstartExperiments: '',
         nWarmstart: 0,
+        llmProvider: 'copilot',
+        embeddingProvider: 'copilot',
+        model: 'claude-sonnet-4.6',
+        beliefModel: 'claude-sonnet-4.6',
+        visionModel: 'claude-sonnet-4.6',
+        embeddingModel: 'text-embedding-3-small',
+        embeddingDimensions: 1536,
         parentRunId: null,
         parentRunName: null,
     });
+    const [providers, setProviders] = useState<ProviderInfo[]>([]);
+    const [localDatasets, setLocalDatasets] = useState<LocalDatasetInfo[]>([]);
+    const [localCatalogPath, setLocalCatalogPath] = useState('');
+    const [selectedLocalDataset, setSelectedLocalDataset] = useState('');
+    const [localFolderPath, setLocalFolderPath] = useState('');
+    const [activeLocalDataset, setActiveLocalDataset] = useState('');
+    const [isSelectingLocalDataset, setIsSelectingLocalDataset] = useState(false);
+    const [localDatasetError, setLocalDatasetError] = useState<string | null>(null);
+
+    useEffect(() => {
+        api.getProviders()
+            .then(({ data }) => setProviders(data.providers))
+            .catch((error) => {
+                console.error('Failed to load providers:', error);
+                setProviders([]);
+            });
+    }, [api]);
+
+    useEffect(() => {
+        if (!isLocal) return;
+        api.listLocalDatasets()
+            .then(({ data }) => {
+                setLocalDatasets(data.datasets);
+                setLocalCatalogPath(data.catalog_path);
+            })
+            .catch((error) => {
+                console.error('Failed to load local datasets:', error);
+                setLocalDatasetError('Could not read the local dataset folder.');
+            });
+    }, [api, isLocal]);
 
     // Field validation errors
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -146,7 +199,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             try {
                 // No userid needed - API will use authenticated user
                 const { data } = await api.getRun({ runId: runid });
-                setHasAi1Permission(data.can_view_datasets ?? false);
+                setHasAi1Permission(!isLocal && (data.can_view_datasets ?? false));
                 const run = getRunFromApi(data);
                 const { metadata } = run;
 
@@ -165,6 +218,37 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                         warmstartExperiments:
                             metadata.warmstartExperiments ?? prev.warmstartExperiments,
                         nWarmstart: metadata.nWarmstart ?? prev.nWarmstart,
+                        llmProvider: isLocal ? 'copilot' : metadata.llmProvider ?? prev.llmProvider,
+                        embeddingProvider: isLocal
+                            ? 'copilot'
+                            : metadata.embeddingProvider ?? prev.embeddingProvider,
+                        model: isLocal
+                            ? !metadata.model ||
+                              metadata.llmProvider === 'current' ||
+                              metadata.model === 'claude-haiku-4.5'
+                                ? 'claude-sonnet-4.6'
+                                : metadata.model
+                            : metadata.model ?? prev.model,
+                        beliefModel: isLocal
+                            ? !metadata.beliefModel ||
+                              metadata.llmProvider === 'current' ||
+                              metadata.beliefModel === 'claude-haiku-4.5'
+                                ? 'claude-sonnet-4.6'
+                                : metadata.beliefModel
+                            : metadata.beliefModel ?? prev.beliefModel,
+                        visionModel: isLocal
+                            ? !metadata.visionModel ||
+                              metadata.llmProvider === 'current' ||
+                              metadata.visionModel === 'claude-haiku-4.5'
+                                ? 'claude-sonnet-4.6'
+                                : metadata.visionModel
+                            : metadata.visionModel ?? prev.visionModel,
+                        embeddingModel: isLocal
+                            ? 'text-embedding-3-small'
+                            : metadata.embeddingModel ?? prev.embeddingModel,
+                        embeddingDimensions: isLocal
+                            ? 1536
+                            : metadata.embeddingDimensions ?? prev.embeddingDimensions,
                         parentRunId: metadata.parentRunId ?? null,
                         parentRunName: metadata.parentRunName ?? null,
                     }));
@@ -178,12 +262,13 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
                             // Create placeholder File object from filename
                             // The actual file content is already in GCS, so we just need the metadata
-                            const placeholderFile = new File([], dataset.name, {
+                            const placeholderFile = new File([], dataset.name.split('/').pop()!, {
                                 type: contentType,
                             });
 
                             return {
                                 file: placeholderFile,
+                                relativePath: dataset.name,
                                 description: dataset.description || '',
                                 status: UploadStatus.COMPLETED,
                                 progress: 100,
@@ -199,6 +284,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                         });
 
                         setFileUploads(uploadStates);
+                        if (isLocal) {
+                            setActiveLocalDataset(metadata.datasets[0].name.split('/')[0]);
+                        }
                     }
                 }
             } catch (err) {
@@ -252,7 +340,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     useEffect(() => {
         fileUploads.forEach((upload, index) => {
             // Create unique key for this upload
-            const uploadKey = `${upload.file.name}-${upload.file.size}-${index}`;
+            const uploadKey = `${getLocalFilePath(upload.file)}-${upload.file.size}-${index}`;
 
             if (
                 upload.status === UploadStatus.PENDING &&
@@ -279,7 +367,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         const uploads = fileUploadsRef.current
             .filter((upload) => upload.status === UploadStatus.COMPLETED)
             .map((upload) => ({
-                name: upload.file.name,
+                name: isLocal
+                    ? upload.relativePath || getLocalFilePath(upload.file)
+                    : upload.file.name,
                 description: upload.description || '',
                 content_type: upload.file.type || 'application/octet-stream',
                 file_size_bytes: upload.totalBytes || upload.file.size,
@@ -313,6 +403,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
             const datasets = getCombinedDatasets();
             const currentSettings = settingsRef.current;
+            const modelPricing = Object.fromEntries(
+                (
+                    providers.find((provider) => provider.id === currentSettings.llmProvider)
+                        ?.models || []
+                )
+                    .filter((model) => model.pricing)
+                    .map((model) => [model.id, model.pricing!])
+            );
             const metadata = {
                 // Descriptive metadata
                 name: currentSettings.name.trim(),
@@ -328,6 +426,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 evidence_weight: currentSettings.evidenceWeight,
                 warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
+                llm_provider: currentSettings.llmProvider,
+                embedding_provider: currentSettings.embeddingProvider,
+                model: currentSettings.model,
+                belief_model: currentSettings.beliefModel,
+                vision_model: currentSettings.visionModel,
+                embedding_model: currentSettings.embeddingModel,
+                embedding_dimensions: currentSettings.embeddingDimensions,
+                model_pricing: modelPricing,
                 // Lineage
                 lineage: {
                     parent_run_id: currentSettings.parentRunId ?? null,
@@ -358,7 +464,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 setIsSaving(false);
             }, remainingTime);
         }
-    }, [api, runid]);
+    }, [api, runid, isLocal, providers]);
 
     const uploadToGCS = async (
         index: number,
@@ -424,6 +530,20 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                     error: null,
                 });
 
+                const { data: runtimeConfig } = await api.getRuntimeConfig();
+                if (runtimeConfig.upload_transport === 'api') {
+                    const { data } = await api.uploadDataset(runid, file, getLocalFilePath(file));
+                    updateUploadState(index, {
+                        status: UploadStatus.COMPLETED,
+                        progress: 100,
+                        uploadedBytes: file.size,
+                        secondsRemaining: 0,
+                        gcsPath: data.path,
+                    });
+                    setTimeout(() => saveDatasetMetadata(), 100);
+                    return;
+                }
+
                 // Request presigned URL from backend
                 const { data } = await api.generateUploadUrl({
                     runid,
@@ -448,7 +568,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 });
             }
         },
-        [fileUploads, runid]
+        [api, fileUploads, runid, saveDatasetMetadata]
     );
 
     const handleFileSelect = (files: File[]) => {
@@ -479,6 +599,87 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             return rest;
         });
         setFormError(null);
+    };
+
+    const applyImportedDataset = async (files: LocalDatasetFile[], label: string) => {
+        const importedUploads: FileUploadState[] = files.map((dataset) => ({
+            file: new File([], dataset.name.split('/').pop()!, {
+                type: dataset.content_type,
+            }),
+            relativePath: dataset.name,
+            description: '',
+            status: UploadStatus.COMPLETED,
+            progress: 100,
+            uploadedBytes: dataset.file_size_bytes,
+            totalBytes: dataset.file_size_bytes,
+            secondsRemaining: 0,
+            uploadStartTime: null,
+            uploadUrl: null,
+            gcsPath: `data/${dataset.name}`,
+            error: null,
+            abortController: null,
+        }));
+        fileUploadsRef.current = importedUploads;
+        setFileUploads(importedUploads);
+        setActiveLocalDataset(label);
+        setFieldErrors((previous) => {
+            const { datasets, ...rest } = previous;
+            return rest;
+        });
+        await saveDatasetMetadata();
+    };
+
+    const importLocalDataset = async (datasetName: string) => {
+        if (!datasetName) return;
+        setSelectedLocalDataset(datasetName);
+        setIsSelectingLocalDataset(true);
+        setLocalDatasetError(null);
+        try {
+            const { data } = await api.importLocalDataset(runid, {
+                dataset_name: datasetName,
+            });
+            await applyImportedDataset(data.files, datasetName);
+        } catch (error) {
+            setLocalDatasetError(
+                error instanceof Error ? error.message : 'Dataset selection failed.'
+            );
+        } finally {
+            setIsSelectingLocalDataset(false);
+        }
+    };
+
+    const browseLocalDatasetFolder = async () => {
+        setLocalDatasetError(null);
+        try {
+            const { data } = await api.browseLocalDatasetFolder();
+            if (data.path) {
+                setLocalFolderPath(data.path);
+                await importLocalFolderPath(data.path);
+            }
+        } catch (error) {
+            setLocalDatasetError(
+                error instanceof Error ? error.message : 'Folder selection failed.'
+            );
+        }
+    };
+
+    const importLocalFolderPath = async (folderPath = localFolderPath) => {
+        if (!folderPath.trim()) return;
+        setIsSelectingLocalDataset(true);
+        setLocalDatasetError(null);
+        try {
+            const { data } = await api.importLocalDataset(runid, {
+                source_path: folderPath.trim(),
+            });
+            const label = folderPath.trim().replace(/\/$/, '').split('/').pop() || 'Dataset';
+            await applyImportedDataset(data.files, label);
+        } catch (error) {
+            setLocalDatasetError(
+                error instanceof Error ? error.message : 'Dataset selection failed.'
+            );
+        } finally {
+            setIsSelectingLocalDataset(false);
+        }
     };
 
     const handleFileDescriptionChange = (index: number, description: string) => {
@@ -544,6 +745,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             // Use refs to get latest state
             const currentSettings = settingsRef.current;
             const datasets = getCombinedDatasets();
+            const modelPricing = Object.fromEntries(
+                (
+                    providers.find((provider) => provider.id === currentSettings.llmProvider)
+                        ?.models || []
+                )
+                    .filter((model) => model.pricing)
+                    .map((model) => [model.id, model.pricing!])
+            );
 
             const metadata = {
                 // Descriptive metadata
@@ -560,6 +769,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 evidence_weight: currentSettings.evidenceWeight,
                 warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
+                llm_provider: currentSettings.llmProvider,
+                embedding_provider: currentSettings.embeddingProvider,
+                model: currentSettings.model,
+                belief_model: currentSettings.beliefModel,
+                vision_model: currentSettings.visionModel,
+                embedding_model: currentSettings.embeddingModel,
+                embedding_dimensions: currentSettings.embeddingDimensions,
+                model_pricing: modelPricing,
                 // Lineage
                 lineage: {
                     parent_run_id: currentSettings.parentRunId ?? null,
@@ -581,7 +798,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 setIsSaving(false);
             }, remainingTime);
         }
-    }, [api, runid]);
+    }, [api, runid, providers]);
 
     // Create debounced versions of save functions
     const debouncedSaveMetadata = useMemo(
@@ -617,10 +834,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         const num = parseInt(value, 10);
 
-        if (isNaN(num) || num < 1 || num > creditsAvailable) {
+        if (isNaN(num) || num < 1 || num > experimentLimit) {
             setFieldErrors((prev) => ({
                 ...prev,
-                nExperiments: `Must be between 1 and ${creditsAvailable}`,
+                nExperiments: `Must be between 1 and ${experimentLimit}`,
             }));
         } else {
             updateSettings('nExperiments', num);
@@ -653,9 +870,22 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         if (
             !settings.nExperiments ||
             settings.nExperiments < 1 ||
-            settings.nExperiments > creditsAvailable
+            settings.nExperiments > experimentLimit
         ) {
-            errors.nExperiments = `Must be between 1 and ${creditsAvailable}`;
+            errors.nExperiments = `Must be between 1 and ${experimentLimit}`;
+        }
+
+        const selectedProvider = providers.find((provider) => provider.id === settings.llmProvider);
+        if (!selectedProvider || selectedProvider.status !== 'ready') {
+            errors.provider =
+                selectedProvider?.remediation || 'Select an available model provider.';
+        }
+        const selectedEmbeddingProvider = providers.find(
+            (provider) => provider.id === settings.embeddingProvider
+        );
+        if (!selectedEmbeddingProvider?.embedding_ready) {
+            errors.embeddingProvider =
+                selectedEmbeddingProvider?.remediation || 'Select an available embedding provider.';
         }
 
         // Check the object keys directly
@@ -744,7 +974,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
     return {
         // Computed values
-        creditsAvailable,
+        creditsAvailable: experimentLimit,
+        isLocal,
+        providers,
 
         // Dataset upload state
         fileUploads,
@@ -759,7 +991,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         formError,
 
         // Loading state
-        isLoading,
+        isLoading: isLoading || isRuntimeLoading,
 
         // Saving state
         isSaving,
@@ -785,5 +1017,17 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         selectedDatasetIds: selectedIds,
         togglePreloadedDataset,
         updatePreloadedDescription,
+        localDatasets,
+        localCatalogPath,
+        selectedLocalDataset,
+        setSelectedLocalDataset,
+        localFolderPath,
+        setLocalFolderPath,
+        activeLocalDataset,
+        isSelectingLocalDataset,
+        localDatasetError,
+        importLocalDataset,
+        browseLocalDatasetFolder,
+        importLocalFolderPath,
     };
 }

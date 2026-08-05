@@ -193,6 +193,11 @@ const TitleWrapper = styled('div')`
     row-gap: 12px;
     padding: 24px;
     border-bottom: 1px solid ${({ theme }) => theme.color['cream-10'].rgba.toString()};
+    background-color: rgba(22, 54, 56, 0.96);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 2;
 `;
 
 const ContentWrapper = styled(Stack)`

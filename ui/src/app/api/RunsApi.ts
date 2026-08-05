@@ -43,6 +43,17 @@ export interface RunMetadataFromApi {
     evidence_weight: number | null;
     warmstart_experiments: string | null;
     n_warmstart: number | null;
+    llm_provider?: 'current' | 'copilot' | null;
+    embedding_provider?: 'current' | 'copilot' | null;
+    model?: string | null;
+    belief_model?: string | null;
+    vision_model?: string | null;
+    embedding_model?: string | null;
+    embedding_dimensions?: number | null;
+    model_pricing?: Record<
+        string,
+        { input_per_million_usd: number; output_per_million_usd: number }
+    > | null;
     // Lineage
     parent_run_id?: string | null;
     parent_run_name?: string | null;
@@ -64,6 +75,7 @@ export interface RunFromApi {
     parent_run_name?: string | null;
     dataset_expires_at?: string | null;
     can_explore_with_asta?: boolean;
+    estimated_cost_usd?: number | null;
 }
 
 export interface UploadDatasetResponseBody {
@@ -77,6 +89,66 @@ export interface GenerateUploadUrlResponseBody {
     gcs_path: string;
     filename: string;
     expires_at_unix: number;
+}
+
+export interface RuntimeConfigResponseBody {
+    deployment_mode: 'hosted' | 'local';
+    upload_transport: 'presigned' | 'api';
+    hosted_features: boolean;
+}
+
+export interface ProviderModel {
+    id: string;
+    name: string;
+    vision: boolean;
+    reasoning_efforts?: string[];
+    pricing?: {
+        input_per_million_usd: number;
+        output_per_million_usd: number;
+    };
+}
+
+export interface ProviderInfo {
+    id: 'current' | 'copilot';
+    name: string;
+    status: 'ready' | 'degraded' | 'error';
+    code: string;
+    message: string;
+    remediation: string | null;
+    embedding_ready: boolean;
+    models: ProviderModel[];
+}
+
+export interface ProvidersResponseBody {
+    providers: ProviderInfo[];
+}
+
+export interface ProviderConfigurationResponseBody {
+    providers: {
+        copilot: { configured: boolean };
+        openai: { configured: boolean };
+        vertex: { configured: boolean; project_id?: string; location?: string };
+    };
+}
+
+export interface CopilotLoginStatus {
+    phase: 'idle' | 'running' | 'completed' | 'failed';
+    device_code: string | null;
+    verification_url: string | null;
+    output: string;
+    return_code: number | null;
+}
+
+export interface LocalDatasetInfo {
+    name: string;
+    file_count: number;
+    size_bytes: number;
+}
+
+export interface LocalDatasetFile {
+    name: string;
+    content_type: string;
+    file_size_bytes: number;
 }
 
 export interface RunResponseBody extends RunFromApi {
@@ -152,6 +224,13 @@ export interface MetadataFromApi {
     evidence_weight: number | null;
     warmstart_experiments: string | null;
     n_warmstart: number | null;
+    llm_provider?: 'current' | 'copilot' | null;
+    embedding_provider?: 'current' | 'copilot' | null;
+    model?: string | null;
+    belief_model?: string | null;
+    vision_model?: string | null;
+    embedding_model?: string | null;
+    embedding_dimensions?: number | null;
     // Lineage
     parent_run_id?: string | null;
     parent_run_name?: string | null;
@@ -297,15 +376,103 @@ export class RunsApi extends BaseApi {
         });
     }
 
-    async uploadDataset(runId: string, file: File) {
+    async uploadDataset(runId: string, file: File, relativePath?: string) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('runid', runId);
+        if (relativePath) {
+            formData.append('relative_path', relativePath);
+        }
 
         return this.request<UploadDatasetResponseBody>({
             url: `${RUNS_URL_PREFIX}/upload-dataset`,
             method: 'POST',
             body: formData,
+        });
+    }
+
+    async getRuntimeConfig() {
+        return this.request<RuntimeConfigResponseBody>({
+            url: `${RUNS_URL_PREFIX}/runtime-config`,
+            method: 'GET',
+        });
+    }
+
+    async getProviders() {
+        return this.request<ProvidersResponseBody>({
+            url: `${RUNS_URL_PREFIX}/providers`,
+            method: 'GET',
+        });
+    }
+
+    async startCopilotLogin() {
+        return this.request<CopilotLoginStatus>({
+            url: `${RUNS_URL_PREFIX}/providers/copilot/login`,
+            method: 'POST',
+        });
+    }
+
+    async getCopilotLoginStatus() {
+        return this.request<CopilotLoginStatus>({
+            url: `${RUNS_URL_PREFIX}/providers/copilot/login`,
+            method: 'GET',
+        });
+    }
+
+    async disconnectCopilot() {
+        return this.request<{ message: string }>({
+            url: `${RUNS_URL_PREFIX}/providers/copilot/configuration`,
+            method: 'DELETE',
+        });
+    }
+
+    async getProviderConfiguration() {
+        return this.request<ProviderConfigurationResponseBody>({
+            url: `${RUNS_URL_PREFIX}/providers/configuration`,
+            method: 'GET',
+        });
+    }
+
+    async saveProviderConfiguration(
+        provider: 'openai' | 'vertex',
+        configuration: Record<string, string>
+    ) {
+        return this.request<ProviderConfigurationResponseBody>({
+            url: `${RUNS_URL_PREFIX}/providers/${provider}/configuration`,
+            method: 'PUT',
+            body: configuration,
+        });
+    }
+
+    async deleteProviderConfiguration(provider: 'openai' | 'vertex') {
+        return this.request<ProviderConfigurationResponseBody>({
+            url: `${RUNS_URL_PREFIX}/providers/${provider}/configuration`,
+            method: 'DELETE',
+        });
+    }
+
+    async listLocalDatasets() {
+        return this.request<{ datasets: LocalDatasetInfo[]; catalog_path: string }>({
+            url: `${RUNS_URL_PREFIX}/local-datasets`,
+            method: 'GET',
+        });
+    }
+
+    async browseLocalDatasetFolder() {
+        return this.request<{ path: string | null }>({
+            url: `${RUNS_URL_PREFIX}/local-datasets/browse`,
+            method: 'POST',
+        });
+    }
+
+    async importLocalDataset(
+        runId: string,
+        selection: { dataset_name: string } | { source_path: string }
+    ) {
+        return this.request<{ files: LocalDatasetFile[] }>({
+            url: `${RUNS_URL_PREFIX}/${encodeURIComponent(runId)}/local-datasets/import`,
+            method: 'POST',
+            body: selection,
         });
     }
 

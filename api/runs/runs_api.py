@@ -4,6 +4,7 @@ This module provides authenticated endpoints for users to create and manage
 their own autodiscovery experiment runs.
 """
 
+import json
 import os
 import tempfile
 import uuid
@@ -12,6 +13,8 @@ from pathlib import Path
 from google.cloud import storage
 from urllib.parse import urlparse
 import logging
+import shutil
+import subprocess
 
 
 from flask import Blueprint, current_app, jsonify, request
@@ -28,6 +31,13 @@ from utils.credits import (
     get_job_stats,
 )
 from utils.experiments import ExperimentTree
+from utils import copilot_login
+from utils.provider_credentials import (
+    delete_provider_configuration,
+    load_provider_credentials,
+    provider_configuration,
+    save_provider_configuration,
+)
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
@@ -111,6 +121,52 @@ UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
 # Users whose runs are publicly accessible (can be queried by anyone)
 PUBLIC_USERS = {"samples"}
 
+_FALLBACK_MODEL_PRICES = (
+    ("opus", 5.0, 25.0),
+    ("sonnet", 3.0, 15.0),
+    ("haiku", 1.0, 5.0),
+    ("gpt-5.4", 2.5, 15.0),
+    ("gpt-5", 0.25, 2.0),
+    ("gemini-3", 0.5, 3.0),
+)
+
+
+def _estimate_local_copilot_cost(job_path: Path, metadata: dict | None) -> float | None:
+    """Estimate API-equivalent USD from actual local Copilot token events."""
+    if (metadata or {}).get("llm_provider") != "copilot":
+        return None
+    events_path = job_path / "output" / "llm_usage_events.jsonl"
+    if not events_path.is_file():
+        return None
+    pricing = (metadata or {}).get("model_pricing") or {}
+    total_cost = 0.0
+    event_count = 0
+    for line in events_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        usage = event.get("usage") or {}
+        prompt_tokens = max(0, int(usage.get("prompt_tokens") or 0))
+        completion_tokens = max(0, int(usage.get("completion_tokens") or 0))
+        if prompt_tokens == 0 and completion_tokens == 0:
+            continue
+        model = str(event.get("model") or "")
+        model_price = pricing.get(model) or {}
+        input_rate = model_price.get("input_per_million_usd")
+        output_rate = model_price.get("output_per_million_usd")
+        if not isinstance(input_rate, (int, float)) or not isinstance(
+            output_rate, (int, float)
+        ):
+            _, input_rate, output_rate = next(
+                (entry for entry in _FALLBACK_MODEL_PRICES if entry[0] in model.lower()),
+                ("default", 3.0, 15.0),
+            )
+        total_cost += (prompt_tokens / 1_000_000) * input_rate
+        total_cost += (completion_tokens / 1_000_000) * output_rate
+        event_count += 1
+    return round(total_cost, 6) if event_count else None
+
 # AutoDiscovery's own frontend base URL, used to build a link back to the
 # source experiment when handing a user off to Asta.
 AUTODISCOVERY_BASE_URL = os.environ.get("AUTODISCOVERY_BASE_URL", "https://autodiscovery.allen.ai")
@@ -178,6 +234,216 @@ def create() -> Blueprint:
                 "hosted_features": not is_local,
             }
         )
+
+    def local_provider_configuration() -> dict:
+        """Return fast, secret-free provider configuration state."""
+        configured_by_env = any(
+            os.environ.get(name) for name in ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
+        )
+        configured_in_keychain = False
+        copilot_home = Path(
+            os.environ.get(
+                "AUTODISCOVERY_COPILOT_HOME",
+                Path.home() / ".copilot" / "autodiscovery",
+            )
+        )
+        if os.uname().sysname == "Darwin":
+            result = subprocess.run(
+                ["security", "find-generic-password", "-s", "copilot-cli"],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=5,
+            )
+            configured_in_keychain = result.returncode == 0 and (
+                copilot_home / "config.json"
+            ).is_file()
+        return {
+            "copilot": {"configured": configured_by_env or configured_in_keychain},
+            **provider_configuration(),
+        }
+
+    @api.route("/providers", methods=["GET"])
+    def providers():
+        """Return provider readiness without credentials or account identifiers."""
+        config = JobConfig.from_env()
+        if config.backend == "local":
+            load_provider_credentials()
+        openai_ready = bool(os.environ.get("OPENAI_API_KEY"))
+        vertex_ready = bool(
+            os.environ.get("VERTEX_ACCESS_TOKEN")
+            or os.environ.get("GOOGLE_OAUTH_ACCESS_TOKEN")
+        )
+        current_models = []
+        if openai_ready:
+            current_models.extend(["gpt-4o", "o4-mini"])
+        if vertex_ready:
+            current_models.append("gemini-3-flash-preview")
+        current_ready = openai_ready or vertex_ready
+        provider_list = [
+            {
+                "id": "current",
+                "name": "OpenAI / Google Vertex",
+                "status": "ready" if current_ready else "error",
+                "code": "READY" if current_ready else "CREDENTIALS_REQUIRED",
+                "message": (
+                    "External OpenAI or Google Vertex credentials are available."
+                    if current_ready
+                    else "No OpenAI or Google Vertex credentials were detected."
+                ),
+                "remediation": None if current_ready else "Configure provider credentials.",
+                "embedding_ready": openai_ready,
+                "models": [{"id": model, "name": model, "vision": True} for model in current_models],
+            }
+        ]
+        copilot_configured = (
+            config.backend != "local"
+            or local_provider_configuration()["copilot"]["configured"]
+        )
+        if not copilot_configured:
+            provider_list.append(
+                {
+                    "id": "copilot",
+                    "name": "GitHub Copilot",
+                    "status": "error",
+                    "code": "AUTH_REQUIRED",
+                    "message": "Copilot is not connected.",
+                    "remediation": "Connect GitHub Copilot in Settings.",
+                    "embedding_ready": False,
+                    "models": [],
+                }
+            )
+        else:
+            from autodiscovery.copilot import doctor
+
+            diagnostic = doctor()
+            provider_list.append(
+                {
+                    "id": "copilot",
+                    "name": "GitHub Copilot",
+                    "status": diagnostic["status"],
+                    "code": diagnostic["code"],
+                    "message": diagnostic["message"],
+                    "remediation": diagnostic["remediation"],
+                    "embedding_ready": diagnostic["status"] == "ready",
+                    "models": diagnostic["models"],
+                }
+            )
+        return jsonify({"providers": provider_list})
+
+    @api.route("/providers/configuration", methods=["GET"])
+    @requires_auth()
+    def get_provider_configuration():
+        if JobConfig.from_env().backend != "local":
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"providers": local_provider_configuration()})
+
+    @api.route("/providers/<provider>/configuration", methods=["PUT", "DELETE"])
+    @requires_auth()
+    def configure_provider(provider: str):
+        if JobConfig.from_env().backend != "local":
+            return jsonify({"error": "Not found"}), 404
+        try:
+            if request.method == "DELETE":
+                delete_provider_configuration(provider)
+            else:
+                save_provider_configuration(provider, request.get_json(silent=True) or {})
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"providers": local_provider_configuration()})
+
+    @api.route("/providers/copilot/login", methods=["POST"])
+    @requires_auth()
+    def start_copilot_login():
+        config = JobConfig.from_env()
+        if config.backend != "local":
+            return jsonify({"error": "Not found"}), 404
+        executable = os.environ.get("COPILOT_CLI_PATH") or shutil.which("copilot")
+        if not executable or not Path(executable).is_file():
+            return jsonify({"error": "Copilot CLI is not installed"}), 409
+        return jsonify(copilot_login.start(executable, config.local_root)), 202
+
+    @api.route("/providers/copilot/login", methods=["GET"])
+    @requires_auth()
+    def copilot_login_status():
+        if JobConfig.from_env().backend != "local":
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(copilot_login.status())
+
+    @api.route("/providers/copilot/configuration", methods=["DELETE"])
+    @requires_auth()
+    def disconnect_copilot():
+        if JobConfig.from_env().backend != "local":
+            return jsonify({"error": "Not found"}), 404
+        if any(os.environ.get(name) for name in ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")):
+            return jsonify({"error": "Copilot authentication is supplied by an environment variable"}), 409
+        if os.uname().sysname != "Darwin":
+            return jsonify({"error": "Copilot disconnect is only available on macOS"}), 501
+        while True:
+            result = subprocess.run(
+                ["security", "delete-generic-password", "-s", "copilot-cli"],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            if result.returncode != 0:
+                break
+        return jsonify({"message": "Copilot disconnected"})
+
+    def get_local_storage():
+        manager = get_job_manager()
+        if manager.config.backend != "local" or manager.local_storage is None:
+            raise FileNotFoundError("Local dataset catalog is not available")
+        return manager.local_storage
+
+    @api.route("/local-datasets", methods=["GET"])
+    @requires_auth()
+    def list_local_datasets():
+        try:
+            storage = get_local_storage()
+        except FileNotFoundError:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(
+            {"datasets": storage.list_datasets(), "catalog_path": str(storage.datasets_root)}
+        )
+
+    @api.route("/local-datasets/browse", methods=["POST"])
+    @requires_auth()
+    def browse_local_dataset_folder():
+        try:
+            get_local_storage()
+        except FileNotFoundError:
+            return jsonify({"error": "Not found"}), 404
+        if os.uname().sysname != "Darwin":
+            return jsonify({"error": "Native folder selection is only available on macOS"}), 501
+        result = subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'POSIX path of (choose folder with prompt "Choose an AutoDiscovery dataset folder")',
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        return jsonify({"path": result.stdout.strip().rstrip("/") if result.returncode == 0 else None})
+
+    @api.route("/<runid>/local-datasets/import", methods=["POST"])
+    @requires_auth()
+    def import_local_dataset(runid: str):
+        body = request.get_json(silent=True) or {}
+        try:
+            files = get_local_storage().import_dataset_folder(
+                request.user.get("sub"),
+                runid,
+                dataset_name=body.get("dataset_name"),
+                source_path=body.get("source_path"),
+            )
+        except FileNotFoundError:
+            return jsonify({"error": "Not found"}), 404
+        except (PermissionError, ValueError) as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"files": files})
 
     @api.route("/create", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
@@ -449,7 +715,7 @@ def create() -> Blueprint:
         def _build_run_model(run_id: str) -> RunModel | None:
             # Parallelize I/O-heavy GCS calls to reduce tail latency.
             try:
-                run_details = get_run_details(req.userid, run_id)
+                run_details = get_run_details(req.userid, run_id, job_manager.config)
             except Exception as e:
                 app_logger.error(f"Failed to get run details for {run_id}: {e}")
                 run_details = None
@@ -510,6 +776,13 @@ def create() -> Blueprint:
                     run_metadata_model.parent_run_name if run_metadata_model else None
                 ),
                 dataset_expires_at=dataset_expires_at,
+                estimated_cost_usd=(
+                    _estimate_local_copilot_cost(
+                        Path(job_manager.get_job_path(req.userid, run_id)), metadata_dict
+                    )
+                    if job_manager.config.backend == "local"
+                    else None
+                ),
             )
 
         if sliced_run_ids:
@@ -570,10 +843,10 @@ def create() -> Blueprint:
             path = manager.get_job_path(req.userid, req.runid)
 
             try:
-                run_details = refresh_run_status(req.userid, req.runid)
+                run_details = refresh_run_status(req.userid, req.runid, manager.config)
             except Exception as e:
                 current_app.logger.error(f"Failed to refresh run status for {req.runid}: {e}")
-                run_details = get_run_details(req.userid, req.runid)
+                run_details = get_run_details(req.userid, req.runid, manager.config)
 
             # Drafts have no output, and the hosted stats helper would otherwise query GCS.
             if manager.config.backend == "local" and not (
@@ -644,6 +917,11 @@ def create() -> Blueprint:
                     run_metadata_model.parent_run_name if run_metadata_model else None
                 ),
                 dataset_expires_at=dataset_expires_at,
+                estimated_cost_usd=(
+                    _estimate_local_copilot_cost(Path(path), metadata_dict)
+                    if manager.config.backend == "local"
+                    else None
+                ),
             )
 
             return jsonify(run_model.model_dump()), 200

@@ -43,6 +43,7 @@ export type Run = {
     datasetExpiresAt?: string | null;
     /** Whether the user has permission to use Asta exploration features */
     canExploreWithAsta?: boolean;
+    estimatedCostUSD?: number | null;
 };
 
 export type RunStats = {
@@ -125,6 +126,13 @@ export type Metadata = {
     evidenceWeight?: number | null;
     warmstartExperiments?: string | null;
     nWarmstart?: number | null;
+    llmProvider?: 'current' | 'copilot' | null;
+    embeddingProvider?: 'current' | 'copilot' | null;
+    model?: string | null;
+    beliefModel?: string | null;
+    visionModel?: string | null;
+    embeddingModel?: string | null;
+    embeddingDimensions?: number | null;
     // Lineage
     parentRunId?: string | null;
     parentRunName?: string | null;
@@ -146,6 +154,7 @@ export const getRunFromApi = (runFromApi: RunFromApi): Run => {
         parentRunName: runFromApi.parent_run_name ?? null,
         datasetExpiresAt: runFromApi.dataset_expires_at ?? null,
         canExploreWithAsta: runFromApi.can_explore_with_asta ?? false,
+        estimatedCostUSD: runFromApi.estimated_cost_usd ?? null,
     };
 };
 
@@ -231,6 +240,13 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         evidenceWeight: metadataFromApi.evidence_weight,
         warmstartExperiments: metadataFromApi.warmstart_experiments,
         nWarmstart: metadataFromApi.n_warmstart,
+        llmProvider: metadataFromApi.llm_provider,
+        embeddingProvider: metadataFromApi.embedding_provider,
+        model: metadataFromApi.model,
+        beliefModel: metadataFromApi.belief_model,
+        visionModel: metadataFromApi.vision_model,
+        embeddingModel: metadataFromApi.embedding_model,
+        embeddingDimensions: metadataFromApi.embedding_dimensions,
         // Lineage
         parentRunId: metadataFromApi.parent_run_id ?? null,
         parentRunName: metadataFromApi.parent_run_name ?? null,

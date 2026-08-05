@@ -1,0 +1,73 @@
+{
+  "name": "autodiscovery-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AutoDiscovery desktop shell for macOS",
+  "author": "Allen Institute for Artificial Intelligence",
+  "main": "src/main.js",
+  "scripts": {
+    "build:ui": "API_ORIGIN=http://127.0.0.1:61551 ../ui/node_modules/.bin/next build ../ui && node scripts/assemble-ui.js",
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "pack:arm64": "npm run build:ui && electron-builder --mac dir --arm64"
+  },
+  "devDependencies": {
+    "electron": "37.2.6",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "org.allenai.autodiscovery",
+    "productName": "AutoDiscovery",
+    "asar": true,
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../ui/.next/standalone",
+        "to": "app/ui"
+      },
+      {
+        "from": "../api",
+        "to": "app/api",
+        "filter": [
+          "**/*",
+          "!tests/**",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../packages",
+        "to": "app/packages",
+        "filter": [
+          "*/pyproject.toml",
+          "*/README.md",
+          "*/LICENSE",
+          "*/src/**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "category": "public.app-category.productivity"
+    }
+  },
+  "allowScripts": {
+    "electron@37.2.6": true
+  }
+}

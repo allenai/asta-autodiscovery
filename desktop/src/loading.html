@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AutoDiscovery</title>
+    <style>
+      body { align-items: center; background: #102d2f; color: #f5f4ea; display: flex; font: 18px Lato, sans-serif; height: 100vh; justify-content: center; margin: 0; }
+      main { max-width: 34rem; padding: 2rem; text-align: center; }
+      h1 { font: 600 28px Manrope, sans-serif; margin: 0 0 1rem; }
+      p { color: #d5e2db; line-height: 1.5; }
+      .error { color: #ffb4ab; }
+    </style>
+  </head>
+  <body>
+    <main><h1>AutoDiscovery</h1><p id="status">Preparing the local runtime...</p></main>
+    <script>
+      window.autodiscoveryDesktop.onBootstrapStatus(({ message, level }) => {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = level === 'error' ? 'error' : '';
+      });
+    </script>
+  </body>
+</html>

@@ -366,7 +366,7 @@ function NoneAuthProvider({ children }: { children: ReactNode }) {
             loginWithRedirect: async () => {},
             logout: () => {},
             getAccessToken: async () => '',
-            canExploreWithAsta: true,
+            canExploreWithAsta: false,
             authError: null,
             provider: 'none',
         }),

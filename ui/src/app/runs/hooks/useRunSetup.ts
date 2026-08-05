@@ -6,7 +6,7 @@ import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi, LocalDatasetFile, LocalDatasetInfo, ProviderInfo } from '@/api/RunsApi';
-import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
+import { getMetadataFromApi, getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
@@ -156,7 +156,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const [isSelectingLocalDataset, setIsSelectingLocalDataset] = useState(false);
     const [localDatasetError, setLocalDatasetError] = useState<string | null>(null);
 
-    useEffect(() => {
+    const refreshProviders = useCallback(() => {
         api.getProviders()
             .then(({ data }) => setProviders(data.providers))
             .catch((error) => {
@@ -164,6 +164,12 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 setProviders([]);
             });
     }, [api]);
+
+    useEffect(() => {
+        refreshProviders();
+        window.addEventListener('focus', refreshProviders);
+        return () => window.removeEventListener('focus', refreshProviders);
+    }, [refreshProviders]);
 
     useEffect(() => {
         if (!isLocal) return;
@@ -195,97 +201,114 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     // Fetch run metadata on mount and prepopulate form
     useEffect(() => {
         const fetchRunMetadata = async () => {
+            if (isRuntimeLoading) return;
             setIsLoading(true);
             try {
-                // No userid needed - API will use authenticated user
-                const { data } = await api.getRun({ runId: runid });
-                setHasAi1Permission(!isLocal && (data.can_view_datasets ?? false));
-                const run = getRunFromApi(data);
-                const { metadata } = run;
+                let metadata: ReturnType<typeof getMetadataFromApi>;
+                if (isLocal) {
+                    const { data } = await api.getRunMetadata({ runid });
+                    metadata = getMetadataFromApi(data.metadata);
+                    setHasAi1Permission(false);
+                } else {
+                    const { data } = await api.getRun({ runId: runid });
+                    setHasAi1Permission(data.can_view_datasets ?? false);
+                    metadata = getRunFromApi(data).metadata ?? null;
+                }
 
                 if (metadata) {
+                    const loadedMetadata = metadata;
                     setSettings((prev) => ({
                         ...prev,
-                        name: metadata.name || '',
-                        datasetsDescription: metadata.description || '',
-                        domain: metadata.domain || '',
-                        intent: metadata.intent || '',
-                        nExperiments: metadata.nExperiments ?? prev.nExperiments,
-                        explorationWeight: metadata.explorationWeight ?? prev.explorationWeight,
-                        mctsSelection: metadata.mctsSelection ?? prev.mctsSelection,
-                        surprisalWidth: metadata.surprisalWidth ?? prev.surprisalWidth,
-                        evidenceWeight: metadata.evidenceWeight ?? prev.evidenceWeight,
+                        name: loadedMetadata.name || '',
+                        datasetsDescription: loadedMetadata.description || '',
+                        domain: loadedMetadata.domain || '',
+                        intent: loadedMetadata.intent || '',
+                        nExperiments: loadedMetadata.nExperiments ?? prev.nExperiments,
+                        explorationWeight:
+                            loadedMetadata.explorationWeight ?? prev.explorationWeight,
+                        mctsSelection: loadedMetadata.mctsSelection ?? prev.mctsSelection,
+                        surprisalWidth: loadedMetadata.surprisalWidth ?? prev.surprisalWidth,
+                        evidenceWeight: loadedMetadata.evidenceWeight ?? prev.evidenceWeight,
                         warmstartExperiments:
-                            metadata.warmstartExperiments ?? prev.warmstartExperiments,
-                        nWarmstart: metadata.nWarmstart ?? prev.nWarmstart,
-                        llmProvider: isLocal ? 'copilot' : metadata.llmProvider ?? prev.llmProvider,
+                            loadedMetadata.warmstartExperiments ?? prev.warmstartExperiments,
+                        nWarmstart: loadedMetadata.nWarmstart ?? prev.nWarmstart,
+                        llmProvider: isLocal
+                            ? 'copilot'
+                            : loadedMetadata.llmProvider ?? prev.llmProvider,
                         embeddingProvider: isLocal
                             ? 'copilot'
-                            : metadata.embeddingProvider ?? prev.embeddingProvider,
+                            : loadedMetadata.embeddingProvider ?? prev.embeddingProvider,
                         model: isLocal
-                            ? !metadata.model ||
-                              metadata.llmProvider === 'current' ||
-                              metadata.model === 'claude-haiku-4.5'
+                            ? !loadedMetadata.model ||
+                              loadedMetadata.llmProvider === 'current' ||
+                              loadedMetadata.model === 'claude-haiku-4.5'
                                 ? 'claude-sonnet-4.6'
-                                : metadata.model
-                            : metadata.model ?? prev.model,
+                                : loadedMetadata.model
+                            : loadedMetadata.model ?? prev.model,
                         beliefModel: isLocal
-                            ? !metadata.beliefModel ||
-                              metadata.llmProvider === 'current' ||
-                              metadata.beliefModel === 'claude-haiku-4.5'
+                            ? !loadedMetadata.beliefModel ||
+                              loadedMetadata.llmProvider === 'current' ||
+                              loadedMetadata.beliefModel === 'claude-haiku-4.5'
                                 ? 'claude-sonnet-4.6'
-                                : metadata.beliefModel
-                            : metadata.beliefModel ?? prev.beliefModel,
+                                : loadedMetadata.beliefModel
+                            : loadedMetadata.beliefModel ?? prev.beliefModel,
                         visionModel: isLocal
-                            ? !metadata.visionModel ||
-                              metadata.llmProvider === 'current' ||
-                              metadata.visionModel === 'claude-haiku-4.5'
+                            ? !loadedMetadata.visionModel ||
+                              loadedMetadata.llmProvider === 'current' ||
+                              loadedMetadata.visionModel === 'claude-haiku-4.5'
                                 ? 'claude-sonnet-4.6'
-                                : metadata.visionModel
-                            : metadata.visionModel ?? prev.visionModel,
+                                : loadedMetadata.visionModel
+                            : loadedMetadata.visionModel ?? prev.visionModel,
                         embeddingModel: isLocal
                             ? 'text-embedding-3-small'
-                            : metadata.embeddingModel ?? prev.embeddingModel,
+                            : loadedMetadata.embeddingModel ?? prev.embeddingModel,
                         embeddingDimensions: isLocal
                             ? 1536
-                            : metadata.embeddingDimensions ?? prev.embeddingDimensions,
-                        parentRunId: metadata.parentRunId ?? null,
-                        parentRunName: metadata.parentRunName ?? null,
+                            : loadedMetadata.embeddingDimensions ?? prev.embeddingDimensions,
+                        parentRunId: loadedMetadata.parentRunId ?? null,
+                        parentRunName: loadedMetadata.parentRunName ?? null,
                     }));
 
                     // Populate fileUploads from saved datasets
-                    if (metadata?.datasets && metadata.datasets.length > 0) {
-                        const uploadStates: FileUploadState[] = metadata.datasets.map((dataset) => {
-                            // Use saved content_type and file_size_bytes if available
-                            const contentType = dataset.contentType || 'application/octet-stream';
-                            const fileSize = dataset.fileSizeBytes || 0;
+                    if (loadedMetadata.datasets && loadedMetadata.datasets.length > 0) {
+                        const uploadStates: FileUploadState[] = loadedMetadata.datasets.map(
+                            (dataset) => {
+                                // Use saved content_type and file_size_bytes if available
+                                const contentType =
+                                    dataset.contentType || 'application/octet-stream';
+                                const fileSize = dataset.fileSizeBytes || 0;
 
-                            // Create placeholder File object from filename
-                            // The actual file content is already in GCS, so we just need the metadata
-                            const placeholderFile = new File([], dataset.name.split('/').pop()!, {
-                                type: contentType,
-                            });
+                                // Create placeholder File object from filename
+                                // The actual file content is already in GCS, so we just need the metadata
+                                const placeholderFile = new File(
+                                    [],
+                                    dataset.name.split('/').pop()!,
+                                    {
+                                        type: contentType,
+                                    }
+                                );
 
-                            return {
-                                file: placeholderFile,
-                                relativePath: dataset.name,
-                                description: dataset.description || '',
-                                status: UploadStatus.COMPLETED,
-                                progress: 100,
-                                uploadedBytes: fileSize,
-                                totalBytes: fileSize,
-                                secondsRemaining: 0,
-                                uploadStartTime: null,
-                                uploadUrl: null,
-                                gcsPath: null, // Could reconstruct from userid/runid/filename if needed
-                                error: null,
-                                abortController: null,
-                            };
-                        });
+                                return {
+                                    file: placeholderFile,
+                                    relativePath: dataset.name,
+                                    description: dataset.description || '',
+                                    status: UploadStatus.COMPLETED,
+                                    progress: 100,
+                                    uploadedBytes: fileSize,
+                                    totalBytes: fileSize,
+                                    secondsRemaining: 0,
+                                    uploadStartTime: null,
+                                    uploadUrl: null,
+                                    gcsPath: null, // Could reconstruct from userid/runid/filename if needed
+                                    error: null,
+                                    abortController: null,
+                                };
+                            }
+                        );
 
                         setFileUploads(uploadStates);
                         if (isLocal) {
-                            setActiveLocalDataset(metadata.datasets[0].name.split('/')[0]);
+                            setActiveLocalDataset(loadedMetadata.datasets[0].name.split('/')[0]);
                         }
                     }
                 }
@@ -297,7 +320,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         };
 
         fetchRunMetadata();
-    }, [runid, api]);
+    }, [runid, api, isLocal, isRuntimeLoading]);
 
     // Warn user before leaving page if uploads are in progress
     useEffect(() => {
@@ -737,68 +760,75 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         setFormError(null);
     };
 
-    const saveMetadata = useCallback(async () => {
-        const saveStartTime = Date.now();
-        setIsSaving(true);
-
-        try {
-            // Use refs to get latest state
-            const currentSettings = settingsRef.current;
-            const datasets = getCombinedDatasets();
-            const modelPricing = Object.fromEntries(
-                (
-                    providers.find((provider) => provider.id === currentSettings.llmProvider)
-                        ?.models || []
-                )
-                    .filter((model) => model.pricing)
-                    .map((model) => [model.id, model.pricing!])
-            );
-
-            const metadata = {
-                // Descriptive metadata
-                name: currentSettings.name.trim(),
-                description: currentSettings.datasetsDescription.trim(),
-                domain: currentSettings.domain.trim(),
-                intent: currentSettings.intent.trim(),
-                datasets,
-                // Job configuration parameters
-                n_experiments: currentSettings.nExperiments,
-                exploration_weight: currentSettings.explorationWeight,
-                mcts_selection: currentSettings.mctsSelection,
-                surprisal_width: currentSettings.surprisalWidth,
-                evidence_weight: currentSettings.evidenceWeight,
-                warmstart_experiments: currentSettings.warmstartExperiments,
-                n_warmstart: currentSettings.nWarmstart,
-                llm_provider: currentSettings.llmProvider,
-                embedding_provider: currentSettings.embeddingProvider,
-                model: currentSettings.model,
-                belief_model: currentSettings.beliefModel,
-                vision_model: currentSettings.visionModel,
-                embedding_model: currentSettings.embeddingModel,
-                embedding_dimensions: currentSettings.embeddingDimensions,
-                model_pricing: modelPricing,
-                // Lineage
-                lineage: {
-                    parent_run_id: currentSettings.parentRunId ?? null,
-                    parent_run_name: currentSettings.parentRunName ?? null,
-                },
-            };
-
-            await api.saveMetadata(runid, metadata);
-        } finally {
-            // Ensure indicator shows for at least 1000ms
-            const elapsed = Date.now() - saveStartTime;
-            const remainingTime = Math.max(0, 1000 - elapsed);
-
-            if (savingTimeoutRef.current) {
-                clearTimeout(savingTimeoutRef.current);
+    const saveMetadata = useCallback(
+        async (showIndicator = true) => {
+            const saveStartTime = Date.now();
+            if (showIndicator) {
+                setIsSaving(true);
             }
 
-            savingTimeoutRef.current = setTimeout(() => {
-                setIsSaving(false);
-            }, remainingTime);
-        }
-    }, [api, runid, providers]);
+            try {
+                // Use refs to get latest state
+                const currentSettings = settingsRef.current;
+                const datasets = getCombinedDatasets();
+                const modelPricing = Object.fromEntries(
+                    (
+                        providers.find((provider) => provider.id === currentSettings.llmProvider)
+                            ?.models || []
+                    )
+                        .filter((model) => model.pricing)
+                        .map((model) => [model.id, model.pricing!])
+                );
+
+                const metadata = {
+                    // Descriptive metadata
+                    name: currentSettings.name.trim(),
+                    description: currentSettings.datasetsDescription.trim(),
+                    domain: currentSettings.domain.trim(),
+                    intent: currentSettings.intent.trim(),
+                    datasets,
+                    // Job configuration parameters
+                    n_experiments: currentSettings.nExperiments,
+                    exploration_weight: currentSettings.explorationWeight,
+                    mcts_selection: currentSettings.mctsSelection,
+                    surprisal_width: currentSettings.surprisalWidth,
+                    evidence_weight: currentSettings.evidenceWeight,
+                    warmstart_experiments: currentSettings.warmstartExperiments,
+                    n_warmstart: currentSettings.nWarmstart,
+                    llm_provider: currentSettings.llmProvider,
+                    embedding_provider: currentSettings.embeddingProvider,
+                    model: currentSettings.model,
+                    belief_model: currentSettings.beliefModel,
+                    vision_model: currentSettings.visionModel,
+                    embedding_model: currentSettings.embeddingModel,
+                    embedding_dimensions: currentSettings.embeddingDimensions,
+                    model_pricing: modelPricing,
+                    // Lineage
+                    lineage: {
+                        parent_run_id: currentSettings.parentRunId ?? null,
+                        parent_run_name: currentSettings.parentRunName ?? null,
+                    },
+                };
+
+                await api.saveMetadata(runid, metadata);
+            } finally {
+                if (showIndicator) {
+                    // Ensure indicator shows for at least 1000ms
+                    const elapsed = Date.now() - saveStartTime;
+                    const remainingTime = Math.max(0, 1000 - elapsed);
+
+                    if (savingTimeoutRef.current) {
+                        clearTimeout(savingTimeoutRef.current);
+                    }
+
+                    savingTimeoutRef.current = setTimeout(() => {
+                        setIsSaving(false);
+                    }, remainingTime);
+                }
+            }
+        },
+        [api, runid, providers]
+    );
 
     // Create debounced versions of save functions
     const debouncedSaveMetadata = useMemo(
@@ -901,17 +931,16 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     };
 
     const handleSubmit = async () => {
-        setIsSubmitting(true);
-
-        // Flush any pending debounced saves
-        debouncedSaveMetadata.flush();
-        debouncedSaveDatasetMetadata.flush();
-
         if (isFormInvalid()) {
             addErrorToast('Please complete the highlighted required fields.');
-            setIsSubmitting(false);
             return;
         }
+
+        setIsSubmitting(true);
+
+        // Submission persists one complete snapshot, so queued autosaves only create races.
+        debouncedSaveMetadata.cancel();
+        debouncedSaveDatasetMetadata.cancel();
 
         try {
             // Check if all uploads are complete
@@ -935,7 +964,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             }
 
             // Save metadata (includes all job configuration)
-            await saveMetadata();
+            await saveMetadata(false);
 
             // Submit run - backend reads configuration from metadata
             const response = await api.submitRun(runid);
@@ -953,6 +982,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             console.error('Error submitting run:', err);
             setFormError(err instanceof Error ? err.message : 'Failed to submit run');
         } finally {
+            if (savingTimeoutRef.current) {
+                clearTimeout(savingTimeoutRef.current);
+            }
+            setIsSaving(false);
             setIsSubmitting(false);
         }
     };

@@ -152,7 +152,7 @@ const Logo = styled('a')`
 
     html.autodiscovery-desktop & {
         padding-top: ${({ theme }) => theme.spacing(6)};
-        -webkit-app-region: no-drag;
+        -webkit-app-region: drag;
     }
 
     svg {

@@ -4,7 +4,6 @@ import { styled, Typography, Box, Stack, Button } from '@mui/material';
 import { Experiment, ExperimentStatus } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
 import { escapeMarkdown } from '@/runs/utils/ExperimentUtils';
-import { useAuth0 } from '@/contexts/Auth0Context';
 import { useRunExperiments } from '@/contexts/RunExperimentsContext';
 import { mkContinueExploringWithAstaBtnAttrs } from '@/analytics/runDetails';
 import { StatusChip } from '@/runs/components/StatusChip';
@@ -23,6 +22,8 @@ type ExperimentDetailsProps = {
     actions?: ReactNode;
     surprisalWidth?: number | null;
     datasetExpired?: boolean;
+    /** False when the deployment has no Asta context service configured. */
+    canExploreWithAsta?: boolean;
 };
 
 export const ExperimentDetails = memo(function ExperimentDetails({
@@ -31,8 +32,8 @@ export const ExperimentDetails = memo(function ExperimentDetails({
     actions,
     surprisalWidth,
     datasetExpired,
+    canExploreWithAsta,
 }: ExperimentDetailsProps) {
-    const { canExploreWithAsta } = useAuth0();
     const { isLoadingSelectedExperiment, selectedExperimentError } = useRunExperiments();
     const richOutputs = experiment.richOutputs ?? [];
     const hasRichOutputs = richOutputs.length > 0;

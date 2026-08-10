@@ -35,14 +35,18 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
+import subprocess
+import tempfile
 
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from autodiscovery.dataset import get_blade_description, get_dataset_description
 from autodiscovery.run import _theoretical_max_boolean_cat
 
 # --- Prompts -----------------------------------------------------------------
@@ -209,8 +213,35 @@ def verdict_label(row: pd.Series) -> str:
     return "likely true"
 
 
-def dataset_context(row: pd.Series) -> str:
-    """Study/domain/dataset description block (no execution artifacts)."""
+def _read_metadata_to_local(path: str) -> tuple[str, str | None]:
+    """Return (local_path, tmpdir). Downloads gs:// paths; passes local through.
+    Mirrors build_dataset_task_data.py so the two builders localize identically."""
+    if not path.startswith("gs://"):
+        return path, None
+    tmp = tempfile.mkdtemp(prefix="lineage_ds_")
+    local = os.path.join(tmp, os.path.basename(path))
+    subprocess.run(["gcloud", "storage", "cp", path, local], check=True, capture_output=True)
+    return local, tmp
+
+
+def rich_description(meta_path: str, mtype: str) -> str:
+    """The real dataset description INCLUDING the per-column schema, exactly as the
+    reward server / build_dataset_task_data.py render it (get_dataset_description for
+    dbench/asta, get_blade_description for blade). Reads only the metadata JSON's
+    ``datasets[].columns`` -- no data files are loaded."""
+    if mtype == "blade":
+        return get_blade_description(meta_path)
+    return get_dataset_description(meta_path)  # dbench / asta
+
+
+def dataset_context(row: pd.Series, rich_desc: str | None = None) -> str:
+    """Study/domain/dataset description block (no execution artifacts).
+
+    When ``rich_desc`` is given (the real get_dataset_description output, which lists
+    each dataset's actual columns + descriptions) it replaces the prose dataset
+    summary, so the policy conditions on the true schema instead of guessing column
+    names. Falls back to the dataset-level names/descriptions carried on the node row.
+    """
     parts = []
     if clean(row["job_name"]):
         parts.append(f"Study: {clean(row['job_name'])}")
@@ -221,6 +252,9 @@ def dataset_context(row: pd.Series) -> str:
     if clean(row["job_intent"]):
         parts.append(f"Research intent: {clean(row['job_intent'])}")
     header = "\n".join(parts) if parts else "Open-ended data-driven exploration."
+
+    if rich_desc and rich_desc.strip():
+        return header + "\n\n" + rich_desc.strip()
 
     names = as_list(row["dataset_names"])
     descs = as_list(row["dataset_descriptions"])
@@ -314,21 +348,51 @@ def drop_fully_invalid_runs(df: pd.DataFrame) -> pd.DataFrame:
     return df[df["job_id"].isin(valid_jobs)].reset_index(drop=True)
 
 
-def build_samples(df: pd.DataFrame, fmt_key: str, width: float) -> list[dict]:
-    """Build all training samples for one format."""
+def target_has_valid_surprise_verdict(r: pd.Series) -> bool:
+    """True iff the target node carries BOTH a valid surprise score and verdict.
+
+    Surprise needs a non-null ``belief_shift_empirical`` (so |normalized surprisal|
+    is defined); verdict needs a non-null ``posterior_empirical_mean``. These are
+    exactly the nodes whose surprise/verdict render as a real value (not ``n/a``).
+    """
+    return abs_normalized_surprisal(r) is not None and verdict_label(r) != "n/a"
+
+
+def build_samples(
+    df: pd.DataFrame,
+    fmt_key: str,
+    width: float,
+    require_valid_target: bool = False,
+    require_valid_history: bool = False,
+    desc_by_id: dict[str, str] | None = None,
+) -> list[dict]:
+    """Build all training samples for one format.
+
+    ``require_valid_target``: only emit target nodes with a valid surprise score
+    AND verdict. ``require_valid_history``: additionally drop any sample whose
+    rendered ancestor history contains an unscored (``n/a``) hypothesis, so every
+    emitted prompt has a complete surprise+verdict context end to end.
+    """
     spec = FORMATS[fmt_key]
     by_job = build_lineage_index(df)
     samples: list[dict] = []
+    skipped_invalid = 0
     for row in df.sort_values(["job_id", "level", "index"]).itertuples(index=False):
         r = pd.Series(row._asdict())
         if int(r["level"]) <= 1 or not clean(r["hypothesis"]):
             continue  # level-1 data-loading roots are not hypotheses
+        if require_valid_target and not target_has_valid_surprise_verdict(r):
+            skipped_invalid += 1
+            continue  # drop targets whose own surprise/verdict is n/a
         ancestors = ancestors_root_first(by_job, r["job_id"], r["node_id"])
         hist_hyps = [a for a in ancestors if clean(a["hypothesis"])]
+        if require_valid_history and not all(target_has_valid_surprise_verdict(a) for a in hist_hyps):
+            skipped_invalid += 1
+            continue  # drop samples whose rendered ancestor history has any n/a
         parent_hyp = clean(hist_hyps[-1]["hypothesis"]) if hist_hyps else ""
 
         user_content = (
-            dataset_context(r)
+            dataset_context(r, desc_by_id.get(str(r["job_id"])) if desc_by_id else None)
             + "\n\n"
             + history_block(ancestors, spec["scores"], spec.get("verdict", False))
             + "\n\n"
@@ -395,6 +459,20 @@ def main(argv: list[str] | None = None) -> None:
         help="|belief_shift| >= width counts as surprising. Default: %(default)s",
     )
     parser.add_argument(
+        "--registry",
+        default=None,
+        help="Optional dataset registry JSON (id -> {dataset_metadata, dataset_metadata_type}), "
+        "same format the reward server uses. When given, the REAL dataset description "
+        "(get_dataset_description, incl. the per-column schema) is injected into each "
+        "prompt's dataset block, keyed by node job_id, replacing the prose summary so the "
+        "policy sees actual column names instead of guessing them.",
+    )
+    parser.add_argument(
+        "--data-root",
+        default=None,
+        help="Substituted for ${DATA_ROOT} in the registry's metadata paths (local dir or gs://).",
+    )
+    parser.add_argument(
         "--formats",
         default=",".join(FORMATS),
         help="Comma-separated subset of formats to build. Default: all.",
@@ -405,6 +483,21 @@ def main(argv: list[str] | None = None) -> None:
         default=True,
         help="Drop only runs where no node has valid prior/posterior means (the whole "
         "run is unscored); runs with any valid node are kept. Default: on.",
+    )
+    parser.add_argument(
+        "--valid-surprise-verdict-only",
+        action="store_true",
+        help="Emit only target nodes that have BOTH a valid surprise score and a valid "
+        "verdict (drops targets whose own surprise/verdict is n/a). Ancestor history is "
+        "unchanged. Off by default.",
+    )
+    parser.add_argument(
+        "--valid-history-only",
+        action="store_true",
+        help="Stronger than --valid-surprise-verdict-only: also drop any sample whose "
+        "rendered ancestor history contains an n/a hypothesis, so every prompt has a "
+        "complete surprise+verdict chain. Applied on node validity uniformly, so "
+        "fmt1/fmt2/fmt3 emit the IDENTICAL sample set (only the prompt text differs).",
     )
     args = parser.parse_args(argv)
 
@@ -418,6 +511,35 @@ def main(argv: list[str] | None = None) -> None:
     df = df.drop_duplicates(subset=["job_id", "node_id"], keep="first").reset_index(drop=True)
     print(f"loaded {before:,} node rows -> {len(df):,} after dedup ({df['job_id'].nunique():,} jobs)")
 
+    # Optional: real column-level dataset descriptions, keyed by job_id, injected into
+    # the prompt in place of the prose summary (get_dataset_description, incl. columns).
+    desc_by_id: dict[str, str] = {}
+    if args.registry:
+        registry = json.load(open(args.registry))
+        n_ok = 0
+        for ds_id, ent in registry.items():
+            meta = ent["dataset_metadata"]
+            if args.data_root is not None:
+                meta = meta.replace("${DATA_ROOT}", args.data_root)
+            local = tmp = None
+            try:
+                local, tmp = _read_metadata_to_local(meta)
+                desc_by_id[ds_id] = rich_description(
+                    local, ent.get("dataset_metadata_type", "dbench")
+                ).strip()
+                n_ok += 1
+            except Exception as e:  # noqa: BLE001 - skip unresolvable datasets, keep prose fallback
+                print(f"  warn: no rich description for {ds_id}: {e}")
+            finally:
+                if tmp:
+                    subprocess.run(["rm", "-rf", tmp], check=False)
+        present = sum(1 for j in df["job_id"].unique() if str(j) in desc_by_id)
+        print(
+            f"registry: rich column-level descriptions for {n_ok}/{len(registry)} datasets "
+            f"({present}/{df['job_id'].nunique()} of this run's jobs matched by job_id; "
+            f"unmatched fall back to the prose summary)"
+        )
+
     if args.drop_fully_invalid_runs:
         jobs_before, rows_before = df["job_id"].nunique(), len(df)
         df = drop_fully_invalid_runs(df)
@@ -427,9 +549,18 @@ def main(argv: list[str] | None = None) -> None:
             f"{rows_before - len(df):,} nodes)"
         )
 
+    req_target = args.valid_surprise_verdict_only or args.valid_history_only
+    req_history = args.valid_history_only
+    if req_history:
+        print("valid-history-only: emitting only samples with a fully-valid target AND ancestor history")
+    elif req_target:
+        print("valid-surprise-verdict-only: emitting ONLY target nodes with a valid surprise score AND verdict")
+
     os.makedirs(args.out_dir, exist_ok=True)
     for fmt_key in fmts:
-        samples = build_samples(df, fmt_key, args.surprisal_width)
+        samples = build_samples(
+            df, fmt_key, args.surprisal_width, req_target, req_history, desc_by_id
+        )
         out_path = os.path.join(args.out_dir, f"{args.prefix}{fmt_key}.parquet")
         write_parquet(samples, out_path)
         n_hist = np.array([s["metadata"]["n_history"] for s in samples])

@@ -63,15 +63,20 @@ SYSTEM_PROMPT = (
     "verifiable hypotheses. The hypothesis should be a falsifiable statement that can be "
     "sufficiently tested by an experiment using the provided data. Here are some instructions "
     "that you must follow:\n"
-    "1. Strictly use only the dataset(s) provided and do not simulate dummy/synthetic data or "
-    "columns that cannot be derived from the existing columns.\n"
+    "1. Use only the columns listed in the dataset description you are given — treat that list "
+    "as the complete and authoritative schema (there is no separate data file to open). You may define "
+    "composite variables, but only as explicit transformations of the listed columns. If your "
+    "hypothesis needs a variable that is not listed, do not invent it: either note that the "
+    "dataset lacks it and adjust, or derive it explicitly from listed columns.\n"
     "2. Each hypothesis should be creative, verifiable with a robust statistical test, and "
     "self-contained.\n"
     "3. Use the prior experiments/hypotheses as inspiration, but do not repeat them.\n\n"
     "A good approach: find an interesting context (e.g. a subset defined by categorical "
     "values), interesting variables (including composites derived from existing columns), and "
     "an interesting relationship between them; then make the hypothesis specific — naming the "
-    "outcome variable(s), the explanatory variable(s), and the expected direction."
+    "outcome variable(s), the explanatory variable(s), and the expected direction. Before "
+    "finalizing, check that every column you name appears verbatim in the provided schema; that "
+    "schema is your ground truth, so never state that you lack access to the data."
 )
 
 # Final generate prompt. fmt1/fmt2 use "open"; fmt3 uses "related". These mirror
@@ -80,7 +85,8 @@ SYSTEM_PROMPT = (
 # dump. {parent} is the most recent (deepest) ancestor hypothesis.
 GENERATE_PROMPT_OPEN = (
     "Given the hypotheses explored above, propose exactly ONE new, falsifiable hypothesis to "
-    "test next. Return only the hypothesis statement."
+    "test next, using only the columns listed in the dataset description or quantities derived "
+    "from them. Return only the hypothesis statement."
 )
 GENERATE_PROMPT_RELATED = (
     "Given the hypotheses explored above, propose exactly ONE new, falsifiable hypothesis that "
@@ -95,7 +101,8 @@ GENERATE_PROMPT_RELATED = (
 # to, so all formats fall back to this neutral prompt.
 GENERATE_PROMPT_COLDSTART = (
     "Propose exactly ONE new, falsifiable hypothesis grounded in the dataset(s) described "
-    "above. Return only the hypothesis statement."
+    "above, using only the listed columns or quantities you derive from them. "
+    "Return only the hypothesis statement."
 )
 
 FORMATS = {
@@ -251,7 +258,10 @@ def dataset_context(row: pd.Series, rich_desc: str | None = None) -> str:
         parts.append(f"Description: {clean(row['job_description'])}")
     if clean(row["job_intent"]):
         parts.append(f"Research intent: {clean(row['job_intent'])}")
-    header = "\n".join(parts) if parts else "Open-ended data-driven exploration."
+    header = "\n".join(parts) if parts else (
+        "Explore the dataset(s) described below to propose one new, falsifiable "
+        "hypothesis they can be used to test."
+    )
 
     if rich_desc and rich_desc.strip():
         return header + "\n\n" + rich_desc.strip()

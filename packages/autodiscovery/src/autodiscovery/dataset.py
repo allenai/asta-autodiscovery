@@ -118,7 +118,9 @@ def get_dataset_description(dataset_metadata_path: str) -> str:
     description.append("##### DATASET DESCRIPTION #####")
     # Add dataset info
     description.append("\n### DATASETS: ###\n")
-    for dataset in metadata["datasets"]:
+    for i, dataset in enumerate(metadata["datasets"]):
+        if i > 0:
+            description.append("")  # blank line separating consecutive datasets
         description.append(f"Dataset Name: {dataset['name']}")
         if dataset.get("description"):
             description.append(f"Dataset Description: {dataset['description']}")
@@ -147,7 +149,9 @@ def get_asta_description(dataset_metadata_path: str) -> str:
     description.append(metadata.get("description", ""))
     # Add dataset info
     description.append("\n### DATASETS: ###\n")
-    for dataset in metadata["datasets"]:
+    for i, dataset in enumerate(metadata["datasets"]):
+        if i > 0:
+            description.append("")  # blank line separating consecutive datasets
         description.append(f"Dataset Name: {dataset['name']}")
         if dataset.get("description"):
             description.append(f"Dataset Description: {dataset['description']}")

@@ -66,7 +66,7 @@ export default function CreditsChip() {
                         </li>
                         <li>
                             <strong>Expiration:</strong> Credits are valid until{' '}
-                            <strong>July 31st, 2026</strong>.
+                            <strong>December 31st, 2026</strong>.
                         </li>
                     </ul>
 

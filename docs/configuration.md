@@ -201,12 +201,16 @@ Used by the completion-email maintenance job to notify users when runs finish.
 
 Configures the "dig deeper" handoff that sends an experiment's context to Asta.
 
+Both `ASTA_CONTEXT_SERVICE_URL` and `ASTA_CONTEXT_SERVICE_API_KEY` must be set to enable it. With
+either missing the feature is off: the UI hides the "Continue exploring with Asta" entry points and
+the API returns `503` from the handoff endpoint. The rest of the app is unaffected.
+
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `AUTODISCOVERY_BASE_URL` | No | `https://autodiscovery.allen.ai` | Base URL of this app, used to build the AutoDiscovery run link included in the Asta handoff. |
 | `ASTA_BASE_URL` | No | `https://asta.allen.ai` | Base URL used to build Asta chat links returned to the UI. |
 | `ASTA_CONTEXT_SERVICE_URL` | No | *(empty — feature disabled)* | URL of the context service that stores handoff artifacts and metadata. |
-| `ASTA_CONTEXT_SERVICE_API_KEY` | No | *(empty)* | API key for the context service. |
+| `ASTA_CONTEXT_SERVICE_API_KEY` | No | *(empty — feature disabled)* | API key for the context service. |
 | `ASTA_BUCKET` | No | `example-workspaces-project` | Bucket the handoff copies dataset files into for Asta to load. |
 
 ## Frontend (UI)

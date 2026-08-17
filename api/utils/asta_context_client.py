@@ -24,6 +24,16 @@ ASTA_CONTEXT_SERVICE_API_KEY = os.environ.get("ASTA_CONTEXT_SERVICE_API_KEY", ""
 MAX_DIRECT_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
+def is_configured() -> bool:
+    """Whether the Asta handoff is usable in this deployment.
+
+    AutoDiscovery is open source and runs in deployments with no Asta backing
+    it, so every entry point into the handoff is gated on this: the UI hides
+    the feature and the API refuses the call rather than failing mid-flight.
+    """
+    return bool(ASTA_CONTEXT_SERVICE_URL and ASTA_CONTEXT_SERVICE_API_KEY)
+
+
 def _base() -> str:
     if not ASTA_CONTEXT_SERVICE_URL:
         raise RuntimeError("ASTA_CONTEXT_SERVICE_URL is not configured")

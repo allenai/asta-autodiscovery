@@ -97,7 +97,7 @@ class ModalSandboxExecutor(CodeExecutor):
         backend,
         timeout: int = 30 * 60,
         vision_model: str = "gpt-4o",
-        llm_provider: str = "current",
+        llm_provider: str | None = None,
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
@@ -661,7 +661,7 @@ def get_openai_config(
 def get_agents(
     work_dir,
     model_name="o4-mini",
-    llm_provider="current",
+    llm_provider: str | None = None,
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -679,7 +679,7 @@ def get_agents(
     Args:
         work_dir: Working directory for code execution.
         model_name: Model used for AG2 conversational agents.
-        llm_provider: LLM provider. ``current`` preserves OpenAI/Vertex routing.
+        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
         branching_factor: Number of experiment candidates to request.
@@ -695,7 +695,7 @@ def get_agents(
     Returns:
         Dictionary mapping agent name to agent instance.
     """
-    if llm_provider not in {"current", "copilot"}:
+    if llm_provider not in {None, "copilot"}:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
     if llm_provider == "copilot" and backend == "local":
         raise ValueError(

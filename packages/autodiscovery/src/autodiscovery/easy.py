@@ -195,13 +195,13 @@ def build_parser() -> argparse.ArgumentParser:
     adv.add_argument("--vision_model", type=str, default="gemini-3.1-pro-preview")
     adv.add_argument(
         "--llm_provider",
-        choices=["current", "copilot"],
-        default="current",
+        choices=["copilot"],
+        default=None,
     )
     adv.add_argument(
         "--embedding_provider",
-        choices=["current", "copilot"],
-        default="current",
+        choices=["copilot"],
+        default=None,
     )
     adv.add_argument("--embedding_model", type=str)
     adv.add_argument("--embedding_dimensions", type=int)

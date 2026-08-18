@@ -167,6 +167,19 @@ def create() -> Blueprint:
         config = JobConfig.from_env()
         return JobManager(config)
 
+    @api.route("/runtime-config", methods=["GET"])
+    def runtime_config():
+        """Return credential-free deployment capabilities used by local clients."""
+        config = JobConfig.from_env()
+        is_local = config.backend == "local"
+        return jsonify(
+            {
+                "deployment_mode": "local" if is_local else "hosted",
+                "upload_transport": "api" if is_local else "presigned",
+                "hosted_features": not is_local,
+            }
+        )
+
     @api.route("/create", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def create_run():
@@ -193,7 +206,7 @@ def create() -> Blueprint:
             path = manager.create_job(userid, runid)
 
             # Create run_details.json
-            run_details = create_run_details(userid, runid)
+            run_details = create_run_details(userid, runid, manager.config)
 
             # Check if user has HIGHER_UPLOAD_LIMIT permission and return the actual limit
             has_higher_upload_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
@@ -419,6 +432,8 @@ def create() -> Blueprint:
         )
 
         job_manager = get_job_manager()
+        if job_manager.config.backend == "local" and req.userid in PUBLIC_USERS:
+            return jsonify(GetViewerRunsResponseModel(runs=[]).model_dump()), 200
         run_ids = job_manager.list_jobs(req.userid)
 
         # TODO the order at this point is meaningless (UUID-sorted) so truncating before
@@ -561,12 +576,19 @@ def create() -> Blueprint:
                 current_app.logger.error(f"Failed to refresh run status for {req.runid}: {e}")
                 run_details = get_run_details(req.userid, req.runid)
 
-            # Get job stats
-            try:
-                job_stats = get_job_stats(userid=req.userid, jobid=req.runid, config=manager.config)
-            except Exception as e:
-                current_app.logger.error(f"Failed to get job stats for {req.runid}: {e}")
+            # Drafts have no output, and the hosted stats helper would otherwise query GCS.
+            if manager.config.backend == "local" and not (
+                run_details and run_details.execution_id
+            ):
                 job_stats = None
+            else:
+                try:
+                    job_stats = get_job_stats(
+                        userid=req.userid, jobid=req.runid, config=manager.config
+                    )
+                except Exception as e:
+                    current_app.logger.error(f"Failed to get job stats for {req.runid}: {e}")
+                    job_stats = None
 
             # Get metadata
             try:
@@ -951,10 +973,35 @@ def create() -> Blueprint:
             if not metadata:
                 raise BadRequest("Run metadata not found. Please save run configuration first.")
 
+            if manager.config.backend == "local":
+                if metadata.get("llm_provider") != "copilot":
+                    raise BadRequest(
+                        "Local runs require GitHub Copilot. Choose a Copilot model in the run settings."
+                    )
+                from autodiscovery.copilot import doctor
+
+                diagnostic = doctor()
+                if diagnostic["status"] != "ready":
+                    raise BadRequest(
+                        diagnostic.get("remediation")
+                        or "GitHub Copilot is not ready. Complete sign-in in Settings."
+                    )
+                available_models = {
+                    model["id"] for model in diagnostic["models"] if model.get("id")
+                }
+                if metadata.get("model") not in available_models:
+                    raise BadRequest(
+                        "Choose an available GitHub Copilot model in the run settings before starting."
+                    )
+
             datasets = metadata.get("datasets", [])
             for ds in datasets:
                 # If the dataset has a URL, it's an S3 preloaded file
-                if ds.get("url") and ds.get("url").startswith("gs://"):
+                if (
+                    manager.config.backend != "local"
+                    and ds.get("url")
+                    and ds.get("url").startswith("gs://")
+                ):
                     if not has_ai1_permission:
                         return jsonify({"error": "Permission denied for preloaded datasets"}), 403
                     filename = ds.get("name")
@@ -978,9 +1025,10 @@ def create() -> Blueprint:
                 raise BadRequest("Number of Experiments is required in metadata")
 
             # Validate experiment count and sufficient credits before submission
-            check_experiment_limits(
-                n_experiments=n_experiments, userid=req.userid, config=manager.config
-            )
+            if manager.config.backend != "local":
+                check_experiment_limits(
+                    n_experiments=n_experiments, userid=req.userid, config=manager.config
+                )
 
             # Build job parameters from metadata
             job_params = {
@@ -991,6 +1039,13 @@ def create() -> Blueprint:
             # Add optional parameters if present in metadata
             # Filter out None and empty strings, but allow 0 and other valid values
             optional_params = [
+                "model",
+                "belief_model",
+                "vision_model",
+                "llm_provider",
+                "embedding_provider",
+                "embedding_model",
+                "embedding_dimensions",
                 "exploration_weight",
                 "mcts_selection",
                 "surprisal_width",
@@ -1018,10 +1073,11 @@ def create() -> Blueprint:
                     "status_checked_at": datetime.now(UTC).isoformat(),
                     "origin_url": origin_url,
                 },
+                manager.config,
             )
 
             # Get updated run_details to return to frontend
-            run_details = get_run_details(req.userid, req.runid)
+            run_details = get_run_details(req.userid, req.runid, manager.config)
             if not run_details:
                 return jsonify({"error": "Failed to retrieve run details after submission"}), 500
 
@@ -1046,6 +1102,9 @@ def create() -> Blueprint:
             return jsonify(
                 {"error": e.message, "requested": e.requested, "available": e.available}
             ), 402  # Payment Required
+
+        except BadRequest as e:
+            return jsonify({"error": e.description}), 400
 
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")

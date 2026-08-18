@@ -176,6 +176,16 @@ class MetadataModel(BaseModel):
     evidence_weight: float | None = Field(None, description="Weight for evidence in belief updates")
     warmstart_experiments: str | None = Field(None, description="Path to warmstart experiments")
     n_warmstart: int | None = Field(None, description="Number of warmstart experiments")
+    llm_provider: str | None = Field(None, description="Provider used for agent model requests")
+    embedding_provider: str | None = Field(None, description="Provider used for embeddings")
+    model: str | None = Field(None, description="Primary agent model")
+    belief_model: str | None = Field(None, description="Model used for belief sampling")
+    vision_model: str | None = Field(None, description="Model used for vision requests")
+    embedding_model: str | None = Field(None, description="Embedding model")
+    embedding_dimensions: int | None = Field(None, description="Embedding vector dimensions")
+    model_pricing: dict[str, dict[str, float]] | None = Field(
+        None, description="Per-model token pricing used for local cost estimates"
+    )
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> MetadataModel:
@@ -217,6 +227,14 @@ class MetadataModel(BaseModel):
             evidence_weight=data.get("evidence_weight"),
             warmstart_experiments=data.get("warmstart_experiments"),
             n_warmstart=data.get("n_warmstart"),
+            llm_provider=data.get("llm_provider"),
+            embedding_provider=data.get("embedding_provider"),
+            model=data.get("model"),
+            belief_model=data.get("belief_model"),
+            vision_model=data.get("vision_model"),
+            embedding_model=data.get("embedding_model"),
+            embedding_dimensions=data.get("embedding_dimensions"),
+            model_pricing=data.get("model_pricing"),
         )
 
     def to_storage_dict(self) -> dict[str, Any]:

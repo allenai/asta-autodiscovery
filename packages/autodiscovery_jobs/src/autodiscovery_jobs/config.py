@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 # How many days uploaded datasets are retained before the cleanup cron deletes
 # them from GCS.  Both the cleanup script and the API's expiry estimate read
@@ -42,6 +43,11 @@ class JobConfig:
     modal_app_name: str = "asta-autodiscovery"
     modal_bucket_secret: str = "example-bucket-secret"
 
+    # Single-user local process backend configuration (ignored by other backends).
+    local_root: str = str(Path.home() / "AutoDiscovery")
+    local_user_id: str = "local"
+    local_max_concurrent_jobs: int = 1
+
     @classmethod
     def from_env(cls, **overrides) -> JobConfig:
         """Create configuration from environment variables with optional overrides.
@@ -68,6 +74,14 @@ class JobConfig:
             ),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),
             modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
+            local_root=os.environ.get("AUTODISCOVERY_LOCAL_ROOT", cls.local_root),
+            local_user_id=os.environ.get("AUTODISCOVERY_LOCAL_USER_ID", cls.local_user_id),
+            local_max_concurrent_jobs=int(
+                os.environ.get(
+                    "AUTODISCOVERY_LOCAL_MAX_CONCURRENT_JOBS",
+                    cls.local_max_concurrent_jobs,
+                )
+            ),
         )
 
         # Apply overrides

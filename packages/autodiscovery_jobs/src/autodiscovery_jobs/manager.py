@@ -11,6 +11,7 @@ from . import gcs
 from .backends import get_backend
 from .config import JobConfig
 from .exceptions import DatasetExpiredError
+from .local_storage import LocalStorage
 from .run_details import RunDetails, create_run_details, get_run_details
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ class JobManager:
         self.config = config or JobConfig.from_env()
         _warn_if_unsafe_code_execution(self.config)
         self.backend = get_backend(self.config)
+        self.local_storage = LocalStorage(self.config) if self.config.backend == "local" else None
 
     # User operations
 
@@ -89,6 +91,8 @@ class JobManager:
         Returns:
             GCS path like "gs://bucket/users/{userid}/"
         """
+        if self.local_storage is not None:
+            return self.local_storage.get_user_path(userid)
         return gcs.get_user_path(userid, self.config)
 
     def list_user_ids(self) -> list[str]:
@@ -97,6 +101,8 @@ class JobManager:
         Returns:
             List of user IDs
         """
+        if self.local_storage is not None:
+            return self.local_storage.list_user_ids()
         return gcs.list_user_ids(self.config)
 
     # Job management
@@ -110,6 +116,8 @@ class JobManager:
         Returns:
             List of job IDs
         """
+        if self.local_storage is not None:
+            return self.local_storage.list_jobs(userid)
         return gcs.list_user_jobs(userid, self.config)
 
     def job_exists(self, userid: str, jobid: str) -> bool:
@@ -122,6 +130,8 @@ class JobManager:
         Returns:
             True if job exists
         """
+        if self.local_storage is not None:
+            return self.local_storage.job_exists(userid, jobid)
         return gcs.job_exists(userid, jobid, self.config)
 
     def create_job(self, userid: str, jobid: str, overwrite: bool = False) -> str:
@@ -135,6 +145,8 @@ class JobManager:
         Returns:
             GCS path to created job directory
         """
+        if self.local_storage is not None:
+            return self.local_storage.create_job(userid, jobid, overwrite)
         return gcs.create_job_directory(userid, jobid, self.config, overwrite)
 
     def copy_job_data(
@@ -155,6 +167,10 @@ class JobManager:
         Returns:
             List of copied filenames
         """
+        if self.local_storage is not None:
+            return self.local_storage.copy_job_data(
+                source_userid, source_jobid, dest_userid, dest_jobid
+            )
         return gcs.copy_job_data_files(
             source_userid, source_jobid, dest_userid, dest_jobid, self.config
         )
@@ -261,6 +277,9 @@ class JobManager:
             userid: User identifier
             jobid: Job identifier
         """
+        if self.local_storage is not None:
+            self.local_storage.delete_job(userid, jobid)
+            return
         gcs.delete_job_directory(userid, jobid, self.config)
         gcs.delete_shared_run_index(jobid, self.config)
 
@@ -304,6 +323,11 @@ class JobManager:
                 # Continue with soft delete even if cancellation fails
                 pass
 
+        if self.local_storage is not None:
+            result = self.local_storage.soft_delete_job(userid, jobid)
+            result["cancelled_execution"] = cancelled_execution
+            return result
+
         # Perform soft delete
         result = gcs.soft_delete_job(userid, jobid, self.config)
         result["cancelled_execution"] = cancelled_execution
@@ -322,6 +346,8 @@ class JobManager:
         Returns:
             GCS path like "gs://bucket/users/{userid}/jobs/{jobid}/"
         """
+        if self.local_storage is not None:
+            return str(self.local_storage.get_job_path(userid, jobid))
         return gcs.get_job_path(userid, jobid, self.config)
 
     # Data operations
@@ -340,6 +366,8 @@ class JobManager:
         Returns:
             GCS path where data was uploaded
         """
+        if self.local_storage is not None:
+            return self.local_storage.upload_dataset(userid, jobid, local_path, remote_name)
         return gcs.upload_dataset(userid, jobid, local_path, self.config, remote_name)
 
     def generate_upload_url(
@@ -362,6 +390,8 @@ class JobManager:
         Returns:
             Dictionary with 'upload_url' and 'gcs_path' keys
         """
+        if self.local_storage is not None:
+            raise ValueError("Local jobs use the multipart upload endpoint")
         return gcs.generate_upload_url(
             userid,
             jobid,
@@ -373,6 +403,8 @@ class JobManager:
 
     def has_data_files(self, userid: str, jobid: str) -> bool:
         """Check if a job has any non-placeholder data files."""
+        if self.local_storage is not None:
+            return self.local_storage.has_data_files(userid, jobid)
         return gcs.has_data_files(userid, jobid, self.config)
 
     def expire_datasets(
@@ -409,6 +441,8 @@ class JobManager:
         Returns:
             GCS path to uploaded metadata
         """
+        if self.local_storage is not None:
+            return self.local_storage.upload_metadata(userid, jobid, metadata)
         return gcs.upload_metadata(userid, jobid, metadata, self.config)
 
     def upload_job_args(self, userid: str, jobid: str, args: dict[str, Any]) -> str:
@@ -433,6 +467,8 @@ class JobManager:
         Returns:
             Metadata dictionary
         """
+        if self.local_storage is not None:
+            return self.local_storage.get_metadata(userid, jobid)
         return gcs.get_metadata(userid, jobid, self.config)
 
     def get_job_args(self, userid: str, jobid: str) -> dict[str, Any] | None:
@@ -464,6 +500,9 @@ class JobManager:
             Returns None for runs that don't exist OR exist but are not shared.
             This prevents information leakage about run existence.
         """
+        if self.local_storage is not None:
+            return None
+
         # Fast path: check the shared-run index
         userid = gcs.get_shared_run_index(runid, self.config)
         if userid:
@@ -495,6 +534,8 @@ class JobManager:
             userid: User ID of the run owner
             is_shared: True to share, False to unshare
         """
+        if self.local_storage is not None:
+            raise ValueError("Run sharing is unavailable for local jobs")
         metadata = self.get_metadata(userid, runid) or {}
         metadata["is_shared"] = is_shared
         self.upload_metadata(userid, runid, metadata)
@@ -604,6 +645,8 @@ class JobManager:
         Returns:
             List of GCS paths to result files
         """
+        if self.local_storage is not None:
+            return self.local_storage.get_results(userid, jobid)
         return gcs.get_job_results(userid, jobid, self.config)
 
     def download_results(self, userid: str, jobid: str, local_dir: Path) -> list[Path]:
@@ -617,6 +660,16 @@ class JobManager:
         Returns:
             List of local file paths that were downloaded
         """
+        if self.local_storage is not None:
+            output_path = self.local_storage.get_job_path(userid, jobid) / "output"
+            copied: list[Path] = []
+            for source in output_path.rglob("*"):
+                if source.is_file():
+                    destination = local_dir / source.relative_to(output_path)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(source.read_bytes())
+                    copied.append(destination)
+            return copied
         return gcs.download_job_results(userid, jobid, local_dir, self.config)
 
     # Convenience methods

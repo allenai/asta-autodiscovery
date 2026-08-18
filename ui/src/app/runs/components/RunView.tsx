@@ -38,7 +38,11 @@ import { Run, getRunFromApi } from '@/types/Run';
 import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from '@/runs/components/ExperimentDetails';
-import { RunExperimentsProvider, useRunExperiments } from '@/contexts/RunExperimentsContext';
+import {
+    RunExperimentsProvider,
+    useRunExperiments,
+    DemoModeConfig,
+} from '@/contexts/RunExperimentsContext';
 import { TopSurprisalsList } from '@/runs/components/TopSurprisalsList';
 import { useSearchValue, useURLSearchParams } from '@/contexts/URLSearchParamsContext';
 import { StatusChip } from '@/runs/components/StatusChip';
@@ -120,6 +124,19 @@ interface RunViewProps {
     /** Optional user ID for viewing public runs (e.g., "samples") */
     userid?: string;
 }
+
+/**
+ * Demo mode config for recording promotional videos. When enabled, a completed
+ * run's experiments are fetched up front and then revealed progressively so the
+ * graph appears to "load" on camera. Set `enabled: false` to restore normal
+ * polling. Defined at module scope so its identity is stable across re-renders
+ * (otherwise the reveal animation would restart on every parent re-render).
+ */
+const DEMO_MODE_CONFIG: DemoModeConfig = {
+    enabled: true,
+    durationSeconds: 20,
+    timingFunction: 'linear',
+};
 
 /**
  * Component for displaying the status of a submitted run.
@@ -233,7 +250,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
     }
 
     return (
-        <RunExperimentsProvider runid={runid} userid={userid} autoStart>
+        <RunExperimentsProvider runid={runid} userid={userid} autoStart demoMode={DEMO_MODE_CONFIG}>
             <RunViewContent
                 run={run as Run & { details: NonNullable<Run['details']> }}
                 error={error}

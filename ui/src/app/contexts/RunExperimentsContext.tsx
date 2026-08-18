@@ -51,6 +51,19 @@ export const DEFAULT_STATE: RunExperimentsState = {
 
 export const DEFAULT_REFRESH_INTERVAL_MS = 15000; // 15 seconds
 
+/**
+ * Timing functions for demo mode
+ * @param t - progress value between 0 and 1
+ * @returns normalized time value between 0 and 1
+ */
+const timingFunctions = {
+    linear: (t: number): number => t,
+    'ease-in-out': (t: number): number => {
+        // Smooth cubic ease-in-out
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    },
+};
+
 const RunExperimentsContext = createContext<RunExperimentsState>(DEFAULT_STATE);
 export default RunExperimentsContext;
 
@@ -62,12 +75,24 @@ export const useRunExperiments = (): RunExperimentsState => {
     return context;
 };
 
+export type TimingFunction = 'linear' | 'ease-in-out';
+
+export interface DemoModeConfig {
+    enabled: boolean;
+    /** Duration in seconds for all experiments to load */
+    durationSeconds: number;
+    /** Timing function to control how experiments appear over time */
+    timingFunction: TimingFunction;
+}
+
 export type RunExperimentsProps = PropsWithChildren<{
     runid: string | null;
     /** Optional user ID for viewing public runs (e.g., "samples"). Defaults to authenticated user. */
     userid?: string;
     autoStart?: boolean;
     refreshIntervalMs?: number;
+    /** Demo mode for recording promotional videos - simulates progressive experiment loading */
+    demoMode?: DemoModeConfig;
 }>;
 
 export const RunExperimentsProvider = ({
@@ -76,6 +101,7 @@ export const RunExperimentsProvider = ({
     children,
     autoStart = false,
     refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS,
+    demoMode,
 }: RunExperimentsProps) => {
     const runsApi = getRunsApi();
 
@@ -92,6 +118,8 @@ export const RunExperimentsProvider = ({
 
     const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
+    const demoModeExperiments = useRef<Experiment[]>([]);
+    const demoModeTimeouts = useRef<NodeJS.Timeout[]>([]);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
     const shouldScrollToSelected = useRef<boolean>(true);
 
@@ -201,10 +229,93 @@ export const RunExperimentsProvider = ({
             setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
             knownExperimentIds.current = new Set();
             selectedExperimentRequestId.current += 1;
+            demoModeExperiments.current = [];
+            demoModeTimeouts.current.forEach(clearTimeout);
+            demoModeTimeouts.current = [];
             return;
         }
         if (!isPolling) {
             return;
+        }
+
+        // Demo mode: simulate progressive experiment loading for promo videos
+        if (demoMode?.enabled) {
+            const loadDemoExperiments = async () => {
+                try {
+                    setIsLoading(true);
+                    // Fetch ALL experiments at once (don't filter by known IDs)
+                    const { data } = await runsApi.getRunExperiments({
+                        userid,
+                        runid,
+                        knownExperimentIds: [],
+                    });
+                    const allExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
+                    demoModeExperiments.current = allExperiments;
+
+                    // We've loaded the data; drop the initial "Loading experiments..."
+                    // state so the count ticks up as nodes are revealed.
+                    hasLoadedOnce.current = true;
+                    setIsLoadingInitial(false);
+
+                    if (allExperiments.length === 0) {
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    const timingFn = timingFunctions[demoMode.timingFunction];
+                    const durationMs = demoMode.durationSeconds * 1000;
+
+                    // Clear any existing timeouts
+                    demoModeTimeouts.current.forEach(clearTimeout);
+                    demoModeTimeouts.current = [];
+
+                    // Calculate reveal time for each experiment
+                    allExperiments.forEach((experiment, index) => {
+                        // Progress from 0 to 1 based on index
+                        const linearProgress = index / Math.max(1, allExperiments.length - 1);
+                        // Apply timing function
+                        const easedProgress = timingFn(linearProgress);
+                        // Calculate delay in milliseconds
+                        const delay = easedProgress * durationMs;
+
+                        const timeout = setTimeout(() => {
+                            setExperiments((prev) => {
+                                // Only add if not already present
+                                if (prev.some((e) => e.experimentId === experiment.experimentId)) {
+                                    return prev;
+                                }
+                                knownExperimentIds.current.add(experiment.experimentId);
+                                return [...prev, experiment];
+                            });
+
+                            // If this is the last experiment, mark as completed
+                            if (index === allExperiments.length - 1) {
+                                setTimeout(() => {
+                                    setHasJobCompleted(true);
+                                    setIsPolling(false);
+                                    setIsLoading(false);
+                                }, 100);
+                            }
+                        }, delay);
+
+                        demoModeTimeouts.current.push(timeout);
+                    });
+
+                    if (lastError !== null) {
+                        setLastError(null);
+                    }
+                } catch (error: any) {
+                    setLastError(error.message || 'Failed to fetch experiments');
+                    setIsLoading(false);
+                }
+            };
+
+            loadDemoExperiments();
+
+            return () => {
+                demoModeTimeouts.current.forEach(clearTimeout);
+                demoModeTimeouts.current = [];
+            };
         }
 
         const fetchLatestExperiments = async () => {
@@ -261,7 +372,7 @@ export const RunExperimentsProvider = ({
         return () => {
             clearInterval(interval);
         };
-    }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted]);
+    }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted, demoMode]);
 
     const memoizedState = useMemo<RunExperimentsState>(
         () => ({

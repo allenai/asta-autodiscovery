@@ -776,10 +776,15 @@ def get_agents(
     theorizer_llm_config = _build_config(theorizer_model, base_url)
     execution_llm_config = _build_config(execution_model, None)
 
-    # Create token limit transform
+    # Create token limit transform. model= must be a large-context entry in
+    # ag2's token table: the validator clamps max_tokens_per_message to the
+    # model's context window, and the DEFAULT (gpt-3.5-turbo-0613, 4096) was
+    # silently amputating >4k-token code messages in transit to the executor.
     token_limit_capability = transform_messages.TransformMessages(
         transforms=[
-            transforms.MessageTokenLimiter(max_tokens_per_message=10_000, min_tokens=12_000)
+            transforms.MessageTokenLimiter(
+                max_tokens_per_message=16_384, min_tokens=20_000, model="gpt-5-mini"
+            )
         ]
     )
 

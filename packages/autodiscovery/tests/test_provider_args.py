@@ -5,7 +5,7 @@ from autodiscovery.args import ArgParser
 from autodiscovery.easy import build_parser
 
 
-def test_engine_provider_defaults_preserve_current_behavior() -> None:
+def test_engine_provider_defaults_preserve_model_name_routing() -> None:
     args = ArgParser().parse_args(
         [
             "--dataset_metadata",
@@ -19,10 +19,25 @@ def test_engine_provider_defaults_preserve_current_behavior() -> None:
         ]
     )
 
-    assert args.llm_provider == "current"
-    assert args.embedding_provider == "current"
+    assert args.llm_provider is None
+    assert args.embedding_provider is None
     assert args.embedding_model is None
     assert args.embedding_dimensions is None
+
+
+def test_easy_cli_provider_defaults_preserve_model_name_routing() -> None:
+    args = build_parser().parse_args(
+        [
+            "--out_dir",
+            "results",
+            "--n_experiments",
+            "1",
+            "data.csv",
+        ]
+    )
+
+    assert args.llm_provider is None
+    assert args.embedding_provider is None
 
 
 def test_easy_cli_accepts_copilot_provider_and_embedding_options() -> None:

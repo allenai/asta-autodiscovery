@@ -119,7 +119,7 @@ def query_llm(
     messages: list[dict[str, str]],
     n_samples: int,
     model: str = "gpt-4o",
-    llm_provider: str = "current",
+    llm_provider: str | None = None,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,
@@ -137,7 +137,7 @@ def query_llm(
         messages: Chat messages to send to the model.
         n_samples: Number of samples to request.
         model: Model name to use.
-        llm_provider: LLM provider. ``current`` preserves OpenAI/Vertex routing.
+        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
         temperature: Sampling temperature.
         reasoning_effort: Optional reasoning effort for reasoning-capable models.
         response_format: Optional structured output schema.
@@ -195,7 +195,7 @@ def query_llm(
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, n_samples - 1)) as executor:
                 responses.extend(executor.map(lambda _: _sample(), range(n_samples - 1)))
         return responses
-    if llm_provider != "current":
+    if llm_provider is not None:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
 
     if client is None:

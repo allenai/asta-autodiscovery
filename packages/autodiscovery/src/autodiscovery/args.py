@@ -29,15 +29,15 @@ class ArgParser(argparse.ArgumentParser):
         )
         self.add_argument(
             "--llm_provider",
-            choices=["current", "copilot"],
-            default="current",
-            help="LLM provider. 'current' preserves OpenAI/Vertex model-name routing.",
+            choices=["copilot"],
+            default=None,
+            help="Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.",
         )
         self.add_argument(
             "--embedding_provider",
-            choices=["current", "copilot"],
-            default="current",
-            help="Embedding provider used by optional deduplication.",
+            choices=["copilot"],
+            default=None,
+            help="Optional embedding provider used by deduplication.",
         )
         self.add_argument(
             "--embedding_model",

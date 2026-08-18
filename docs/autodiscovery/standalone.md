@@ -60,14 +60,14 @@ auto-discovery \
    data/measurements.csv
 ```
 
-`--llm_provider current` and `--embedding_provider current` are the defaults and
-preserve the existing Vertex/OpenAI behavior. Copilot honors `--temperature`
-and `--belief_temperature` when the selected model permits that value. Some
-reasoning modes constrain temperature at the provider.
+Omit `--llm_provider` and `--embedding_provider` to preserve the existing
+Vertex/OpenAI behavior. Copilot honors `--temperature` and
+`--belief_temperature` when the selected model permits that value. Some reasoning
+modes constrain temperature at the provider.
 
 Copilot deduplication defaults to `text-embedding-3-small` with 1536 dimensions.
 This is not numerically identical to the existing OpenAI
-`text-embedding-3-large` default, so use `--embedding_provider current` when
+`text-embedding-3-large` default, so leave `--embedding_provider` unset when
 exact embedding geometry must be preserved. Copilot currently requires the
 `process` or `modal` execution backend; the `local` backend's generated image
 analysis code is tied to an OpenAI client.

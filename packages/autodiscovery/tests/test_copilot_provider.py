@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import httpx
 from autodiscovery.agents import ModalSandboxExecutor, get_agents
 from autodiscovery.beliefs import BeliefTrueFalseCat
-from autodiscovery.copilot import doctor
+from autodiscovery.copilot import _classify_error, doctor
 from autodiscovery.copilot_provider import (
     CopilotAG2Client,
     CopilotCompletion,
@@ -377,6 +377,77 @@ def test_copilot_embeddings_use_supported_default_and_dimensions(monkeypatch) ->
         dimensions=1536,
     )
     assert calls[-1][1]["model"] == "text-embedding-ada-002"
+
+
+def test_copilot_embeddings_honor_batch_size_and_retry(monkeypatch) -> None:
+    calls = []
+
+    class EmbeddingRuntime:
+        def embed(self, texts, **kwargs):
+            calls.append(texts)
+            if len(calls) == 1:
+                raise RuntimeError("transient failure")
+            return CopilotEmbeddingResult(
+                vectors=[[float(len(text))] for text in texts],
+                model=kwargs["model"],
+                dimensions=kwargs["dimensions"],
+                prompt_tokens=len(texts),
+                total_tokens=len(texts),
+            )
+
+    monkeypatch.setattr(
+        "autodiscovery.copilot_provider.get_copilot_runtime",
+        lambda: EmbeddingRuntime(),
+    )
+
+    vectors = get_embedding(
+        ["first", "second"],
+        embedding_provider="copilot",
+        batch_size=1,
+        n_attempts=2,
+    )
+
+    assert calls == [["first"], ["first"], ["second"]]
+    assert vectors.tolist() == [[5.0], [6.0]]
+
+
+def test_openai_embeddings_honor_dimensions() -> None:
+    calls = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            data=[
+                SimpleNamespace(embedding=[float(index)])
+                for index in range(len(kwargs["input"]))
+            ]
+        )
+
+    client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+
+    vectors = get_embedding(
+        ["first", "second"],
+        model="text-embedding-3-small",
+        dimensions=512,
+        client=client,
+    )
+
+    assert calls == [
+        {
+            "input": ["first", "second"],
+            "model": "text-embedding-3-small",
+            "dimensions": 512,
+        }
+    ]
+    assert vectors.tolist() == [[0.0], [1.0]]
+
+
+def test_diagnostic_prioritizes_seat_and_policy_errors_over_authentication() -> None:
+    seat_error = RuntimeError("not authorized: Copilot seat required")
+    policy_error = RuntimeError("auth forbidden by organization policy")
+
+    assert _classify_error(seat_error)[0] == "SEAT_REQUIRED"
+    assert _classify_error(policy_error)[0] == "POLICY_BLOCKED"
 
 
 def test_doctor_returns_safe_model_catalog(monkeypatch) -> None:

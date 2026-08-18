@@ -60,12 +60,12 @@ def _classify_error(exc: Exception) -> tuple[str, str]:
     text = str(exc).lower()
     if isinstance(exc, ImportError):
         return "SDK_MISSING", "Install the Copilot extra: pip install 'asta-autodiscovery[copilot]'"
-    if "not authenticated" in text or "login" in text or "auth" in text:
-        return "AUTH_REQUIRED", "Run 'copilot login', then retry the diagnostic."
     if "seat" in text or "entitlement" in text:
         return "SEAT_REQUIRED", "Confirm that the GitHub account has an active Copilot seat."
     if "policy" in text or "blocked" in text or "forbidden" in text:
         return "POLICY_BLOCKED", "Ask the Copilot administrator to allow the requested models."
+    if "not authenticated" in text or "login" in text or "auth" in text:
+        return "AUTH_REQUIRED", "Run 'copilot login', then retry the diagnostic."
     if "download" in text or "certificate" in text or "ssl" in text:
         return "RUNTIME_DOWNLOAD_FAILED", "Set COPILOT_CLI_PATH to an installed Copilot CLI."
     if "model" in text and ("unavailable" in text or "unsupported" in text):

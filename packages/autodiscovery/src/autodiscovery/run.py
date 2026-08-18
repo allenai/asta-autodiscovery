@@ -294,8 +294,8 @@ def run_mcts(
     log_dirname,
     work_dir,
     model_name="gpt-4o",
-    llm_provider="current",
-    embedding_provider="current",
+    llm_provider=None,
+    embedding_provider=None,
     embedding_model=None,
     embedding_dimensions=None,
     belief_model_name="gemini-3-flash-preview",
@@ -340,7 +340,7 @@ def run_mcts(
         log_dirname: Directory to save logs and MCTS nodes.
         work_dir: Working directory for agents.
         model_name: LLM model name for agents.
-        llm_provider: LLM provider. ``current`` preserves OpenAI/Vertex routing.
+        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
         embedding_provider: Provider used for deduplication embeddings.
         embedding_model: Optional deduplication embedding model override.
         embedding_dimensions: Optional deduplication embedding dimensions.
@@ -955,8 +955,8 @@ def main(args):
                 log_dirname,
                 run_dedupe=args.dedupe,
                 model=args.belief_model,
-                llm_provider=getattr(args, "llm_provider", "current"),
-                embedding_provider=getattr(args, "embedding_provider", "current"),
+                llm_provider=getattr(args, "llm_provider", None),
+                embedding_provider=getattr(args, "embedding_provider", None),
                 embedding_model=getattr(args, "embedding_model", None),
                 embedding_dimensions=getattr(args, "embedding_dimensions", None),
             )
@@ -1038,8 +1038,8 @@ def main(args):
         n_belief_samples=args.n_belief_samples,
         k_parents=args.k_parents,
         model_name=args.model,
-        llm_provider=getattr(args, "llm_provider", "current"),
-        embedding_provider=getattr(args, "embedding_provider", "current"),
+        llm_provider=getattr(args, "llm_provider", None),
+        embedding_provider=getattr(args, "embedding_provider", None),
         embedding_model=getattr(args, "embedding_model", None),
         embedding_dimensions=getattr(args, "embedding_dimensions", None),
         belief_model_name=args.belief_model,

@@ -138,7 +138,7 @@ def get_hypotheses(in_nodes_list):
 def get_embedding(
     texts,
     model=None,
-    embedding_provider="current",
+    embedding_provider: str | None = None,
     dimensions=None,
     batch_size=128,
     client=None,
@@ -150,7 +150,7 @@ def get_embedding(
     Args:
         texts (list): A list of text strings to be embedded.
         model (str, optional): Embedding model override. Defaults by provider.
-        embedding_provider: Embedding provider. ``current`` preserves OpenAI.
+        embedding_provider: Optional embedding provider. Omit to use OpenAI.
         dimensions: Optional output dimensions for providers that support it.
         batch_size (int, optional): The number of texts to process in one API call.
         usage_tracker: Optional usage tracker for embedding requests.
@@ -169,24 +169,39 @@ def get_embedding(
         selected_dimensions = (
             DEFAULT_EMBEDDING_DIMENSIONS if dimensions is None else dimensions
         )
-        result = get_copilot_runtime().embed(
-            texts,
-            model=selected_model,
-            dimensions=selected_dimensions,
-        )
-        if usage_tracker is not None:
-            usage_tracker.record_event(
-                source="copilot",
-                component="dedupe.embeddings",
-                model=result.model,
-                prompt_tokens=result.prompt_tokens,
-                completion_tokens=0,
-                total_tokens=result.total_tokens,
-                agent_name="dedupe",
-                metadata={"dimensions": result.dimensions},
-            )
-        return np.array(result.vectors)
-    if embedding_provider != "current":
+        runtime = get_copilot_runtime()
+        all_embeddings = []
+        for attempt in range(n_attempts):
+            try:
+                all_embeddings = []
+                for i in range(0, len(texts), batch_size):
+                    result = runtime.embed(
+                        texts[i : i + batch_size],
+                        model=selected_model,
+                        dimensions=selected_dimensions,
+                    )
+                    if usage_tracker is not None:
+                        usage_tracker.record_event(
+                            source="copilot",
+                            component="dedupe.embeddings",
+                            model=result.model,
+                            prompt_tokens=result.prompt_tokens,
+                            completion_tokens=0,
+                            total_tokens=result.total_tokens,
+                            agent_name="dedupe",
+                            metadata={"dimensions": result.dimensions},
+                        )
+                    all_embeddings.extend(result.vectors)
+                break
+            except Exception as exc:
+                if attempt < n_attempts - 1:
+                    print(f"Embeddings: Attempt {attempt + 1} failed: {exc}. Retrying...")
+                else:
+                    raise RuntimeError(
+                        f"Failed to get embeddings after {n_attempts} attempts."
+                    ) from exc
+        return np.array(all_embeddings)
+    if embedding_provider is not None:
         raise ValueError(f"Unknown embedding provider: {embedding_provider}")
 
     selected_model = model or "text-embedding-3-large"
@@ -200,7 +215,10 @@ def get_embedding(
             for i in range(0, len(texts), batch_size):
                 batch = texts[i : i + batch_size]
                 # Request embeddings for the current batch from the API
-                response = client.embeddings.create(input=batch, model=selected_model)
+                request = {"input": batch, "model": selected_model}
+                if dimensions is not None:
+                    request["dimensions"] = dimensions
+                response = client.embeddings.create(**request)
                 if usage_tracker is not None:
                     usage_tracker.record_response(
                         response,
@@ -226,7 +244,7 @@ def get_llm_merge_decision(
     n_samples: int = 30,
     threshold: float = 0.7,
     model: str = "gpt-4o",
-    llm_provider: str = "current",
+    llm_provider: str | None = None,
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -283,8 +301,8 @@ def dedupe(
     seed=42,
     rep_mode="biggest",
     model="gpt-4o",
-    llm_provider="current",
-    embedding_provider="current",
+    llm_provider=None,
+    embedding_provider=None,
     embedding_model=None,
     embedding_dimensions=None,
     n_nodes=None,

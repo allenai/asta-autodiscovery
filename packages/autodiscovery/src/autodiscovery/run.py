@@ -32,6 +32,7 @@ from autodiscovery.mcts import (
     progressive_widening_all,
     ucb1_recursive,
 )
+from autodiscovery.metrics import RunMetrics
 from autodiscovery.mcts_utils import (
     get_context_string,
     get_msgs_from_latest_query,
@@ -409,6 +410,9 @@ def run_mcts(
 
     usage_tracker = UsageTracker()
     usage_tracker.save_events(log_dirname)
+    # Key run-health metrics (% execution failures, % surprisals, token usage/
+    # limit), logged after every experiment and saved as run_metrics.json.
+    run_metrics = RunMetrics()
 
     try:
         if agent_usage_mode == "per_response":
@@ -713,6 +717,10 @@ def run_mcts(
                     _node_end_time = time()
                     node.time_elapsed = round(_node_end_time - _node_start_time, 2)
 
+                    if node.level > 1:
+                        run_metrics.record(success=bool(node.success), surprising=node.surprising)
+                        print(run_metrics.log_line(usage_tracker), flush=True)
+
                     def _backprop_and_save():
                         # MCTS BACKPROPAGATION
                         node.update_counts(visits=1, reward=node.self_value)
@@ -796,6 +804,8 @@ def run_mcts(
                         f"{exc.__class__.__name__}: {exc}"
                     )
                     traceback.print_exception(type(exc), exc, exc.__traceback__)
+                    run_metrics.record(success=False, surprising=None)
+                    print(run_metrics.log_line(usage_tracker), flush=True)
 
                 expanded_nodes = []
                 with ThreadPoolExecutor(max_workers=n_threads) as executor:
@@ -860,6 +870,8 @@ def run_mcts(
                             f"{exc.__class__.__name__}: {exc}"
                         )
                         traceback.print_exception(type(exc), exc, exc.__traceback__)
+                        run_metrics.record(success=False, surprising=None)
+                        print(run_metrics.log_line(usage_tracker), flush=True)
                         continue
                     if new_node is not None:
                         expanded_nodes.append(new_node)
@@ -892,6 +904,9 @@ def run_mcts(
     )
     usage_tracker.save_events(log_dirname)
     usage_tracker.save_summary(log_dirname)
+    print(run_metrics.log_line(usage_tracker, prefix="[metrics][final]"), flush=True)
+    metrics_path = run_metrics.save(log_dirname, usage_tracker)
+    print(f"Run metrics saved to {metrics_path}", flush=True)
 
 
 def main(args):

@@ -49,7 +49,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
 from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
+from autodiscovery.llm_retry import apply_openai_wrapper_usage_tracking
+from autodiscovery.llm_usage import (
+    UsageTracker,
+    clear_ag2_usage_context,
+    configure_ag2_usage_tracking,
+    set_ag2_usage_context,
+)
 from autodiscovery.mcts import MCTSNode
+from autodiscovery.metrics import RunMetrics
 from autodiscovery.mcts_utils import (
     get_context_string,
     get_msgs_from_latest_query,
@@ -57,6 +65,33 @@ from autodiscovery.mcts_utils import (
     get_self_value,
 )
 from autodiscovery.transitions import SpeakerSelector
+
+# Process-wide run metrics + LLM usage, shared across all scorers/dataset pools
+# so `concurrency > 1` still aggregates into one set of numbers. Every scored
+# request appends a `[metrics] ...` line (% execution failures, % surprisals,
+# token usage, token limit) and refreshes run_metrics.json / the usage summary
+# under config.log_dir when one is set.
+_run_metrics = RunMetrics()
+_usage_tracker = UsageTracker()
+_usage_wire_lock = threading.Lock()
+_usage_tracking_wired = False
+
+
+def _ensure_usage_tracking() -> None:
+    """Wire the AG2 OpenAIWrapper usage patch to the shared tracker (idempotent)."""
+    global _usage_tracking_wired
+    with _usage_wire_lock:
+        if _usage_tracking_wired:
+            return
+        if apply_openai_wrapper_usage_tracking():
+            configure_ag2_usage_tracking(_usage_tracker)
+        else:
+            print(  # noqa: T201
+                "[slime_reward] warn: AG2 usage patch unavailable; "
+                "group-chat token usage will not be tracked",
+                flush=True,
+            )
+        _usage_tracking_wired = True
 
 
 def _theoretical_max_boolean_cat(
@@ -217,6 +252,7 @@ class SurpriseRewardScorer:
         self._warmed_up = False
         self._n_scored = 0
         self._lock = threading.Lock()
+        _ensure_usage_tracking()
 
     # -- public API ----------------------------------------------------------
 
@@ -238,13 +274,33 @@ class SurpriseRewardScorer:
         """
         with self._lock:
             self._n_scored += 1
+            # Attribute this thread's AG2 group-chat usage to the request.
+            set_ag2_usage_context(
+                node_id=f"reward_{self._n_scored:06d}", component="slime_reward.chat"
+            )
             try:
                 result = self._score(hypothesis, experiment_plan)
             except Exception as e:  # noqa: BLE001 - reward calls must not crash training
                 result = self._failed_result(hypothesis, f"{type(e).__name__}: {e}")
+            finally:
+                clear_ag2_usage_context()
+            _run_metrics.record(
+                success=bool(result.get("success")), surprising=result.get("surprising")
+            )
             self._log_result(result)
             self._log_observability(result)
+            self._save_metrics()
             return result
+
+    def _save_metrics(self) -> None:
+        """Refresh run_metrics.json + the LLM usage summary under config.log_dir."""
+        if self.config.log_dir is None:
+            return
+        try:
+            _run_metrics.save(self.config.log_dir, _usage_tracker)
+            _usage_tracker.save_summary(self.config.log_dir)
+        except Exception as e:  # noqa: BLE001 - metrics persistence must not fail scoring
+            print(f"[slime_reward] warn: failed saving metrics: {e}", flush=True)  # noqa: T201
 
     def _log_observability(self, result: dict) -> None:
         """Emit a compact per-hypothesis line to stdout so, when the reward server
@@ -259,6 +315,9 @@ class SurpriseRewardScorer:
                 f"prior={result.get('prior_belief')} posterior={result.get('posterior_belief')}",
                 flush=True,
             )
+        # Aggregate run health after every request: % execution failures,
+        # % surprisals, token usage, token limit.
+        print(_run_metrics.log_line(_usage_tracker), flush=True)  # noqa: T201
 
     # -- internals -----------------------------------------------------------
 
@@ -333,6 +392,9 @@ class SurpriseRewardScorer:
             belief_mode=config.belief_mode,
             evidence_msg=evidence_msg,
             evidence_weight=config.evidence_weight,
+            usage_tracker=_usage_tracker,
+            usage_node_id=f"reward_{self._n_scored:06d}",
+            usage_context_label="slime_reward",
         )
         reward, surprising = get_self_value(
             belief_change=belief_change,
@@ -377,6 +439,13 @@ class SurpriseRewardScorer:
             "posterior_mean": float(posterior_mean_val),
             "prior_belief": prior_belief,
             "posterior_belief": posterior_belief,
+            # NL feedback from the belief model (one rationale per belief sample,
+            # captured from thinking models' reasoning_content). Consumed by the
+            # aux-loss training path; empty lists for non-thinking belief models.
+            "belief_feedback": {
+                "prior": getattr(prior, "rationales", None) or [],
+                "posterior": getattr(posterior, "rationales", None) or [],
+            },
             "hypothesis": hypothesis,
             "execution_log": execution_log,
             "error": None,
@@ -434,6 +503,7 @@ class SurpriseRewardScorer:
             "posterior_mean": None,
             "prior_belief": None,
             "posterior_belief": None,
+            "belief_feedback": None,
             "hypothesis": hypothesis,
             "execution_log": execution_log,
             "error": error,
@@ -459,6 +529,7 @@ class SurpriseRewardScorer:
                 backend=config.backend,
                 dataset_paths=self.dataset_paths,
                 vision_model=config.vision_model,
+                usage_tracker=_usage_tracker,
             )
         return self._agents
 

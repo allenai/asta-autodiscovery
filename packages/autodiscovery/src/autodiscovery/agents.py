@@ -17,6 +17,7 @@ from autodiscovery.llm_retry import (
     call_with_backoff,
 )
 from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER, UsageTracker
+from autodiscovery.metrics import MAX_TOKENS_PER_MESSAGE, MIN_TOKENS
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -783,7 +784,9 @@ def get_agents(
     token_limit_capability = transform_messages.TransformMessages(
         transforms=[
             transforms.MessageTokenLimiter(
-                max_tokens_per_message=16_384, min_tokens=20_000, model="gpt-5-mini"
+                max_tokens_per_message=MAX_TOKENS_PER_MESSAGE,
+                min_tokens=MIN_TOKENS,
+                model="gpt-5-mini",
             )
         ]
     )

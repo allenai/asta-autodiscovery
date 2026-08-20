@@ -197,10 +197,17 @@ def abs_normalized_surprisal(row: pd.Series) -> float | None:
     return abs(float(shift) / tmax)
 
 
+# |belief_shift_empirical| >= this renders as surprising (1) in lineage history.
+# Matches the --surprisal-width default used for the is_surprising metadata flag.
+SURPRISE_BINARY_THRESHOLD = 0.2
+
+
 def surprise_label(row: pd.Series) -> str:
-    """Render a node's raw surprise score (|normalized_surprisal|)."""
-    ns = abs_normalized_surprisal(row)
-    return f"{ns:.3f}" if ns is not None else "n/a"
+    """Render a node's surprise as binary: 1 if |belief_shift| >= threshold, else 0."""
+    shift = row.get("belief_shift_empirical")
+    if shift is None or pd.isna(shift):
+        return "n/a"
+    return "1" if abs(float(shift)) >= SURPRISE_BINARY_THRESHOLD else "0"
 
 
 def verdict_label(row: pd.Series) -> str:
@@ -277,22 +284,40 @@ def dataset_context(row: pd.Series, rich_desc: str | None = None) -> str:
     return header
 
 
-def history_block(ancestors: list[pd.Series], with_scores: bool, with_verdict: bool = False) -> str:
-    """Render the lineage path (root -> parent) as a numbered hypothesis list.
+def visible_history(hist_hyps: list[pd.Series], spec: dict) -> list[pd.Series]:
+    """Ancestors that actually appear in this format's rendered history.
+
+    Formats that show scores (or verdicts) omit ancestors whose score (or
+    verdict) would render as ``n/a``, so no unscored hypotheses appear in the
+    history lines. fmt1 (no annotations) keeps every ancestor hypothesis.
+    """
+    hyps = hist_hyps
+    if spec["scores"]:
+        hyps = [a for a in hyps if surprise_label(a) != "n/a"]
+    if spec.get("verdict"):
+        hyps = [a for a in hyps if verdict_label(a) != "n/a"]
+    return hyps
+
+
+def history_block(hyps: list[pd.Series], with_scores: bool, with_verdict: bool = False) -> str:
+    """Render the (pre-filtered) lineage path as a numbered hypothesis list.
 
     Only the hypothesis text is included (fmt1), hypothesis + surprise score
     (fmt2/3), or hypothesis + surprise + verdict triplets (``_w_verdict``). No
-    execution artifacts are emitted.
+    execution artifacts are emitted. Callers pass the ``visible_history`` list,
+    so every rendered score/verdict is a real value, never ``n/a``.
     """
-    hyps = [a for a in ancestors if clean(a["hypothesis"])]
     if not hyps:
         return "No hypotheses have been explored along this line of inquiry yet."
     if with_verdict and with_scores:
-        suffix = ", each with its measured surprise score and outcome verdict:"
+        suffix = (
+            ", each with its binary surprise score (1 = surprising result, 0 = not) "
+            "and outcome verdict:"
+        )
     elif with_verdict:
         suffix = ", each with its outcome verdict:"
     elif with_scores:
-        suffix = ", each with its measured surprise score:"
+        suffix = ", each with its binary surprise score (1 = surprising result, 0 = not):"
     else:
         suffix = ":"
     lead = "Hypotheses already explored along this line of inquiry (root to current), in order" + suffix
@@ -300,7 +325,7 @@ def history_block(ancestors: list[pd.Series], with_scores: bool, with_verdict: b
     for i, a in enumerate(hyps, 1):
         lines.append(f"{i}. {clean(a['hypothesis'])}")
         if with_scores:
-            lines.append(f"   surprise: {surprise_label(a)}")
+            lines.append(f"   score: {surprise_label(a)}")
         if with_verdict:
             lines.append(f"   verdict: {verdict_label(a)}")
     return "\n".join(lines)
@@ -349,9 +374,9 @@ def drop_fully_invalid_runs(df: pd.DataFrame) -> pd.DataFrame:
     A node is valid when both ``prior_empirical_mean`` and
     ``posterior_empirical_mean`` are present. A run is dropped only when every one
     of its nodes is invalid (the whole run is unscored); any run with at least one
-    valid node is kept. Individual invalid nodes are left in place, so their
-    surprise score renders as ``n/a`` in lineage history and their metadata score
-    is null when they are the target.
+    valid node is kept. Individual invalid nodes are left in place: score/verdict
+    formats omit them from rendered lineage history (see ``visible_history``) and
+    their metadata score is null when they are the target.
     """
     valid = df["prior_empirical_mean"].notna() & df["posterior_empirical_mean"].notna()
     valid_jobs = set(df.loc[valid, "job_id"].unique())
@@ -361,11 +386,11 @@ def drop_fully_invalid_runs(df: pd.DataFrame) -> pd.DataFrame:
 def target_has_valid_surprise_verdict(r: pd.Series) -> bool:
     """True iff the target node carries BOTH a valid surprise score and verdict.
 
-    Surprise needs a non-null ``belief_shift_empirical`` (so |normalized surprisal|
-    is defined); verdict needs a non-null ``posterior_empirical_mean``. These are
-    exactly the nodes whose surprise/verdict render as a real value (not ``n/a``).
+    Surprise needs a non-null ``belief_shift_empirical``; verdict needs a non-null
+    ``posterior_empirical_mean``. These are exactly the nodes whose surprise/verdict
+    render as a real value (not ``n/a``).
     """
-    return abs_normalized_surprisal(r) is not None and verdict_label(r) != "n/a"
+    return surprise_label(r) != "n/a" and verdict_label(r) != "n/a"
 
 
 def build_samples(
@@ -398,15 +423,18 @@ def build_samples(
         hist_hyps = [a for a in ancestors if clean(a["hypothesis"])]
         if require_valid_history and not all(target_has_valid_surprise_verdict(a) for a in hist_hyps):
             skipped_invalid += 1
-            continue  # drop samples whose rendered ancestor history has any n/a
-        parent_hyp = clean(hist_hyps[-1]["hypothesis"]) if hist_hyps else ""
+            continue  # drop samples whose ancestor history has any n/a
+        # Unscored ancestors are omitted from score/verdict formats, so the parent
+        # reference, cold-start fallback, and n_history all track what is shown.
+        shown_hyps = visible_history(hist_hyps, spec)
+        parent_hyp = clean(shown_hyps[-1]["hypothesis"]) if shown_hyps else ""
 
         user_content = (
             dataset_context(r, desc_by_id.get(str(r["job_id"])) if desc_by_id else None)
             + "\n\n"
-            + history_block(ancestors, spec["scores"], spec.get("verdict", False))
+            + history_block(shown_hyps, spec["scores"], spec.get("verdict", False))
             + "\n\n"
-            + final_prompt(spec["prompt"], parent_hyp, bool(hist_hyps))
+            + final_prompt(spec["prompt"], parent_hyp, bool(shown_hyps))
         )
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -427,11 +455,13 @@ def build_samples(
                     "node_id": str(r["node_id"]),
                     "level": int(r["level"]),
                     "index": int(r["index"]),
-                    "n_history": len(hist_hyps),
+                    "n_history": len(shown_hyps),
                     "format": fmt_key,
                     # reference target + labels (for SFT / offline analysis)
                     "target_hypothesis": clean(r["hypothesis"]),
-                    # raw surprise score shown in fmt2/fmt3 history lines
+                    # normalized surprisal, kept for offline analysis; the binary
+                    # score shown in fmt2/fmt3 history is |belief_shift| >=
+                    # SURPRISE_BINARY_THRESHOLD (see surprise_label)
                     "abs_normalized_surprisal": abs_ns,
                     "belief_shift": None if pd.isna(shift) else float(shift),
                     "is_surprising": None if pd.isna(shift) else bool(abs(shift) >= width),

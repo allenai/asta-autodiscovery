@@ -77,10 +77,11 @@ def test_default_provider_namespaces_bare_names() -> None:
 # --- capabilities ----------------------------------------------------------
 
 
-def test_wire_model_name_keeps_the_google_prefix_internal_to_vertex() -> None:
-    assert parse_model("gemini-3.1-pro-preview").wire_model_name == "google/gemini-3.1-pro-preview"
-    assert parse_model("o4-mini").wire_model_name == "o4-mini"
-    assert parse_model("github_copilot/claude-haiku-4.5").wire_model_name == "claude-haiku-4.5"
+def test_google_prefix_is_accepted_and_canonicalized() -> None:
+    """google/ was Vertex wire format; litellm owns that now, so it is just an alias."""
+    assert str(parse_model("google/gemini-3.1-pro-preview")) == "vertex_ai/gemini-3.1-pro-preview"
+    assert str(parse_model("gemini-3.1-pro-preview")) == "vertex_ai/gemini-3.1-pro-preview"
+    assert str(parse_model("o4-mini")) == "openai/o4-mini"
 
 
 def test_temperature_and_reasoning_match_pre_litellm_behavior() -> None:

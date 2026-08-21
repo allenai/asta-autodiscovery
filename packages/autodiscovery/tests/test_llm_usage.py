@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from autodiscovery.llm_usage import (
     LOCAL_IMAGE_USAGE_MARKER,
     UsageTracker,
@@ -62,29 +63,26 @@ class _FakeChatResponse:
         self.choices = [_FakeChoice('{"ok": true}')]
 
 
-class _FakeCompletions:
+class _FakeTransport:
+    """Stand-in for autodiscovery.llm.complete that records each call."""
+
     def __init__(self):
         self.calls: list[dict] = []
 
-    def create(self, **kwargs):
-        self.calls.append(dict(kwargs))
+    def __call__(self, spec, messages, **kwargs):
+        self.calls.append({"model": str(spec), "messages": messages, **kwargs})
         n = int(kwargs.get("n", 1))
         return _FakeChatResponse(
-            model=str(kwargs.get("model", "gpt-4o")),
-            prompt_tokens=10 * n,
-            completion_tokens=2 * n,
-            total_tokens=12 * n,
+            model=str(spec), prompt_tokens=10 * n, completion_tokens=2 * n, total_tokens=12 * n
         )
 
 
-class _FakeChat:
-    def __init__(self):
-        self.completions = _FakeCompletions()
-
-
-class _FakeClient:
-    def __init__(self):
-        self.chat = _FakeChat()
+@pytest.fixture
+def transport(monkeypatch):
+    """Route autodiscovery.llm.complete at a recording fake."""
+    fake = _FakeTransport()
+    monkeypatch.setattr("autodiscovery.utils.llm.complete", fake)
+    return fake
 
 
 def test_usage_tracker_records_response_tokens() -> None:
@@ -183,13 +181,7 @@ def test_extract_local_image_usage_markers() -> None:
         "completion_tokens": 7,
         "total_tokens": 49,
     }
-    text = (
-        "before\n"
-        + LOCAL_IMAGE_USAGE_MARKER
-        + json.dumps(payload)
-        + "\n"
-        + "after\n"
-    )
+    text = "before\n" + LOCAL_IMAGE_USAGE_MARKER + json.dumps(payload) + "\n" + "after\n"
 
     entries, cleaned = extract_local_image_usage_markers(text)
     assert len(entries) == 1
@@ -221,14 +213,13 @@ def test_usage_tracker_save_events_and_summary_separately(tmp_path: Path) -> Non
     assert summary_path.exists()
 
 
-def test_query_llm_records_usage_metadata(tmp_path: Path) -> None:
+def test_query_llm_records_usage_metadata(tmp_path: Path, transport) -> None:
     """Ensure query_llm records the per-request sample count as metadata."""
     tracker = UsageTracker()
     responses = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=4,
         model="gpt-4o",
-        client=_FakeClient(),
         usage_tracker=tracker,
         usage_component="belief.main.prior",
         usage_agent_name="belief_agent",
@@ -253,14 +244,13 @@ def test_query_llm_records_usage_metadata(tmp_path: Path) -> None:
     assert event["usage"]["total_tokens"] == 48
 
 
-def test_query_llm_records_actual_n_per_request(tmp_path: Path) -> None:
+def test_query_llm_records_actual_n_per_request(tmp_path: Path, transport) -> None:
     """Ensure metadata n reflects the actual n used for each batched request."""
     tracker = UsageTracker()
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=30,
         model="gpt-5-mini",
-        client=_FakeClient(),
         usage_tracker=tracker,
         usage_component="belief.main.posterior",
         usage_agent_name="belief_agent",
@@ -275,51 +265,43 @@ def test_query_llm_records_actual_n_per_request(tmp_path: Path) -> None:
     assert [event["metadata"]["n"] for event in events] == [8, 8, 8, 6]
 
 
-def test_query_llm_passes_reasoning_effort_for_gemini() -> None:
-    """Ensure Gemini OpenAI-compatible requests include reasoning_effort."""
-    client = _FakeClient()
+def test_query_llm_passes_reasoning_effort_for_gemini(transport) -> None:
+    """Ensure Gemini requests include reasoning_effort."""
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=1,
         model="gemini-3-flash-preview",
         reasoning_effort="minimal",
-        client=client,
     )
 
-    assert len(client.chat.completions.calls) == 1
-    request = client.chat.completions.calls[0]
-    assert request["reasoning_effort"] == "minimal"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["model"] == "vertex_ai/gemini-3-flash-preview"
+    assert transport.calls[0]["reasoning_effort"] == "minimal"
 
 
-def test_query_llm_maps_minimal_reasoning_effort_for_openai_reasoning_models() -> None:
+def test_query_llm_maps_minimal_reasoning_effort_for_openai_reasoning_models(transport) -> None:
     """Ensure o-series models, which lack minimal effort, map it to low."""
-    client = _FakeClient()
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=1,
         model="o4-mini",
         reasoning_effort="minimal",
-        client=client,
     )
 
-    assert len(client.chat.completions.calls) == 1
-    request = client.chat.completions.calls[0]
-    assert request["reasoning_effort"] == "low"
+    assert transport.calls[0]["reasoning_effort"] == "low"
 
 
-def test_query_llm_keeps_minimal_reasoning_effort_for_gpt5() -> None:
+def test_query_llm_keeps_minimal_reasoning_effort_for_gpt5(transport) -> None:
     """The gpt-5 family accepts minimal effort; do not downgrade it.
 
     The old routing keyed off a ``gpt-5`` name prefix and downgraded the whole
     family. litellm records ``supports_minimal_reasoning_effort`` per model.
     """
-    client = _FakeClient()
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=1,
         model="gpt-5-mini",
         reasoning_effort="minimal",
-        client=client,
     )
 
-    assert client.chat.completions.calls[0]["reasoning_effort"] == "minimal"
+    assert transport.calls[0]["reasoning_effort"] == "minimal"

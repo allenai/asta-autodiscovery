@@ -90,14 +90,9 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 gcloud auth application-default login
 ```
 
-**Static access token (short-lived, e.g. in CI):**
-If present, this will take priority over the `GOOGLE_APPLICATION_CREDENTIALS` setting.
-```sh
-export VERTEX_ACCESS_TOKEN=$(gcloud auth print-access-token)
-```
-
-To bypass project/location lookup entirely, set `VERTEX_OPENAI_BASE_URL` to a fully-formed
-Vertex OpenAI-compatible endpoint URL.
+Vertex authenticates via Application Default Credentials, so either
+`GOOGLE_APPLICATION_CREDENTIALS` or `gcloud auth application-default login` is
+required. Raw bearer tokens (`VERTEX_ACCESS_TOKEN`) are no longer accepted.
 
 ### OpenAI
 

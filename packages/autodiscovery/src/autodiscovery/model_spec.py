@@ -126,18 +126,6 @@ class ModelSpec:
         return self.provider == GITHUB_COPILOT
 
     @property
-    def wire_model_name(self) -> str:
-        """Return the model name this provider's transport expects on the wire.
-
-        Vertex's OpenAI-compatible endpoint requires a publisher prefix
-        (``google/gemini-...``). That is a transport detail, so it is applied
-        here rather than carried through user-facing config.
-        """
-        if self.is_vertex:
-            return f"google/{self.model}"
-        return self.model
-
-    @property
     def info(self) -> dict[str, Any] | None:
         """Return litellm's registry entry for this model, or None if unmapped."""
         return _model_info(self.provider, self.model)
@@ -152,14 +140,12 @@ class ModelSpec:
 
     @property
     def supports_reasoning(self) -> bool:
-        """Whether the model takes a ``reasoning_effort`` parameter.
+        """Whether litellm's registry records reasoning support.
 
-        litellm's registry has no reasoning data for ``github_copilot`` models
-        even where the underlying model reasons, so Copilot keeps passing the
-        caller's value through to its SDK.
+        litellm drops ``reasoning_effort`` for models that do not accept it, so
+        this is only consulted for the two rules litellm cannot express:
+        :attr:`accepts_temperature` and minimal-effort normalization.
         """
-        if self.is_copilot:
-            return True
         info = self.info
         return bool(info.get("supports_reasoning")) if info else False
 

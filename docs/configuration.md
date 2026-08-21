@@ -167,10 +167,14 @@ Model access for the discovery agents.
 | `OPENAI_API_KEY` | Conditional | *(none)* | OpenAI API key. Required when using OpenAI models. |
 | `VERTEX_PROJECT_ID` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models. |
 | `VERTEX_LOCATION` | No | `global` | Vertex AI location/region. |
-| `VERTEX_OPENAI_BASE_URL` | No | *(derived)* | Overrides the base URL for the Vertex OpenAI-compatible endpoint. When unset it is derived from the project/location. |
-| `VERTEX_ACCESS_TOKEN` | Conditional | *(none)* | OAuth bearer token for Vertex. `GOOGLE_OAUTH_ACCESS_TOKEN` is accepted as a fallback. |
-| `GOOGLE_OAUTH_ACCESS_TOKEN` | No | *(none)* | Fallback OAuth token used for Vertex when `VERTEX_ACCESS_TOKEN` is not set. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Conditional | *(none)* | Service-account key for Vertex. Vertex uses Application Default Credentials; run `gcloud auth application-default login` instead for local development. |
+| `GITHUB_COPILOT_TOKEN_DIR` | Conditional | `~/.config/litellm/github_copilot` | Directory holding an `access-token` file with a GitHub OAuth token. Required when using `github_copilot/` models. |
 | `ASTA_AGENTS_MODEL` | No | `openai/gpt-5-mini` | Model used by the `agents` package (LiteLLM model string). |
+
+`VERTEX_ACCESS_TOKEN`, `GOOGLE_OAUTH_ACCESS_TOKEN` and `VERTEX_OPENAI_BASE_URL`
+are no longer read. Vertex traffic goes through litellm's Vertex client, which
+authenticates with ADC and refreshes tokens itself, so a raw bearer token and a
+hand-set OpenAI-compatible base URL no longer have a place.
 
 ### LLM retry / backoff
 

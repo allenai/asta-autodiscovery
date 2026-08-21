@@ -18,7 +18,6 @@ from autodiscovery.dataset import (
     resolve_local_dataset_source,
 )
 from autodiscovery.future_utils import gather_completed_futures
-from autodiscovery.llm_retry import apply_openai_wrapper_usage_tracking
 from autodiscovery.llm_usage import (
     UsageTracker,
     clear_ag2_usage_context,
@@ -408,12 +407,7 @@ def run_mcts(
 
     try:
         if agent_usage_mode == "per_response":
-            if not apply_openai_wrapper_usage_tracking():
-                raise RuntimeError(
-                    "Agent usage mode 'per_response' requires AG2 OpenAIWrapper patching, "
-                    "but the patch could not be applied. Rerun with "
-                    "--agent_usage_mode=summary_delta to use explicit fallback mode."
-                )
+            # LiteLLMAG2Client records each response as it is produced.
             configure_ag2_usage_tracking(usage_tracker)
         elif agent_usage_mode == "summary_delta":
             configure_ag2_usage_tracking(None)

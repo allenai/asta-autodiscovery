@@ -54,35 +54,44 @@ the model flags is preferred.
 
 ## Credentials
 
-The default models (`gemini-3.1-pro-preview`, `gemini-3-flash-preview`) run on
-Vertex AI. Set:
+All model traffic goes through [litellm](https://docs.litellm.ai/), so
+credentials follow litellm's conventions per provider.
+
+**Vertex AI** (the default models `gemini-3.1-pro-preview`,
+`gemini-3-flash-preview`) uses Application Default Credentials:
 
 ```sh
 export VERTEX_PROJECT_ID=your-gcp-project
 export VERTEX_LOCATION=global            # optional, defaults to global
-export VERTEX_ACCESS_TOKEN=$(gcloud auth print-access-token)
+
+# Either a service-account key...
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+# ...or local user credentials:
+gcloud auth application-default login
 ```
 
-To use OpenAI models instead, pass `--model openai/gpt-...` and export
-`OPENAI_API_KEY`.
+> **Changed:** `VERTEX_ACCESS_TOKEN` is no longer used. litellm's Vertex client
+> authenticates with ADC and refreshes on its own, so a raw access token from
+> `gcloud auth print-access-token` has no equivalent. Use
+> `gcloud auth application-default login` locally; deployments already using
+> `GOOGLE_APPLICATION_CREDENTIALS` need no change.
+
+**OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 
 ### GitHub Copilot
 
-GitHub Copilot is an optional provider. Install the extra and authenticate the
-Copilot CLI with an account that has an active Copilot seat:
+GitHub Copilot needs no extra install — litellm speaks it natively. It reads a
+GitHub OAuth token from a file, so no interactive login happens at run time:
 
 ```sh
-pip install 'asta-autodiscovery[copilot]'
-copilot login
-python -m autodiscovery.copilot doctor --json
+export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # default ~/.config/litellm/github_copilot
+# the directory must contain a file named `access-token`
 ```
 
-If the SDK cannot download its runtime, install the Copilot CLI separately and
-point the SDK at it:
-
-```sh
-export COPILOT_CLI_PATH=/path/to/copilot
-```
+> **Changed:** Copilot no longer shells out to the `copilot` CLI via
+> `github-copilot-sdk`, and the `[copilot]` extra and
+> `python -m autodiscovery.copilot doctor` command are gone. The account still
+> needs an active Copilot seat.
 
 Select Copilot per role with the `github_copilot/` prefix:
 

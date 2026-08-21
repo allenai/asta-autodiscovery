@@ -263,3 +263,41 @@ def test_resolution_never_triggers_copilot_device_flow(monkeypatch) -> None:
     assert resolved.mode == "chat"
     with pytest.raises(ModelSpecError, match="not in github_copilot's catalog"):
         validate_model("github_copilot/gemini-3.1-pro-preview", flag="--model")
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        # Defaults and common overrides.
+        "gemini-3.1-pro-preview",
+        "gemini-3-flash-preview",
+        "o4-mini",
+        "gpt-4o",
+        "text-embedding-3-large",
+        # Names that exist only in Copilot's catalog. litellm does not route
+        # these to github_copilot today, so bare-name resolution stays safe --
+        # but nothing structurally guarantees that, hence the test.
+        "mai-code-1-flash",
+        "gpt-41-copilot",
+        "claude-opus-4.6-fast",
+        "gpt-5.3-codex",
+    ],
+)
+def test_bare_name_resolution_never_triggers_copilot_device_flow(monkeypatch, spec: str) -> None:
+    """Bare names go through litellm's resolver, which can authenticate.
+
+    ``parse_model`` hands an unprefixed name to ``litellm.get_llm_provider()``,
+    and that blocks on GitHub's device flow for anything it routes to
+    ``github_copilot``. No bare name resolves that way today. If a future litellm
+    changes that, this fails instead of hanging a deployment.
+    """
+    from litellm.llms.github_copilot.authenticator import Authenticator
+
+    def fail(*args, **kwargs):
+        raise AssertionError(f"resolving bare name {spec!r} attempted Copilot authentication")
+
+    monkeypatch.setattr(Authenticator, "get_api_key", fail)
+    monkeypatch.setattr(Authenticator, "get_access_token", fail)
+    monkeypatch.setattr(Authenticator, "_login", fail)
+
+    assert not parse_model(spec).is_copilot

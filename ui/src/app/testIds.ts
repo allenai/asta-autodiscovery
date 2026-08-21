@@ -13,7 +13,7 @@ export const TEST_ID_BACK_BUTTON = 'back-button';
 
 // Homepage
 export const TEST_ID_AI2_LOGO_LINK = 'ai2-logo-link';
-export const TEST_ID_ASTA_LABS_LOGO_LINK = 'asta-labs-logo-link';
+export const TEST_ID_ASTA_LOGO_LINK = 'asta-logo-link';
 export const TEST_ID_EXAMPLE_SESSION_ITEM = 'example-session-item';
 
 // ToS / Footer

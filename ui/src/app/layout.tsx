@@ -19,7 +19,7 @@ import HeapAnalyticsLoader from '@/components/HeapAnalyticsLoader';
 import { Toasts } from '@/components/Toasts';
 
 export const metadata: Metadata = {
-    title: 'AstaLabs AutoDiscovery',
+    title: 'Asta AutoDiscovery',
 };
 
 // This layout will be applied to every page in the app.

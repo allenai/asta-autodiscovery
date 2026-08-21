@@ -38,7 +38,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="gemini-3-flash-preview",
+            default="vertex_ai/gemini-3-flash-preview",
             help="LLM model for hypothesis merging decisions. Accepts litellm's <provider>/<model> form.",
         )
         self.add_argument(
@@ -138,7 +138,7 @@ def get_hypotheses(in_nodes_list):
 
 def get_embedding(
     texts,
-    model="text-embedding-3-large",
+    model="openai/text-embedding-3-large",
     dimensions=None,
     batch_size=128,
     n_attempts=1,
@@ -188,7 +188,7 @@ def get_llm_merge_decision(
     hyp2: str,
     n_samples: int = 30,
     threshold: float = 0.7,
-    model: str = "gemini-3-flash-preview",
+    model: str = "vertex_ai/gemini-3-flash-preview",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -242,8 +242,8 @@ def dedupe(
     merge_threshold=0.7,
     seed=42,
     rep_mode="biggest",
-    model="gemini-3-flash-preview",
-    embedding_model="text-embedding-3-large",
+    model="vertex_ai/gemini-3-flash-preview",
+    embedding_model="openai/text-embedding-3-large",
     embedding_dimensions=None,
     n_nodes=None,
     verbose=False,

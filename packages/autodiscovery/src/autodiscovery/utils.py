@@ -44,7 +44,7 @@ def normalize_reasoning_effort(spec: ModelSpec, reasoning_effort: str | None) ->
 def query_llm(
     messages: list[dict[str, str]],
     n_samples: int,
-    model: str = "gemini-3.1-pro-preview",
+    model: str = "vertex_ai/gemini-3.1-pro-preview",
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,

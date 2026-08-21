@@ -99,7 +99,7 @@ def save_belief_distribution(
     current_hypothesis,
     context,
     distribution,
-    model="gpt-4o",
+    model="openai/gpt-4o",
     n_samples=30,
     is_prior=False,
     temperature=None,

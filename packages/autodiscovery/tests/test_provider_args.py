@@ -31,23 +31,42 @@ def engine_args(*extra: str) -> Namespace:
 @pytest.mark.parametrize(
     ("spec", "provider", "model"),
     [
-        # Bare names keep resolving the way existing deployment configs expect.
-        ("gemini-3.1-pro-preview", "vertex_ai", "gemini-3.1-pro-preview"),
-        ("gemini-3-flash-preview", "vertex_ai", "gemini-3-flash-preview"),
-        ("o4-mini", "openai", "o4-mini"),
-        ("gpt-4o", "openai", "gpt-4o"),
-        ("text-embedding-3-large", "openai", "text-embedding-3-large"),
-        # litellm's own convention.
         ("vertex_ai/gemini-3.1-pro-preview", "vertex_ai", "gemini-3.1-pro-preview"),
+        ("vertex_ai/gemini-3-flash-preview", "vertex_ai", "gemini-3-flash-preview"),
         ("openai/o4-mini", "openai", "o4-mini"),
+        ("openai/gpt-4o", "openai", "gpt-4o"),
+        ("openai/text-embedding-3-large", "openai", "text-embedding-3-large"),
         ("github_copilot/claude-haiku-4.5", "github_copilot", "claude-haiku-4.5"),
-        # google/ is a Vertex wire-format detail retained as a legacy alias.
-        ("google/gemini-3.1-pro-preview", "vertex_ai", "gemini-3.1-pro-preview"),
     ],
 )
 def test_parse_model_resolves_provider(spec: str, provider: str, model: str) -> None:
     resolved = parse_model(spec)
+
     assert (resolved.provider, resolved.model) == (provider, model)
+    assert str(resolved) == spec
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "gemini-3.1-pro-preview",
+        "o4-mini",
+        "gpt-4o",
+        "text-embedding-3-large",
+        # google/ was Vertex's OpenAI-compatible wire prefix, never a litellm one.
+        "google/gemini-3.1-pro-preview",
+    ],
+)
+def test_parse_model_requires_a_litellm_provider_prefix(spec: str) -> None:
+    """Unqualified and non-litellm names are rejected rather than guessed at."""
+    with pytest.raises(ModelSpecError):
+        parse_model(spec)
+
+
+def test_unqualified_name_error_names_the_qualified_form() -> None:
+    """The error should say exactly what to write instead."""
+    with pytest.raises(ModelSpecError, match=r"vertex_ai/gemini-3\.1-pro-preview"):
+        parse_model("gemini-3.1-pro-preview")
 
 
 def test_parse_model_rejects_non_litellm_prefix() -> None:
@@ -56,50 +75,56 @@ def test_parse_model_rejects_non_litellm_prefix() -> None:
 
 
 def test_parse_model_rejects_provider_without_a_transport() -> None:
-    # litellm resolves a bare claude-* name to Anthropic direct, which this
-    # package cannot call. The Copilot-hosted model must be named explicitly.
+    """Anthropic direct is a real litellm provider, but not one we route to."""
     with pytest.raises(ModelSpecError, match="no transport for"):
-        parse_model("claude-haiku-4.5")
+        parse_model("anthropic/claude-haiku-4.5")
     assert parse_model("github_copilot/claude-haiku-4.5").is_copilot
 
 
-def test_parse_model_falls_back_for_models_litellm_has_not_mapped() -> None:
-    """A model newer than the pinned litellm must not break an existing config."""
-    assert parse_model("gemini-4.7-pro-preview").is_vertex
-    assert parse_model("some-unmapped-model").is_openai
+def test_parse_model_accepts_models_litellm_has_not_mapped() -> None:
+    """A model newer than the pinned litellm still resolves from its prefix."""
+    resolved = parse_model("vertex_ai/gemini-4.7-pro-preview")
 
-
-def test_default_provider_namespaces_bare_names() -> None:
-    resolved = parse_model("claude-haiku-4.5", default_provider="copilot")
-    assert str(resolved) == "github_copilot/claude-haiku-4.5"
+    assert resolved.is_vertex
+    assert resolved.info is None
 
 
 # --- capabilities ----------------------------------------------------------
 
 
-def test_google_prefix_is_accepted_and_canonicalized() -> None:
-    """google/ was Vertex wire format; litellm owns that now, so it is just an alias."""
-    assert str(parse_model("google/gemini-3.1-pro-preview")) == "vertex_ai/gemini-3.1-pro-preview"
-    assert str(parse_model("gemini-3.1-pro-preview")) == "vertex_ai/gemini-3.1-pro-preview"
-    assert str(parse_model("o4-mini")) == "openai/o4-mini"
-
-
-def test_temperature_and_reasoning_match_pre_litellm_behavior() -> None:
-    o_series = parse_model("o4-mini")
-    assert o_series.supports_reasoning
+def test_temperature_and_n_rules_are_provider_derived() -> None:
+    """The two rules litellm's registry cannot express."""
+    o_series = parse_model("openai/o4-mini")
     assert not o_series.accepts_temperature
     assert o_series.max_n == 8
 
-    gemini = parse_model("gemini-3.1-pro-preview")
-    assert gemini.supports_reasoning
+    gemini = parse_model("vertex_ai/gemini-3.1-pro-preview")
     # Gemini reasoning models still take a temperature; only OpenAI's reject it.
     assert gemini.accepts_temperature
     assert gemini.max_n == 5
 
-    gpt4o = parse_model("gpt-4o")
-    assert not gpt4o.supports_reasoning
+    gpt4o = parse_model("openai/gpt-4o")
     assert gpt4o.accepts_temperature
     assert gpt4o.max_n is None
+
+
+def test_minimal_reasoning_effort_uses_the_registry_not_a_name_prefix() -> None:
+    """Downgrade minimal->low only where the model really lacks it.
+
+    The old ``startswith("o")/"gpt-5"`` test downgraded the whole gpt-5 family,
+    which does accept ``minimal``. litellm records that per model.
+    """
+    from autodiscovery.utils import normalize_reasoning_effort
+
+    assert normalize_reasoning_effort(parse_model("openai/o4-mini"), "minimal") == "low"
+    assert normalize_reasoning_effort(parse_model("openai/gpt-5-mini"), "minimal") == "minimal"
+    # Gemini passes the caller's value through.
+    assert (
+        normalize_reasoning_effort(parse_model("vertex_ai/gemini-3-flash-preview"), "minimal")
+        == "minimal"
+    )
+    assert normalize_reasoning_effort(parse_model("openai/o4-mini"), "high") == "high"
+    assert normalize_reasoning_effort(parse_model("openai/o4-mini"), None) is None
 
 
 # --- validate_model --------------------------------------------------------
@@ -107,30 +132,71 @@ def test_temperature_and_reasoning_match_pre_litellm_behavior() -> None:
 
 def test_validate_model_rejects_a_vision_model_without_image_support() -> None:
     with pytest.raises(ModelSpecError, match="does not support image input"):
-        validate_model("gpt-3.5-turbo", flag="--vision_model", require_vision=True)
+        validate_model("openai/gpt-3.5-turbo", flag="--vision_model", require_vision=True)
     # The same model is fine when vision is not required.
-    assert validate_model("gpt-3.5-turbo", flag="--model").is_openai
+    assert validate_model("openai/gpt-3.5-turbo", flag="--model").is_openai
 
 
 def test_validate_model_rejects_a_mode_mismatch() -> None:
     with pytest.raises(ModelSpecError, match="'chat' model is required"):
-        validate_model("text-embedding-3-large", flag="--model")
+        validate_model("openai/text-embedding-3-large", flag="--model")
     with pytest.raises(ModelSpecError, match="'embedding' model is required"):
-        validate_model("gpt-4o", flag="--embedding_model", mode="embedding")
+        validate_model("openai/gpt-4o", flag="--embedding_model", mode="embedding")
+
+
+def test_validate_model_rejects_a_model_missing_from_copilots_catalog() -> None:
+    """Copilot's litellm catalog is a complete enumeration, so absence is an error."""
+    with pytest.raises(ModelSpecError, match="not in github_copilot's catalog"):
+        validate_model("github_copilot/gemini-3.1-pro-preview", flag="--model")
 
 
 def test_validate_model_allows_models_litellm_has_not_mapped() -> None:
-    resolved = validate_model("gemini-4.7-pro-preview", flag="--model")
+    """Open-catalog providers ship models before litellm maps them."""
+    resolved = validate_model("vertex_ai/gemini-4.7-pro-preview", flag="--model")
+
     assert resolved.is_vertex
     assert resolved.info is None
+
+
+def test_validation_never_triggers_copilot_device_flow(monkeypatch) -> None:
+    """litellm must not run GitHub's interactive auth during validation.
+
+    ``litellm.get_llm_provider()`` and the ``litellm.supports_*()`` helpers run
+    GitHub's device-flow login for ``github_copilot/`` models -- they print a
+    device code and block for three 60s attempts, with no env var to disable it.
+    Requiring a provider prefix means the resolver is never called at all, and
+    capability lookups pass ``custom_llm_provider`` explicitly. This test fails
+    if anything reintroduces an authenticating litellm call.
+    """
+    from litellm.llms.github_copilot.authenticator import Authenticator
+
+    def fail(*args, **kwargs):
+        raise AssertionError("model resolution attempted GitHub Copilot authentication")
+
+    monkeypatch.setattr(Authenticator, "get_api_key", fail)
+    monkeypatch.setattr(Authenticator, "get_access_token", fail)
+    monkeypatch.setattr(Authenticator, "_login", fail)
+
+    resolved = validate_model("github_copilot/claude-haiku-4.5", flag="--model")
+    assert resolved.is_copilot
+    assert resolved.supports_vision
 
 
 # --- CLI boundary ----------------------------------------------------------
 
 
-def test_engine_defaults_resolve_to_the_providers_used_today() -> None:
+def test_engine_defaults_are_litellm_qualified() -> None:
     args = engine_args()
+
+    assert args.model == "vertex_ai/gemini-3.1-pro-preview"
+    assert args.belief_model == "vertex_ai/gemini-3-flash-preview"
+    assert args.vision_model == "vertex_ai/gemini-3.1-pro-preview"
+    assert args.embedding_model == "openai/text-embedding-3-large"
     resolve_model_args(args)
+
+
+def test_easy_cli_shares_the_engine_model_defaults() -> None:
+    args = build_parser().parse_args(["--out_dir", "results", "--n_experiments", "1", "data.csv"])
 
     assert args.model == "vertex_ai/gemini-3.1-pro-preview"
     assert args.belief_model == "vertex_ai/gemini-3-flash-preview"
@@ -138,23 +204,11 @@ def test_engine_defaults_resolve_to_the_providers_used_today() -> None:
     assert args.embedding_model == "openai/text-embedding-3-large"
 
 
-def test_prefixed_model_flags_survive_the_boundary() -> None:
-    args = engine_args(
-        "--model",
-        "github_copilot/claude-haiku-4.5",
-        "--belief_model",
-        "openai/gpt-4o",
-        "--vision_model",
-        "github_copilot/gemini-3-pro-preview",
-        "--embedding_model",
-        "github_copilot/text-embedding-3-small",
-    )
-    resolve_model_args(args)
-
-    assert args.model == "github_copilot/claude-haiku-4.5"
-    assert args.belief_model == "openai/gpt-4o"
-    assert args.vision_model == "github_copilot/gemini-3-pro-preview"
-    assert args.embedding_model == "github_copilot/text-embedding-3-small"
+@pytest.mark.parametrize("flag", ["--llm_provider", "--embedding_provider"])
+def test_provider_flags_are_gone(flag: str) -> None:
+    """Both flags were replaced by the provider prefix on each model flag."""
+    with pytest.raises(SystemExit):
+        engine_args(flag, "copilot")
 
 
 def test_mixed_provider_runs_are_expressible() -> None:
@@ -171,154 +225,8 @@ def test_mixed_provider_runs_are_expressible() -> None:
     assert parse_model(args.vision_model).is_vertex
 
 
-def test_deprecated_provider_flags_still_namespace_bare_model_names() -> None:
-    args = engine_args(
-        "--llm_provider",
-        "copilot",
-        "--embedding_provider",
-        "copilot",
-        "--model",
-        "claude-haiku-4.5",
-        "--belief_model",
-        "gpt-4o",
-        "--vision_model",
-        "gemini-3-pro-preview",
-    )
-    resolve_model_args(args)
+def test_unqualified_model_flag_fails_at_startup() -> None:
+    args = engine_args("--model", "gemini-3.1-pro-preview")
 
-    assert args.model == "github_copilot/claude-haiku-4.5"
-    assert args.belief_model == "github_copilot/gpt-4o"
-    assert args.vision_model == "github_copilot/gemini-3-pro-preview"
-    # Copilot's catalog has no text-embedding-3-large, so it gets its own default.
-    assert args.embedding_model == "github_copilot/text-embedding-3-small"
-
-
-def test_copilot_provider_flag_with_default_models_fails_at_startup() -> None:
-    """The #59 failure mode, now caught before the first model call.
-
-    ``--llm_provider copilot`` with the default ``--model
-    gemini-3.1-pro-preview`` used to fail partway into a run; Copilot's catalog
-    has ``gemini-3-pro-preview``, not ``gemini-3.1-pro-preview``.
-    """
-    args = engine_args("--llm_provider", "copilot")
-    with pytest.raises(ModelSpecError, match="not in github_copilot's catalog"):
+    with pytest.raises(ModelSpecError, match="missing a provider"):
         resolve_model_args(args)
-
-
-def test_easy_cli_shares_the_engine_model_defaults() -> None:
-    args = build_parser().parse_args(["--out_dir", "results", "--n_experiments", "1", "data.csv"])
-
-    assert args.model == "gemini-3.1-pro-preview"
-    assert args.belief_model == "gemini-3-flash-preview"
-    assert args.vision_model == "gemini-3.1-pro-preview"
-    assert args.llm_provider is None
-    assert args.embedding_provider is None
-
-
-def test_easy_cli_accepts_prefixed_models() -> None:
-    args = build_parser().parse_args(
-        [
-            "--out_dir",
-            "results",
-            "--n_experiments",
-            "1",
-            "--model",
-            "github_copilot/claude-haiku-4.5",
-            "--embedding_model",
-            "github_copilot/text-embedding-3-small",
-            "--embedding_dimensions",
-            "1536",
-            "--dedupe",
-            "data.csv",
-        ]
-    )
-
-    assert args.model == "github_copilot/claude-haiku-4.5"
-    assert args.embedding_model == "github_copilot/text-embedding-3-small"
-    assert args.embedding_dimensions == 1536
-    assert args.dedupe is True
-
-
-def test_resolution_never_triggers_copilot_device_flow(monkeypatch) -> None:
-    """litellm must not run GitHub's interactive auth during model resolution.
-
-    ``litellm.get_llm_provider()`` and the ``litellm.supports_*()`` helpers run
-    GitHub's device-flow login for ``github_copilot/`` models -- they print a
-    device code and block for three 60s attempts. There is no litellm env var to
-    disable that, so it would hang any deployed (non-TTY) run. model_spec avoids
-    it by splitting the provider prefix itself and only reading litellm's static
-    registry; this test fails if anything reintroduces an authenticating call.
-    """
-    from litellm.llms.github_copilot.authenticator import Authenticator
-
-    def fail(*args, **kwargs):
-        raise AssertionError("model resolution attempted GitHub Copilot authentication")
-
-    monkeypatch.setattr(Authenticator, "get_api_key", fail)
-    monkeypatch.setattr(Authenticator, "get_access_token", fail)
-    monkeypatch.setattr(Authenticator, "_login", fail)
-
-    resolved = validate_model("github_copilot/claude-haiku-4.5", flag="--model")
-    assert resolved.is_copilot
-    assert resolved.supports_vision
-    assert resolved.info is not None
-    with pytest.raises(ModelSpecError, match="not in github_copilot's catalog"):
-        validate_model("github_copilot/gemini-3.1-pro-preview", flag="--model")
-
-
-@pytest.mark.parametrize(
-    "spec",
-    [
-        # Defaults and common overrides.
-        "gemini-3.1-pro-preview",
-        "gemini-3-flash-preview",
-        "o4-mini",
-        "gpt-4o",
-        "text-embedding-3-large",
-        # Names that exist only in Copilot's catalog. litellm does not route
-        # these to github_copilot today, so bare-name resolution stays safe --
-        # but nothing structurally guarantees that, hence the test.
-        "mai-code-1-flash",
-        "gpt-41-copilot",
-        "claude-opus-4.6-fast",
-        "gpt-5.3-codex",
-    ],
-)
-def test_bare_name_resolution_never_triggers_copilot_device_flow(monkeypatch, spec: str) -> None:
-    """Bare names go through litellm's resolver, which can authenticate.
-
-    ``parse_model`` hands an unprefixed name to ``litellm.get_llm_provider()``,
-    and that blocks on GitHub's device flow for anything it routes to
-    ``github_copilot``. No bare name resolves that way today. If a future litellm
-    changes that, this fails instead of hanging a deployment.
-    """
-    from litellm.llms.github_copilot.authenticator import Authenticator
-
-    def fail(*args, **kwargs):
-        raise AssertionError(f"resolving bare name {spec!r} attempted Copilot authentication")
-
-    monkeypatch.setattr(Authenticator, "get_api_key", fail)
-    monkeypatch.setattr(Authenticator, "get_access_token", fail)
-    monkeypatch.setattr(Authenticator, "_login", fail)
-
-    assert not parse_model(spec).is_copilot
-
-
-def test_minimal_reasoning_effort_uses_the_registry_not_a_name_prefix() -> None:
-    """Downgrade minimal->low only where the model really lacks it.
-
-    The old ``startswith("o")/"gpt-5"`` test downgraded the whole gpt-5 family,
-    which does accept ``minimal``. litellm records that per model.
-    """
-    from autodiscovery.utils import normalize_reasoning_effort
-
-    assert normalize_reasoning_effort(parse_model("o4-mini"), "minimal") == "low"
-    assert normalize_reasoning_effort(parse_model("gpt-5-mini"), "minimal") == "minimal"
-    # Gemini and Copilot pass the caller's value through, as before.
-    assert normalize_reasoning_effort(parse_model("gemini-3-flash-preview"), "minimal") == "minimal"
-    assert (
-        normalize_reasoning_effort(parse_model("github_copilot/claude-haiku-4.5"), "minimal")
-        == "minimal"
-    )
-    assert normalize_reasoning_effort(parse_model("o4-mini"), "high") == "high"
-    assert normalize_reasoning_effort(parse_model("o4-mini"), None) is None

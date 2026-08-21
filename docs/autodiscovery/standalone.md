@@ -25,12 +25,18 @@ Every model flag — `--model`, `--belief_model`, `--vision_model`,
 --model github_copilot/claude-haiku-4.5
 ```
 
-A bare model name still works and is resolved to a provider by litellm, so
-existing configurations keep running unchanged: `gemini-3.1-pro-preview` goes to
-Vertex AI, `o4-mini` and `text-embedding-3-large` go to OpenAI. Prefixes matter
-where a bare name is ambiguous — bare `claude-haiku-4.5` names Anthropic direct,
-which this package cannot call; the Copilot-hosted model is
-`github_copilot/claude-haiku-4.5`.
+The prefix is **required**. A bare name is ambiguous — `claude-haiku-4.5` is
+Anthropic direct or Copilot depending on who you ask — and resolving one means
+asking litellm, which authenticates for some providers. Unqualified names are
+rejected at startup with the qualified form to use:
+
+```
+'gemini-3.1-pro-preview' is missing a provider. Model names are litellm-qualified
+as <provider>/<model>, e.g. vertex_ai/gemini-3.1-pro-preview or openai/gemini-3.1-pro-preview.
+```
+
+`google/<model>` is also rejected: it was Vertex's OpenAI-compatible wire prefix,
+never a litellm provider. Use `vertex_ai/<model>`.
 
 Because the provider travels with each flag, roles can use different providers
 in one run — Copilot for chat, Vertex for plot analysis:
@@ -45,20 +51,18 @@ auto-discovery \
 Each flag is checked against litellm's offline model registry at startup, before
 the first model call: the vision model must support image input, the embedding
 model must be an embedding model, and Copilot models must exist in Copilot's
-catalog. `google/<model>` is still accepted as a legacy alias for
-`vertex_ai/<model>`.
+catalog.
 
-`--llm_provider` and `--embedding_provider` are deprecated. They still set the
-provider assumed for bare model names in their respective flags, but prefixing
-the model flags is preferred.
+> **Changed:** `--llm_provider` and `--embedding_provider` are removed. The
+> provider now travels with each model flag.
 
 ## Credentials
 
 All model traffic goes through [litellm](https://docs.litellm.ai/), so
 credentials follow litellm's conventions per provider.
 
-**Vertex AI** (the default models `gemini-3.1-pro-preview`,
-`gemini-3-flash-preview`) uses Application Default Credentials:
+**Vertex AI** (the default models `vertex_ai/gemini-3.1-pro-preview`,
+`vertex_ai/gemini-3-flash-preview`) uses Application Default Credentials:
 
 ```sh
 export VERTEX_PROJECT_ID=your-gcp-project
@@ -107,8 +111,7 @@ auto-discovery \
    data/measurements.csv
 ```
 
-Use unprefixed (or `vertex_ai/`/`openai/`) model names to preserve the existing
-Vertex/OpenAI behavior. Copilot honors `--temperature` and
+Copilot honors `--temperature` and
 `--belief_temperature` when the selected model permits that value. Some reasoning
 modes constrain temperature at the provider.
 

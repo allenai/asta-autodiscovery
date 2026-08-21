@@ -1,11 +1,11 @@
 """Provider/model resolution built on litellm's naming convention and registry.
 
 Every user-facing model flag (``--model``, ``--belief_model``, ``--vision_model``,
-``--embedding_model``) accepts litellm's ``<provider>/<model>`` form, where the
+``--embedding_model``) takes litellm's ``<provider>/<model>`` form, where the
 provider is one of litellm's snake_case slugs (``openai``, ``vertex_ai``,
-``gemini``, ``github_copilot``, ...). Bare model names keep working: litellm
-resolves ``o4-mini`` to ``openai`` and ``gemini-3.1-pro-preview`` to
-``vertex_ai`` on its own, so existing deployment configs are unaffected.
+``gemini``, ``github_copilot``, ...). The prefix is required: a bare name is
+ambiguous (``claude-haiku-4.5`` is Anthropic direct or Copilot depending on who
+you ask) and resolving one means asking litellm, which authenticates.
 
 This module is the single place that answers "which provider, and what can this
 model do". Call sites branch on :class:`ModelSpec` fields instead of sniffing
@@ -36,15 +36,6 @@ from typing import Any
 OPENAI = "openai"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
-
-#: Prefixes accepted at the CLI boundary that are not litellm provider slugs.
-#: ``google/`` is Vertex's OpenAI-compatible wire format, which leaked into
-#: user-facing model names before this module existed. ``copilot`` is the value
-#: of the deprecated ``--llm_provider``/``--embedding_provider`` flags.
-_PROVIDER_ALIASES = {
-    "google": VERTEX_AI,
-    "copilot": GITHUB_COPILOT,
-}
 
 #: Providers whose transport is implemented in this package.
 SUPPORTED_PROVIDERS = (OPENAI, VERTEX_AI, GITHUB_COPILOT)
@@ -178,68 +169,35 @@ class ModelSpec:
         return _MAX_N_BY_PROVIDER.get(self.provider)
 
 
-def canonical_provider(name: str) -> str:
-    """Return the litellm slug for a provider name, resolving legacy aliases."""
-    return _PROVIDER_ALIASES.get(name, name)
-
-
-def parse_model(spec: str, *, default_provider: str | None = None) -> ModelSpec:
-    """Resolve a model flag to a provider and bare model name.
+def parse_model(spec: str) -> ModelSpec:
+    """Resolve a litellm ``<provider>/<model>`` name.
 
     Args:
-        spec: ``<provider>/<model>`` or a bare model name.
-        default_provider: Provider to assume for a bare model name, from the
-            deprecated ``--llm_provider``/``--embedding_provider`` flags. When
-            omitted, litellm resolves the bare name itself.
+        spec: A litellm-qualified model name, e.g. ``vertex_ai/gemini-3-flash-preview``.
 
     Returns:
         The resolved :class:`ModelSpec`.
 
     Raises:
-        ModelSpecError: If the prefix is not a litellm provider, the provider
-            has no transport here, or a bare name cannot be resolved.
+        ModelSpecError: If the name is unqualified, the prefix is not a litellm
+            provider, or the provider has no transport here.
     """
     if not spec or not spec.strip():
         raise ModelSpecError("Model name must not be empty")
     spec = spec.strip()
 
-    prefix, sep, remainder = spec.partition("/")
-    if sep and remainder:
-        provider = canonical_provider(prefix)
-        if provider not in _provider_slugs():
-            raise ModelSpecError(
-                f"'{prefix}' in '{spec}' is not a litellm provider. Use one of "
-                f"{', '.join(SUPPORTED_PROVIDERS)}, or a bare model name."
-            )
-        return _checked(ModelSpec(provider=provider, model=remainder), spec)
-
-    if default_provider is not None:
-        provider = canonical_provider(default_provider)
-        return _checked(ModelSpec(provider=provider, model=spec), spec)
-
-    try:
-        model, provider, *_ = _litellm().get_llm_provider(spec)
-    except Exception:
-        return _checked(ModelSpec(provider=_legacy_provider(spec), model=spec), spec)
+    provider, sep, model = spec.partition("/")
+    if not sep or not model:
+        raise ModelSpecError(
+            f"'{spec}' is missing a provider. Model names are litellm-qualified as "
+            f"<provider>/<model>, e.g. vertex_ai/{spec} or openai/{spec}."
+        )
+    if provider not in _provider_slugs():
+        raise ModelSpecError(
+            f"'{provider}' in '{spec}' is not a litellm provider. Use one of "
+            f"{', '.join(SUPPORTED_PROVIDERS)}."
+        )
     return _checked(ModelSpec(provider=provider, model=model), spec)
-
-
-def _legacy_provider(spec: str) -> str:
-    """Route a bare name litellm cannot resolve, the way this package used to.
-
-    litellm only resolves bare names it has in its registry, so a model released
-    after the pinned litellm version -- ``gemini-3.2-pro-preview``, say -- fails
-    lookup even though the run would work. Falling back to the pre-litellm
-    heuristic (``gemini*`` to Vertex, everything else to OpenAI) keeps existing
-    deployment configs working. This is the one name-prefix test left in the
-    codebase, and qualifying the flag as ``<provider>/<model>`` skips it.
-    """
-    provider = VERTEX_AI if spec.split("/")[-1].startswith("gemini") else OPENAI
-    print(
-        f"[model_spec] '{spec}' is not in litellm's model registry; routing to "
-        f"'{provider}' by name. Qualify it as '{provider}/{spec}' to make this explicit."
-    )
-    return provider
 
 
 def _checked(resolved: ModelSpec, spec: str) -> ModelSpec:
@@ -257,7 +215,6 @@ def validate_model(
     spec: str,
     *,
     flag: str,
-    default_provider: str | None = None,
     mode: str = "chat",
     require_vision: bool = False,
 ) -> ModelSpec:
@@ -268,9 +225,8 @@ def validate_model(
     that. Checks only fire when litellm actually knows the model.
 
     Args:
-        spec: ``<provider>/<model>`` or a bare model name.
+        spec: A litellm-qualified ``<provider>/<model>`` name.
         flag: CLI flag name, used in messages.
-        default_provider: Provider to assume for a bare model name.
         mode: Expected litellm mode, ``chat`` or ``embedding``.
         require_vision: Whether the model must accept image input.
 
@@ -280,7 +236,7 @@ def validate_model(
     Raises:
         ModelSpecError: If the model is unusable for its role.
     """
-    resolved = parse_model(spec, default_provider=default_provider)
+    resolved = parse_model(spec)
     info = resolved.info
 
     if info is None:

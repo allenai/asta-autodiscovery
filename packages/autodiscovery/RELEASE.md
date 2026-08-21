@@ -56,16 +56,16 @@ Run `auto-discovery --help` to see the full set of options.
 
 ## Authentication
 
-The agent talks to model providers through their OpenAI-compatible endpoints. The provider is
-chosen per-model from the model name: anything starting with `gemini` is routed through Google
-Vertex AI; everything else (e.g. `gpt-4o`) goes to OpenAI. You only need to configure the
-providers for the models you actually select via `--model`, `--belief_model`, and
-`--vision_model`.
+All model traffic goes through [litellm](https://docs.litellm.ai/), and every model flag names
+its provider explicitly as `<provider>/<model>` — for example
+`vertex_ai/gemini-3.1-pro-preview`, `openai/o4-mini`, `github_copilot/claude-haiku-4.5`. You only
+need to configure the providers you actually name in `--model`, `--belief_model`,
+`--vision_model` and `--embedding_model`.
 
-### Gemini (Vertex AI)
+### Vertex AI
 
-Used when any of `--model`, `--belief_model`, or `--vision_model` is a `gemini-*` name. The
-defaults are Gemini models, so this is required unless you override all three.
+Used when a model flag names `vertex_ai/...`. The defaults are Vertex models, so this is required
+unless you override them all.
 
 Pick one of the following. In all cases, set the project (and optionally location) so the agent
 knows which Vertex endpoint to call:
@@ -96,24 +96,36 @@ required. Raw bearer tokens (`VERTEX_ACCESS_TOKEN`) are no longer accepted.
 
 ### OpenAI
 
-Used when any of `--model`, `--belief_model`, or `--vision_model` is a non-Gemini name
-(e.g. `gpt-4o`, `gpt-4o-mini`).
+Used when a model flag names `openai/...` (e.g. `openai/gpt-4o`).
 
 ```sh
 export OPENAI_API_KEY=sk-...
 ```
 
+### GitHub Copilot
+
+Used when a model flag names `github_copilot/...`. litellm reads a GitHub OAuth token from a
+file, so no interactive login happens at run time:
+
+```sh
+export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # must contain a file named `access-token`
+```
+
 ### Selecting models
 
-| Flag | What it controls | Provider |
+| Flag | What it controls | Default |
 | --- | --- | --- |
-| `--model` | Primary reasoning model used for hypothesis generation and analysis. | Gemini if name starts with `gemini`, else OpenAI. |
-| `--belief_model` | Model used for belief updates over experimental outcomes. | Same routing. |
-| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | Same routing. |
+| `--model` | Primary reasoning model used for hypothesis generation and analysis. | `vertex_ai/gemini-3.1-pro-preview` |
+| `--belief_model` | Model used for belief updates over experimental outcomes. | `vertex_ai/gemini-3-flash-preview` |
+| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | `vertex_ai/gemini-3.1-pro-preview` |
+| `--embedding_model` | Model used for deduplication embeddings. | `openai/text-embedding-3-large` |
 
-Mixing providers is supported — for example, `--model gpt-4o --belief_model gemini-3-flash-preview`
-will use OpenAI for the main loop and Vertex AI for belief updates, and both `OPENAI_API_KEY` and
-the Vertex variables must be set.
+Because the provider travels with each flag, mixing providers is supported — for example,
+`--model openai/gpt-4o --belief_model vertex_ai/gemini-3-flash-preview` uses OpenAI for the main
+loop and Vertex AI for belief updates, with both `OPENAI_API_KEY` and the Vertex variables set.
+
+Each flag is validated against litellm's offline model registry at startup, before the first
+model call.
 
 ## Citation
 

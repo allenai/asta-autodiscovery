@@ -89,7 +89,7 @@ def test_usage_tracker_records_response_tokens() -> None:
     """Ensure direct response usage is captured as token usage."""
     tracker = UsageTracker()
     tracker.record_response(
-        _FakeResponse("gpt-4o", prompt_tokens=100, completion_tokens=20, total_tokens=120),
+        _FakeResponse("openai/gpt-4o", prompt_tokens=100, completion_tokens=20, total_tokens=120),
         source="openai",
         component="belief.main.posterior",
         agent_name="belief_agent",
@@ -114,7 +114,7 @@ def test_usage_tracker_preserves_optional_usage_details() -> None:
     tracker = UsageTracker()
     tracker.record_response(
         {
-            "model": "gpt-4o",
+            "model": "openai/gpt-4o",
             "usage": {
                 "prompt_tokens": 42,
                 "completion_tokens": 7,
@@ -176,7 +176,7 @@ def test_extract_local_image_usage_markers() -> None:
     payload = {
         "source": "openai",
         "component": "image_analysis.local",
-        "model": "gpt-4o",
+        "model": "openai/gpt-4o",
         "prompt_tokens": 42,
         "completion_tokens": 7,
         "total_tokens": 49,
@@ -195,7 +195,7 @@ def test_usage_tracker_save_events_and_summary_separately(tmp_path: Path) -> Non
     tracker.record_event(
         source="openai",
         component="belief.main.prior",
-        model="gpt-4o",
+        model="openai/gpt-4o",
         prompt_tokens=10,
         completion_tokens=2,
         agent_name="belief_agent",
@@ -219,7 +219,7 @@ def test_query_llm_records_usage_metadata(tmp_path: Path, transport) -> None:
     responses = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=4,
-        model="gpt-4o",
+        model="openai/gpt-4o",
         usage_tracker=tracker,
         usage_component="belief.main.prior",
         usage_agent_name="belief_agent",
@@ -250,7 +250,7 @@ def test_query_llm_records_actual_n_per_request(tmp_path: Path, transport) -> No
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=30,
-        model="gpt-5-mini",
+        model="openai/gpt-5-mini",
         usage_tracker=tracker,
         usage_component="belief.main.posterior",
         usage_agent_name="belief_agent",
@@ -270,7 +270,7 @@ def test_query_llm_passes_reasoning_effort_for_gemini(transport) -> None:
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=1,
-        model="gemini-3-flash-preview",
+        model="vertex_ai/gemini-3-flash-preview",
         reasoning_effort="minimal",
     )
 
@@ -284,7 +284,7 @@ def test_query_llm_maps_minimal_reasoning_effort_for_openai_reasoning_models(tra
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=1,
-        model="o4-mini",
+        model="openai/o4-mini",
         reasoning_effort="minimal",
     )
 
@@ -300,7 +300,7 @@ def test_query_llm_keeps_minimal_reasoning_effort_for_gpt5(transport) -> None:
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
         n_samples=1,
-        model="gpt-5-mini",
+        model="openai/gpt-5-mini",
         reasoning_effort="minimal",
     )
 

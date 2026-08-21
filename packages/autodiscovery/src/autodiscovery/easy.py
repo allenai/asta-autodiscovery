@@ -28,7 +28,7 @@ import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
-from autodiscovery.args import MODEL_FLAG_HELP, PROVIDER_FLAG_HELP
+from autodiscovery.args import MODEL_FLAG_HELP
 
 
 def _sniff_columns(path: Path) -> list[dict[str, str]] | None:
@@ -78,7 +78,9 @@ def _build_metadata(
             # it only to the first file to avoid repeating it per-file.
             first = True
             for child in sorted(path.rglob("*")):
-                if child.is_file() and not any(p.startswith(".") for p in child.relative_to(path).parts):
+                if child.is_file() and not any(
+                    p.startswith(".") for p in child.relative_to(path).parts
+                ):
                     rel = str(Path(path.name) / child.relative_to(path))
                     entry: dict = {
                         "name": rel,
@@ -195,38 +197,26 @@ def build_parser() -> argparse.ArgumentParser:
     adv.add_argument(
         "--model",
         type=str,
-        default="gemini-3.1-pro-preview",
+        default="vertex_ai/gemini-3.1-pro-preview",
         help=MODEL_FLAG_HELP.format(role="all agents (except the belief agent)"),
     )
     adv.add_argument(
         "--belief_model",
         type=str,
-        default="gemini-3-flash-preview",
+        default="vertex_ai/gemini-3-flash-preview",
         help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
     )
     adv.add_argument(
         "--vision_model",
         type=str,
-        default="gemini-3.1-pro-preview",
+        default="vertex_ai/gemini-3.1-pro-preview",
         help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
-    )
-    adv.add_argument(
-        "--llm_provider",
-        choices=["copilot"],
-        default=None,
-        help=PROVIDER_FLAG_HELP.format(flags="--model/--belief_model/--vision_model"),
-    )
-    adv.add_argument(
-        "--embedding_provider",
-        choices=["copilot"],
-        default=None,
-        help=PROVIDER_FLAG_HELP.format(flags="--embedding_model"),
     )
     adv.add_argument(
         "--embedding_model",
         type=str,
-        help=MODEL_FLAG_HELP.format(role="deduplication embeddings")
-        + " Defaults to the selected provider's embedding model.",
+        default="openai/text-embedding-3-large",
+        help=MODEL_FLAG_HELP.format(role="deduplication embeddings"),
     )
     adv.add_argument("--embedding_dimensions", type=int)
     adv.add_argument("--temperature", type=float, default=1.0)
@@ -320,8 +310,6 @@ def cli_main(argv: list[str] | None = None) -> None:
         model=args.model,
         belief_model=args.belief_model,
         vision_model=args.vision_model,
-        llm_provider=args.llm_provider,
-        embedding_provider=args.embedding_provider,
         embedding_model=args.embedding_model,
         embedding_dimensions=args.embedding_dimensions,
         temperature=args.temperature,

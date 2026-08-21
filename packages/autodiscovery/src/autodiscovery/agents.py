@@ -90,7 +90,7 @@ class ModalSandboxExecutor(CodeExecutor):
         self,
         backend,
         timeout: int = 30 * 60,
-        vision_model: str = "gemini-3.1-pro-preview",
+        vision_model: str = "vertex_ai/gemini-3.1-pro-preview",
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
@@ -378,7 +378,7 @@ patch_matplotlib_show()
 
 
 class CodeBlockWrapperTransform(transforms.MessageTransform):
-    def __init__(self, vision_model: str = "gemini-3.1-pro-preview"):
+    def __init__(self, vision_model: str = "vertex_ai/gemini-3.1-pro-preview"):
         self.image_analysis_patch = build_image_analysis_patch(vision_model)
 
     def apply_transform(self, messages: list[dict]) -> list[dict]:
@@ -540,7 +540,7 @@ def get_llm_config(
 
 def get_agents(
     work_dir,
-    model_name="gemini-3.1-pro-preview",
+    model_name="vertex_ai/gemini-3.1-pro-preview",
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -550,7 +550,7 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
-    vision_model: str = "gemini-3.1-pro-preview",
+    vision_model: str = "vertex_ai/gemini-3.1-pro-preview",
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.

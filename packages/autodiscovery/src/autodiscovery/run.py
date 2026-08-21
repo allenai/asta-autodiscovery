@@ -46,7 +46,7 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
-from autodiscovery.model_spec import canonical_provider, parse_model, validate_model
+from autodiscovery.model_spec import parse_model, validate_model
 
 
 def _theoretical_max_boolean_cat(
@@ -288,10 +288,10 @@ def run_mcts(
     dataset_paths,
     log_dirname,
     work_dir,
-    model_name="gemini-3.1-pro-preview",
-    embedding_model="text-embedding-3-large",
+    model_name="vertex_ai/gemini-3.1-pro-preview",
+    embedding_model="openai/text-embedding-3-large",
     embedding_dimensions=None,
-    belief_model_name="gemini-3-flash-preview",
+    belief_model_name="vertex_ai/gemini-3-flash-preview",
     max_iterations=100,
     branching_factor=8,
     max_rounds=100000,
@@ -319,7 +319,7 @@ def run_mcts(
     warmstart_experiments=None,
     backend="process",
     bucket_path=None,
-    vision_model="gemini-3.1-pro-preview",
+    vision_model="vertex_ai/gemini-3.1-pro-preview",
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
@@ -874,75 +874,24 @@ def run_mcts(
     usage_tracker.save_summary(log_dirname)
 
 
-#: Embedding model used when --embedding_model is omitted. Copilot's catalog has
-#: no text-embedding-3-large, so it needs its own default.
-_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
-_DEFAULT_COPILOT_EMBEDDING_MODEL = "github_copilot/text-embedding-3-small"
-
-
 def resolve_model_args(args) -> None:
-    """Resolve and validate every model flag in place, before any model call.
+    """Validate every model flag before any model call.
 
-    Rewrites ``args.model``, ``args.belief_model``, ``args.vision_model`` and
-    ``args.embedding_model`` to canonical litellm ``<provider>/<model>`` names so
-    nothing downstream has to guess a provider, and fails fast on a model that
-    litellm knows cannot do its job (a vision model without image support, an
-    embedding model passed as a chat model). The deprecated
-    ``--llm_provider``/``--embedding_provider`` flags are consumed here as the
-    default provider for bare model names, and not passed on.
+    Checks each flag against litellm's offline registry and fails fast on a
+    model that cannot do its job: a vision model without image support, an
+    embedding model passed as a chat model, a Copilot model absent from
+    Copilot's catalog.
 
     Args:
-        args: Parsed argument namespace, mutated in place.
+        args: Parsed argument namespace.
 
     Raises:
         ModelSpecError: If a model flag cannot serve its role.
     """
-    llm_provider = getattr(args, "llm_provider", None)
-    embedding_provider = getattr(args, "embedding_provider", None)
-    for flag, model_flag, value in (
-        ("--llm_provider", "--model", llm_provider),
-        ("--embedding_provider", "--embedding_model", embedding_provider),
-    ):
-        if value is not None:
-            print(
-                f"Warning: {flag} is deprecated. Qualify the model flags instead, "
-                f"e.g. {model_flag} {canonical_provider(value)}/<model>."
-            )
-
-    args.model = str(validate_model(args.model, flag="--model", default_provider=llm_provider))
-    args.belief_model = str(
-        validate_model(args.belief_model, flag="--belief_model", default_provider=llm_provider)
-    )
-    args.vision_model = str(
-        validate_model(
-            args.vision_model,
-            flag="--vision_model",
-            default_provider=llm_provider,
-            require_vision=True,
-        )
-    )
-
-    embedding_model = getattr(args, "embedding_model", None)
-    if embedding_model is None:
-        embedding_model = (
-            _DEFAULT_COPILOT_EMBEDDING_MODEL
-            if embedding_provider == "copilot"
-            else _DEFAULT_EMBEDDING_MODEL
-        )
-    args.embedding_model = str(
-        validate_model(
-            embedding_model,
-            flag="--embedding_model",
-            default_provider=embedding_provider,
-            mode="embedding",
-        )
-    )
-
-    print(
-        "Resolved models: "
-        f"model={args.model} belief_model={args.belief_model} "
-        f"vision_model={args.vision_model} embedding_model={args.embedding_model}"
-    )
+    validate_model(args.model, flag="--model")
+    validate_model(args.belief_model, flag="--belief_model")
+    validate_model(args.vision_model, flag="--vision_model", require_vision=True)
+    validate_model(args.embedding_model, flag="--embedding_model", mode="embedding")
 
 
 def main(args):

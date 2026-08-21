@@ -223,9 +223,7 @@ class JobManager:
         )
 
     @staticmethod
-    def _build_fork_metadata(
-        parent_metadata: dict[str, Any], parent_run_id: str
-    ) -> dict[str, Any]:
+    def _build_fork_metadata(parent_metadata: dict[str, Any], parent_run_id: str) -> dict[str, Any]:
         """Build child metadata from parent metadata for a fork operation."""
         parent_name = parent_metadata.get("name", "Untitled")
         return {
@@ -483,7 +481,9 @@ class JobManager:
                 return userid
         except Exception:
             # If we can't read metadata, treat as not shared
-            logger.warning("Failed to read metadata for run %s (user %s)", runid, userid, exc_info=True)
+            logger.warning(
+                "Failed to read metadata for run %s (user %s)", runid, userid, exc_info=True
+            )
 
         return None
 
@@ -529,7 +529,7 @@ class JobManager:
             userid: User identifier
             jobid: Job identifier
             n_experiments: Number of experiments to run
-            model: Model to use (e.g., "gpt-4o", "o4-mini"); uses args.py default when omitted
+            model: Model to use (e.g., "openai/gpt-4o", "vertex_ai/gemini-3-flash-preview"); uses args.py default when omitted
             belief_model: Model for belief distribution (optional)
             temperature: Temperature for agents (optional)
             belief_temperature: Temperature for belief agent (optional)

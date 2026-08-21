@@ -2,15 +2,9 @@ import argparse
 
 #: Shared help text so every model flag documents the same litellm convention.
 MODEL_FLAG_HELP = (
-    "Model to use for {role}. Accepts litellm's <provider>/<model> form "
+    "Model to use for {role}, as litellm's <provider>/<model> "
     "(e.g. vertex_ai/gemini-3.1-pro-preview, openai/o4-mini, "
-    "github_copilot/claude-haiku-4.5). A bare model name is resolved to a "
-    "provider by litellm."
-)
-
-PROVIDER_FLAG_HELP = (
-    "Deprecated. Provider assumed for bare model names in {flags}; prefer "
-    "qualifying those flags as <provider>/<model>."
+    "github_copilot/claude-haiku-4.5). The provider prefix is required."
 )
 
 
@@ -25,7 +19,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="gemini-3.1-pro-preview",
+            default="vertex_ai/gemini-3.1-pro-preview",
             help=MODEL_FLAG_HELP.format(
                 role="all agents (except belief distribution agent)",
             ),
@@ -33,32 +27,20 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--belief_model",
             type=str,
-            default="gemini-3-flash-preview",
+            default="vertex_ai/gemini-3-flash-preview",
             help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
         )
         self.add_argument(
             "--vision_model",
             type=str,
-            default="gemini-3.1-pro-preview",
+            default="vertex_ai/gemini-3.1-pro-preview",
             help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
-        )
-        self.add_argument(
-            "--llm_provider",
-            choices=["copilot"],
-            default=None,
-            help=PROVIDER_FLAG_HELP.format(flags="--model/--belief_model/--vision_model"),
-        )
-        self.add_argument(
-            "--embedding_provider",
-            choices=["copilot"],
-            default=None,
-            help=PROVIDER_FLAG_HELP.format(flags="--embedding_model"),
         )
         self.add_argument(
             "--embedding_model",
             type=str,
-            help=MODEL_FLAG_HELP.format(role="deduplication embeddings")
-            + " Defaults to the selected provider's embedding model.",
+            default="openai/text-embedding-3-large",
+            help=MODEL_FLAG_HELP.format(role="deduplication embeddings"),
         )
         self.add_argument(
             "--embedding_dimensions",

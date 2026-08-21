@@ -78,8 +78,7 @@ class BeliefTrueFalse:
             return self.mean
 
         def update(self, n_true: int = 0, n_false: int = 0, distr=None, normalize: bool = False):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.n_true += distr.n_true
                 self.n_false += distr.n_false
@@ -312,8 +311,7 @@ class BeliefCategorical:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.definitely_true += distr.definitely_true
                 self.maybe_true += distr.maybe_true
@@ -597,8 +595,7 @@ class BeliefCategoricalNumeric:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.bucket_02 += distr.bucket_02
                 self.bucket_24 += distr.bucket_24
@@ -808,8 +805,7 @@ class BeliefGauss:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new samples or another distribution.
-            """
+            """Update the distribution with new samples or another distribution."""
             if distr is not None:
                 self.n += distr.n
                 # TOFIX: samples don't take into account the original weight of the distribution
@@ -1035,8 +1031,7 @@ class BeliefTrueFalseCat:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.definitely_true += distr.definitely_true
                 self.maybe_true += distr.maybe_true
@@ -1209,7 +1204,7 @@ BELIEF_MODE_TO_CLS = {
 def get_belief(
     hypothesis: str,
     evidence: list[dict[str, str]] | None = None,
-    model: str = "gemini-3-flash-preview",
+    model: str = "vertex_ai/gemini-3-flash-preview",
     belief_mode: str = "boolean",
     n_samples: int = 5,
     temperature: float | None = None,
@@ -1321,7 +1316,7 @@ def get_belief(
 def calculate_prior_and_posterior_beliefs(
     node,
     n_samples=4,
-    model="gemini-3-flash-preview",
+    model="vertex_ai/gemini-3-flash-preview",
     temperature=None,
     reasoning_effort=None,
     implicit_bayes_posterior=False,

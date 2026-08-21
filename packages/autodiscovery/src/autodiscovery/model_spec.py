@@ -13,12 +13,17 @@ model-name prefixes.
 
 Note on litellm and Copilot: ``litellm.get_llm_provider()`` (and the
 ``litellm.supports_*`` helpers, which call it) run GitHub's device-flow auth when
-handed a ``github_copilot/`` model, printing a device code and blocking. So this
-module splits the provider prefix itself and only ever queries litellm's static
-registry via ``get_model_info(model=..., custom_llm_provider=...)``, which is
-offline and auth-free. litellm is used here as the naming, registry, and
-validation authority; the actual transports (Vertex's OpenAI-compatible endpoint,
-the Copilot CLI SDK, OpenAI direct) are unchanged.
+handed a ``github_copilot/`` model, printing a device code and blocking for three
+60s attempts. litellm has no env var to disable that -- its
+``GITHUB_COPILOT_*`` variables only relocate the token files and endpoints -- so
+it would hang any non-interactive deployment. This module therefore splits the
+provider prefix itself and only ever queries litellm's static registry via
+``get_model_info(model=..., custom_llm_provider=...)``, which is offline and
+auth-free. ``test_resolution_never_triggers_copilot_device_flow`` guards this.
+
+litellm is used here as the naming, registry, and validation authority; the
+actual transports (Vertex's OpenAI-compatible endpoint, the Copilot CLI SDK,
+OpenAI direct) are unchanged.
 """
 
 from __future__ import annotations

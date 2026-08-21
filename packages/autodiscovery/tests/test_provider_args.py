@@ -236,3 +236,30 @@ def test_easy_cli_accepts_prefixed_models() -> None:
     assert args.embedding_model == "github_copilot/text-embedding-3-small"
     assert args.embedding_dimensions == 1536
     assert args.dedupe is True
+
+
+def test_resolution_never_triggers_copilot_device_flow(monkeypatch) -> None:
+    """litellm must not run GitHub's interactive auth during model resolution.
+
+    ``litellm.get_llm_provider()`` and the ``litellm.supports_*()`` helpers run
+    GitHub's device-flow login for ``github_copilot/`` models -- they print a
+    device code and block for three 60s attempts. There is no litellm env var to
+    disable that, so it would hang any deployed (non-TTY) run. model_spec avoids
+    it by splitting the provider prefix itself and only reading litellm's static
+    registry; this test fails if anything reintroduces an authenticating call.
+    """
+    from litellm.llms.github_copilot.authenticator import Authenticator
+
+    def fail(*args, **kwargs):
+        raise AssertionError("model resolution attempted GitHub Copilot authentication")
+
+    monkeypatch.setattr(Authenticator, "get_api_key", fail)
+    monkeypatch.setattr(Authenticator, "get_access_token", fail)
+    monkeypatch.setattr(Authenticator, "_login", fail)
+
+    resolved = validate_model("github_copilot/claude-haiku-4.5", flag="--model")
+    assert resolved.is_copilot
+    assert resolved.supports_vision
+    assert resolved.mode == "chat"
+    with pytest.raises(ModelSpecError, match="not in github_copilot's catalog"):
+        validate_model("github_copilot/gemini-3.1-pro-preview", flag="--model")

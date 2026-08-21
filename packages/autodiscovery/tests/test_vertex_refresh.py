@@ -4,7 +4,8 @@ import types
 
 import autodiscovery.vertex_client as vertex_client
 import pytest
-from autodiscovery.utils import get_openai_client_for_model, is_gemini_model
+from autodiscovery.model_spec import parse_model
+from autodiscovery.utils import get_openai_client_for_model
 
 
 class DummyOpenAI:
@@ -61,10 +62,11 @@ def install_fake_google_auth(monkeypatch: pytest.MonkeyPatch, token: str = "fres
     return holder
 
 
-def test_is_gemini_model_accepts_google_prefix():
-    assert is_gemini_model("gemini-3-flash-preview")
-    assert is_gemini_model("google/gemini-3-flash-preview")
-    assert not is_gemini_model("gpt-4o")
+def test_gemini_names_resolve_to_vertex():
+    assert parse_model("gemini-3-flash-preview").is_vertex
+    assert parse_model("google/gemini-3-flash-preview").is_vertex
+    assert parse_model("vertex_ai/gemini-3-flash-preview").is_vertex
+    assert not parse_model("gpt-4o").is_vertex
 
 
 def test_get_openai_client_for_model_gemini_returns_refresher(monkeypatch: pytest.MonkeyPatch):
@@ -106,7 +108,7 @@ def test_vertex_openai_client_refresher_adc_integration():
     except Exception:
         pytest.skip("google-auth is not available.")
 
-    from autodiscovery.utils import get_vertex_openai_base_url, normalize_vertex_model_name
+    from autodiscovery.utils import get_vertex_openai_base_url
 
     try:
         base_url = get_vertex_openai_base_url()
@@ -116,7 +118,7 @@ def test_vertex_openai_client_refresher_adc_integration():
     model = os.getenv("VERTEX_TEST_MODEL", "gemini-3-flash-preview")
     client = vertex_client.OpenAICredentialsRefresher(base_url=base_url)
     response = client.chat.completions.create(
-        model=normalize_vertex_model_name(model),
+        model=parse_model(model).wire_model_name,
         messages=[{"role": "user", "content": "ping"}],
         max_tokens=8,
     )

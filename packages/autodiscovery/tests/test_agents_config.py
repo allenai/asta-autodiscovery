@@ -38,3 +38,40 @@ def test_get_openai_config_openai_model_unchanged() -> None:
     assert config["timeout"] == 600
     assert config["temperature"] == 0.2
     assert config["logprobs"] is True
+
+
+def test_get_openai_config_reasoning_model_drops_temperature() -> None:
+    """OpenAI reasoning models reject temperature and take reasoning_effort."""
+    config = get_openai_config(
+        model_name="o4-mini",
+        temperature=0.7,
+        reasoning_effort="high",
+        api_key="openai-key",
+    )
+
+    assert "temperature" not in config
+    assert config["reasoning_effort"] == "high"
+    assert "logprobs" not in config
+
+
+def test_get_openai_config_gemini_keeps_temperature_with_reasoning(monkeypatch) -> None:
+    """Gemini reasoning models take both, unlike OpenAI's."""
+    monkeypatch.setenv("VERTEX_OPENAI_BASE_URL", "https://vertex.example/v1")
+    monkeypatch.setenv("VERTEX_ACCESS_TOKEN", "vertex-token")
+
+    config = get_openai_config(
+        model_name="vertex_ai/gemini-3.1-pro-preview",
+        temperature=0.7,
+        reasoning_effort="low",
+    )
+
+    assert config["model"] == "google/gemini-3.1-pro-preview"
+    assert config["temperature"] == 0.7
+    assert config["reasoning_effort"] == "low"
+
+
+def test_get_openai_config_accepts_prefixed_openai_model() -> None:
+    config = get_openai_config(model_name="openai/gpt-4o", api_key="openai-key")
+
+    assert config["model"] == "gpt-4o"
+    assert config["logprobs"] is True

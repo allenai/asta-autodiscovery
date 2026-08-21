@@ -10,50 +10,16 @@ from pydantic import BaseModel, ValidationError
 
 from autodiscovery.llm_retry import call_with_backoff
 from autodiscovery.llm_usage import UsageTracker
+from autodiscovery.model_spec import ModelSpec, parse_model
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
 from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
 
 
-def is_gemini_model(model: str) -> bool:
-    """Check if the model is a Gemini model."""
-    if not model:
-        return False
-    return model.split("/")[-1].startswith("gemini")
-
-
-def is_reasoning_model(model: str) -> bool:
-    """Check if the model is an OpenAI reasoning model with n<=8 limits."""
-    return any(model.startswith(prefix) for prefix in ["o", "gpt-5"])
-
-
-def normalize_vertex_model_name(model: str) -> str:
-    """Normalize Gemini model names for Vertex AI OpenAI-compatible requests.
-
-    Args:
-        model: Model name provided by the caller.
-
-    Returns:
-        Vertex-compatible model name, with publisher prefix when required.
-    """
-    if is_gemini_model(model) and "/" not in model:
-        return f"google/{model}"
-    return model
-
-
-def max_n_for_model(model: str) -> int | None:
-    """Return max supported n for the model, or None if no known cap."""
-    if is_gemini_model(model):
-        return 5
-    if is_reasoning_model(model):
-        return 8
-    return None
-
-
-def normalize_reasoning_effort(model: str, reasoning_effort: str | None) -> str | None:
+def normalize_reasoning_effort(spec: ModelSpec, reasoning_effort: str | None) -> str | None:
     """Normalize reasoning effort values across providers.
 
     Args:
-        model: Model name provided by the caller.
+        spec: Resolved model.
         reasoning_effort: Requested reasoning effort value.
 
     Returns:
@@ -61,13 +27,11 @@ def normalize_reasoning_effort(model: str, reasoning_effort: str | None) -> str 
     """
     if reasoning_effort is None:
         return None
-    if is_gemini_model(model):
-        return reasoning_effort
-    if is_reasoning_model(model) and reasoning_effort == "minimal":
+    if reasoning_effort == "minimal" and spec.is_openai and spec.supports_reasoning:
         # OpenAI reasoning models use low/medium/high. Keep CLI semantics consistent
-        # by mapping minimal to low for non-Gemini models.
+        # by mapping minimal to low.
         print(
-            f"[query_llm] model={model} does not support reasoning_effort='minimal'; "
+            f"[query_llm] model={spec} does not support reasoning_effort='minimal'; "
             "using 'low' instead."
         )
         return "low"
@@ -108,9 +72,10 @@ def get_vertex_access_token() -> str:
     )
 
 
-def get_openai_client_for_model(model: str, api_key: str | None = None) -> Any:
+def get_openai_client_for_model(model: str | ModelSpec, api_key: str | None = None) -> Any:
     """Create an OpenAI-compatible client for the given model."""
-    if is_gemini_model(model):
+    spec = model if isinstance(model, ModelSpec) else parse_model(model)
+    if spec.is_vertex:
         return OpenAICredentialsRefresher(api_key=api_key, base_url=get_vertex_openai_base_url())
     return OpenAI(api_key=api_key) if api_key else OpenAI()
 
@@ -118,8 +83,7 @@ def get_openai_client_for_model(model: str, api_key: str | None = None) -> Any:
 def query_llm(
     messages: list[dict[str, str]],
     n_samples: int,
-    model: str = "gpt-4o",
-    llm_provider: str | None = None,
+    model: str = "gemini-3.1-pro-preview",
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,
@@ -136,8 +100,7 @@ def query_llm(
     Args:
         messages: Chat messages to send to the model.
         n_samples: Number of samples to request.
-        model: Model name to use.
-        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
+        model: Model name, optionally litellm-qualified as ``<provider>/<model>``.
         temperature: Sampling temperature.
         reasoning_effort: Optional reasoning effort for reasoning-capable models.
         response_format: Optional structured output schema.
@@ -153,7 +116,10 @@ def query_llm(
     Returns:
         A list of parsed response objects.
     """
-    if llm_provider == "copilot":
+    spec = parse_model(model)
+    normalized_reasoning_effort = normalize_reasoning_effort(spec, reasoning_effort)
+
+    if spec.is_copilot:
         if response_format is None:
             raise ValueError("Copilot queries require a Pydantic response_format")
         from autodiscovery.copilot_provider import get_copilot_runtime
@@ -163,10 +129,10 @@ def query_llm(
         def _sample() -> dict[str, Any]:
             completion = runtime.complete(
                 messages=messages,
-                model=model,
+                model=spec.wire_model_name,
                 response_format=response_format,
                 temperature=temperature,
-                reasoning_effort=reasoning_effort,
+                reasoning_effort=normalized_reasoning_effort,
             )
             if usage_tracker is not None:
                 metadata = dict(usage_metadata or {})
@@ -192,20 +158,17 @@ def query_llm(
             return []
         responses = [_sample()]
         if n_samples > 1:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, n_samples - 1)) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(8, n_samples - 1)
+            ) as executor:
                 responses.extend(executor.map(lambda _: _sample(), range(n_samples - 1)))
         return responses
-    if llm_provider is not None:
-        raise ValueError(f"Unknown LLM provider: {llm_provider}")
 
     if client is None:
-        client = get_openai_client_for_model(model)
-    is_gemini = is_gemini_model(model)
-    is_reasoning = is_reasoning_model(model)
-    normalized_reasoning_effort = normalize_reasoning_effort(model, reasoning_effort)
-    model_name = normalize_vertex_model_name(model) if is_gemini else model
+        client = get_openai_client_for_model(spec)
+    model_name = spec.wire_model_name
 
-    max_n = max_n_for_model(model)
+    max_n = spec.max_n
     if max_n is not None:
         batch_sizes = []
         remaining = n_samples
@@ -239,10 +202,10 @@ def query_llm(
             "messages": messages,
             "n": batch_n,
         }
-        if temperature is not None and not is_reasoning:
+        if temperature is not None and spec.accepts_temperature:
             kwargs["temperature"] = temperature
 
-        if (is_reasoning or is_gemini) and normalized_reasoning_effort is not None:
+        if spec.supports_reasoning and normalized_reasoning_effort is not None:
             kwargs["reasoning_effort"] = normalized_reasoning_effort
 
         def _send_request():
@@ -254,9 +217,7 @@ def query_llm(
                 return client.chat.completions.create(**kwargs)
             except ValidationError:
                 # Retry if the response format validation fails
-                return client.beta.chat.completions.parse(
-                    **kwargs, response_format=response_format
-                )
+                return client.beta.chat.completions.parse(**kwargs, response_format=response_format)
 
         return call_with_backoff(
             _send_request,
@@ -268,7 +229,7 @@ def query_llm(
     if len(batch_sizes) == 1:
         batch_n = batch_sizes[0]
         response_items = [(batch_n, _call_llm(batch_n))]
-    elif is_gemini:
+    elif spec.is_vertex:
         max_workers = min(8, len(batch_sizes))
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [(batch_n, executor.submit(_call_llm, batch_n)) for batch_n in batch_sizes]

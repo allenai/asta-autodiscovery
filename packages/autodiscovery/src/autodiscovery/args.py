@@ -1,5 +1,18 @@
 import argparse
 
+#: Shared help text so every model flag documents the same litellm convention.
+MODEL_FLAG_HELP = (
+    "Model to use for {role}. Accepts litellm's <provider>/<model> form "
+    "(e.g. vertex_ai/gemini-3.1-pro-preview, openai/o4-mini, "
+    "github_copilot/claude-haiku-4.5). A bare model name is resolved to a "
+    "provider by litellm."
+)
+
+PROVIDER_FLAG_HELP = (
+    "Deprecated. Provider assumed for bare model names in {flags}; prefer "
+    "qualifying those flags as <provider>/<model>."
+)
+
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self, group=None):
@@ -13,36 +26,39 @@ class ArgParser(argparse.ArgumentParser):
             "--model",
             type=str,
             default="gemini-3.1-pro-preview",
-            help="LLM to use for all agents (except belief distribution agent).",
+            help=MODEL_FLAG_HELP.format(
+                role="all agents (except belief distribution agent)",
+            ),
         )
         self.add_argument(
             "--belief_model",
             type=str,
             default="gemini-3-flash-preview",
-            help="LLM to use for belief distribution agent.",
+            help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
         )
         self.add_argument(
             "--vision_model",
             type=str,
             default="gemini-3.1-pro-preview",
-            help="Model to use for image analysis during code execution.",
+            help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
         )
         self.add_argument(
             "--llm_provider",
             choices=["copilot"],
             default=None,
-            help="Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.",
+            help=PROVIDER_FLAG_HELP.format(flags="--model/--belief_model/--vision_model"),
         )
         self.add_argument(
             "--embedding_provider",
             choices=["copilot"],
             default=None,
-            help="Optional embedding provider used by deduplication.",
+            help=PROVIDER_FLAG_HELP.format(flags="--embedding_model"),
         )
         self.add_argument(
             "--embedding_model",
             type=str,
-            help="Optional embedding model override for the selected embedding provider.",
+            help=MODEL_FLAG_HELP.format(role="deduplication embeddings")
+            + " Defaults to the selected provider's embedding model.",
         )
         self.add_argument(
             "--embedding_dimensions",

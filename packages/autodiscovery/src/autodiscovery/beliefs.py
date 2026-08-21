@@ -1209,8 +1209,7 @@ BELIEF_MODE_TO_CLS = {
 def get_belief(
     hypothesis: str,
     evidence: list[dict[str, str]] | None = None,
-    model: str = "gpt-4o",
-    llm_provider: str | None = None,
+    model: str = "gemini-3-flash-preview",
     belief_mode: str = "boolean",
     n_samples: int = 5,
     temperature: float | None = None,
@@ -1229,8 +1228,7 @@ def get_belief(
     Args:
         hypothesis: The hypothesis to evaluate
         evidence: Optional evidence messages to condition the belief
-        model: The LLM model to use
-        llm_provider: LLM provider for belief sampling.
+        model: The LLM model to use, optionally qualified as ``<provider>/<model>``
         belief_mode: The belief mode to use for parsing responses (e.g., BeliefTrueFalse, BeliefCategorical)
         n_samples: Number of samples to draw from the LLM
         temperature: Temperature for sampling
@@ -1289,7 +1287,6 @@ def get_belief(
             response = query_llm(
                 all_msgs,
                 model=model,
-                llm_provider=llm_provider,
                 n_samples=n_samples,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
@@ -1324,8 +1321,7 @@ def get_belief(
 def calculate_prior_and_posterior_beliefs(
     node,
     n_samples=4,
-    model="gpt-4o",
-    llm_provider=None,
+    model="gemini-3-flash-preview",
     temperature=None,
     reasoning_effort=None,
     implicit_bayes_posterior=False,
@@ -1343,8 +1339,7 @@ def calculate_prior_and_posterior_beliefs(
     Args:
         node: MCTSNode instance containing node information and messages or a dictionary with node data
         n_samples: Number of samples to draw from the LLM
-        model: The LLM model to use for querying
-        llm_provider: LLM provider for belief sampling.
+        model: The LLM model to use for querying, optionally qualified as ``<provider>/<model>``
         temperature: Temperature for sampling
         reasoning_effort: Reasoning effort for supported models.
         implicit_bayes_posterior: Whether to use implicit Bayesian posterior
@@ -1398,7 +1393,6 @@ def calculate_prior_and_posterior_beliefs(
             hypothesis=hypothesis,
             evidence=None,
             model=model,
-            llm_provider=llm_provider,
             belief_mode=belief_mode,
             n_samples=n_samples,
             temperature=temperature,
@@ -1413,7 +1407,6 @@ def calculate_prior_and_posterior_beliefs(
         hypothesis=hypothesis,
         evidence=evidence_msg,
         model=model,
-        llm_provider=llm_provider,
         belief_mode=belief_mode,
         n_samples=n_samples,
         temperature=temperature,

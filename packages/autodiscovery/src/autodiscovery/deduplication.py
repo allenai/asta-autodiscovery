@@ -10,6 +10,7 @@ from scipy.cluster.hierarchy import linkage
 from tqdm import tqdm
 
 from autodiscovery.llm_usage import UsageTracker
+from autodiscovery.model_spec import parse_model
 from autodiscovery.utils import query_llm
 
 
@@ -37,8 +38,8 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="gpt-4o",
-            help="LLM model to use for hypothesis merging decisions. Default is gpt-4o.",
+            default="gemini-3-flash-preview",
+            help="LLM model for hypothesis merging decisions. Accepts litellm's <provider>/<model> form.",
         )
         self.add_argument(
             "--n_nodes",
@@ -137,38 +138,33 @@ def get_hypotheses(in_nodes_list):
 
 def get_embedding(
     texts,
-    model=None,
-    embedding_provider: str | None = None,
+    model="text-embedding-3-large",
     dimensions=None,
     batch_size=128,
     client=None,
     n_attempts=1,
     usage_tracker: UsageTracker | None = None,
 ):
-    """Compute embeddings for a list of texts using the OpenAI Embeddings API.
+    """Compute embeddings for a list of texts.
 
     Args:
         texts (list): A list of text strings to be embedded.
-        model (str, optional): Embedding model override. Defaults by provider.
-        embedding_provider: Optional embedding provider. Omit to use OpenAI.
+        model (str): Embedding model, optionally qualified as ``<provider>/<model>``.
         dimensions: Optional output dimensions for providers that support it.
         batch_size (int, optional): The number of texts to process in one API call.
+        client: Optional pre-configured OpenAI-compatible client.
+        n_attempts: Number of attempts before giving up.
         usage_tracker: Optional usage tracker for embedding requests.
 
     Returns:
         numpy.ndarray: An array of embeddings for the input texts.
     """
-    if embedding_provider == "copilot":
-        from autodiscovery.copilot_provider import (
-            DEFAULT_EMBEDDING_DIMENSIONS,
-            DEFAULT_EMBEDDING_MODEL,
-            get_copilot_runtime,
-        )
+    spec = parse_model(model)
 
-        selected_model = model or DEFAULT_EMBEDDING_MODEL
-        selected_dimensions = (
-            DEFAULT_EMBEDDING_DIMENSIONS if dimensions is None else dimensions
-        )
+    if spec.is_copilot:
+        from autodiscovery.copilot_provider import DEFAULT_EMBEDDING_DIMENSIONS, get_copilot_runtime
+
+        selected_dimensions = DEFAULT_EMBEDDING_DIMENSIONS if dimensions is None else dimensions
         runtime = get_copilot_runtime()
         all_embeddings = []
         for attempt in range(n_attempts):
@@ -177,7 +173,7 @@ def get_embedding(
                 for i in range(0, len(texts), batch_size):
                     result = runtime.embed(
                         texts[i : i + batch_size],
-                        model=selected_model,
+                        model=spec.wire_model_name,
                         dimensions=selected_dimensions,
                     )
                     if usage_tracker is not None:
@@ -201,10 +197,7 @@ def get_embedding(
                         f"Failed to get embeddings after {n_attempts} attempts."
                     ) from exc
         return np.array(all_embeddings)
-    if embedding_provider is not None:
-        raise ValueError(f"Unknown embedding provider: {embedding_provider}")
 
-    selected_model = model or "text-embedding-3-large"
     if client is None:
         client = OpenAI()
     all_embeddings = []
@@ -215,7 +208,7 @@ def get_embedding(
             for i in range(0, len(texts), batch_size):
                 batch = texts[i : i + batch_size]
                 # Request embeddings for the current batch from the API
-                request = {"input": batch, "model": selected_model}
+                request = {"input": batch, "model": spec.wire_model_name}
                 if dimensions is not None:
                     request["dimensions"] = dimensions
                 response = client.embeddings.create(**request)
@@ -243,8 +236,7 @@ def get_llm_merge_decision(
     hyp2: str,
     n_samples: int = 30,
     threshold: float = 0.7,
-    model: str = "gpt-4o",
-    llm_provider: str | None = None,
+    model: str = "gemini-3-flash-preview",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -256,8 +248,7 @@ def get_llm_merge_decision(
         hyp2: Second hypothesis string.
         n_samples: Number of LLM samples to draw.
         threshold: Proportion threshold for merging decisions.
-        model: LLM model identifier.
-        llm_provider: LLM provider for merge decisions.
+        model: LLM model, optionally qualified as ``<provider>/<model>``.
         temperature: Sampling temperature.
         reasoning_effort: Reasoning effort for the model.
         usage_tracker: Optional usage tracker for merge decision calls.
@@ -280,7 +271,6 @@ def get_llm_merge_decision(
     response = query_llm(
         all_msgs,
         model=model,
-        llm_provider=llm_provider,
         n_samples=n_samples,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
@@ -300,10 +290,8 @@ def dedupe(
     merge_threshold=0.7,
     seed=42,
     rep_mode="biggest",
-    model="gpt-4o",
-    llm_provider=None,
-    embedding_provider=None,
-    embedding_model=None,
+    model="gemini-3-flash-preview",
+    embedding_model="text-embedding-3-large",
     embedding_dimensions=None,
     n_nodes=None,
     verbose=False,
@@ -318,10 +306,8 @@ def dedupe(
         merge_threshold: Merge threshold for LLM votes.
         seed: Random seed.
         rep_mode: Representative selection mode for merged clusters.
-        model: LLM model identifier.
-        llm_provider: LLM provider for merge decisions.
-        embedding_provider: Provider for candidate embeddings.
-        embedding_model: Optional embedding model override.
+        model: LLM model, optionally qualified as ``<provider>/<model>``.
+        embedding_model: Embedding model, optionally qualified as ``<provider>/<model>``.
         embedding_dimensions: Optional embedding dimensions override.
         n_nodes: Optional cap on nodes processed.
         verbose: Whether to print verbose details.
@@ -352,15 +338,15 @@ def dedupe(
     n_dedup = len(dedup_hyp)
 
     # Generate embeddings for deduplicated hypotheses
-    embedding_kwargs = {
-        "embedding_provider": embedding_provider,
-        "dimensions": embedding_dimensions,
-        "n_attempts": 3,
-        "usage_tracker": usage_tracker,
-    }
-    if embedding_model is not None:
-        embedding_kwargs["model"] = embedding_model
-    embeds = np.array(get_embedding(dedup_hyp, **embedding_kwargs))
+    embeds = np.array(
+        get_embedding(
+            dedup_hyp,
+            model=embedding_model,
+            dimensions=embedding_dimensions,
+            n_attempts=3,
+            usage_tracker=usage_tracker,
+        )
+    )
 
     # Initialize assignment structures
     clusters = {i: [i] for i in range(n_dedup)}
@@ -420,7 +406,6 @@ def dedupe(
             n_samples=n_samples,
             threshold=merge_threshold,
             model=model,
-            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         if verbose:

@@ -13,6 +13,45 @@ pip install autodiscovery
 This pulls in `autodiscovery-modal` (sandboxed code execution) as a transitive
 dependency. Requires Python 3.13+.
 
+## Selecting models
+
+Every model flag — `--model`, `--belief_model`, `--vision_model`,
+`--embedding_model` — accepts [litellm's](https://docs.litellm.ai/docs/providers)
+`<provider>/<model>` naming, with snake_case provider slugs:
+
+```sh
+--model vertex_ai/gemini-3.1-pro-preview
+--model openai/o4-mini
+--model github_copilot/claude-haiku-4.5
+```
+
+A bare model name still works and is resolved to a provider by litellm, so
+existing configurations keep running unchanged: `gemini-3.1-pro-preview` goes to
+Vertex AI, `o4-mini` and `text-embedding-3-large` go to OpenAI. Prefixes matter
+where a bare name is ambiguous — bare `claude-haiku-4.5` names Anthropic direct,
+which this package cannot call; the Copilot-hosted model is
+`github_copilot/claude-haiku-4.5`.
+
+Because the provider travels with each flag, roles can use different providers
+in one run — Copilot for chat, Vertex for plot analysis:
+
+```sh
+auto-discovery \
+   --model github_copilot/claude-haiku-4.5 \
+   --vision_model vertex_ai/gemini-3.1-pro-preview \
+   ...
+```
+
+Each flag is checked against litellm's offline model registry at startup, before
+the first model call: the vision model must support image input, the embedding
+model must be an embedding model, and Copilot models must exist in Copilot's
+catalog. `google/<model>` is still accepted as a legacy alias for
+`vertex_ai/<model>`.
+
+`--llm_provider` and `--embedding_provider` are deprecated. They still set the
+provider assumed for bare model names in their respective flags, but prefixing
+the model flags is preferred.
+
 ## Credentials
 
 The default models (`gemini-3.1-pro-preview`, `gemini-3-flash-preview`) run on
@@ -24,7 +63,8 @@ export VERTEX_LOCATION=global            # optional, defaults to global
 export VERTEX_ACCESS_TOKEN=$(gcloud auth print-access-token)
 ```
 
-To use OpenAI models instead, pass `--model gpt-...` and export `OPENAI_API_KEY`.
+To use OpenAI models instead, pass `--model openai/gpt-...` and export
+`OPENAI_API_KEY`.
 
 ### GitHub Copilot
 
@@ -44,33 +84,30 @@ point the SDK at it:
 export COPILOT_CLI_PATH=/path/to/copilot
 ```
 
-Select Copilot independently for chat and embeddings:
+Select Copilot per role with the `github_copilot/` prefix:
 
 ```sh
 auto-discovery \
-   --llm_provider copilot \
-   --model claude-haiku-4.5 \
-   --belief_model claude-haiku-4.5 \
-   --vision_model claude-haiku-4.5 \
-   --embedding_provider copilot \
-   --embedding_model text-embedding-3-small \
+   --model github_copilot/claude-haiku-4.5 \
+   --belief_model github_copilot/claude-haiku-4.5 \
+   --vision_model github_copilot/claude-haiku-4.5 \
+   --embedding_model github_copilot/text-embedding-3-small \
    --embedding_dimensions 1536 \
    --backend process \
    --dedupe \
    data/measurements.csv
 ```
 
-Omit `--llm_provider` and `--embedding_provider` to preserve the existing
+Use unprefixed (or `vertex_ai/`/`openai/`) model names to preserve the existing
 Vertex/OpenAI behavior. Copilot honors `--temperature` and
 `--belief_temperature` when the selected model permits that value. Some reasoning
 modes constrain temperature at the provider.
 
-Copilot deduplication defaults to `text-embedding-3-small` with 1536 dimensions.
-This is not numerically identical to the existing OpenAI
-`text-embedding-3-large` default, so leave `--embedding_provider` unset when
-exact embedding geometry must be preserved. Copilot currently requires the
-`process` or `modal` execution backend; the `local` backend's generated image
-analysis code is tied to an OpenAI client.
+`github_copilot/text-embedding-3-small` at 1536 dimensions is not numerically
+identical to the OpenAI `text-embedding-3-large` default, so keep the OpenAI
+embedding model when exact embedding geometry must be preserved. Copilot
+currently requires the `process` or `modal` execution backend; the `local`
+backend's generated image analysis code is tied to an OpenAI client.
 
 ## Run
 

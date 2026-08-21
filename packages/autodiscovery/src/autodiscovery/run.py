@@ -47,6 +47,7 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
+from autodiscovery.model_spec import canonical_provider, parse_model, validate_model
 
 
 def _theoretical_max_boolean_cat(
@@ -82,7 +83,6 @@ def _theoretical_max_boolean_cat(
 def compute_and_store_reward(
     node,
     belief_model_name,
-    llm_provider,
     belief_temperature,
     belief_reasoning_effort,
     n_belief_samples,
@@ -103,7 +103,6 @@ def compute_and_store_reward(
     Args:
         node: Node whose reward will be computed.
         belief_model_name: Model name for belief elicitation.
-        llm_provider: LLM provider for belief elicitation.
         belief_temperature: Temperature for belief sampling.
         belief_reasoning_effort: Reasoning effort for belief-model calls.
         n_belief_samples: Number of belief samples.
@@ -143,7 +142,6 @@ def compute_and_store_reward(
             pt_prior, s_conditioned_prior, _, _ = calculate_prior_and_posterior_beliefs(
                 node,
                 model=belief_model_name,
-                llm_provider=llm_provider,
                 temperature=belief_temperature,
                 reasoning_effort=belief_reasoning_effort,
                 n_samples=n_belief_samples,
@@ -194,7 +192,6 @@ def compute_and_store_reward(
         prior, posterior, belief_change, kl_divergence = calculate_prior_and_posterior_beliefs(
             node,
             model=belief_model_name,
-            llm_provider=llm_provider,
             temperature=belief_temperature,
             reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
@@ -230,7 +227,6 @@ def compute_and_store_reward(
         _, _posterior, _belief_change, _kl_divergence = calculate_prior_and_posterior_beliefs(
             node,
             model=belief_model_name,
-            llm_provider=llm_provider,
             temperature=belief_temperature,
             reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
@@ -293,10 +289,8 @@ def run_mcts(
     dataset_paths,
     log_dirname,
     work_dir,
-    model_name="gpt-4o",
-    llm_provider=None,
-    embedding_provider=None,
-    embedding_model=None,
+    model_name="gemini-3.1-pro-preview",
+    embedding_model="text-embedding-3-large",
     embedding_dimensions=None,
     belief_model_name="gemini-3-flash-preview",
     max_iterations=100,
@@ -326,7 +320,7 @@ def run_mcts(
     warmstart_experiments=None,
     backend="process",
     bucket_path=None,
-    vision_model="gpt-4o",
+    vision_model="gemini-3.1-pro-preview",
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
@@ -339,10 +333,9 @@ def run_mcts(
         dataset_paths: List of paths to dataset files.
         log_dirname: Directory to save logs and MCTS nodes.
         work_dir: Working directory for agents.
-        model_name: LLM model name for agents.
-        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
-        embedding_provider: Provider used for deduplication embeddings.
-        embedding_model: Optional deduplication embedding model override.
+        model_name: LLM model for agents, optionally qualified as ``<provider>/<model>``.
+        embedding_model: Deduplication embedding model, optionally qualified as
+            ``<provider>/<model>``.
         embedding_dimensions: Optional deduplication embedding dimensions.
         belief_model_name: LLM model name for belief distribution agent.
         max_iterations: Maximum number of MCTS iterations.
@@ -450,7 +443,6 @@ def run_mcts(
             base_agent_objs = get_agents(
                 work_dir,
                 model_name=model_name,
-                llm_provider=llm_provider,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
                 branching_factor=branching_factor,
@@ -584,7 +576,9 @@ def run_mcts(
                             if root_context is not None:
                                 node_context.append(root_context)
                         path_context = node.get_path_context(k=k_parents - 1, skip_root=True) or []
-                        node_context.extend(context for context in path_context if context is not None)
+                        node_context.extend(
+                            context for context in path_context if context is not None
+                        )
 
                     node_messages = [
                         {
@@ -644,7 +638,9 @@ def run_mcts(
 
                     # Store the raw message logs for the node
                     logger_obj.log_node(
-                        node.level, node.node_idx, chat_manager.messages_to_string(groupchat.messages)
+                        node.level,
+                        node.node_idx,
+                        chat_manager.messages_to_string(groupchat.messages),
                     )
 
                     # Get messages starting from the current query and update the node
@@ -678,7 +674,6 @@ def run_mcts(
                         compute_and_store_reward(
                             node,
                             belief_model_name,
-                            llm_provider,
                             belief_temperature,
                             belief_reasoning_effort,
                             n_belief_samples,
@@ -757,7 +752,6 @@ def run_mcts(
                         thread_local.agent_objs = get_agents(
                             thread_work_dir,
                             model_name=model_name,
-                            llm_provider=llm_provider,
                             temperature=temperature,
                             reasoning_effort=reasoning_effort,
                             branching_factor=branching_factor,
@@ -810,7 +804,6 @@ def run_mcts(
                     base_agent_objs = get_agents(
                         work_dir,
                         model_name=model_name,
-                        llm_provider=llm_provider,
                         temperature=temperature,
                         reasoning_effort=reasoning_effort,
                         branching_factor=branching_factor,
@@ -878,8 +871,6 @@ def run_mcts(
         log_dirname,
         run_dedupe,
         belief_model_name,
-        llm_provider=llm_provider,
-        embedding_provider=embedding_provider,
         embedding_model=embedding_model,
         embedding_dimensions=embedding_dimensions,
         time_elapsed=time_elapsed,
@@ -887,6 +878,77 @@ def run_mcts(
     )
     usage_tracker.save_events(log_dirname)
     usage_tracker.save_summary(log_dirname)
+
+
+#: Embedding model used when --embedding_model is omitted. Copilot's catalog has
+#: no text-embedding-3-large, so it needs its own default.
+_DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
+_DEFAULT_COPILOT_EMBEDDING_MODEL = "github_copilot/text-embedding-3-small"
+
+
+def resolve_model_args(args) -> None:
+    """Resolve and validate every model flag in place, before any model call.
+
+    Rewrites ``args.model``, ``args.belief_model``, ``args.vision_model`` and
+    ``args.embedding_model`` to canonical litellm ``<provider>/<model>`` names so
+    nothing downstream has to guess a provider, and fails fast on a model that
+    litellm knows cannot do its job (a vision model without image support, an
+    embedding model passed as a chat model). The deprecated
+    ``--llm_provider``/``--embedding_provider`` flags are consumed here as the
+    default provider for bare model names, and not passed on.
+
+    Args:
+        args: Parsed argument namespace, mutated in place.
+
+    Raises:
+        ModelSpecError: If a model flag cannot serve its role.
+    """
+    llm_provider = getattr(args, "llm_provider", None)
+    embedding_provider = getattr(args, "embedding_provider", None)
+    for flag, model_flag, value in (
+        ("--llm_provider", "--model", llm_provider),
+        ("--embedding_provider", "--embedding_model", embedding_provider),
+    ):
+        if value is not None:
+            print(
+                f"Warning: {flag} is deprecated. Qualify the model flags instead, "
+                f"e.g. {model_flag} {canonical_provider(value)}/<model>."
+            )
+
+    args.model = str(validate_model(args.model, flag="--model", default_provider=llm_provider))
+    args.belief_model = str(
+        validate_model(args.belief_model, flag="--belief_model", default_provider=llm_provider)
+    )
+    args.vision_model = str(
+        validate_model(
+            args.vision_model,
+            flag="--vision_model",
+            default_provider=llm_provider,
+            require_vision=True,
+        )
+    )
+
+    embedding_model = getattr(args, "embedding_model", None)
+    if embedding_model is None:
+        embedding_model = (
+            _DEFAULT_COPILOT_EMBEDDING_MODEL
+            if embedding_provider == "copilot"
+            else _DEFAULT_EMBEDDING_MODEL
+        )
+    args.embedding_model = str(
+        validate_model(
+            embedding_model,
+            flag="--embedding_model",
+            default_provider=embedding_provider,
+            mode="embedding",
+        )
+    )
+
+    print(
+        "Resolved models: "
+        f"model={args.model} belief_model={args.belief_model} "
+        f"vision_model={args.vision_model} embedding_model={args.embedding_model}"
+    )
 
 
 def main(args):
@@ -898,14 +960,18 @@ def main(args):
     if getattr(args, "use_modal_sandbox", False) and args.backend == "process":
         args.backend = "modal"
 
-    # Validate and fix arguments
-    if "o4-mini" in args.model and args.temperature is not None:
-        print("Warning: Setting temperature for o4-mini is not permitted. Using default None.")
+    # Resolve provider/model selection before anything issues a model call.
+    resolve_model_args(args)
+
+    # OpenAI reasoning models reject temperature; drop it rather than fail mid-run.
+    if not parse_model(args.model).accepts_temperature and args.temperature is not None:
+        print(f"Warning: {args.model} does not accept a temperature. Using None.")
         args.temperature = None
-    if "o4-mini" in args.belief_model and args.belief_temperature is not None:
-        print(
-            "Warning: Setting temperature for o4-mini belief model is not permitted. Using default None."
-        )
+    if (
+        not parse_model(args.belief_model).accepts_temperature
+        and args.belief_temperature is not None
+    ):
+        print(f"Warning: {args.belief_model} does not accept a temperature. Using None.")
         args.belief_temperature = None
 
     # Create log directory
@@ -955,9 +1021,7 @@ def main(args):
                 log_dirname,
                 run_dedupe=args.dedupe,
                 model=args.belief_model,
-                llm_provider=getattr(args, "llm_provider", None),
-                embedding_provider=getattr(args, "embedding_provider", None),
-                embedding_model=getattr(args, "embedding_model", None),
+                embedding_model=args.embedding_model,
                 embedding_dimensions=getattr(args, "embedding_dimensions", None),
             )
             return
@@ -1038,9 +1102,7 @@ def main(args):
         n_belief_samples=args.n_belief_samples,
         k_parents=args.k_parents,
         model_name=args.model,
-        llm_provider=getattr(args, "llm_provider", None),
-        embedding_provider=getattr(args, "embedding_provider", None),
-        embedding_model=getattr(args, "embedding_model", None),
+        embedding_model=args.embedding_model,
         embedding_dimensions=getattr(args, "embedding_dimensions", None),
         belief_model_name=args.belief_model,
         temperature=args.temperature,

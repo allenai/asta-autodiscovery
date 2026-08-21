@@ -15,6 +15,7 @@ from autodiscovery.llm_retry import (
     call_with_backoff,
 )
 from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER, UsageTracker
+from autodiscovery.model_spec import parse_model
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -24,7 +25,7 @@ from autodiscovery.structured_outputs import (
     ExperimentReviewer,
     ImageAnalysis,
 )
-from autodiscovery.utils import get_vertex_access_token, is_gemini_model, normalize_vertex_model_name
+from autodiscovery.utils import get_vertex_access_token
 from autodiscovery.vertex_client import OpenAICredentialsRefresher
 from autodiscovery.vertex_config import get_vertex_openai_base_url
 
@@ -96,8 +97,7 @@ class ModalSandboxExecutor(CodeExecutor):
         self,
         backend,
         timeout: int = 30 * 60,
-        vision_model: str = "gpt-4o",
-        llm_provider: str | None = None,
+        vision_model: str = "gemini-3.1-pro-preview",
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
@@ -105,35 +105,31 @@ class ModalSandboxExecutor(CodeExecutor):
         Args:
             backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
             timeout: Timeout in seconds (for Autogen compatibility)
-            vision_model: Model to use for image analysis
-            llm_provider: LLM provider used for image analysis.
+            vision_model: Vision model, optionally qualified as ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
         """
         self._executor = backend
         self._timeout = timeout
         self.vision_model = vision_model
-        self.llm_provider = llm_provider
+        self.vision_spec = parse_model(vision_model)
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
 
     def _get_vision_client(self):
         from openai import OpenAI
 
-        is_gemini = is_gemini_model(self.vision_model)
-        if is_gemini:
+        if self.vision_spec.is_vertex:
             try:
                 base_url = get_vertex_openai_base_url()
             except ValueError as exc:
                 return None, f"Image analysis skipped: {exc}"
-        else:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                return (
-                    None,
-                    f"Image analysis skipped: OPENAI_API_KEY is not set for {self.vision_model}.",
-                )
-        if is_gemini:
             return OpenAICredentialsRefresher(base_url=base_url), None
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return (
+                None,
+                f"Image analysis skipped: OPENAI_API_KEY is not set for {self.vision_model}.",
+            )
         return OpenAI(api_key=api_key), None
 
     def _analyze_image(self, image_data: str) -> str:
@@ -145,7 +141,7 @@ class ModalSandboxExecutor(CodeExecutor):
         Returns:
             Analysis text
         """
-        if self.llm_provider == "copilot":
+        if self.vision_spec.is_copilot:
             from autodiscovery.copilot_provider import get_copilot_runtime
 
             completion = get_copilot_runtime().complete(
@@ -159,7 +155,7 @@ class ModalSandboxExecutor(CodeExecutor):
                     },
                     {"role": "user", "content": IMAGE_ANALYST_PROMPT},
                 ],
-                model=self.vision_model,
+                model=self.vision_spec.wire_model_name,
                 response_format=ImageAnalysis,
                 attachments=[
                     {
@@ -210,9 +206,7 @@ class ModalSandboxExecutor(CodeExecutor):
 
         response = call_with_backoff(
             lambda: client.chat.completions.create(
-                model=normalize_vertex_model_name(self.vision_model)
-                if is_gemini_model(self.vision_model)
-                else self.vision_model,
+                model=self.vision_spec.wire_model_name,
                 messages=messages,
             ),
             label=f"vision_analysis(model={self.vision_model})",
@@ -375,6 +369,13 @@ def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
 
 
 def build_image_analysis_patch(vision_model: str) -> str:
+    """Build the matplotlib patch injected into locally executed experiment code.
+
+    Provider routing is resolved here, in the parent process, and baked into the
+    patch as literals. The patch runs in an isolated execution context that has
+    neither litellm nor autodiscovery importable, so it must not re-derive them.
+    """
+    spec = parse_model(vision_model)
     template = """\
 import matplotlib.pyplot as plt
 import functools
@@ -384,19 +385,14 @@ import json
 import os
 from openai import OpenAI
 
+# Resolved by autodiscovery.model_spec in the parent process.
 VISION_MODEL = __VISION_MODEL__
+WIRE_MODEL_NAME = __WIRE_MODEL_NAME__
+IS_VERTEX = __IS_VERTEX__
 USAGE_MARKER = __USAGE_MARKER__
 VERTEX_OPENAI_BASE_URL_ENV = "VERTEX_OPENAI_BASE_URL"
 VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
 VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
-
-def _is_gemini_model(model: str) -> bool:
-    return model.split("/")[-1].startswith("gemini")
-
-def _normalize_vertex_model_name(model: str) -> str:
-    if _is_gemini_model(model) and "/" not in model:
-        return f"google/{model}"
-    return model
 
 def _get_vertex_base_url():
     # Reference: https://github.com/GoogleCloudPlatform/generative-ai/blob/main/gemini/chat-completions/intro_chat_completions_api.ipynb
@@ -430,8 +426,7 @@ def _get_vertex_token():
         return None
 
 def _get_openai_client():
-    is_gemini = _is_gemini_model(VISION_MODEL)
-    if is_gemini:
+    if IS_VERTEX:
         api_key = _get_vertex_token()
         base_url = _get_vertex_base_url()
         if not api_key or not base_url:
@@ -448,7 +443,7 @@ image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
 def image_to_text():
     client = _get_openai_client()
     if client is None:
-        missing = "VERTEX_ACCESS_TOKEN/GOOGLE_OAUTH_ACCESS_TOKEN + Vertex base URL" if _is_gemini_model(VISION_MODEL) else "OPENAI_API_KEY"
+        missing = "VERTEX_ACCESS_TOKEN/GOOGLE_OAUTH_ACCESS_TOKEN + Vertex base URL" if IS_VERTEX else "OPENAI_API_KEY"
         print(f"Image analysis skipped: {{missing}} is not set for {{VISION_MODEL}}.")
         return
     for fig_num in plt.get_fignums():
@@ -479,7 +474,7 @@ def image_to_text():
             ]
             # Get image analysis from the LLM
             response = client.chat.completions.create(
-                model=_normalize_vertex_model_name(VISION_MODEL) if _is_gemini_model(VISION_MODEL) else VISION_MODEL,
+                model=WIRE_MODEL_NAME,
                 messages=messages,
                 max_tokens=1000,
             )
@@ -513,13 +508,15 @@ patch_matplotlib_show()
 """
     return (
         template.replace("__VISION_MODEL__", repr(vision_model))
+        .replace("__WIRE_MODEL_NAME__", repr(spec.wire_model_name))
+        .replace("__IS_VERTEX__", repr(spec.is_vertex))
         .replace("__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT))
         .replace("__USAGE_MARKER__", repr(LOCAL_IMAGE_USAGE_MARKER))
     )
 
 
 class CodeBlockWrapperTransform(transforms.MessageTransform):
-    def __init__(self, vision_model: str = "gpt-4o"):
+    def __init__(self, vision_model: str = "gemini-3.1-pro-preview"):
         self.image_analysis_patch = build_image_analysis_patch(vision_model)
 
     def apply_transform(self, messages: list[dict]) -> list[dict]:
@@ -542,9 +539,7 @@ class CodeBlockWrapperTransform(transforms.MessageTransform):
         return "CodeBlockWrapperTransform", True
 
 
-def code_transform_working_dir(
-    backend: str, work_dir: str, modal_working_dir: str | None
-) -> str:
+def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: str | None) -> str:
     """Return the directory the code transform should ``os.chdir`` into per cell.
 
     For the process/local backends this must be **absolute**: their subprocess
@@ -597,16 +592,16 @@ def get_openai_config(
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     timeout: int = 600,
-    model_name: str = "o4-mini",
+    model_name: str = "gemini-3.1-pro-preview",
 ):
     """Build a model config for AG2/Autogen clients.
 
     Args:
         api_key: API key for the provider. Defaults to env-based resolution.
         temperature: Sampling temperature.
-        reasoning_effort: Optional reasoning effort for o-series models.
+        reasoning_effort: Optional reasoning effort for reasoning-capable models.
         timeout: Request timeout in seconds.
-        model_name: Target model name.
+        model_name: Model name, optionally qualified as ``<provider>/<model>``.
 
     Returns:
         Configuration dict for the Autogen LLM client.
@@ -614,54 +609,42 @@ def get_openai_config(
     # Apply retry policy for AG2 OpenAI-compatible client calls.
     apply_openai_client_backoff_retry()
 
-    # Check if this is a Gemini model
-    is_gemini = is_gemini_model(model_name)
+    spec = parse_model(model_name)
 
-    if is_gemini:
+    config = {
+        "api_type": "openai",
+        "model": spec.wire_model_name,
+        "timeout": timeout,
+        # Retries are handled by apply_openai_client_backoff_retry().
+        "max_retries": 0,
+        # Disabling caching also addresses this bug: https://github.com/ag2ai/ag2/issues/1103
+        "cache_seed": None,
+    }
+
+    if spec.is_vertex:
         # Route Gemini through Vertex's OpenAI-compatible endpoint so usage metadata
         # (including provider-native total token counts) is preserved.
         apply_openai_client_vertex_token_refresh()
-        base_url = get_vertex_openai_base_url()
-        config = {
-            "api_type": "openai",
-            "model": normalize_vertex_model_name(model_name),
-            "timeout": timeout,
-            "api_key": get_vertex_access_token(),
-            "base_url": base_url,
-            # Retries are handled by apply_openai_client_backoff_retry().
-            "max_retries": 0,
-            "cache_seed": None,
-        }
-        if temperature is not None:
-            config["temperature"] = temperature
+        config["api_key"] = get_vertex_access_token()
+        config["base_url"] = get_vertex_openai_base_url()
     else:
-        # Configure for OpenAI models
-        config = {
-            "api_type": "openai",
-            "model": model_name,
-            "timeout": timeout,
-            "api_key": api_key,
-            # Retries are handled by apply_openai_client_backoff_retry().
-            "max_retries": 0,
-            "cache_seed": None,  # Disabling caching also addresses this bug: https://github.com/ag2ai/ag2/issues/1103
-        }
-        if temperature is not None:
-            config["temperature"] = temperature
+        config["api_key"] = api_key
 
-        # Make o-series specific changes
-        if model_name.startswith("o"):
-            if reasoning_effort is not None:
-                config["reasoning_effort"] = reasoning_effort  # Defaults to medium
-        else:
-            config["logprobs"] = True
+    if temperature is not None and spec.accepts_temperature:
+        config["temperature"] = temperature
+
+    if spec.supports_reasoning:
+        if reasoning_effort is not None:
+            config["reasoning_effort"] = reasoning_effort  # Defaults to medium
+    elif spec.is_openai:
+        config["logprobs"] = True
 
     return config
 
 
 def get_agents(
     work_dir,
-    model_name="o4-mini",
-    llm_provider: str | None = None,
+    model_name="gemini-3.1-pro-preview",
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -671,15 +654,15 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
-    vision_model: str = "gpt-4o",
+    vision_model: str = "gemini-3.1-pro-preview",
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
 
     Args:
         work_dir: Working directory for code execution.
-        model_name: Model used for AG2 conversational agents.
-        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
+        model_name: Model for AG2 conversational agents, optionally qualified as
+            ``<provider>/<model>``.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
         branching_factor: Number of experiment candidates to request.
@@ -689,23 +672,25 @@ def get_agents(
         backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
-        vision_model: Vision model used for plot analysis.
+        vision_model: Vision model for plot analysis, optionally qualified as
+            ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
 
     Returns:
         Dictionary mapping agent name to agent instance.
     """
-    if llm_provider not in {None, "copilot"}:
-        raise ValueError(f"Unknown LLM provider: {llm_provider}")
-    if llm_provider == "copilot" and backend == "local":
+    chat_spec = parse_model(model_name)
+    vision_spec = parse_model(vision_model)
+
+    if vision_spec.is_copilot and backend == "local":
         raise ValueError(
             "Copilot requires the process or modal backend so plot analysis does not "
             "fall back to an in-experiment OpenAI client"
         )
 
-    if llm_provider == "copilot":
+    if chat_spec.is_copilot:
         copilot_model_config = {
-            "model": model_name,
+            "model": chat_spec.wire_model_name,
             "model_client_cls": "CopilotAG2Client",
         }
         if reasoning_effort is not None:
@@ -717,10 +702,8 @@ def get_agents(
         if temperature is not None:
             llm_config["temperature"] = temperature
     else:
-        is_gemini = is_gemini_model(model_name)
-        api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
         llm_config = get_openai_config(
-            api_key=api_key,
+            api_key=None if chat_spec.is_vertex else os.getenv("OPENAI_API_KEY"),
             model_name=model_name,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
@@ -916,7 +899,6 @@ def install(package):
             modal_executor,
             timeout=code_timeout,
             vision_model=vision_model,
-            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         print(
@@ -932,7 +914,6 @@ def install(package):
             _ProcessBackendAdapter(process_backend),
             timeout=code_timeout,
             vision_model=vision_model,
-            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         print(f"Using process backend with work_dir: {work_dir}")
@@ -985,7 +966,7 @@ def install(package):
         user_proxy,
     ]
 
-    if llm_provider == "copilot":
+    if chat_spec.is_copilot:
         from autodiscovery.copilot_provider import CopilotAG2Client
 
         for agent in agents:

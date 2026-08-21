@@ -97,8 +97,7 @@ def test_query_llm_copilot_samples_and_records_usage(monkeypatch) -> None:
     responses = query_llm(
         [{"role": "user", "content": "Assess a hypothesis"}],
         n_samples=3,
-        model="claude-haiku-4.5",
-        llm_provider="copilot",
+        model="github_copilot/claude-haiku-4.5",
         temperature=1.0,
         response_format=BeliefTrueFalseCat.ResponseFormat,
         usage_tracker=tracker,
@@ -140,8 +139,7 @@ def test_copilot_vision_uses_blob_attachment_and_records_usage(monkeypatch) -> N
     tracker = UsageTracker()
     executor = ModalSandboxExecutor(
         backend=None,
-        vision_model="claude-haiku-4.5",
-        llm_provider="copilot",
+        vision_model="github_copilot/claude-haiku-4.5",
         usage_tracker=tracker,
     )
 
@@ -162,7 +160,12 @@ def test_copilot_vision_uses_blob_attachment_and_records_usage(monkeypatch) -> N
 
 def test_copilot_rejects_local_execution_backend(tmp_path) -> None:
     try:
-        get_agents(tmp_path, llm_provider="copilot", backend="local")
+        get_agents(
+            tmp_path,
+            model_name="github_copilot/claude-haiku-4.5",
+            vision_model="github_copilot/claude-haiku-4.5",
+            backend="local",
+        )
     except ValueError as exc:
         assert "requires the process or modal backend" in str(exc)
     else:
@@ -173,8 +176,7 @@ def test_copilot_agents_accept_reasoning_effort(tmp_path) -> None:
     """Construct the exact local worker agent config without a duplicate AG2 entry."""
     agents = get_agents(
         tmp_path,
-        model_name="claude-haiku-4.5",
-        llm_provider="copilot",
+        model_name="github_copilot/claude-haiku-4.5",
         reasoning_effort="medium",
         backend="process",
     )
@@ -356,7 +358,7 @@ def test_copilot_embeddings_use_supported_default_and_dimensions(monkeypatch) ->
 
     vectors = get_embedding(
         ["first", "second"],
-        embedding_provider="copilot",
+        model="github_copilot/text-embedding-3-small",
         dimensions=512,
         usage_tracker=tracker,
     )
@@ -372,8 +374,7 @@ def test_copilot_embeddings_use_supported_default_and_dimensions(monkeypatch) ->
 
     get_embedding(
         ["first", "second"],
-        model="text-embedding-ada-002",
-        embedding_provider="copilot",
+        model="github_copilot/text-embedding-ada-002",
         dimensions=1536,
     )
     assert calls[-1][1]["model"] == "text-embedding-ada-002"
@@ -402,7 +403,7 @@ def test_copilot_embeddings_honor_batch_size_and_retry(monkeypatch) -> None:
 
     vectors = get_embedding(
         ["first", "second"],
-        embedding_provider="copilot",
+        model="github_copilot/text-embedding-3-small",
         batch_size=1,
         n_attempts=2,
     )

@@ -28,6 +28,8 @@ import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
+from autodiscovery.args import MODEL_FLAG_HELP, PROVIDER_FLAG_HELP
+
 
 def _sniff_columns(path: Path) -> list[dict[str, str]] | None:
     """Read CSV/TSV headers and return column entries with empty descriptions."""
@@ -190,20 +192,42 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
     adv = parser.add_argument_group("advanced")
-    adv.add_argument("--model", type=str, default="gemini-3.1-pro-preview")
-    adv.add_argument("--belief_model", type=str, default="gemini-3-flash-preview")
-    adv.add_argument("--vision_model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument(
+        "--model",
+        type=str,
+        default="gemini-3.1-pro-preview",
+        help=MODEL_FLAG_HELP.format(role="all agents (except the belief agent)"),
+    )
+    adv.add_argument(
+        "--belief_model",
+        type=str,
+        default="gemini-3-flash-preview",
+        help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
+    )
+    adv.add_argument(
+        "--vision_model",
+        type=str,
+        default="gemini-3.1-pro-preview",
+        help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
+    )
     adv.add_argument(
         "--llm_provider",
         choices=["copilot"],
         default=None,
+        help=PROVIDER_FLAG_HELP.format(flags="--model/--belief_model/--vision_model"),
     )
     adv.add_argument(
         "--embedding_provider",
         choices=["copilot"],
         default=None,
+        help=PROVIDER_FLAG_HELP.format(flags="--embedding_model"),
     )
-    adv.add_argument("--embedding_model", type=str)
+    adv.add_argument(
+        "--embedding_model",
+        type=str,
+        help=MODEL_FLAG_HELP.format(role="deduplication embeddings")
+        + " Defaults to the selected provider's embedding model.",
+    )
     adv.add_argument("--embedding_dimensions", type=int)
     adv.add_argument("--temperature", type=float, default=1.0)
     adv.add_argument("--belief_temperature", type=float, default=1.0)

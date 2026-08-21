@@ -301,3 +301,23 @@ def test_bare_name_resolution_never_triggers_copilot_device_flow(monkeypatch, sp
     monkeypatch.setattr(Authenticator, "_login", fail)
 
     assert not parse_model(spec).is_copilot
+
+
+def test_minimal_reasoning_effort_uses_the_registry_not_a_name_prefix() -> None:
+    """Downgrade minimal->low only where the model really lacks it.
+
+    The old ``startswith("o")/"gpt-5"`` test downgraded the whole gpt-5 family,
+    which does accept ``minimal``. litellm records that per model.
+    """
+    from autodiscovery.utils import normalize_reasoning_effort
+
+    assert normalize_reasoning_effort(parse_model("o4-mini"), "minimal") == "low"
+    assert normalize_reasoning_effort(parse_model("gpt-5-mini"), "minimal") == "minimal"
+    # Gemini and Copilot pass the caller's value through, as before.
+    assert normalize_reasoning_effort(parse_model("gemini-3-flash-preview"), "minimal") == "minimal"
+    assert (
+        normalize_reasoning_effort(parse_model("github_copilot/claude-haiku-4.5"), "minimal")
+        == "minimal"
+    )
+    assert normalize_reasoning_effort(parse_model("o4-mini"), "high") == "high"
+    assert normalize_reasoning_effort(parse_model("o4-mini"), None) is None

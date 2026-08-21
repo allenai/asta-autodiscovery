@@ -27,9 +27,15 @@ def normalize_reasoning_effort(spec: ModelSpec, reasoning_effort: str | None) ->
     """
     if reasoning_effort is None:
         return None
-    if reasoning_effort == "minimal" and spec.is_openai and spec.supports_reasoning:
-        # OpenAI reasoning models use low/medium/high. Keep CLI semantics consistent
-        # by mapping minimal to low.
+    if (
+        reasoning_effort == "minimal"
+        and spec.is_openai
+        and spec.supports_reasoning
+        and not spec.supports_minimal_reasoning_effort
+    ):
+        # Most OpenAI reasoning models take only low/medium/high. Keep CLI
+        # semantics consistent by mapping minimal to low, except where litellm
+        # records that the model really does accept it (the gpt-5 family).
         print(
             f"[query_llm] model={spec} does not support reasoning_effort='minimal'; "
             "using 'low' instead."

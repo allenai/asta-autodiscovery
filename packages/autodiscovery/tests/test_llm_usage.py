@@ -292,7 +292,27 @@ def test_query_llm_passes_reasoning_effort_for_gemini() -> None:
 
 
 def test_query_llm_maps_minimal_reasoning_effort_for_openai_reasoning_models() -> None:
-    """Ensure OpenAI reasoning models map minimal effort to low."""
+    """Ensure o-series models, which lack minimal effort, map it to low."""
+    client = _FakeClient()
+    _ = query_llm(
+        messages=[{"role": "user", "content": "Return JSON."}],
+        n_samples=1,
+        model="o4-mini",
+        reasoning_effort="minimal",
+        client=client,
+    )
+
+    assert len(client.chat.completions.calls) == 1
+    request = client.chat.completions.calls[0]
+    assert request["reasoning_effort"] == "low"
+
+
+def test_query_llm_keeps_minimal_reasoning_effort_for_gpt5() -> None:
+    """The gpt-5 family accepts minimal effort; do not downgrade it.
+
+    The old routing keyed off a ``gpt-5`` name prefix and downgraded the whole
+    family. litellm records ``supports_minimal_reasoning_effort`` per model.
+    """
     client = _FakeClient()
     _ = query_llm(
         messages=[{"role": "user", "content": "Return JSON."}],
@@ -302,6 +322,4 @@ def test_query_llm_maps_minimal_reasoning_effort_for_openai_reasoning_models() -
         client=client,
     )
 
-    assert len(client.chat.completions.calls) == 1
-    request = client.chat.completions.calls[0]
-    assert request["reasoning_effort"] == "low"
+    assert client.chat.completions.calls[0]["reasoning_effort"] == "minimal"

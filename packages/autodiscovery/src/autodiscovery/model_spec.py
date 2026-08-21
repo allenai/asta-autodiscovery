@@ -164,10 +164,23 @@ class ModelSpec:
         return bool(info.get("supports_reasoning")) if info else False
 
     @property
+    def supports_minimal_reasoning_effort(self) -> bool:
+        """Whether litellm affirmatively records support for ``minimal`` effort.
+
+        The registry only ever says ``True`` or nothing, so a missing value means
+        "unknown", not "unsupported". Callers must treat it as a positive signal
+        only.
+        """
+        info = self.info
+        return bool(info.get("supports_minimal_reasoning_effort")) if info else False
+
+    @property
     def accepts_temperature(self) -> bool:
         """Whether the model accepts a ``temperature`` parameter.
 
         OpenAI's reasoning models reject it; Gemini reasoning models accept it.
+        litellm cannot answer this: ``supported_openai_params`` lists
+        ``temperature`` for ``o4-mini``, which rejects it at the API.
         """
         return not (self.is_openai and self.supports_reasoning)
 

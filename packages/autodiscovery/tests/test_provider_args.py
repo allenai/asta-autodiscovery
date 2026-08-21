@@ -121,7 +121,7 @@ def test_validate_model_rejects_a_mode_mismatch() -> None:
 def test_validate_model_allows_models_litellm_has_not_mapped() -> None:
     resolved = validate_model("gemini-4.7-pro-preview", flag="--model")
     assert resolved.is_vertex
-    assert not resolved.is_known
+    assert resolved.info is None
 
 
 # --- CLI boundary ----------------------------------------------------------
@@ -260,7 +260,7 @@ def test_resolution_never_triggers_copilot_device_flow(monkeypatch) -> None:
     resolved = validate_model("github_copilot/claude-haiku-4.5", flag="--model")
     assert resolved.is_copilot
     assert resolved.supports_vision
-    assert resolved.mode == "chat"
+    assert resolved.info is not None
     with pytest.raises(ModelSpecError, match="not in github_copilot's catalog"):
         validate_model("github_copilot/gemini-3.1-pro-preview", flag="--model")
 

@@ -143,17 +143,6 @@ class ModelSpec:
         return _model_info(self.provider, self.model)
 
     @property
-    def is_known(self) -> bool:
-        """Whether litellm's registry has an entry for this model."""
-        return self.info is not None
-
-    @property
-    def mode(self) -> str | None:
-        """Return litellm's mode (``chat``, ``embedding``, ...) or None."""
-        info = self.info
-        return info.get("mode") if info else None
-
-    @property
     def supports_vision(self) -> bool | None:
         """Whether the model accepts image input; None when unmapped."""
         info = self.info
@@ -293,12 +282,15 @@ def validate_model(
         ModelSpecError: If the model is unusable for its role.
     """
     resolved = parse_model(spec, default_provider=default_provider)
+    info = resolved.info
 
-    if not resolved.is_known:
+    if info is None:
         if resolved.provider in _CLOSED_CATALOG_PROVIDERS:
+            catalog = _litellm().models_by_provider.get(resolved.provider, [])
+            available = sorted(name.removeprefix(f"{resolved.provider}/") for name in catalog)
             raise ModelSpecError(
-                f"{flag}={spec} is not in {resolved.provider}'s catalog. Available: "
-                f"{', '.join(known_models(resolved.provider))}"
+                f"{flag}={spec} is not in {resolved.provider}'s catalog. "
+                f"Available: {', '.join(available)}"
             )
         print(
             f"[model_spec] {flag}={spec} resolves to provider "
@@ -307,9 +299,9 @@ def validate_model(
         )
         return resolved
 
-    if resolved.mode != mode:
+    if info.get("mode") != mode:
         raise ModelSpecError(
-            f"{flag}={spec} is a '{resolved.mode}' model, but a '{mode}' model is required."
+            f"{flag}={spec} is a '{info.get('mode')}' model, but a '{mode}' model is required."
         )
 
     if require_vision and not resolved.supports_vision:
@@ -319,10 +311,3 @@ def validate_model(
         )
 
     return resolved
-
-
-def known_models(provider: str) -> list[str]:
-    """Return the bare model names litellm knows for a provider, sorted."""
-    prefix = f"{provider}/"
-    models = _litellm().models_by_provider.get(provider, [])
-    return sorted(model.removeprefix(prefix) for model in models)

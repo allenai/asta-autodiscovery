@@ -9,36 +9,6 @@ from pydantic import ValidationError
 
 from autodiscovery import llm
 from autodiscovery.llm_usage import UsageTracker
-from autodiscovery.model_spec import ModelSpec, parse_model
-
-
-def normalize_reasoning_effort(spec: ModelSpec, reasoning_effort: str | None) -> str | None:
-    """Normalize reasoning effort values across providers.
-
-    Args:
-        spec: Resolved model.
-        reasoning_effort: Requested reasoning effort value.
-
-    Returns:
-        A provider-compatible reasoning effort value or ``None``.
-    """
-    if reasoning_effort is None:
-        return None
-    if (
-        reasoning_effort == "minimal"
-        and spec.is_openai
-        and spec.supports_reasoning
-        and not spec.supports_minimal_reasoning_effort
-    ):
-        # Most OpenAI reasoning models take only low/medium/high. Keep CLI
-        # semantics consistent by mapping minimal to low, except where litellm
-        # records that the model really does accept it (the gpt-5 family).
-        print(
-            f"[query_llm] model={spec} does not support reasoning_effort='minimal'; "
-            "using 'low' instead."
-        )
-        return "low"
-    return reasoning_effort
 
 
 def query_llm(
@@ -79,30 +49,30 @@ def query_llm(
     if n_samples <= 0:
         return []
 
-    spec = parse_model(model)
     kwargs: dict[str, Any] = {}
-    if temperature is not None and spec.accepts_temperature:
+    if temperature is not None and llm.accepts_temperature(model):
         kwargs["temperature"] = temperature
-    if (effort := normalize_reasoning_effort(spec, reasoning_effort)) is not None:
+    if (effort := llm.normalize_reasoning_effort(model, reasoning_effort)) is not None:
         kwargs["reasoning_effort"] = effort
     if response_format is not None:
         kwargs["response_format"] = response_format
 
     # Some providers cap n per request, so split the sample count into batches.
-    batch_sizes = _batch_sizes(n_samples, spec.max_n)
+    cap = llm.max_n(model)
+    batch_sizes = _batch_sizes(n_samples, cap)
     if len(batch_sizes) > 1:
         print(
-            f"[query_llm] model={spec} requesting n={n_samples} via {len(batch_sizes)} calls "
-            f"(max_n={spec.max_n})."
+            f"[query_llm] model={model} requesting n={n_samples} via {len(batch_sizes)} calls "
+            f"(max_n={cap})."
         )
         debug_requests = True
     elif debug_requests:
-        print(f"[query_llm] model={spec} requesting n={n_samples} via 1 call.")
+        print(f"[query_llm] model={model} requesting n={n_samples} via 1 call.")
 
     def _call(batch_n: int):
         if debug_requests:
             print(f"[query_llm] sending request (n={batch_n})")
-        return llm.complete(spec, messages, n=batch_n, **kwargs)
+        return llm.complete(model, messages, n=batch_n, **kwargs)
 
     if len(batch_sizes) == 1:
         response_items = [(batch_sizes[0], _call(batch_sizes[0]))]
@@ -118,13 +88,13 @@ def query_llm(
             metadata["n"] = batch_n
             usage_tracker.record_response(
                 response,
-                source=spec.provider,
+                source=llm.provider_of(model),
                 component=usage_component,
                 agent_name=usage_agent_name,
                 node_id=usage_node_id,
                 metadata=metadata,
             )
-        responses.extend(_parse_choices(response, spec, response_format))
+        responses.extend(_parse_choices(response, model, response_format))
     return responses
 
 
@@ -140,7 +110,7 @@ def _batch_sizes(n_samples: int, max_n: int | None) -> list[int]:
     return batches
 
 
-def _parse_choices(response: Any, spec: ModelSpec, response_format) -> list[Any]:
+def _parse_choices(response: Any, model: str, response_format) -> list[Any]:
     """Extract parsed payloads from a litellm response's choices."""
     parsed_responses = []
     for choice in response.choices:
@@ -161,7 +131,7 @@ def _parse_choices(response: Any, spec: ModelSpec, response_format) -> list[Any]
                 parsed_responses.append(repaired)
             else:
                 raise ValueError(
-                    f"LLM response was not valid JSON for model {spec}: {content[:200]}"
+                    f"LLM response was not valid JSON for model {model}: {content[:200]}"
                 ) from None
     return parsed_responses
 

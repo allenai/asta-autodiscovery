@@ -12,7 +12,6 @@ from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLine
 
 from autodiscovery import llm
 from autodiscovery.llm_usage import UsageTracker, record_ag2_response_usage
-from autodiscovery.model_spec import parse_model
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -104,7 +103,6 @@ class ModalSandboxExecutor(CodeExecutor):
         self._executor = backend
         self._timeout = timeout
         self.vision_model = vision_model
-        self.vision_spec = parse_model(vision_model)
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
 
@@ -137,14 +135,14 @@ class ModalSandboxExecutor(CodeExecutor):
             },
         ]
         try:
-            response = llm.complete(self.vision_spec, messages)
+            response = llm.complete(self.vision_model, messages)
         except Exception as exc:
             return f"Image analysis skipped: {exc}"
 
         if self._usage_tracker is not None:
             self._usage_tracker.record_response(
                 response,
-                source=self.vision_spec.provider,
+                source=llm.provider_of(self.vision_model),
                 component="image_analysis.modal",
                 agent_name="code_executor",
                 node_id=self._usage_node_id,
@@ -305,7 +303,7 @@ def build_image_analysis_patch(vision_model: str) -> str:
     reimplementing provider routing and auth for the execution context.
     """
     # Fail fast here, in the parent, rather than inside generated code.
-    parse_model(vision_model)
+    llm.provider_of(vision_model)
     template = """\
 import matplotlib.pyplot as plt
 import functools
@@ -315,10 +313,8 @@ from io import BytesIO
 
 from autodiscovery import llm
 from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER
-from autodiscovery import llm
-from autodiscovery.model_spec import parse_model
 
-VISION_SPEC = parse_model(__VISION_MODEL__)
+VISION_MODEL = __VISION_MODEL__
 image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
 
 
@@ -343,7 +339,7 @@ def image_to_text():
                 }
             ]
             try:
-                response = llm.complete(VISION_SPEC, messages, max_tokens=1000)
+                response = llm.complete(VISION_MODEL, messages, max_tokens=1000)
             except Exception as exc:
                 print('Image analysis skipped: ' + str(exc))
                 plt.close(fig)
@@ -351,10 +347,10 @@ def image_to_text():
             usage = getattr(response, 'usage', None)
             if usage is not None:
                 print(LOCAL_IMAGE_USAGE_MARKER + json.dumps({
-                    'source': VISION_SPEC.provider,
+                    'source': llm.provider_of(VISION_MODEL),
                     'component': 'image_analysis.local',
                     'agent_name': 'code_executor',
-                    'model': getattr(response, 'model', str(VISION_SPEC)),
+                    'model': getattr(response, 'model', VISION_MODEL),
                     'prompt_tokens': getattr(usage, 'prompt_tokens', 0) or 0,
                     'completion_tokens': getattr(usage, 'completion_tokens', 0) or 0,
                     'total_tokens': getattr(usage, 'total_tokens', 0) or 0,
@@ -460,7 +456,7 @@ class LiteLLMAG2Client:
 
     def __init__(self, config: dict[str, Any], **_: Any) -> None:
         """Initialize the adapter from an AG2 model configuration."""
-        self.spec = parse_model(str(config["model"]))
+        self.model = str(config["model"])
         self.config = config
 
     def create(self, params: dict[str, Any]) -> Any:
@@ -478,9 +474,9 @@ class LiteLLMAG2Client:
             for key in ("temperature", "reasoning_effort", "response_format", "n", "stream")
             if params.get(key) is not None
         }
-        if not self.spec.accepts_temperature:
+        if not llm.accepts_temperature(self.model):
             kwargs.pop("temperature", None)
-        response = llm.complete(self.spec, params["messages"], **kwargs)
+        response = llm.complete(self.model, params["messages"], **kwargs)
         # This is the single point every AG2 response flows through, so usage is
         # recorded here rather than by patching AG2's OpenAIWrapper.
         record_ag2_response_usage(response, agent_name=self.config.get("agent_name"))
@@ -525,13 +521,13 @@ def get_llm_config(
     Returns:
         Configuration dict for AG2.
     """
-    spec = parse_model(model_name)
+    llm.provider_of(model_name)  # fail fast on an unusable name
     entry: dict[str, Any] = {
-        "model": str(spec),
+        "model": model_name,
         "model_client_cls": LiteLLMAG2Client.__name__,
         "timeout": timeout,
     }
-    if temperature is not None and spec.accepts_temperature:
+    if temperature is not None and llm.accepts_temperature(model_name):
         entry["temperature"] = temperature
     if reasoning_effort is not None:
         entry["reasoning_effort"] = reasoning_effort

@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from time import time
 
+from autodiscovery import llm
 from autodiscovery.agents import get_agents
 from autodiscovery.args import ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
@@ -46,7 +47,6 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
-from autodiscovery.model_spec import parse_model, validate_model
 
 
 def _theoretical_max_boolean_cat(
@@ -886,12 +886,12 @@ def resolve_model_args(args) -> None:
         args: Parsed argument namespace.
 
     Raises:
-        ModelSpecError: If a model flag cannot serve its role.
+        ModelError: If a model flag cannot serve its role.
     """
-    validate_model(args.model, flag="--model")
-    validate_model(args.belief_model, flag="--belief_model")
-    validate_model(args.vision_model, flag="--vision_model", require_vision=True)
-    validate_model(args.embedding_model, flag="--embedding_model", mode="embedding")
+    llm.validate(args.model, flag="--model")
+    llm.validate(args.belief_model, flag="--belief_model")
+    llm.validate(args.vision_model, flag="--vision_model", require_vision=True)
+    llm.validate(args.embedding_model, flag="--embedding_model", mode="embedding")
 
 
 def main(args):
@@ -907,13 +907,10 @@ def main(args):
     resolve_model_args(args)
 
     # OpenAI reasoning models reject temperature; drop it rather than fail mid-run.
-    if not parse_model(args.model).accepts_temperature and args.temperature is not None:
+    if not llm.accepts_temperature(args.model) and args.temperature is not None:
         print(f"Warning: {args.model} does not accept a temperature. Using None.")
         args.temperature = None
-    if (
-        not parse_model(args.belief_model).accepts_temperature
-        and args.belief_temperature is not None
-    ):
+    if not llm.accepts_temperature(args.belief_model) and args.belief_temperature is not None:
         print(f"Warning: {args.belief_model} does not accept a temperature. Using None.")
         args.belief_temperature = None
 

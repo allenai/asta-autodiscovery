@@ -111,7 +111,7 @@ def test_ag2_client_records_usage_for_every_response(monkeypatch) -> None:
 
 
 def test_llm_config_rejects_an_unusable_provider() -> None:
-    from autodiscovery.model_spec import ModelSpecError
+    from autodiscovery.llm import ModelError
 
-    with pytest.raises(ModelSpecError):
+    with pytest.raises(ModelError):
         get_llm_config("nonprovider/some-model")

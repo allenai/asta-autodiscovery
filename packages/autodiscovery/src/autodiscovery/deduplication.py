@@ -10,7 +10,6 @@ from tqdm import tqdm
 
 from autodiscovery import llm
 from autodiscovery.llm_usage import UsageTracker
-from autodiscovery.model_spec import parse_model
 from autodiscovery.utils import query_llm
 
 
@@ -157,18 +156,17 @@ def get_embedding(
     Returns:
         numpy.ndarray: An array of embeddings for the input texts.
     """
-    spec = parse_model(model)
     kwargs = {} if dimensions is None else {"dimensions": dimensions}
 
     for attempt in range(n_attempts):
         try:
             all_embeddings = []
             for i in range(0, len(texts), batch_size):
-                response = llm.embed(spec, texts[i : i + batch_size], **kwargs)
+                response = llm.embed(model, texts[i : i + batch_size], **kwargs)
                 if usage_tracker is not None:
                     usage_tracker.record_response(
                         response,
-                        source=spec.provider,
+                        source=llm.provider_of(model),
                         component="dedupe.embeddings",
                         agent_name="dedupe",
                     )

@@ -147,12 +147,11 @@ const MainContent = styled('div')`
 `;
 
 const Logo = styled('a')`
-    padding: ${({ theme }) => theme.spacing(2)};
+    display: block;
+    padding: ${({ theme }) => theme.spacing(2, 2, 1, 2)};
 
     svg {
-        width: 100%;
-        min-width: 175px;
-        max-width: 300px;
+        width: 160px;
         height: auto;
     }
 

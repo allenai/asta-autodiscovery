@@ -108,16 +108,16 @@ def build_email_subject(status: str, run_name: str | None) -> str:
     """Build email subject line based on run status."""
     if status == "SUCCEEDED":
         name_part = run_name or "Your Session"
-        return f"[AstaLabs AutoDiscovery] Successful Discovery Session: {name_part}"
+        return f"[Asta AutoDiscovery] Successful Discovery Session: {name_part}"
     elif status == "FAILED":
         name_part = run_name or "Your Session"
-        return f"[AstaLabs AutoDiscovery] Failed Discovery Session: {name_part}"
+        return f"[Asta AutoDiscovery] Failed Discovery Session: {name_part}"
     elif status == "CANCELLED":
         name_part = run_name or "Your Session"
-        return f"[AstaLabs AutoDiscovery] Cancelled Discovery Session: {name_part}"
+        return f"[Asta AutoDiscovery] Cancelled Discovery Session: {name_part}"
     else:
         name_part = run_name or "Your Session"
-        return f"[AstaLabs AutoDiscovery] Discovery Session Complete: {name_part}"
+        return f"[Asta AutoDiscovery] Discovery Session Complete: {name_part}"
 
 
 def format_duration(started_at: str | None, finished_at: datetime | None) -> str | None:

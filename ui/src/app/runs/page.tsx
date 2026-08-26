@@ -4,7 +4,7 @@ import { Box, CircularProgress, styled, Typography } from '@mui/material';
 import Image from 'next/image';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
-import { TEST_ID_AI2_LOGO_LINK, TEST_ID_ASTA_LABS_LOGO_LINK } from '@/testIds';
+import { TEST_ID_AI2_LOGO_LINK, TEST_ID_ASTA_LOGO_LINK } from '@/testIds';
 import { IntroBox } from '@/runs/components/IntroBox';
 import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
 import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
@@ -53,19 +53,19 @@ export default function RunsPage() {
                                 />
                             </Ai2LogoWrapper>{' '}
                             and is an{' '}
-                            <AstaLabsLogoWrapper
+                            <AstaLogoWrapper
                                 href="https://asta.allen.ai"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                data-test-id={TEST_ID_ASTA_LABS_LOGO_LINK}>
+                                data-test-id={TEST_ID_ASTA_LOGO_LINK}>
                                 <Image
-                                    src="/astalabs-logo.svg"
-                                    alt="AstaLabs"
-                                    width={120.004}
+                                    src="/asta-logo.svg"
+                                    alt="Asta"
+                                    width={71}
                                     height={17}
                                     style={{ display: 'block', transform: 'translateY(-2px)' }}
                                 />
-                            </AstaLabsLogoWrapper>{' '}
+                            </AstaLogoWrapper>{' '}
                             experiment.
                         </Attribution>
                     </Section>
@@ -174,7 +174,7 @@ const Ai2LogoWrapper = styled('a')({
     },
 });
 
-const AstaLabsLogoWrapper = styled('a')({
+const AstaLogoWrapper = styled('a')({
     display: 'inline-block',
     verticalAlign: 'middle',
     lineHeight: 0,

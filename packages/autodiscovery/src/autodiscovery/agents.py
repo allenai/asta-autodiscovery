@@ -728,12 +728,12 @@ def get_agents(
 
     # Create token limit transform.
     # `model` must be set explicitly: MessageTokenLimiter defaults to "gpt-3.5-turbo-0613"
-    # and silently caps max_tokens_per_message to that model's 4096-token limit. The value
-    # only drives tokenizer choice and the cap lookup, so any large-context OpenAI model works.
+    # and silently caps max_tokens_per_message to that model's 4096-token limit.
+    # The value only drives tokenizer choice and the cap lookup, so any large-context OpenAI model works.
     token_limit_capability = transform_messages.TransformMessages(
         transforms=[
             transforms.MessageTokenLimiter(
-                max_tokens_per_message=20_000, min_tokens=24_000, model="gpt-4o"
+                max_tokens_per_message=10_000, min_tokens=12_000, model="gpt-4o"
             )
         ]
     )

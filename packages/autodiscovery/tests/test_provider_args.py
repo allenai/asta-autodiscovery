@@ -79,10 +79,15 @@ def test_non_litellm_prefix_is_rejected() -> None:
         provider_of("nonprovider/some-model")
 
 
-def test_provider_without_credentials_is_rejected() -> None:
-    """Anthropic direct is a real litellm provider, but not one we configure."""
-    with pytest.raises(ModelError, match="no credentials for"):
-        provider_of("anthropic/claude-haiku-4.5")
+def test_any_litellm_provider_is_accepted() -> None:
+    """No whitelist: providers beyond the three we document are usable.
+
+    Supplying their credentials is the operator's job, per litellm's own env-var
+    conventions. Only the slug is checked, so a typo still fails at startup.
+    """
+    assert provider_of("anthropic/claude-haiku-4.5") == "anthropic"
+    assert provider_of("bedrock/anthropic.claude-3-sonnet-20240229-v1:0") == "bedrock"
+    assert provider_of("ollama/llama3") == "ollama"
     assert provider_of("github_copilot/claude-haiku-4.5") == "github_copilot"
 
 

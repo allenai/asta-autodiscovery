@@ -13,7 +13,8 @@ dependencies = [
     "matplotlib==3.10",
     "IPython>=9.9.0",
     "ag2[openai]==0.10",
-    "google-cloud-aiplatform",
+    # litellm's vertex_ai transport authenticates via google.auth (ADC).
+    "google-auth",
     "scikit-learn",
     "scipy",
     "statsmodels",

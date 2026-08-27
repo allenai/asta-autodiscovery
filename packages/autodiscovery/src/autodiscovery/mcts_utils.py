@@ -112,8 +112,8 @@ def save_nodes(
         nodes_dict_or_list: Dictionary or list of MCTSNode objects or dicts.
         log_dirname: Directory to save the JSON and CSV files.
         run_dedupe: Whether to deduplicate nodes based on hypothesis.
-        model: Model for deduplication, optionally qualified as ``<provider>/<model>``.
-        embedding_model: Embedding model, optionally qualified as ``<provider>/<model>``.
+        model: Model for deduplication, as litellm's ``<provider>/<model>``.
+        embedding_model: Embedding model, as litellm's ``<provider>/<model>``.
         embedding_dimensions: Optional embedding dimensions override.
         save_csv: Whether to save nodes to a CSV file.
         time_elapsed: Optional time elapsed for logging purposes.
@@ -169,8 +169,8 @@ def save_nodes_to_json(
         nodes_list: List of MCTS node objects.
         log_dirname: Directory to save the JSON file
         run_dedupe: Whether to deduplicate nodes based on hypothesis.
-        dedupe_model: Model for deduplication, optionally qualified as ``<provider>/<model>``.
-        embedding_model: Embedding model, optionally qualified as ``<provider>/<model>``.
+        dedupe_model: Model for deduplication, as litellm's ``<provider>/<model>``.
+        embedding_model: Embedding model, as litellm's ``<provider>/<model>``.
         embedding_dimensions: Optional embedding dimensions override.
         log_dedupe_comparisons: Whether to log deduplication comparisons to a file.
         time_elapsed: Optional time elapsed for logging purposes.

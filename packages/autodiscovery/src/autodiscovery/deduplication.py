@@ -38,7 +38,7 @@ class ArgParser(argparse.ArgumentParser):
             "--model",
             type=str,
             default="vertex_ai/gemini-3-flash-preview",
-            help="LLM model for hypothesis merging decisions. Accepts litellm's <provider>/<model> form.",
+            help="LLM model for hypothesis merging decisions, as litellm's <provider>/<model>.",
         )
         self.add_argument(
             "--n_nodes",
@@ -147,7 +147,7 @@ def get_embedding(
 
     Args:
         texts (list): A list of text strings to be embedded.
-        model (str): Embedding model, optionally qualified as ``<provider>/<model>``.
+        model (str): Embedding model, as litellm's ``<provider>/<model>``.
         dimensions: Optional output dimensions for providers that support it.
         batch_size (int, optional): The number of texts to process in one API call.
         n_attempts: Number of attempts before giving up.
@@ -198,7 +198,7 @@ def get_llm_merge_decision(
         hyp2: Second hypothesis string.
         n_samples: Number of LLM samples to draw.
         threshold: Proportion threshold for merging decisions.
-        model: LLM model, optionally qualified as ``<provider>/<model>``.
+        model: LLM model, as litellm's ``<provider>/<model>``.
         temperature: Sampling temperature.
         reasoning_effort: Reasoning effort for the model.
         usage_tracker: Optional usage tracker for merge decision calls.
@@ -256,8 +256,8 @@ def dedupe(
         merge_threshold: Merge threshold for LLM votes.
         seed: Random seed.
         rep_mode: Representative selection mode for merged clusters.
-        model: LLM model, optionally qualified as ``<provider>/<model>``.
-        embedding_model: Embedding model, optionally qualified as ``<provider>/<model>``.
+        model: LLM model, as litellm's ``<provider>/<model>``.
+        embedding_model: Embedding model, as litellm's ``<provider>/<model>``.
         embedding_dimensions: Optional embedding dimensions override.
         n_nodes: Optional cap on nodes processed.
         verbose: Whether to print verbose details.

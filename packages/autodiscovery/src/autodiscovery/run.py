@@ -332,8 +332,8 @@ def run_mcts(
         dataset_paths: List of paths to dataset files.
         log_dirname: Directory to save logs and MCTS nodes.
         work_dir: Working directory for agents.
-        model_name: LLM model for agents, optionally qualified as ``<provider>/<model>``.
-        embedding_model: Deduplication embedding model, optionally qualified as
+        model_name: LLM model for agents, as litellm's ``<provider>/<model>``.
+        embedding_model: Deduplication embedding model, as litellm's
             ``<provider>/<model>``.
         embedding_dimensions: Optional deduplication embedding dimensions.
         belief_model_name: LLM model name for belief distribution agent.

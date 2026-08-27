@@ -19,7 +19,9 @@ its registry cannot express them; each is noted at its definition. Everything
 else -- which parameters a model accepts, wire formats, credentials -- is
 litellm's job.
 
-Provider credentials follow litellm's own conventions:
+Any of litellm's providers can be named; supplying credentials for one is the
+operator's job and follows litellm's own env-var conventions. The three this
+package documents and tests:
 
 - ``vertex_ai`` uses Application Default Credentials. Set
   ``GOOGLE_APPLICATION_CREDENTIALS`` to a service-account key, or run
@@ -40,11 +42,11 @@ from typing import Any
 
 from autodiscovery.llm_retry import load_retry_config
 
-# litellm provider slugs this package has credentials and defaults for.
+# Providers this package has special handling for. Any litellm provider works;
+# these are the ones with a documented credential path or a quirk below.
 OPENAI = "openai"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
-SUPPORTED_PROVIDERS = (OPENAI, VERTEX_AI, GITHUB_COPILOT)
 
 #: Providers whose litellm catalog is a complete, closed enumeration. For these,
 #: a model missing from the registry really is unavailable, so it is an error
@@ -93,8 +95,8 @@ def provider_of(model: str) -> str:
         The provider slug.
 
     Raises:
-        ModelError: If the name is unqualified, the prefix is not a litellm
-            provider, or this package has no credentials for that provider.
+        ModelError: If the name is unqualified or the prefix is not one of
+            litellm's provider slugs.
     """
     if not model or not model.strip():
         raise ModelError("Model name must not be empty")
@@ -108,15 +110,14 @@ def provider_of(model: str) -> str:
 
     from litellm.types.utils import LlmProviders
 
+    # Any of litellm's ~149 providers is allowed; supplying its credentials is
+    # the operator's job, per litellm's own env-var conventions. Checking the
+    # slug here only turns a typo into a startup error instead of a confusing
+    # auth failure on the first model call.
     if provider not in {member.value for member in LlmProviders}:
         raise ModelError(
-            f"'{provider}' in '{model}' is not a litellm provider. Use one of "
-            f"{', '.join(SUPPORTED_PROVIDERS)}."
-        )
-    if provider not in SUPPORTED_PROVIDERS:
-        raise ModelError(
-            f"'{model}' names litellm provider '{provider}', which autodiscovery has "
-            f"no credentials for. Supported: {', '.join(SUPPORTED_PROVIDERS)}."
+            f"'{provider}' in '{model}' is not a litellm provider. See "
+            f"https://docs.litellm.ai/docs/providers for the full list."
         )
     return provider
 

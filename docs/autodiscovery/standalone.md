@@ -38,6 +38,12 @@ as <provider>/<model>, e.g. vertex_ai/gemini-3.1-pro-preview or openai/gemini-3.
 `google/<model>` is also rejected: it was Vertex's OpenAI-compatible wire prefix,
 never a litellm provider. Use `vertex_ai/<model>`.
 
+Any of litellm's [~149 providers](https://docs.litellm.ai/docs/providers) can be
+named — there is no allow-list. The three documented below (`vertex_ai`,
+`openai`, `github_copilot`) are the ones this project configures credentials for
+and tests; using another means supplying its credentials yourself, per litellm's
+env-var conventions.
+
 Because the provider travels with each flag, roles can use different providers
 in one run — Copilot for chat, Vertex for plot analysis:
 

@@ -97,7 +97,7 @@ class ModalSandboxExecutor(CodeExecutor):
         Args:
             backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
             timeout: Timeout in seconds (for Autogen compatibility)
-            vision_model: Vision model, optionally qualified as ``<provider>/<model>``
+            vision_model: Vision model, as litellm's ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
         """
         self._executor = backend
@@ -512,7 +512,7 @@ def get_llm_config(
     """Build an AG2 llm_config backed by :class:`LiteLLMAG2Client`.
 
     Args:
-        model_name: Model name, optionally qualified as ``<provider>/<model>``.
+        model_name: Model name, as litellm's ``<provider>/<model>``.
         temperature: Sampling temperature. Omitted for models that reject it.
         reasoning_effort: Optional reasoning effort; litellm drops it where
             unsupported.
@@ -553,7 +553,7 @@ def get_agents(
 
     Args:
         work_dir: Working directory for code execution.
-        model_name: Model for AG2 conversational agents, optionally qualified as
+        model_name: Model for AG2 conversational agents, as litellm's
             ``<provider>/<model>``.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
@@ -564,7 +564,7 @@ def get_agents(
         backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
-        vision_model: Vision model for plot analysis, optionally qualified as
+        vision_model: Vision model for plot analysis, as litellm's
             ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
 

@@ -30,7 +30,7 @@ def query_llm(
     Args:
         messages: Chat messages to send to the model.
         n_samples: Number of samples to request.
-        model: Model name, optionally litellm-qualified as ``<provider>/<model>``.
+        model: Model name, as litellm's ``<provider>/<model>``.
         temperature: Sampling temperature. Dropped for models that reject it.
         reasoning_effort: Optional reasoning effort. Dropped by litellm for
             models that do not accept it.

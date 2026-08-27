@@ -190,9 +190,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
     adv = parser.add_argument_group("advanced")
-    adv.add_argument("--model", type=str, default="gemini-3.1-pro-preview")
-    adv.add_argument("--belief_model", type=str, default="gemini-3-flash-preview")
-    adv.add_argument("--vision_model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument("--model", type=str, default="gemini-3.7-flash")
+    adv.add_argument("--belief_model", type=str, default="gemini-3.7-flash")
+    adv.add_argument("--vision_model", type=str, default="gemini-3.7-flash")
     adv.add_argument(
         "--llm_provider",
         choices=["copilot"],

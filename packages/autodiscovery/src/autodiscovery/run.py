@@ -298,7 +298,7 @@ def run_mcts(
     embedding_provider=None,
     embedding_model=None,
     embedding_dimensions=None,
-    belief_model_name="gemini-3-flash-preview",
+    belief_model_name="gemini-3.7-flash",
     max_iterations=100,
     branching_factor=8,
     max_rounds=100000,

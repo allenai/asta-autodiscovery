@@ -15,8 +15,7 @@ dependency. Requires Python 3.13+.
 
 ## Credentials
 
-The default models (`gemini-3.1-pro-preview`, `gemini-3-flash-preview`) run on
-Vertex AI. Set:
+The default model (`gemini-3.7-flash`) runs on Vertex AI. Set:
 
 ```sh
 export VERTEX_PROJECT_ID=your-gcp-project

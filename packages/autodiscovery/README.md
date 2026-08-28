@@ -34,9 +34,9 @@ uv run --package autodiscovery python -m autodiscovery.run \
     --out_dir="outputs" \
     --dataset_metadata="discoverybench/real/test/nls_ses/metadata.json" \
     --n_experiments=16 \
-    --model="gemini-3-flash-preview" \
-    --belief_model="gemini-3-flash-preview" \
-    --vision_model="gemini-3-flash-preview"
+    --model="gemini-3.7-flash" \
+    --belief_model="gemini-3.7-flash" \
+    --vision_model="gemini-3.7-flash"
 ```
 
 To resume a previous exploration, use the `--continue_from_dir` flag to specify the directory containing the previous

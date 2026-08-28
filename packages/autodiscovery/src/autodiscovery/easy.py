@@ -197,19 +197,19 @@ def build_parser() -> argparse.ArgumentParser:
     adv.add_argument(
         "--model",
         type=str,
-        default="vertex_ai/gemini-3.1-pro-preview",
+        default="vertex_ai/gemini-3.7-flash",
         help=MODEL_FLAG_HELP.format(role="all agents (except the belief agent)"),
     )
     adv.add_argument(
         "--belief_model",
         type=str,
-        default="vertex_ai/gemini-3-flash-preview",
+        default="vertex_ai/gemini-3.7-flash",
         help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
     )
     adv.add_argument(
         "--vision_model",
         type=str,
-        default="vertex_ai/gemini-3.1-pro-preview",
+        default="vertex_ai/gemini-3.7-flash",
         help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
     )
     adv.add_argument(

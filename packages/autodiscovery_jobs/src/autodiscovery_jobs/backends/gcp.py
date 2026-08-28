@@ -48,7 +48,7 @@ def run_job(
         jobid: Job identifier
         config: Configuration (uses default if None)
         n_experiments: Number of experiments to run (required)
-        model: Model to use (e.g., "openai/gpt-4o", "vertex_ai/gemini-3-flash-preview"); uses args.py default when omitted
+        model: Model to use (e.g., "openai/gpt-4o", "vertex_ai/gemini-3.7-flash"); uses args.py default when omitted
         belief_model: Model for belief distribution (optional)
         temperature: Temperature for agents (optional)
         belief_temperature: Temperature for belief agent (optional)

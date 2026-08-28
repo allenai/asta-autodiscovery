@@ -20,7 +20,7 @@ Every model flag — `--model`, `--belief_model`, `--vision_model`,
 `<provider>/<model>` naming, with snake_case provider slugs:
 
 ```sh
---model vertex_ai/gemini-3.1-pro-preview
+--model vertex_ai/gemini-3.7-flash
 --model openai/o4-mini
 --model github_copilot/claude-haiku-4.5
 ```
@@ -31,8 +31,8 @@ asking litellm, which authenticates for some providers. Unqualified names are
 rejected at startup with the qualified form to use:
 
 ```
-'gemini-3.1-pro-preview' is missing a provider. Model names are litellm-qualified
-as <provider>/<model>, e.g. vertex_ai/gemini-3.1-pro-preview or openai/gemini-3.1-pro-preview.
+'gemini-3.7-flash' is missing a provider. Model names are litellm-qualified
+as <provider>/<model>, e.g. vertex_ai/gemini-3.7-flash or openai/gemini-3.7-flash.
 ```
 
 `google/<model>` is also rejected: it was Vertex's OpenAI-compatible wire prefix,
@@ -50,7 +50,7 @@ in one run — Copilot for chat, Vertex for plot analysis:
 ```sh
 auto-discovery \
    --model github_copilot/claude-haiku-4.5 \
-   --vision_model vertex_ai/gemini-3.1-pro-preview \
+   --vision_model vertex_ai/gemini-3.7-flash \
    ...
 ```
 
@@ -74,8 +74,8 @@ validation falls back to the registry with a warning.
 All model traffic goes through [litellm](https://docs.litellm.ai/), so
 credentials follow litellm's conventions per provider.
 
-**Vertex AI** (the default models `vertex_ai/gemini-3.1-pro-preview`,
-`vertex_ai/gemini-3-flash-preview`) uses Application Default Credentials:
+**Vertex AI** (the default model `vertex_ai/gemini-3.7-flash`) uses Application
+Default Credentials:
 
 ```sh
 export VERTEX_PROJECT_ID=your-gcp-project

@@ -58,7 +58,7 @@ Run `auto-discovery --help` to see the full set of options.
 
 All model traffic goes through [litellm](https://docs.litellm.ai/), and every model flag names
 its provider explicitly as `<provider>/<model>` — for example
-`vertex_ai/gemini-3.1-pro-preview`, `openai/o4-mini`, `github_copilot/claude-haiku-4.5`. You only
+`vertex_ai/gemini-3.7-flash`, `openai/o4-mini`, `github_copilot/claude-haiku-4.5`. You only
 need to configure the providers you actually name in `--model`, `--belief_model`,
 `--vision_model` and `--embedding_model`.
 
@@ -115,13 +115,13 @@ export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # must contain a file named `acce
 
 | Flag | What it controls | Default |
 | --- | --- | --- |
-| `--model` | Primary reasoning model used for hypothesis generation and analysis. | `vertex_ai/gemini-3.1-pro-preview` |
-| `--belief_model` | Model used for belief updates over experimental outcomes. | `vertex_ai/gemini-3-flash-preview` |
-| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | `vertex_ai/gemini-3.1-pro-preview` |
+| `--model` | Primary reasoning model used for hypothesis generation and analysis. | `vertex_ai/gemini-3.7-flash` |
+| `--belief_model` | Model used for belief updates over experimental outcomes. | `vertex_ai/gemini-3.7-flash` |
+| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | `vertex_ai/gemini-3.7-flash` |
 | `--embedding_model` | Model used for deduplication embeddings. | `openai/text-embedding-3-large` |
 
 Because the provider travels with each flag, mixing providers is supported — for example,
-`--model openai/gpt-4o --belief_model vertex_ai/gemini-3-flash-preview` uses OpenAI for the main
+`--model openai/gpt-4o --belief_model vertex_ai/gemini-3.7-flash` uses OpenAI for the main
 loop and Vertex AI for belief updates, with both `OPENAI_API_KEY` and the Vertex variables set.
 
 Each flag is validated against litellm's offline model registry at startup, before the first

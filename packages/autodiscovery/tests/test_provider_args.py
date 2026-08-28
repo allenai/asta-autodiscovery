@@ -237,9 +237,9 @@ def test_validation_never_triggers_copilot_device_flow(monkeypatch) -> None:
 def test_engine_defaults_are_litellm_qualified() -> None:
     args = engine_args()
 
-    assert args.model == "vertex_ai/gemini-3.1-pro-preview"
-    assert args.belief_model == "vertex_ai/gemini-3-flash-preview"
-    assert args.vision_model == "vertex_ai/gemini-3.1-pro-preview"
+    assert args.model == "vertex_ai/gemini-3.7-flash"
+    assert args.belief_model == "vertex_ai/gemini-3.7-flash"
+    assert args.vision_model == "vertex_ai/gemini-3.7-flash"
     assert args.embedding_model == "openai/text-embedding-3-large"
     resolve_model_args(args)
 
@@ -247,9 +247,9 @@ def test_engine_defaults_are_litellm_qualified() -> None:
 def test_easy_cli_shares_the_engine_model_defaults() -> None:
     args = build_parser().parse_args(["--out_dir", "results", "--n_experiments", "1", "data.csv"])
 
-    assert args.model == "vertex_ai/gemini-3.1-pro-preview"
-    assert args.belief_model == "vertex_ai/gemini-3-flash-preview"
-    assert args.vision_model == "vertex_ai/gemini-3.1-pro-preview"
+    assert args.model == "vertex_ai/gemini-3.7-flash"
+    assert args.belief_model == "vertex_ai/gemini-3.7-flash"
+    assert args.vision_model == "vertex_ai/gemini-3.7-flash"
     assert args.embedding_model == "openai/text-embedding-3-large"
 
 

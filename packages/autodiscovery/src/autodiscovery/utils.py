@@ -14,7 +14,7 @@ from autodiscovery.llm_usage import UsageTracker
 def query_llm(
     messages: list[dict[str, str]],
     n_samples: int,
-    model: str = "vertex_ai/gemini-3.1-pro-preview",
+    model: str = "vertex_ai/gemini-3.7-flash",
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,

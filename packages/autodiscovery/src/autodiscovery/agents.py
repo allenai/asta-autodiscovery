@@ -89,7 +89,7 @@ class ModalSandboxExecutor(CodeExecutor):
         self,
         backend,
         timeout: int = 30 * 60,
-        vision_model: str = "vertex_ai/gemini-3.1-pro-preview",
+        vision_model: str = "vertex_ai/gemini-3.7-flash",
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
@@ -374,7 +374,7 @@ patch_matplotlib_show()
 
 
 class CodeBlockWrapperTransform(transforms.MessageTransform):
-    def __init__(self, vision_model: str = "vertex_ai/gemini-3.1-pro-preview"):
+    def __init__(self, vision_model: str = "vertex_ai/gemini-3.7-flash"):
         self.image_analysis_patch = build_image_analysis_patch(vision_model)
 
     def apply_transform(self, messages: list[dict]) -> list[dict]:
@@ -536,7 +536,7 @@ def get_llm_config(
 
 def get_agents(
     work_dir,
-    model_name="vertex_ai/gemini-3.1-pro-preview",
+    model_name="vertex_ai/gemini-3.7-flash",
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -546,7 +546,7 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
-    vision_model: str = "vertex_ai/gemini-3.1-pro-preview",
+    vision_model: str = "vertex_ai/gemini-3.7-flash",
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
@@ -577,10 +577,15 @@ def get_agents(
         reasoning_effort=reasoning_effort,
     )
 
-    # Create token limit transform
+    # Create token limit transform.
+    # `model` must be set explicitly: MessageTokenLimiter defaults to "gpt-3.5-turbo-0613"
+    # and silently caps max_tokens_per_message to that model's 4096-token limit.
+    # The value only drives tokenizer choice and the cap lookup, so any large-context OpenAI model works.
     token_limit_capability = transform_messages.TransformMessages(
         transforms=[
-            transforms.MessageTokenLimiter(max_tokens_per_message=10_000, min_tokens=12_000)
+            transforms.MessageTokenLimiter(
+                max_tokens_per_message=10_000, min_tokens=12_000, model="gpt-4o"
+            )
         ]
     )
 

@@ -37,7 +37,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="vertex_ai/gemini-3-flash-preview",
+            default="vertex_ai/gemini-3.7-flash",
             help="LLM model for hypothesis merging decisions, as litellm's <provider>/<model>.",
         )
         self.add_argument(
@@ -186,7 +186,7 @@ def get_llm_merge_decision(
     hyp2: str,
     n_samples: int = 30,
     threshold: float = 0.7,
-    model: str = "vertex_ai/gemini-3-flash-preview",
+    model: str = "vertex_ai/gemini-3.7-flash",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -240,7 +240,7 @@ def dedupe(
     merge_threshold=0.7,
     seed=42,
     rep_mode="biggest",
-    model="vertex_ai/gemini-3-flash-preview",
+    model="vertex_ai/gemini-3.7-flash",
     embedding_model="openai/text-embedding-3-large",
     embedding_dimensions=None,
     n_nodes=None,

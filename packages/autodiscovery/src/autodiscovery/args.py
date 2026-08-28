@@ -3,7 +3,7 @@ import argparse
 #: Shared help text so every model flag documents the same litellm convention.
 MODEL_FLAG_HELP = (
     "Model to use for {role}, as litellm's <provider>/<model> "
-    "(e.g. vertex_ai/gemini-3.1-pro-preview, openai/o4-mini, "
+    "(e.g. vertex_ai/gemini-3.7-flash, openai/o4-mini, "
     "github_copilot/claude-haiku-4.5). The provider prefix is required."
 )
 
@@ -19,7 +19,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="vertex_ai/gemini-3.1-pro-preview",
+            default="vertex_ai/gemini-3.7-flash",
             help=MODEL_FLAG_HELP.format(
                 role="all agents (except belief distribution agent)",
             ),
@@ -27,13 +27,13 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--belief_model",
             type=str,
-            default="vertex_ai/gemini-3-flash-preview",
+            default="vertex_ai/gemini-3.7-flash",
             help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
         )
         self.add_argument(
             "--vision_model",
             type=str,
-            default="vertex_ai/gemini-3.1-pro-preview",
+            default="vertex_ai/gemini-3.7-flash",
             help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
         )
         self.add_argument(

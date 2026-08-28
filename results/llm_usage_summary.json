@@ -1,0 +1,108 @@
+{
+  "totals": {
+    "calls": 33,
+    "prompt_tokens": 80554,
+    "completion_tokens": 14910,
+    "total_tokens": 95464,
+    "reasoning_tokens": 0
+  },
+  "by_model": {
+    "github_copilot/gpt-4.1-2025-04-14": {
+      "calls": 33,
+      "prompt_tokens": 80554,
+      "completion_tokens": 14910,
+      "total_tokens": 95464,
+      "reasoning_tokens": 0
+    }
+  },
+  "by_agent": {
+    "unassigned": {
+      "calls": 24,
+      "prompt_tokens": 74213,
+      "completion_tokens": 14097,
+      "total_tokens": 88310,
+      "reasoning_tokens": 0
+    },
+    "belief_agent": {
+      "calls": 8,
+      "prompt_tokens": 5065,
+      "completion_tokens": 259,
+      "total_tokens": 5324,
+      "reasoning_tokens": 0
+    },
+    "code_executor": {
+      "calls": 1,
+      "prompt_tokens": 1276,
+      "completion_tokens": 554,
+      "total_tokens": 1830,
+      "reasoning_tokens": 0
+    }
+  },
+  "by_node": {
+    "node_1_0": {
+      "calls": 4,
+      "prompt_tokens": 5277,
+      "completion_tokens": 1836,
+      "total_tokens": 7113,
+      "reasoning_tokens": 0
+    },
+    "node_2_1": {
+      "calls": 8,
+      "prompt_tokens": 21160,
+      "completion_tokens": 3485,
+      "total_tokens": 24645,
+      "reasoning_tokens": 0
+    },
+    "node_2_0": {
+      "calls": 8,
+      "prompt_tokens": 22512,
+      "completion_tokens": 3691,
+      "total_tokens": 26203,
+      "reasoning_tokens": 0
+    },
+    "node_3_0": {
+      "calls": 6,
+      "prompt_tokens": 13317,
+      "completion_tokens": 2578,
+      "total_tokens": 15895,
+      "reasoning_tokens": 0
+    },
+    "node_3_1": {
+      "calls": 7,
+      "prompt_tokens": 18288,
+      "completion_tokens": 3320,
+      "total_tokens": 21608,
+      "reasoning_tokens": 0
+    }
+  },
+  "by_component": {
+    "agents.chat": {
+      "calls": 24,
+      "prompt_tokens": 74213,
+      "completion_tokens": 14097,
+      "total_tokens": 88310,
+      "reasoning_tokens": 0
+    },
+    "belief.main.prior": {
+      "calls": 4,
+      "prompt_tokens": 1207,
+      "completion_tokens": 123,
+      "total_tokens": 1330,
+      "reasoning_tokens": 0
+    },
+    "belief.main.posterior": {
+      "calls": 4,
+      "prompt_tokens": 3858,
+      "completion_tokens": 136,
+      "total_tokens": 3994,
+      "reasoning_tokens": 0
+    },
+    "image_analysis.modal": {
+      "calls": 1,
+      "prompt_tokens": 1276,
+      "completion_tokens": 554,
+      "total_tokens": 1830,
+      "reasoning_tokens": 0
+    }
+  }
+}

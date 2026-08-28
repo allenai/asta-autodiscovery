@@ -149,10 +149,59 @@ def test_validate_rejects_a_mode_mismatch() -> None:
         validate("openai/gpt-4o", flag="--embedding_model", mode="embedding")
 
 
-def test_validate_rejects_a_model_missing_from_copilots_catalog() -> None:
-    """Copilot's litellm catalog is a complete enumeration, so absence is an error."""
-    with pytest.raises(ModelError, match="not in github_copilot's catalog"):
-        validate("github_copilot/gemini-3.1-pro-preview", flag="--model")
+def test_copilot_validation_prefers_the_accounts_live_catalog(monkeypatch) -> None:
+    """litellm's static Copilot catalog is not authoritative in either direction.
+
+    It lists models an account cannot call (``gpt-5`` returns "The requested
+    model is not supported") and omits ones it can (``gpt-5.4``). Copilot's own
+    ``/models`` endpoint is the real answer, so validation uses it when it can be
+    read from litellm's cached key without authenticating.
+    """
+    live = {
+        "gpt-4.1": {"capabilities": {"supports": {"vision": True}}},
+        "gpt-5.4": {"capabilities": {"supports": {"vision": True}}},
+        "gpt-4o-mini": {"capabilities": {"supports": {}}},
+    }
+    monkeypatch.setattr("autodiscovery.llm._copilot_live_catalog", lambda: live)
+
+    # In litellm's catalog but not callable by this account.
+    with pytest.raises(ModelError, match="not available to this Copilot account"):
+        validate("github_copilot/gpt-5", flag="--model")
+    # Callable but absent from litellm's catalog -- must not be rejected.
+    validate("github_copilot/gpt-5.4", flag="--model")
+    # Vision comes from the live entry, not litellm's registry.
+    validate("github_copilot/gpt-4.1", flag="--vision_model", require_vision=True)
+    with pytest.raises(ModelError, match="does not support image input"):
+        validate("github_copilot/gpt-4o-mini", flag="--vision_model", require_vision=True)
+
+
+def test_copilot_validation_falls_back_when_the_live_catalog_is_unavailable(monkeypatch) -> None:
+    """No cached Copilot key means no live list; fall back to litellm's registry."""
+    monkeypatch.setattr("autodiscovery.llm._copilot_live_catalog", lambda: None)
+
+    validate("github_copilot/gpt-4.1", flag="--model")
+
+
+def test_copilot_live_catalog_never_authenticates(monkeypatch, tmp_path) -> None:
+    """Reading the live list must not be able to trigger the device flow."""
+    from litellm.llms.github_copilot.authenticator import Authenticator
+
+    def fail(*args, **kwargs):
+        raise AssertionError("live catalog lookup attempted authentication")
+
+    monkeypatch.setattr(Authenticator, "get_api_key", fail)
+    monkeypatch.setattr(Authenticator, "get_access_token", fail)
+    monkeypatch.setattr(Authenticator, "_login", fail)
+    # Point at an empty dir so there is no cached key to read.
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN_DIR", str(tmp_path))
+
+    from autodiscovery.llm import _copilot_live_catalog
+
+    _copilot_live_catalog.cache_clear()
+    try:
+        assert _copilot_live_catalog() is None
+    finally:
+        _copilot_live_catalog.cache_clear()
 
 
 def test_validate_allows_models_litellm_has_not_mapped() -> None:

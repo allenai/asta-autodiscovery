@@ -54,10 +54,17 @@ auto-discovery \
    ...
 ```
 
-Each flag is checked against litellm's offline model registry at startup, before
-the first model call: the vision model must support image input, the embedding
-model must be an embedding model, and Copilot models must exist in Copilot's
-catalog.
+Each flag is checked at startup, before the first model call: the vision model
+must support image input, the embedding model must be an embedding model, and
+chat flags must be chat models. A model litellm has not mapped yet is a warning,
+not an error — providers ship models faster than litellm maps them.
+
+For `github_copilot/` the check uses Copilot's own `/models` endpoint instead of
+litellm's static catalog, which is inaccurate in both directions: it lists models
+an account cannot call (`gpt-5` → *"The requested model is not supported"*) and
+omits ones it can (`gpt-5.4`, `claude-opus-5`). The live list is read from
+litellm's cached API key and never triggers a login; with no usable cached key,
+validation falls back to the registry with a warning.
 
 > **Changed:** `--llm_provider` and `--embedding_provider` are removed. The
 > provider now travels with each model flag.

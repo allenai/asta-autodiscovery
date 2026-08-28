@@ -48,12 +48,6 @@ OPENAI = "openai"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
 
-#: Providers whose litellm catalog is a complete, closed enumeration. For these,
-#: a model missing from the registry really is unavailable, so it is an error
-#: rather than a warning. OpenAI and Vertex ship models faster than litellm maps
-#: them, so an unmapped model there is only a warning.
-_CLOSED_CATALOG_PROVIDERS = frozenset({GITHUB_COPILOT})
-
 VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
 VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
 
@@ -212,6 +206,58 @@ def normalize_reasoning_effort(model: str, reasoning_effort: str | None) -> str 
     return "low"
 
 
+@functools.cache
+def _copilot_live_catalog() -> dict[str, dict[str, Any]] | None:
+    """Return the Copilot models this account can actually call, or None.
+
+    litellm's static ``github_copilot`` catalog is not authoritative: it lists
+    models an account cannot call (``gpt-5`` returns "The requested model is not
+    supported") and omits ones it can (``gpt-5.4``, ``grok-4.6``). Copilot's own
+    ``/models`` endpoint is the real answer, and it also reports vision support
+    per model.
+
+    This deliberately reads only litellm's *cached, unexpired* API key. It never
+    touches ``Authenticator``, so it cannot trigger the device-flow login that
+    would block a non-interactive run. If there is no usable cached key, or the
+    request fails, it returns None and the caller falls back to the registry.
+
+    Returns:
+        Mapping of model id to its ``/models`` entry, or None if unavailable.
+    """
+    import json
+
+    key_dir = os.getenv(
+        "GITHUB_COPILOT_TOKEN_DIR", os.path.expanduser("~/.config/litellm/github_copilot")
+    )
+    key_file = os.path.join(key_dir, os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json"))
+    try:
+        import time
+
+        import httpx
+
+        with open(key_file) as handle:
+            cached = json.load(handle)
+        if cached.get("expires_at", 0) <= time.time():
+            return None
+        api_base = (cached.get("endpoints") or {}).get("api")
+        token = cached.get("token")
+        if not api_base or not token:
+            return None
+        response = httpx.get(
+            f"{api_base}/models",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Copilot-Integration-Id": "vscode-chat",
+                "Editor-Version": "vscode/1.85.0",
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        return {entry["id"]: entry for entry in response.json().get("data", []) if entry.get("id")}
+    except Exception:
+        return None
+
+
 def validate(
     model: str,
     *,
@@ -235,15 +281,25 @@ def validate(
         ModelError: If the model cannot serve its role.
     """
     provider = provider_of(model)
-    info = model_info(model)
 
-    if info is None:
-        if provider in _CLOSED_CATALOG_PROVIDERS:
-            catalog = _configure().models_by_provider.get(provider, [])
-            available = sorted(name.removeprefix(f"{provider}/") for name in catalog)
+    # Copilot's own endpoint knows what this account can call; litellm's static
+    # catalog does not. Prefer it whenever we can read it without authenticating.
+    if provider == GITHUB_COPILOT and (live := _copilot_live_catalog()) is not None:
+        bare = model.split("/", 1)[1]
+        if bare not in live:
             raise ModelError(
-                f"{flag}={model} is not in {provider}'s catalog. Available: {', '.join(available)}"
+                f"{flag}={model} is not available to this Copilot account. "
+                f"Available: {', '.join(sorted(live))}"
             )
+        supports = (live[bare].get("capabilities") or {}).get("supports") or {}
+        if require_vision and not supports.get("vision"):
+            raise ModelError(
+                f"{flag}={model} does not support image input. Choose a vision-capable "
+                f"model for plot analysis."
+            )
+
+    info = model_info(model)
+    if info is None:
         print(
             f"[llm] {flag}={model} is not in litellm's model registry; skipping capability checks."
         )

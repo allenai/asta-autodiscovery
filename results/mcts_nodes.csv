@@ -1,0 +1,64 @@
+id,success,hypothesis,surprisal,prior,posterior,belief_dir,belief_change,belief_kl,experiment_plan,analysis,review
+2_0,True,The proportion of mixed-breed registrations is higher among dogs than among cats in Seattle.,True,0.75,0.2812,neg,0.4688,3.2713,"Objective: To compare the proportion of mixed-breed versus purebred registrations between dogs and cats in Seattle.
+
+Steps: 1. Define 'mixed breed' registrations as those with 'Secondary Breed' not null or containing 'Mix'.
+2. Calculate, for dogs and cats separately, the proportions of mixed-breed and purebred registrations.
+3. Conduct a statistical test (such as a z-test for proportions) to compare between species.
+
+Deliverables: 1. Summary table comparing frequency of mixed-breed vs purebred registrations by species.
+2. Statistical test result for difference in proportions.","The experiment successfully compared the proportions of mixed-breed versus purebred registrations between dogs and cats in Seattle. 
+
+Results:
+1. From the summary table: 
+   - Dogs: 18,908 mixed-breed, 8,935 purebred (total: 27,843)
+   - Cats: 11,012 mixed-breed, 2,422 purebred (total: 13,434)
+2. Proportions:
+   - Mixed-breed proportion among dogs: 67.9%
+   - Mixed-breed proportion among cats: 81.97%
+3. The z-test for proportions between dogs and cats yielded a Z statistic of -29.974 and a p-value of effectively 0, which is below the standard 0.05 threshold. This indicates a highly statistically significant difference in the proportion of mixed-breed registrations between the two species.
+
+Thus, contrary to the original hypothesis, the proportion of mixed-breed registrations is significantly higher among cats than among dogs in Seattle.","The experiment was executed faithfully according to the plan. The dataset was loaded, 'mixed breed' status was defined robustly based on secondary breed information and 'Mix' indicators, and results were stratified by species (Dog and Cat). Proportions were calculated and a z-test for difference in proportions was correctly applied using statsmodels' proportions_ztest. The deliverables—a summary table, proportions table, and statistical test—were all produced.
+
+Findings: The results show that the mixed-breed registration proportion is higher among cats (81.97%) than among dogs (67.9%) in Seattle. The statistical test p-value (<0.00001) indicates this difference is highly significant. Therefore, the hypothesis that the mixed-breed proportion is higher among dogs is rejected; in fact, mixed-breed cats are registered more proportionally than mixed-breed dogs in Seattle."
+3_0,True,"Duplicate license numbers, indicating potential re-issuance or clerical issues, are more prevalent among certain species or breeds.",True,0.7083,0.3906,neg,0.3177,1.5717,"Objective: To investigate whether duplicate license numbers occur in the data and whether such duplicates are more common for a particular species or breed.
+
+Steps: 1. Identify instances where 'License Number' appears more than once in the dataset.
+2. For duplicate license numbers, tabulate their species and breed details.
+3. Assess if the frequency of duplicate license numbers is associated with any particular species, breed, or ZIP code.
+
+Deliverables: 1. Analysis of the frequency of issuance of duplicate pet licenses (same license number issued multiple times).
+2. Discussion of potential reasons for duplicate license numbers and whether these occurrences differ by species or breed.","The experiment systematically investigated duplicate license numbers in the Seattle pet license dataset. Only one license number was found to be duplicated, accounting for two entries (both for cats of the Domestic Shorthair breed, from ZIP code 98144). This is a very small fraction of the dataset (2 out of 41,301 records). The duplicate is exclusively associated with cats, while no dog, goat, or pig licenses showed duplication. The overall frequency of cats in the dataset is about 32.5%, but 100% of the duplicates found were cats. However, given the extremely low number of duplicates, it is difficult to draw robust conclusions about prevalence by species or breed. The result suggests that duplicate license numbers are rare in this dataset. No evidence was found that duplicates are prevalent in any particular species or breed, but the only duplicate case observed is associated with cats (Domestic Shorthair).","The experiment was conducted faithfully according to the objective and steps. The code accurately identifies duplicate license numbers, analyzes their associations with species, breed, and ZIP code, and provides the required summary and discussion. The only duplicate found in the dataset involved two cat records (both Domestic Shorthair, ZIP code 98144) and no duplications were found for dogs, goats, or pigs. This supports that duplicate license numbers are extremely rare (2 out of 41,301 records) and do not meaningfully cluster among any broader group. While 100% of duplicate cases involved cats, the absolute number is too small for any substantive statistical inference. All requested deliverables were produced. Therefore, the experiment was successful. Summary: The dataset contains only one instance of a duplicate license number, both assigned to cats of the same breed and ZIP. Duplicate licenses are extraordinarily rare and show no evidence of being associated with any particular species or breed in Seattle's licensing records."
+3_1,True,"The diversity of pet primary breeds differs significantly across Seattle ZIP Codes, with some neighborhoods showing much richer breed diversity than others.",False,0.7083,0.8906,pos,0.1823,0.8235,"Objective: To quantify the diversity of primary pet breeds within each ZIP Code and analyze which areas have the most or least breed diversity.
+
+Steps: 1. For each ZIP Code, calculate diversity indexes (e.g., Shannon, Simpson) using the count of unique primary breeds.
+2. Rank ZIP Codes by diversity and identify any spatial clustering of high/low diversity neighborhoods.
+3. Visualize using maps or neighborhood profiles to communicate patterns.
+
+Deliverables: 1. Map or table showing breed diversity (e.g., Shannon diversity index) by ZIP Code.
+2. Statistical summary comparing diversity scores across Seattle neighborhoods.","The experiment has successfully quantified pet primary breed diversity across Seattle ZIP Codes using both the Shannon and Simpson diversity indexes. The code correctly calculated diversity scores for each ZIP Code after cleaning the data, and the deliverables were clearly presented through a ranked table (top and bottom 10 ZIP codes) and a bar plot showing the top 20 ZIP codes by breed diversity.
+
+Key findings:
+- ZIP Codes such as 98136, 98199, 98116, and 98118 have the highest pet primary breed diversity, with Shannon Index values above 4.0 and over 140 distinct breeds each. This indicates highly varied pet populations in these neighborhoods.
+- 60% of ZIP codes (see statistical summary) have very low or zero diversity (Shannon Index of 0 and just one breed), which likely reflects ZIPs with small sample sizes or non-Seattle addresses present in the data.
+- The statistical summary shows a wide range in breed diversity: some areas (the top quartile) have much richer breed diversity, with up to 214 breeds recorded, while half the ZIP codes have diversity scores below 0.66 and only 2 or fewer breeds, suggesting breed diversity is concentrated in select neighborhoods.
+- The visualization of the top 20 ZIP codes demonstrates that breed diversity is relatively uniformly high in these neighborhoods, with a gradual decrease from the highest to the 20th most diverse ZIP.
+
+No spatial clustering was mapped, but working from the summary tables and the plot, there is strong evidence for significant variation in breed diversity by neighborhood (ZIP Code). Areas with larger, more diverse populations have richer pet breed representation, supporting the hypothesis.","The experiment was implemented faithfully to the original plan. The code loaded and cleaned the dataset, computed breed diversity indices (Shannon and Simpson) for each ZIP Code, and presented both ranked tables and a bar visualization for the top 20 ZIP Codes by Shannon Index. The analysis interprets the results well: ZIP Codes such as 98136, 98199, 98116, and 98118 exhibit the highest breed diversity, while many ZIPs show very low or zero diversity (likely small sample ZIPs or non-Seattle entries). Statistical summaries confirm that breed diversity is unevenly distributed, with some neighborhoods much richer in breed diversity than others. The deliverables were met, and the hypothesis—that the diversity of pet primary breeds varies significantly across ZIP Codes—was supported by the results. The only minor shortcoming is the lack of a spatial map visualization, but the bar plot and tables suffice for establishing neighborhood variation. Overall, the experiment is a success."
+2_1,True,"Some pets (names/species) are associated with multiple license records, suggesting annual or repeated renewals, and this tendency varies by species or breed.",False,0.7917,0.9219,pos,0.1302,0.555,"Objective: To determine if there are pets that have been issued multiple licenses across different years, and whether this is more common in certain species or breeds.
+
+Steps: 1. Identify unique pets by 'Animal's Name' and possibly combine with species and breed for more reliability.
+2. Count the number of distinct license issue dates per unique pet.
+3. Compare rates of repeated licensing by species and/or breed.
+
+Deliverables: 1. Analysis showing frequency and patterns of repeat license issuance for pets (possibly by license number or animal name).
+2. Summary of whether certain pets or types are more likely to have multiple license records over time.","The experiment was successful and addressed the hypothesis. Of 35,358 unique pets (defined by name, species, and breed combination), 3,090 (8.74%) had more than one license issuance, indicating repeated licensing (renewals). The analysis revealed that repeated licensing is far more common in cats (14.93%) than dogs (6.33%), with goats and pigs showing none. Among top breeds, Domestic Shorthair cats showed the highest repeat licensing rate (21.32%), followed by Labrador and Golden Retrievers (dogs), and several other cat breeds. The sample highlights pets with 2-6 licenses issued. This confirms that repeated licensing is associated with particular pets, and the rate varies significantly by species and breed, being especially high among Domestic Shorthair cats.","The experiment was designed to test whether some pets have multiple license records (due to repeated or annual renewals) and if this tendency varies by species or breed. The code implemented the intended logic by uniquely identifying pets using a combination of their name, species, and breeds, then counting the number of distinct license issue dates for each. The results were analyzed both overall and segregated by species and top breeds.
+
+Key findings:
+- Out of 35,358 unique pets, 3,090 (8.74%) had more than one license issuance, indicating that repeated/renewed licensing is not uncommon.
+- Cats are the most likely species to have repeated licenses (14.93%), followed by dogs (6.33%), and no repeats observed in goats or pigs.
+- Among the most common breeds, Domestic Shorthair (a cat breed) has the highest repeat licensing rate (21.32%), noticeably higher than most dog breeds listed.
+- Several example pets with multiple licenses were shown, with up to 6 renewals observed for some.
+
+The experimental pipeline faithfully follows the objective and hypothesis. The deliverables check out, results are interpretable, and the analysis is sufficient. The hypothesis that some pets are recurrently licensed and that this varies by species and breed is supported by the data.
+
+No major issues found. The experiment is successful."

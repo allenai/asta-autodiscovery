@@ -212,9 +212,17 @@ def _copilot_live_catalog() -> dict[str, dict[str, Any]] | None:
 
     litellm's static ``github_copilot`` catalog is not authoritative: it lists
     models an account cannot call (``gpt-5`` returns "The requested model is not
-    supported") and omits ones it can (``gpt-5.4``, ``grok-4.6``). Copilot's own
-    ``/models`` endpoint is the real answer, and it also reports vision support
-    per model.
+    supported") and omits ones it can (``gpt-5.4``, ``claude-sonnet-5``).
+    Copilot's own ``/models`` endpoint is closer to the truth, and it also
+    reports vision support per model.
+
+    It is still only a superset of what chat completions will serve: some listed
+    models return ``model_not_supported`` anyway (``gpt-5.5``, ``claude-opus-5``
+    on a plan that lists both). Nothing in the payload distinguishes them --
+    entries for a working and a refused model are structurally identical, and it
+    is not a stale-client-header issue either. So this narrows the failure window
+    rather than closing it; a model absent from the list definitely will not
+    work, but presence is not a guarantee.
 
     This deliberately reads only litellm's *cached, unexpired* API key. It never
     touches ``Authenticator``, so it cannot trigger the device-flow login that

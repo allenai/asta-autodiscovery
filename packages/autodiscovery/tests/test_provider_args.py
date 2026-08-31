@@ -115,6 +115,10 @@ def test_max_n_is_capped_per_provider() -> None:
     assert max_n("vertex_ai/gemini-3.1-pro-preview") == 5
     assert max_n("openai/o4-mini") == 8
     assert max_n("openai/gpt-4o") is None
+    # Copilot rejects n > 8 outright; batching must kick in instead. Without a
+    # cap, dedupe's 10 merge votes error rather than splitting into 8 + 2.
+    assert max_n("github_copilot/gpt-5.4") == 8
+    assert max_n("github_copilot/gpt-4.1") == 8
 
 
 def test_minimal_reasoning_effort_uses_the_registry_not_a_name_prefix() -> None:

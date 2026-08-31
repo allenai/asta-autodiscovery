@@ -1203,8 +1203,9 @@ BELIEF_MODE_TO_CLS = {
 
 def get_belief(
     hypothesis: str,
+    *,
+    model: str,
     evidence: list[dict[str, str]] | None = None,
-    model: str = "vertex_ai/gemini-3.7-flash",
     belief_mode: str = "boolean",
     n_samples: int = 5,
     temperature: float | None = None,
@@ -1315,8 +1316,9 @@ def get_belief(
 
 def calculate_prior_and_posterior_beliefs(
     node,
+    *,
+    model,
     n_samples=4,
-    model="vertex_ai/gemini-3.7-flash",
     temperature=None,
     reasoning_effort=None,
     implicit_bayes_posterior=False,

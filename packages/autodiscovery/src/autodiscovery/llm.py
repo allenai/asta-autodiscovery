@@ -174,6 +174,11 @@ def max_n(model: str) -> int | None:
     provider = provider_of(model)
     if provider == VERTEX_AI:
         return 5
+    if provider == GITHUB_COPILOT:
+        # Measured: n=10 fails with "Invalid 'n': ... Expected a value <= 8".
+        # Without this, anything above 8 errors instead of batching -- notably
+        # dedupe, which asks for 10 merge votes.
+        return 8
     info = model_info(model)
     if provider == OPENAI and info and info.get("supports_reasoning"):
         return 8

@@ -41,6 +41,12 @@ class ArgParser(argparse.ArgumentParser):
             help="LLM model for hypothesis merging decisions, as litellm's <provider>/<model>.",
         )
         self.add_argument(
+            "--embedding_model",
+            type=str,
+            default="openai/text-embedding-3-large",
+            help="Embedding model for candidate clustering, as litellm's <provider>/<model>.",
+        )
+        self.add_argument(
             "--n_nodes",
             type=int,
             default=None,
@@ -137,7 +143,7 @@ def get_hypotheses(in_nodes_list):
 
 def get_embedding(
     texts,
-    model="openai/text-embedding-3-large",
+    model,
     dimensions=None,
     batch_size=128,
     n_attempts=1,
@@ -184,9 +190,10 @@ def get_embedding(
 def get_llm_merge_decision(
     hyp1: str,
     hyp2: str,
+    *,
+    model: str,
     n_samples: int = 30,
     threshold: float = 0.7,
-    model: str = "vertex_ai/gemini-3.7-flash",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -236,12 +243,13 @@ def get_llm_merge_decision(
 
 def dedupe(
     nodes_or_json_path,
+    *,
+    model,
+    embedding_model,
     n_samples=10,
     merge_threshold=0.7,
     seed=42,
     rep_mode="biggest",
-    model="vertex_ai/gemini-3.7-flash",
-    embedding_model="openai/text-embedding-3-large",
     embedding_dimensions=None,
     n_nodes=None,
     verbose=False,
@@ -422,6 +430,7 @@ if __name__ == "__main__":
         merge_threshold=args.merge_threshold,
         seed=args.seed,
         model=args.model,
+        embedding_model=args.embedding_model,
         n_nodes=args.n_nodes,
         verbose=args.verbose,
     )

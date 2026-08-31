@@ -41,11 +41,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/af/56/79594b0dad64e4ac1b776efc254498a23fada5e40e97a3da900fe19e5c04/ag2-0.10.0-py3-none-any.whl", hash = "sha256:52337fef62a8ab8a9170f52cd1a80c0b5632a6cb9fd6b6182ad3df73467a1a56", size = 881186, upload-time = "2025-10-22T22:03:55.966Z" },
 ]
 
-[package.optional-dependencies]
-openai = [
-    { name = "openai" },
-]
-
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -211,7 +206,7 @@ name = "asta-autodiscovery"
 version = "0.2.2"
 source = { editable = "packages/autodiscovery" }
 dependencies = [
-    { name = "ag2", extra = ["openai"] },
+    { name = "ag2" },
     { name = "asta-autodiscovery-modal" },
     { name = "asta-code-execution" },
     { name = "boto3" },
@@ -231,7 +226,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ag2", extras = ["openai"], specifier = "==0.10" },
+    { name = "ag2", specifier = "==0.10" },
     { name = "asta-autodiscovery-modal", editable = "packages/autodiscovery_modal" },
     { name = "asta-code-execution", editable = "packages/code_execution" },
     { name = "boto3" },

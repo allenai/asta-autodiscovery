@@ -135,10 +135,11 @@ class ModalSandboxExecutor(CodeExecutor):
                 ],
             },
         ]
-        try:
-            response = llm.complete(self.vision_model, messages)
-        except Exception as exc:
-            return f"Image analysis skipped: {exc}"
+        # Deliberately not caught here: execute_code_blocks already wraps this
+        # call and records "Failed to analyze image: ..." per figure, which is
+        # what main did. Swallowing it here would duplicate that handling and
+        # hide the failure behind a different message.
+        response = llm.complete(self.vision_model, messages)
 
         if self._usage_tracker is not None:
             self._usage_tracker.record_response(

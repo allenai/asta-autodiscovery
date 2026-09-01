@@ -40,7 +40,7 @@ import functools
 import os
 from typing import Any
 
-from autodiscovery.llm_retry import load_retry_config
+from autodiscovery.llm_retry import call_with_backoff
 
 # Providers this package has special handling for. Any litellm provider works;
 # these are the ones with a documented credential path or a quirk below.
@@ -74,7 +74,11 @@ def _configure() -> Any:
     # We surface our own errors; litellm's provider-list banner is noise.
     litellm.suppress_debug_info = True
 
-    litellm.num_retries = load_retry_config().max_retries
+    # Retries are ours, via call_with_backoff below. litellm's num_retries maps
+    # onto the provider SDK's max_retries, which ignores our documented
+    # LLM_RETRY_INITIAL_DELAY_SECONDS / LLM_RETRY_MAX_DELAY_SECONDS. Setting it
+    # to 0 keeps a single retry layer rather than two nested ones.
+    litellm.num_retries = 0
     return litellm
 
 
@@ -356,12 +360,16 @@ def complete(model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
     Returns:
         A litellm ``ModelResponse``, which is OpenAI-shaped.
     """
-    return _configure().completion(
-        model=model,
-        messages=messages,
-        timeout=REQUEST_TIMEOUT_S,
-        **_provider_kwargs(model),
-        **kwargs,
+    litellm = _configure()
+    return call_with_backoff(
+        lambda: litellm.completion(
+            model=model,
+            messages=messages,
+            timeout=REQUEST_TIMEOUT_S,
+            **_provider_kwargs(model),
+            **kwargs,
+        ),
+        label=f"completion(model={model})",
     )
 
 
@@ -376,9 +384,13 @@ def embed(model: str, inputs: list[str], **kwargs: Any) -> Any:
     Returns:
         A litellm ``EmbeddingResponse``.
     """
-    return _configure().embedding(
-        model=model,
-        input=inputs,
-        **_provider_kwargs(model),
-        **kwargs,
+    litellm = _configure()
+    return call_with_backoff(
+        lambda: litellm.embedding(
+            model=model,
+            input=inputs,
+            **_provider_kwargs(model),
+            **kwargs,
+        ),
+        label=f"embedding(model={model})",
     )

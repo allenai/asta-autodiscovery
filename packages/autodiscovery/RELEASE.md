@@ -105,11 +105,15 @@ export OPENAI_API_KEY=sk-...
 ### GitHub Copilot
 
 Used when a model flag names `github_copilot/...`. litellm reads a GitHub OAuth token from a
-file, so no interactive login happens at run time:
+file. On an interactive terminal it runs GitHub's device-code login on first use and
+caches the token itself, so no setup is needed. For non-interactive runs, pre-seed it:
 
 ```sh
 export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # must contain a file named `access-token`
 ```
+
+There is no TTY detection, so a headless run without a cached token prints a device
+code and blocks for about three minutes before failing.
 
 ### Selecting models
 

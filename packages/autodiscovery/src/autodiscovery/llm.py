@@ -29,9 +29,12 @@ package documents and tests:
   ``VERTEX_LOCATION`` are mapped onto litellm's ``vertex_project`` /
   ``vertex_location`` so existing deployment env vars keep working.
 - ``openai`` uses ``OPENAI_API_KEY``.
-- ``github_copilot`` uses a GitHub OAuth token under
+- ``github_copilot`` caches a GitHub OAuth token at
   ``$GITHUB_COPILOT_TOKEN_DIR/access-token`` (default
-  ``~/.config/litellm/github_copilot``). See ``docs/autodiscovery/standalone.md``.
+  ``~/.config/litellm/github_copilot``). litellm obtains it via device-code login
+  on first use, which works interactively but has no TTY detection -- a headless
+  run without a cached token blocks on a device prompt. Pre-seed the file for
+  non-interactive use. See ``docs/autodiscovery/standalone.md``.
 """
 
 from __future__ import annotations

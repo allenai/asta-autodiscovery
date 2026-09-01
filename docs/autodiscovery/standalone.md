@@ -88,13 +88,22 @@ gcloud auth application-default login
 
 ### GitHub Copilot
 
-GitHub Copilot needs no extra install — litellm speaks it natively. It reads a
-GitHub OAuth token from a file, so no interactive login happens at run time:
+GitHub Copilot needs no extra install — litellm speaks it natively.
+
+On an interactive terminal, litellm runs GitHub's device-code login on first
+use — it prints a code to enter at github.com and caches the token itself. No
+setup needed.
+
+For **non-interactive** runs (deployed jobs, CI), pre-seed the token instead:
 
 ```sh
 export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # default ~/.config/litellm/github_copilot
-# the directory must contain a file named `access-token`
+# the directory must contain a file named `access-token` holding a GitHub OAuth token
 ```
+
+litellm does no TTY detection, so without a cached token a headless run prints
+a device code and blocks for roughly three minutes before failing, rather than
+erroring immediately.
 
 Select Copilot per role with the `github_copilot/` prefix:
 

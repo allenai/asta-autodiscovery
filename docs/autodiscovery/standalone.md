@@ -66,9 +66,6 @@ omits ones it can (`gpt-5.4`, `claude-opus-5`). The live list is read from
 litellm's cached API key and never triggers a login; with no usable cached key,
 validation falls back to the registry with a warning.
 
-> **Changed:** `--llm_provider` and `--embedding_provider` are removed. The
-> provider now travels with each model flag.
-
 ## Credentials
 
 All model traffic goes through [litellm](https://docs.litellm.ai/), so
@@ -87,12 +84,6 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 gcloud auth application-default login
 ```
 
-> **Changed:** `VERTEX_ACCESS_TOKEN` is no longer used. litellm's Vertex client
-> authenticates with ADC and refreshes on its own, so a raw access token from
-> `gcloud auth print-access-token` has no equivalent. Use
-> `gcloud auth application-default login` locally; deployments already using
-> `GOOGLE_APPLICATION_CREDENTIALS` need no change.
-
 **OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 
 ### GitHub Copilot
@@ -104,11 +95,6 @@ GitHub OAuth token from a file, so no interactive login happens at run time:
 export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # default ~/.config/litellm/github_copilot
 # the directory must contain a file named `access-token`
 ```
-
-> **Changed:** Copilot no longer shells out to the `copilot` CLI via
-> `github-copilot-sdk`, and the `[copilot]` extra and
-> `python -m autodiscovery.copilot doctor` command are gone. The account still
-> needs an active Copilot seat.
 
 Select Copilot per role with the `github_copilot/` prefix:
 

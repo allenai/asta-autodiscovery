@@ -28,13 +28,16 @@ Example usage:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from time import monotonic
 from typing import Any, NamedTuple
+from weakref import WeakValueDictionary
 
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import (
     count_experiment_results,
     get_job_args,
-    get_metadata,
+    get_metadata_or_none,
     list_user_jobs,
 )
 from autodiscovery_jobs.run_details import get_run_details
@@ -47,6 +50,11 @@ DEFAULT_CREDITS_GRANTED = 500
 
 # Max number of experiments that can run in a single job
 DEFAULT_EXPERIMENT_LIMIT = 500
+
+# The credits display is polled frequently by every open browser tab. Keep this
+# deliberately short so the UI remains current while repeated reads share one
+# GCS aggregation. Credit checks before run submission bypass this cache.
+CREDITS_CACHE_TTL_SECONDS = 5.0
 
 
 class JobStats(NamedTuple):
@@ -79,6 +87,13 @@ class UserCredits(NamedTuple):
     consumed: int
     pending: int
     available: int
+
+
+_credits_cache: dict[tuple[str, str, str | None], tuple[float, UserCredits]] = {}
+_credits_cache_lock = Lock()
+_credits_refresh_locks: WeakValueDictionary[tuple[str, str, str | None], Lock] = (
+    WeakValueDictionary()
+)
 
 
 class InsufficientCreditsError(Exception):
@@ -174,7 +189,7 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
     """
     config = config or JobConfig()
 
-    metadata = get_metadata(userid=userid, jobid=jobid, config=config)
+    metadata = get_metadata_or_none(userid=userid, jobid=jobid, config=config)
     if metadata is None:
         return None
 
@@ -292,6 +307,38 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
         pending=total_pending,
         available=available,
     )
+
+
+def get_cached_user_credits(userid: str, config: JobConfig | None = None) -> UserCredits:
+    """Return a short-lived, per-user cached credits summary.
+
+    Concurrent cache misses for the same user are coalesced into one GCS
+    aggregation. Callers that enforce credit limits must use
+    :func:`get_user_credits` directly so authorization always uses fresh data.
+    """
+    config = config or JobConfig()
+    cache_key = (userid, config.bucket, config.project_id)
+
+    with _credits_cache_lock:
+        cached = _credits_cache.get(cache_key)
+        if cached is not None and cached[0] > monotonic():
+            return cached[1]
+        refresh_lock = _credits_refresh_locks.setdefault(cache_key, Lock())
+
+    with refresh_lock:
+        # Another request may have populated the cache while this one waited.
+        with _credits_cache_lock:
+            cached = _credits_cache.get(cache_key)
+            if cached is not None and cached[0] > monotonic():
+                return cached[1]
+
+        credits = get_user_credits(userid=userid, config=config)
+        with _credits_cache_lock:
+            _credits_cache[cache_key] = (
+                monotonic() + CREDITS_CACHE_TTL_SECONDS,
+                credits,
+            )
+        return credits
 
 
 def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | None = None) -> bool:

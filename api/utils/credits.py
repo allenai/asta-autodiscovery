@@ -28,10 +28,10 @@ Example usage:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
+from dataclasses import astuple
+from functools import lru_cache
 from time import monotonic
 from typing import Any, NamedTuple
-from weakref import WeakValueDictionary
 
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import (
@@ -55,6 +55,9 @@ DEFAULT_EXPERIMENT_LIMIT = 500
 # deliberately short so the UI remains current while repeated reads share one
 # GCS aggregation. Credit checks before run submission bypass this cache.
 CREDITS_CACHE_TTL_SECONDS = 5.0
+
+# Cap on distinct (user, config) entries kept per worker process.
+CREDITS_CACHE_MAX_ENTRIES = 512
 
 
 class JobStats(NamedTuple):
@@ -87,13 +90,6 @@ class UserCredits(NamedTuple):
     consumed: int
     pending: int
     available: int
-
-
-_credits_cache: dict[tuple[str, str, str | None], tuple[float, UserCredits]] = {}
-_credits_cache_lock = Lock()
-_credits_refresh_locks: WeakValueDictionary[tuple[str, str, str | None], Lock] = (
-    WeakValueDictionary()
-)
 
 
 class InsufficientCreditsError(Exception):
@@ -309,36 +305,27 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
     )
 
 
+@lru_cache(maxsize=CREDITS_CACHE_MAX_ENTRIES)
+def _aggregate_user_credits(
+    userid: str, config_fields: tuple[Any, ...], _ttl_bucket: int
+) -> UserCredits:
+    """Cache key holder for :func:`get_cached_user_credits`.
+
+    ``config_fields`` is a hashable ``astuple`` of the JobConfig; ``_ttl_bucket``
+    changes every ``CREDITS_CACHE_TTL_SECONDS`` so entries age out.
+    """
+    return get_user_credits(userid=userid, config=JobConfig(*config_fields))
+
+
 def get_cached_user_credits(userid: str, config: JobConfig | None = None) -> UserCredits:
     """Return a short-lived, per-user cached credits summary.
 
-    Concurrent cache misses for the same user are coalesced into one GCS
-    aggregation. Callers that enforce credit limits must use
-    :func:`get_user_credits` directly so authorization always uses fresh data.
+    Callers that enforce credit limits must use :func:`get_user_credits`
+    directly so authorization always uses fresh data.
     """
     config = config or JobConfig()
-    cache_key = (userid, config.bucket, config.project_id)
-
-    with _credits_cache_lock:
-        cached = _credits_cache.get(cache_key)
-        if cached is not None and cached[0] > monotonic():
-            return cached[1]
-        refresh_lock = _credits_refresh_locks.setdefault(cache_key, Lock())
-
-    with refresh_lock:
-        # Another request may have populated the cache while this one waited.
-        with _credits_cache_lock:
-            cached = _credits_cache.get(cache_key)
-            if cached is not None and cached[0] > monotonic():
-                return cached[1]
-
-        credits = get_user_credits(userid=userid, config=config)
-        with _credits_cache_lock:
-            _credits_cache[cache_key] = (
-                monotonic() + CREDITS_CACHE_TTL_SECONDS,
-                credits,
-            )
-        return credits
+    ttl_bucket = int(monotonic() // CREDITS_CACHE_TTL_SECONDS)
+    return _aggregate_user_credits(userid, astuple(config), ttl_bucket)
 
 
 def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | None = None) -> bool:

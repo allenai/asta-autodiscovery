@@ -28,7 +28,6 @@ Example usage:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import astuple
 from functools import lru_cache
 from time import monotonic
 from typing import Any, NamedTuple
@@ -306,15 +305,14 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
 
 
 @lru_cache(maxsize=CREDITS_CACHE_MAX_ENTRIES)
-def _aggregate_user_credits(
-    userid: str, config_fields: tuple[Any, ...], _ttl_bucket: int
-) -> UserCredits:
+def _aggregate_user_credits(userid: str, config: JobConfig, _ttl_bucket: int) -> UserCredits:
     """Cache key holder for :func:`get_cached_user_credits`.
 
-    ``config_fields`` is a hashable ``astuple`` of the JobConfig; ``_ttl_bucket``
-    changes every ``CREDITS_CACHE_TTL_SECONDS`` so entries age out.
+    ``JobConfig`` is a frozen dataclass, so it is hashable and usable as part of
+    the cache key directly; ``_ttl_bucket`` changes every
+    ``CREDITS_CACHE_TTL_SECONDS`` so entries age out.
     """
-    return get_user_credits(userid=userid, config=JobConfig(*config_fields))
+    return get_user_credits(userid=userid, config=config)
 
 
 def get_cached_user_credits(userid: str, config: JobConfig | None = None) -> UserCredits:
@@ -325,7 +323,7 @@ def get_cached_user_credits(userid: str, config: JobConfig | None = None) -> Use
     """
     config = config or JobConfig()
     ttl_bucket = int(monotonic() // CREDITS_CACHE_TTL_SECONDS)
-    return _aggregate_user_credits(userid, astuple(config), ttl_bucket)
+    return _aggregate_user_credits(userid, config, ttl_bucket)
 
 
 def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | None = None) -> bool:

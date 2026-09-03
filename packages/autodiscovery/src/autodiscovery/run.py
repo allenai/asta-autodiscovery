@@ -282,6 +282,27 @@ def compute_and_store_reward(
         # TODO: Update all past nodes with the new surprisal set
 
 
+class NoProgressError(RuntimeError):
+    """Raised when exploration stops committing nodes and cannot recover.
+
+    Attributes:
+        iterations: Number of consecutive iterations that committed no node.
+        last_error: The last per-node expansion error, when one was raised.
+    """
+
+    def __init__(self, message, *, iterations, last_error=None):
+        """Initialize the error.
+
+        Args:
+            message: Human-readable description of the stall.
+            iterations: Number of consecutive iterations that committed no node.
+            last_error: The last per-node expansion error, when one was raised.
+        """
+        super().__init__(message)
+        self.iterations = iterations
+        self.last_error = last_error
+
+
 def run_mcts(
     root,
     nodes_by_level,
@@ -324,6 +345,7 @@ def run_mcts(
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
+    max_no_progress_iterations: int = 3,
 ):
     """Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
 
@@ -371,6 +393,13 @@ def run_mcts(
         agent_usage_mode: Tracking mode for agents chat usage. ``per_response`` records
             usage from each AG2 model response. ``summary_delta`` records usage from
             AG2 usage-summary deltas.
+        max_no_progress_iterations: Number of consecutive iterations that may commit no
+            node before exploration aborts. Guards against a durable failure (bad model
+            credentials, exhausted quota, unparseable replies) spinning the loop forever.
+
+    Raises:
+        NoProgressError: If ``max_no_progress_iterations`` consecutive iterations commit
+            no node. Whatever was explored before the abort is still saved.
     """
 
     def _get_executor_rich_outputs(code_executor_agent) -> list:
@@ -405,6 +434,8 @@ def run_mcts(
 
     usage_tracker = UsageTracker()
     usage_tracker.save_events(log_dirname)
+
+    no_progress_error: NoProgressError | None = None
 
     try:
         if agent_usage_mode == "per_response":
@@ -474,8 +505,34 @@ def run_mcts(
         total_to_sample = max_iterations
         n_sampled = 0
         iteration_idx = 0
+        consecutive_no_progress = 0
+        last_expansion_error: Exception | None = None
+        expansion_error_guard = threading.Lock()
         node_mutation_locks: dict[str, threading.Lock] = {}
         node_mutation_locks_guard = threading.Lock()
+
+        def _on_expand_error(node_id: str, exc: Exception) -> None:
+            """Report a failed node expansion and remember it as the latest failure cause."""
+            nonlocal last_expansion_error
+            with expansion_error_guard:
+                last_expansion_error = exc
+            # Keep exploration running when one node expansion fails.
+            print(f"[run_mcts] Failed expanding node {node_id}: {exc.__class__.__name__}: {exc}")
+            traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+        def _no_progress_error(reason: str) -> NoProgressError:
+            """Build the abort error for a stalled run, naming the last underlying failure."""
+            cause = (
+                f"{last_expansion_error.__class__.__name__}: {last_expansion_error}"
+                if last_expansion_error is not None
+                else "no usable experiment was generated"
+            )
+            return NoProgressError(
+                f"Exploration aborted: {reason} "
+                f"({n_sampled}/{total_to_sample} experiments completed). Last failure: {cause}",
+                iterations=consecutive_no_progress,
+                last_error=last_expansion_error,
+            )
 
         def _get_node_mutation_lock(node_obj: MCTSNode) -> threading.Lock:
             """Return a per-node lock used to serialize mutable node state updates."""
@@ -501,6 +558,14 @@ def run_mcts(
                 return_n=min(batch_size, remaining_budget),
             )[:remaining_budget]
             if not next_nodes:
+                # Running out of nodes is the normal way exploration ends early. It is a failure
+                # only when the tree ran dry because expansion kept erroring, or when the run never
+                # committed a single node (e.g. the data loader could never be created).
+                if consecutive_no_progress and (last_expansion_error is not None or n_sampled == 0):
+                    raise _no_progress_error(
+                        f"no node is left to expand after {consecutive_no_progress} "
+                        "consecutive iteration(s) that committed no node"
+                    ) from last_expansion_error
                 break
             print(
                 "SAMPLED "
@@ -772,14 +837,6 @@ def run_mcts(
                         is_threaded=True,
                     )
 
-                def _on_expand_error(node_id: str, exc: Exception) -> None:
-                    # Keep exploration running when one node expansion fails.
-                    print(
-                        f"[run_mcts] Failed expanding node {node_id}: "
-                        f"{exc.__class__.__name__}: {exc}"
-                    )
-                    traceback.print_exception(type(exc), exc, exc.__traceback__)
-
                 expanded_nodes = []
                 with ThreadPoolExecutor(max_workers=n_threads) as executor:
                     future_labels = {
@@ -834,11 +891,7 @@ def run_mcts(
                         )
                     except Exception as exc:
                         # Align sequential behavior with threaded mode by continuing after per-node failures.
-                        print(
-                            f"[run_mcts] Failed expanding node {node_id}: "
-                            f"{exc.__class__.__name__}: {exc}"
-                        )
-                        traceback.print_exception(type(exc), exc, exc.__traceback__)
+                        _on_expand_error(node_id, exc)
                         continue
                     if new_node is not None:
                         expanded_nodes.append(new_node)
@@ -850,8 +903,29 @@ def run_mcts(
             expanded_nodes.sort(key=lambda n: (n.level, n.node_idx))
             for node in expanded_nodes:
                 nodes_by_level[node.level].append(node)
+
+            # Abort instead of spinning when nothing gets committed iteration after iteration.
+            # Without this, a durable failure (bad credentials, exhausted quota, replies that never
+            # parse into an experiment) loops at full speed and buries its own cause in log noise.
+            if expanded_nodes:
+                consecutive_no_progress = 0
+                last_expansion_error = None
+            else:
+                consecutive_no_progress += 1
+                print(
+                    f"NO NODE COMMITTED IN ITERATION {iteration_idx} "
+                    f"({consecutive_no_progress}/{max_no_progress_iterations} consecutive)\n"
+                )
+                if consecutive_no_progress >= max_no_progress_iterations:
+                    raise _no_progress_error(
+                        f"{consecutive_no_progress} consecutive iterations committed no node"
+                    ) from last_expansion_error
     except KeyboardInterrupt:
         print("\n\n######### EXPLORATION INTERRUPTED! SAVING THE CURRENT STATE... #########\n\n")
+    except NoProgressError as exc:
+        # Save whatever was explored before re-raising, so the partial run is not lost.
+        no_progress_error = exc
+        print(f"\n\n######### EXPLORATION ABORTED! {exc} #########\n\n")
     finally:
         clear_ag2_usage_context()
         configure_ag2_usage_tracking(None)
@@ -873,6 +947,10 @@ def run_mcts(
     )
     usage_tracker.save_events(log_dirname)
     usage_tracker.save_summary(log_dirname)
+
+    if no_progress_error is not None:
+        # Surface the failure to the caller (non-zero exit for the CLI) now that state is saved.
+        raise no_progress_error
 
 
 def resolve_model_args(args) -> None:

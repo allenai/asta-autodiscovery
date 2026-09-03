@@ -84,6 +84,17 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 gcloud auth application-default login
 ```
 
+The project is required and is not inferred from your credentials — a run
+naming a `vertex_ai/` model without `VERTEX_PROJECT_ID` stops at startup naming
+the variable. Application Default Credentials carry a project of their own, but
+it is frequently not the one you meant, and using it silently would turn a
+missing setting into a 404 about an unrelated project. The location is optional
+because `global` serves the Gemini models this package defaults to; litellm's
+own default, `us-central1`, does not.
+
+litellm's own `VERTEXAI_PROJECT`/`VERTEX_PROJECT` and `VERTEXAI_LOCATION` work
+too, and take lower precedence than the names above.
+
 **OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 
 ### GitHub Copilot

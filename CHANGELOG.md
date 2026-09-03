@@ -7,6 +7,32 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 [pypi]: https://pypi.org/project/asta-autodiscovery/
 
+## Unreleased
+
+### Fixed: Vertex AI configuration ([#78])
+
+Two 1.0.0 regressions, both on the path a first run takes, since the default
+models are Vertex.
+
+- **`VERTEX_LOCATION` unset means `global` again.** 1.0.0 passed the location to
+  litellm only when the variable happened to be set, so unset took litellm's own
+  default of `us-central1` — which does not serve `vertex_ai/gemini-3.7-flash`.
+  The 404 that came back read as if the model did not exist. `global` is now
+  passed when nothing is configured, matching what the docs have said all along.
+- **A missing `VERTEX_PROJECT_ID` fails at startup again**, with a message naming
+  the variable, rather than letting litellm fall back to the Application Default
+  Credentials project and 404 on a project you never chose.
+
+litellm's own `VERTEXAI_PROJECT`/`VERTEX_PROJECT` and `VERTEXAI_LOCATION` are
+also read, at lower precedence, so a deployment configured litellm's way is
+neither rejected by the new check nor overridden by the default location.
+
+A model-flag mistake now exits with a one-line error instead of a traceback.
+That covers the `<provider>/<model>` prefix error every 0.2.x command line hits
+on upgrade.
+
+[#78]: https://github.com/allenai/asta-autodiscovery/issues/78
+
 ## 1.0.0
 
 First release of the litellm-based model layer ([#67], [#68]). Every model call

@@ -88,6 +88,11 @@ export VERTEX_PROJECT_ID=your-gcp-project-id
 export VERTEX_LOCATION=global   # optional; defaults to "global"
 ```
 
+`VERTEX_PROJECT_ID` is required for a `vertex_ai/` model, and a run that names one without it
+stops at startup naming the variable. It is not inferred from your credentials: Application
+Default Credentials carry a project of their own, which is frequently not the project you meant,
+so relying on it turns a missing setting into a confusing 404 about an unrelated project.
+
 **Service account key file (recommended for non-interactive use):**
 
 Create a service account in your GCP project, grant it the `Vertex AI User` role, download a

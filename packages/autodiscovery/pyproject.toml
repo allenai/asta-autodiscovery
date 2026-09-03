@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery"
-version = "0.2.2"
+version = "1.0.0"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
 readme = "RELEASE.md"
 license = "Apache-2.0"

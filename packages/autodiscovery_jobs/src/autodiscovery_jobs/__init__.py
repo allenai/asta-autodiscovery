@@ -101,7 +101,7 @@ from .user_profile import (
     update_user_profile,
 )
 
-__version__ = "0.2.2"
+__version__ = "1.0.0"
 
 __all__ = [
     # Main class

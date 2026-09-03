@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery-modal"
-version = "0.2.2"
+version = "1.0.0"
 description = "Add your description here"
 readme = "README.md"
 license = "Apache-2.0"

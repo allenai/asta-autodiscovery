@@ -6,6 +6,19 @@ generate follow-up hypotheses in a recursive exploration.
 
 > Link to our NeurIPS 2025 paper: [AutoDiscovery: Open-ended Scientific Discovery via Bayesian Surprise](https://openreview.net/pdf?id=kJqTkj2HhF)
 
+## Upgrading from 0.2.x
+
+1.0.0 changes two things that every existing command line depends on:
+
+- **Model flags now name their provider.** `--model gemini-3.1-pro-preview`
+  becomes `--model vertex_ai/gemini-3.7-flash`. A bare model name is rejected at
+  startup. See [Selecting models](#selecting-models) below.
+- **Vertex AI authenticates via Application Default Credentials only.**
+  `VERTEX_ACCESS_TOKEN`, `GOOGLE_OAUTH_ACCESS_TOKEN` and
+  `VERTEX_OPENAI_BASE_URL` are no longer read.
+
+Full notes: [CHANGELOG](https://github.com/allenai/asta-autodiscovery/blob/main/CHANGELOG.md).
+
 ## Installation
 
 Requires Python 3.13 or newer.

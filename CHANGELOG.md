@@ -7,6 +7,23 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 [pypi]: https://pypi.org/project/asta-autodiscovery/
 
+## Unreleased
+
+### Fixed: a run whose experiment generation always fails now stops ([#79])
+
+A durable model failure at the data-loader step — misconfigured Vertex
+project/location, expired credentials, exhausted quota, replies that never parse
+into an experiment — used to spin `run_mcts` at full speed forever, emitting
+gigabytes of the same four log lines and burying the underlying error. It now
+aborts, saves whatever was explored, and raises `run.NoProgressError` naming the
+last failure, so the CLI exits non-zero.
+
+`run.run_mcts(...)` takes a new `max_no_progress_iterations` keyword argument
+(default `3`): the number of consecutive iterations that may commit no node
+before the run aborts.
+
+[#79]: https://github.com/allenai/asta-autodiscovery/issues/79
+
 ## 1.0.0
 
 First release of the litellm-based model layer ([#67], [#68]). Every model call

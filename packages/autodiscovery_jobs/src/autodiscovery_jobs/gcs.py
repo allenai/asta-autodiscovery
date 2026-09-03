@@ -2,6 +2,7 @@
 
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -1131,3 +1132,310 @@ def generate_upload_url(
         }
     except Exception as e:
         raise GCSError(f"Failed to generate upload URL: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Per-user erasure (maintainer-only)
+#
+# Everything below implements a permanent, per-subject purge used to satisfy a
+# "right to be forgotten" request. It is deliberately NOT surfaced on JobManager
+# or any HTTP route: the only intended caller is scripts/purge_user_data.py,
+# run by a system maintainer. See scripts/README.md.
+# ---------------------------------------------------------------------------
+
+# Derived metrics snapshot. It caches one record per job -- including the owning
+# userid -- so a subject erasure has to strip the subject's rows from it too.
+# api/metrics/aggregator.py imports this as its PERSIST_BLOB_PATH so the path has
+# a single definition.
+METRICS_CACHE_BLOB_PATH = "_metrics/jobs_cache.json"
+
+
+@dataclass
+class UserDataSummary:
+    """Inventory of everything stored for one user in the primary bucket.
+
+    Attributes:
+        userid: The subject the inventory was taken for.
+        bucket: Bucket the objects live in.
+        object_count: Number of objects under ``users/{userid}/``.
+        total_bytes: Combined size of those objects.
+        job_ids: Job identifiers found under the user prefix.
+        active_job_ids: Jobs whose run_details.json shows a non-terminal status.
+            These can still write to GCS, so they must be cancelled before a
+            purge to make the erasure final.
+        shared_run_ids: Jobs with an ``index/shared-runs/`` entry naming the user.
+            The entry itself stores the userid, so it is in scope for erasure.
+        has_user_profile: Whether ``users/{userid}/user.json`` (credits) exists.
+        metrics_cache_entries: Rows naming the user in the derived metrics cache.
+        object_paths: Every object path under the user prefix, sorted.
+    """
+
+    userid: str
+    bucket: str
+    object_count: int
+    total_bytes: int
+    job_ids: list[str]
+    active_job_ids: list[str]
+    shared_run_ids: list[str]
+    has_user_profile: bool
+    metrics_cache_entries: int
+    object_paths: list[str]
+
+    @property
+    def is_empty(self) -> bool:
+        """Whether the subject has no data left anywhere this summary covers."""
+        return (
+            self.object_count == 0 and not self.shared_run_ids and self.metrics_cache_entries == 0
+        )
+
+
+def _validate_userid(userid: str) -> str:
+    """Reject user IDs that would widen a purge beyond a single subject.
+
+    Args:
+        userid: Candidate user identifier (an Auth0 ``sub``).
+
+    Returns:
+        The validated user identifier.
+
+    Raises:
+        ValueError: If the identifier is empty or contains a path separator.
+    """
+    if not userid or not userid.strip():
+        raise ValueError("userid must be a non-empty string")
+    if "/" in userid:
+        raise ValueError(f"userid must not contain '/': {userid!r}")
+    return userid
+
+
+def _shared_run_ids_for_user(bucket: storage.Bucket, userid: str) -> list[str]:
+    """List shared-run index entries owned by a user.
+
+    Scans the whole index rather than deriving entries from the user's job
+    directories: an entry can outlive its job directory, and the entry body
+    stores the userid, so a stale one would leave the subject named in the
+    bucket after a purge.
+
+    Args:
+        bucket: Bucket holding the index.
+        userid: User identifier to match.
+
+    Returns:
+        Sorted job IDs whose index entry names this user.
+    """
+    matches: list[str] = []
+    for blob in bucket.list_blobs(prefix="index/shared-runs/"):
+        jobid = blob.name.rsplit("/", 1)[-1]
+        if not jobid:
+            continue
+        try:
+            entry = json.loads(blob.download_as_text())
+        except Exception:
+            continue
+        if isinstance(entry, dict) and entry.get("userid") == userid:
+            matches.append(jobid)
+    return sorted(matches)
+
+
+def _load_metrics_cache(bucket: storage.Bucket) -> dict[str, Any] | None:
+    """Read the derived metrics cache, or None when absent or unreadable."""
+    try:
+        payload = json.loads(bucket.blob(METRICS_CACHE_BLOB_PATH).download_as_text())
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _count_metrics_cache_entries(bucket: storage.Bucket, userid: str) -> int:
+    """Count rows in the derived metrics cache that name a user."""
+    payload = _load_metrics_cache(bucket)
+    if payload is None:
+        return 0
+    jobs = payload.get("jobs")
+    if not isinstance(jobs, list):
+        return 0
+    return sum(1 for job in jobs if isinstance(job, dict) and job.get("userid") == userid)
+
+
+def _purge_metrics_cache_entries(bucket: storage.Bucket, userid: str) -> int:
+    """Strip a user's rows from the derived metrics cache.
+
+    Rewrites the snapshot in place. A running API pod may still hold the
+    pre-purge cache in memory until it rescans or restarts; the authoritative
+    job data it would rescan from is gone by then, so the rows do not come back.
+
+    Args:
+        bucket: Bucket holding the cache.
+        userid: User identifier to strip.
+
+    Returns:
+        Number of rows removed.
+    """
+    payload = _load_metrics_cache(bucket)
+    if payload is None:
+        return 0
+    jobs = payload.get("jobs")
+    if not isinstance(jobs, list):
+        return 0
+
+    kept = [job for job in jobs if not (isinstance(job, dict) and job.get("userid") == userid)]
+    removed = len(jobs) - len(kept)
+    if removed == 0:
+        return 0
+
+    payload["jobs"] = kept
+    bucket.blob(METRICS_CACHE_BLOB_PATH).upload_from_string(
+        json.dumps(payload), content_type="application/json"
+    )
+    return removed
+
+
+def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDataSummary:
+    """Inventory every object stored for a user, without deleting anything.
+
+    Intended as the review step a maintainer reads before authorizing an
+    irreversible purge (see :func:`purge_user_data`).
+
+    Args:
+        userid: User identifier (Auth0 ``sub``).
+        config: Configuration (uses default if None).
+
+    Returns:
+        A :class:`UserDataSummary` describing the subject's footprint.
+
+    Raises:
+        ValueError: If ``userid`` is empty or contains a path separator.
+        GCSError: If the bucket cannot be listed.
+    """
+    from .run_details import TERMINAL_STATUSES, get_run_details
+
+    _validate_userid(userid)
+    config = config or JobConfig()
+
+    client = get_storage_client(config.project_id)
+    bucket = client.bucket(config.bucket)
+
+    user_prefix = f"users/{userid}/"
+    jobs_prefix = f"{user_prefix}jobs/"
+    profile_path = f"{user_prefix}user.json"
+
+    try:
+        object_paths: list[str] = []
+        total_bytes = 0
+        job_ids: set[str] = set()
+        has_user_profile = False
+
+        for blob in bucket.list_blobs(prefix=user_prefix):
+            object_paths.append(blob.name)
+            total_bytes += blob.size or 0
+            if blob.name == profile_path:
+                has_user_profile = True
+            if blob.name.startswith(jobs_prefix):
+                remainder = blob.name[len(jobs_prefix) :]
+                jobid = remainder.split("/", 1)[0]
+                if jobid:
+                    job_ids.add(jobid)
+
+        shared_run_ids = _shared_run_ids_for_user(bucket, userid)
+        metrics_cache_entries = _count_metrics_cache_entries(bucket, userid)
+    except Exception as e:
+        raise GCSError(f"Failed to summarize data for user {userid}: {e}")
+
+    active_job_ids = []
+    for jobid in sorted(job_ids):
+        details = get_run_details(userid, jobid, config)
+        if details is not None and details.status not in TERMINAL_STATUSES:
+            active_job_ids.append(jobid)
+
+    return UserDataSummary(
+        userid=userid,
+        bucket=config.bucket,
+        object_count=len(object_paths),
+        total_bytes=total_bytes,
+        job_ids=sorted(job_ids),
+        active_job_ids=active_job_ids,
+        shared_run_ids=shared_run_ids,
+        has_user_profile=has_user_profile,
+        metrics_cache_entries=metrics_cache_entries,
+        object_paths=sorted(object_paths),
+    )
+
+
+def purge_user_data(
+    userid: str,
+    config: JobConfig | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Permanently erase every object stored for a user in the primary bucket.
+
+    Unlike :func:`soft_delete_job`, this preserves nothing: uploaded datasets,
+    results, metadata, run details and the credits profile under
+    ``users/{userid}/`` are deleted outright, along with the user's shared-run
+    index entries and rows in the derived metrics cache. **There is no recovery
+    path.** Only :func:`summarize_user_data` should run before it.
+
+    Maintainer-only. Do not wire this to an HTTP route -- it is called from
+    scripts/purge_user_data.py, which gates it behind an interactive
+    confirmation.
+
+    This covers the primary ``autodiscovery`` bucket only. Datasets copied into
+    the Asta workspaces bucket are keyed by a different identifier; see
+    :func:`autodiscovery_jobs.asta_gcs.purge_asta_workspace_data`.
+
+    Args:
+        userid: User identifier (Auth0 ``sub``).
+        config: Configuration (uses default if None).
+        dry_run: If True, report what would be deleted without deleting it.
+
+    Returns:
+        Dictionary with keys:
+        - userid: The subject purged
+        - bucket: Bucket operated on
+        - dry_run: Whether this was a rehearsal
+        - deleted_objects: Object paths deleted (or that would be)
+        - deleted_bytes: Combined size of those objects
+        - deleted_shared_run_ids: Shared-run index entries removed
+        - metrics_cache_entries_removed: Rows stripped from the metrics cache
+
+    Raises:
+        ValueError: If ``userid`` is empty or contains a path separator.
+        GCSError: If deletion fails.
+    """
+    _validate_userid(userid)
+    config = config or JobConfig()
+
+    client = get_storage_client(config.project_id)
+    bucket = client.bucket(config.bucket)
+    user_prefix = f"users/{userid}/"
+
+    deleted_objects: list[str] = []
+    deleted_bytes = 0
+
+    try:
+        for blob in bucket.list_blobs(prefix=user_prefix):
+            deleted_objects.append(blob.name)
+            deleted_bytes += blob.size or 0
+            if not dry_run:
+                blob.delete()
+
+        shared_run_ids = _shared_run_ids_for_user(bucket, userid)
+        if not dry_run:
+            for jobid in shared_run_ids:
+                delete_shared_run_index(jobid, config)
+
+        if dry_run:
+            metrics_removed = _count_metrics_cache_entries(bucket, userid)
+        else:
+            metrics_removed = _purge_metrics_cache_entries(bucket, userid)
+    except Exception as e:
+        raise GCSError(f"Failed to purge data for user {userid}: {e}")
+
+    return {
+        "userid": userid,
+        "bucket": config.bucket,
+        "dry_run": dry_run,
+        "deleted_objects": sorted(deleted_objects),
+        "deleted_bytes": deleted_bytes,
+        "deleted_shared_run_ids": shared_run_ids,
+        "metrics_cache_entries_removed": metrics_removed,
+    }

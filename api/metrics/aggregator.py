@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from autodiscovery_jobs.config import JobConfig
+from autodiscovery_jobs.gcs import METRICS_CACHE_BLOB_PATH
 from google.cloud import storage
 
 from .costs import _lookup_pricing, calculate_llm_cost, get_duration_seconds
@@ -47,7 +48,9 @@ ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
 
 # Where the persisted metrics cache snapshot lives in the shared GCS bucket.
 # Loaded on cold start so pod restarts don't re-scan every job from scratch.
-PERSIST_BLOB_PATH = "_metrics/jobs_cache.json"
+# Defined in autodiscovery_jobs.gcs so the per-user purge, which has to strip a
+# subject's rows out of this snapshot, reads the same path.
+PERSIST_BLOB_PATH = METRICS_CACHE_BLOB_PATH
 PERSIST_SCHEMA_VERSION = 1
 
 # Per-pod file lock so only one gunicorn worker scans GCS at a time. Other

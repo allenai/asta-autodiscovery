@@ -1,17 +1,17 @@
 # Standalone CLI
 
-The `autodiscovery` package ships a console script, `auto-discovery`, that runs the
+The `asta-autodiscovery` package ships a console script, `auto-discovery`, that runs the
 discovery engine end-to-end against a local dataset — no Cloud Run, GCS, or UI
 required.
 
 ## Install from PyPI
 
 ```sh
-pip install autodiscovery
+pip install asta-autodiscovery
 ```
 
-This pulls in `autodiscovery-modal` (sandboxed code execution) as a transitive
-dependency. Requires Python 3.13+.
+This pulls in `asta-autodiscovery-modal` (sandboxed code execution) and
+`asta-code-execution` as transitive dependencies. Requires Python 3.13+.
 
 ## Selecting models
 
@@ -151,7 +151,8 @@ parameters, belief mode, execution backend, etc.).
 ## Publishing to PyPI
 
 Releases are cut from a git tag and published via the
-[`publish-to-pypi`](../.github/workflows/publish-to-pypi.yml) workflow.
+[`publish-to-pypi`](https://github.com/allenai/asta-autodiscovery/blob/main/.github/workflows/publish-to-pypi.yml)
+workflow.
 
 Steps:
 
@@ -161,9 +162,9 @@ Steps:
    make set-version VERSION=x.y.z
    ```
 
-   This keeps all six sub-packages in sync. Only `autodiscovery` and
-   `autodiscovery-modal` are actually published, but we sync the whole workspace
-   so versions don't drift.
+   This keeps all six sub-packages in sync. Only `asta-autodiscovery`,
+   `asta-autodiscovery-modal` and `asta-code-execution` are actually published,
+   but we sync the whole workspace so versions don't drift.
 
 2. Just before merging to main, push the version tag:
 
@@ -176,3 +177,8 @@ Steps:
 
 3. **Trigger the workflow**: in GitHub Actions, run the *Publish to PyPI*
    workflow with the tag (e.g. `v1.1.7`) as the `version` input.
+
+   The workflow publishes the three packages and then creates the matching
+   GitHub release, pointing at the tag's `CHANGELOG.md`. Add the version's
+   changelog entry before releasing — that link is the only per-version notes
+   PyPI consumers get, since PyPI renders only the current long description.

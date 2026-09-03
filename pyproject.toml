@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery-workspace"
-version = "0.2.2"
+version = "1.0.0"
 description = "Asta AutoDiscovery (workspace root)"
 readme = "README.md"
 license = "Apache-2.0"

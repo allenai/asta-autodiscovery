@@ -34,10 +34,13 @@ uv run --package autodiscovery python -m autodiscovery.run \
     --out_dir="outputs" \
     --dataset_metadata="discoverybench/real/test/nls_ses/metadata.json" \
     --n_experiments=16 \
-    --model="gemini-3.7-flash" \
-    --belief_model="gemini-3.7-flash" \
-    --vision_model="gemini-3.7-flash"
+    --model="vertex_ai/gemini-3.7-flash" \
+    --belief_model="vertex_ai/gemini-3.7-flash" \
+    --vision_model="vertex_ai/gemini-3.7-flash"
 ```
+
+Model flags take litellm's `<provider>/<model>` naming; the provider prefix is required.
+See [docs/autodiscovery/standalone.md](../../docs/autodiscovery/standalone.md#selecting-models).
 
 To resume a previous exploration, use the `--continue_from_dir` flag to specify the directory containing the previous
 exploration logs. This will allow the script to continue from where it left off, using the MCTS nodes it had generated

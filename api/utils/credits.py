@@ -311,6 +311,12 @@ def _aggregate_user_credits(userid: str, config: JobConfig, _ttl_bucket: int) ->
     ``JobConfig`` is a frozen dataclass, so it is hashable and usable as part of
     the cache key directly; ``_ttl_bucket`` changes every
     ``CREDITS_CACHE_TTL_SECONDS`` so entries age out.
+
+    There is deliberately no in-flight lock around the miss: ``start.sh`` runs
+    gunicorn sync workers with no ``--threads``, so a process handles one
+    request at a time and has nothing to coalesce. Concurrency here is between
+    the 10 worker processes, which no in-process lock can serialise. Revisit if
+    the server ever moves to threaded or async workers.
     """
     return get_user_credits(userid=userid, config=config)
 

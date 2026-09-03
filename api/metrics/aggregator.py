@@ -26,7 +26,16 @@ from typing import Any
 from autodiscovery_jobs.config import JobConfig
 from google.cloud import storage
 
-from .costs import _lookup_pricing, calculate_llm_cost, get_duration_seconds
+from .costs import (
+    UNAVAILABLE,
+    bucket_call_counts,
+    bucket_costs,
+    calculate_llm_cost,
+    coerce_float,
+    coerce_int,
+    cost_status,
+    get_duration_seconds,
+)
 from .models import (
     AggregatedUsageBucket,
     AggregatedUsageResponse,
@@ -73,6 +82,7 @@ class JobSnapshot:
     model: str | None = None
     llm_usage_summary: dict | None = None
     llm_cost_usd: float = 0.0
+    llm_cost_status: str = UNAVAILABLE
     llm_cost_by_agent: dict[str, dict[str, float]] = field(default_factory=dict)
     llm_cost_by_component: dict[str, dict[str, float]] = field(default_factory=dict)
     llm_cost_by_node: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -178,46 +188,14 @@ def _load_persisted_cache(bucket: storage.Bucket) -> AggregatedData | None:
     )
 
 
-def _coerce_nonnegative_int(value: object) -> int:
-    """Parse a value into a non-negative int, returning 0 on invalid input."""
-    try:
-        return max(0, int(value))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
-
-
-def _lookup_bucket_cost_by_type(model_name: str, bucket: dict[str, Any]) -> tuple[float, float, float]:
-    """Calculate prompt/completion/reasoning costs for one usage bucket."""
-    pricing = _lookup_pricing(model_name)
-
-    prompt_tokens = _coerce_nonnegative_int(bucket.get("prompt_tokens"))
-    completion_tokens = _coerce_nonnegative_int(bucket.get("completion_tokens"))
-    reasoning_tokens = _coerce_nonnegative_int(bucket.get("reasoning_tokens"))
-    total_tokens = _coerce_nonnegative_int(bucket.get("total_tokens"))
-
-    output_tokens = max(0, total_tokens - prompt_tokens)
-    prompt_cost = (prompt_tokens / 1_000_000) * pricing["input"]
-    output_cost = (output_tokens / 1_000_000) * pricing["output"]
-
-    explicit_output_tokens = completion_tokens + reasoning_tokens
-    if explicit_output_tokens > 0:
-        completion_cost = output_cost * (completion_tokens / explicit_output_tokens)
-        reasoning_cost = output_cost * (reasoning_tokens / explicit_output_tokens)
-    else:
-        completion_cost = output_cost
-        reasoning_cost = 0.0
-
-    return prompt_cost, completion_cost, reasoning_cost
-
-
 def _extract_event_bucket(event: dict[str, Any]) -> dict[str, int]:
     """Extract normalized token counts from one usage event."""
     usage = event.get("usage") if isinstance(event.get("usage"), dict) else {}
     usage = usage if isinstance(usage, dict) else {}
 
-    prompt_tokens = _coerce_nonnegative_int(usage.get("prompt_tokens"))
-    completion_tokens = _coerce_nonnegative_int(usage.get("completion_tokens"))
-    total_tokens = _coerce_nonnegative_int(usage.get("total_tokens"))
+    prompt_tokens = coerce_int(usage.get("prompt_tokens"))
+    completion_tokens = coerce_int(usage.get("completion_tokens"))
+    total_tokens = coerce_int(usage.get("total_tokens"))
     if total_tokens == 0:
         total_tokens = prompt_tokens + completion_tokens
 
@@ -227,9 +205,9 @@ def _extract_event_bucket(event: dict[str, Any]) -> dict[str, int]:
         else {}
     )
     completion_details = completion_details if isinstance(completion_details, dict) else {}
-    reasoning_tokens = _coerce_nonnegative_int(completion_details.get("reasoning_tokens"))
+    reasoning_tokens = coerce_int(completion_details.get("reasoning_tokens"))
     if reasoning_tokens == 0:
-        reasoning_tokens = _coerce_nonnegative_int(usage.get("reasoning_tokens"))
+        reasoning_tokens = coerce_int(usage.get("reasoning_tokens"))
 
     return {
         "prompt_tokens": prompt_tokens,
@@ -246,22 +224,37 @@ def _empty_cost_bucket() -> dict[str, float]:
         "completion_cost_usd": 0.0,
         "reasoning_cost_usd": 0.0,
         "total_cost_usd": 0.0,
+        "calls": 0.0,
+        "priced_calls": 0.0,
+    }
+
+
+def _event_cost(event: dict[str, Any]) -> dict[str, float] | None:
+    """Read the cost the producing run recorded for one usage event."""
+    cost = event.get("cost")
+    if not isinstance(cost, dict) or cost.get("total_usd") is None:
+        return None
+    return {
+        "total_cost_usd": coerce_float(cost.get("total_usd")),
+        "prompt_cost_usd": coerce_float(cost.get("prompt_usd")),
+        "completion_cost_usd": coerce_float(cost.get("completion_usd")),
+        "reasoning_cost_usd": coerce_float(cost.get("reasoning_usd")),
     }
 
 
 def _accumulate_cost(
     target: dict[str, dict[str, float]],
     key: str,
-    prompt_cost: float,
-    completion_cost: float,
-    reasoning_cost: float,
+    cost: dict[str, float] | None,
 ) -> None:
-    """Accumulate one usage event cost into a keyed cost map."""
+    """Accumulate one usage event's recorded cost into a keyed cost map."""
     bucket = target.setdefault(key, _empty_cost_bucket())
-    bucket["prompt_cost_usd"] += prompt_cost
-    bucket["completion_cost_usd"] += completion_cost
-    bucket["reasoning_cost_usd"] += reasoning_cost
-    bucket["total_cost_usd"] += prompt_cost + completion_cost + reasoning_cost
+    bucket["calls"] += 1
+    if cost is None:
+        return
+    bucket["priced_calls"] += 1
+    for cost_key, value in cost.items():
+        bucket[cost_key] += value
 
 
 def _build_event_cost_breakdowns(
@@ -271,23 +264,16 @@ def _build_event_cost_breakdowns(
     dict[str, dict[str, float]],
     dict[str, dict[str, float]],
 ]:
-    """Build exact cost maps from raw usage events by agent/component/node."""
+    """Build cost maps from raw usage events by agent/component/node."""
     by_agent: dict[str, dict[str, float]] = {}
     by_component: dict[str, dict[str, float]] = {}
     by_node: dict[str, dict[str, float]] = {}
 
     for event in events:
-        model = str(event.get("model") or "unknown")
-        bucket = _extract_event_bucket(event)
-        prompt_cost, completion_cost, reasoning_cost = _lookup_bucket_cost_by_type(model, bucket)
-
-        agent_key = str(event.get("agent_name") or "unassigned")
-        component_key = str(event.get("component") or "unknown")
-        node_key = str(event.get("node_id") or "run_level")
-
-        _accumulate_cost(by_agent, agent_key, prompt_cost, completion_cost, reasoning_cost)
-        _accumulate_cost(by_component, component_key, prompt_cost, completion_cost, reasoning_cost)
-        _accumulate_cost(by_node, node_key, prompt_cost, completion_cost, reasoning_cost)
+        cost = _event_cost(event)
+        _accumulate_cost(by_agent, str(event.get("agent_name") or "unassigned"), cost)
+        _accumulate_cost(by_component, str(event.get("component") or "unknown"), cost)
+        _accumulate_cost(by_node, str(event.get("node_id") or "run_level"), cost)
 
     return by_agent, by_component, by_node
 
@@ -304,10 +290,10 @@ def _derive_requested_experiments(
     metadata = metadata or {}
     run_args = run_args or {}
 
-    requested_main = _coerce_nonnegative_int(
+    requested_main = coerce_int(
         metadata.get("n_experiments") or run_args.get("n_experiments"),
     )
-    requested_warmstart = _coerce_nonnegative_int(
+    requested_warmstart = coerce_int(
         metadata.get("n_warmstart") or run_args.get("n_warmstart"),
     )
     return requested_main + requested_warmstart
@@ -416,6 +402,7 @@ def _scan_job(
             model=model,
             llm_usage_summary=llm_summary,
             llm_cost_usd=llm_cost,
+            llm_cost_status=cost_status(llm_summary),
             llm_cost_by_agent=llm_cost_by_agent,
             llm_cost_by_component=llm_cost_by_component,
             llm_cost_by_node=llm_cost_by_node,
@@ -465,8 +452,8 @@ def _scan_all_jobs(
                 ):
                     continue
                 # Force one-time re-scan when older cached snapshots predate
-                # exact event-level cost attribution fields.
-                if not hasattr(j, "llm_cost_by_agent"):
+                # event-level cost attribution fields.
+                if not hasattr(j, "llm_cost_by_agent") or not hasattr(j, "llm_cost_status"):
                     continue
                 cached_terminal[(j.userid, j.jobid)] = j
 
@@ -702,6 +689,11 @@ def get_metrics_cache() -> MetricsCache:
 # Query helpers
 # ---------------------------------------------------------------------------
 
+def _count_runs_missing_cost(jobs: list[JobSnapshot]) -> int:
+    """Count runs contributing no cost, so a total can be caveated not inflated."""
+    return sum(1 for j in jobs if j.llm_cost_status == UNAVAILABLE)
+
+
 def _filter_jobs(
     jobs: list[JobSnapshot],
     start_date: str | None = None,
@@ -757,13 +749,17 @@ def compute_overview(
         else 0.0
     )
 
-    # LLM costs
+    # LLM costs. Runs with no recorded cost contribute nothing and are counted
+    # separately so the dashboard can caveat the total rather than imply it is
+    # complete — see api/metrics/costs.py.
     total_llm = sum(j.llm_cost_usd for j in jobs)
+    runs_missing_cost = _count_runs_missing_cost(jobs)
 
-    # Cost per hypothesis — only consider jobs with LLM usage data
-    jobs_with_usage = [j for j in jobs if j.llm_usage_summary]
-    hypotheses_with_usage = sum(j.n_experiments_completed for j in jobs_with_usage)
-    llm_cost_for_hypotheses = sum(j.llm_cost_usd for j in jobs_with_usage)
+    # Cost per hypothesis — only consider jobs whose cost is known, so the
+    # denominator matches the numerator.
+    jobs_with_cost = [j for j in jobs if j.llm_cost_status != UNAVAILABLE]
+    hypotheses_with_usage = sum(j.n_experiments_completed for j in jobs_with_cost)
+    llm_cost_for_hypotheses = sum(j.llm_cost_usd for j in jobs_with_cost)
     cost_per_hypothesis = (
         llm_cost_for_hypotheses / hypotheses_with_usage
         if hypotheses_with_usage > 0
@@ -817,6 +813,7 @@ def compute_overview(
         total_experiments_requested=total_experiments_requested,
         experiment_completion_rate=round(exp_completion_rate, 4),
         llm_cost_usd=round(total_llm, 4),
+        runs_missing_cost=runs_missing_cost,
         hypotheses_with_usage=hypotheses_with_usage,
         cost_per_hypothesis_usd=round(cost_per_hypothesis, 4) if cost_per_hypothesis is not None else None,
         share_rate=round(share_rate, 4),
@@ -865,6 +862,7 @@ def compute_users_list(
                 success_rate=round(sr, 4),
                 total_experiments=total_experiments,
                 llm_cost_usd=round(total_llm, 4),
+                runs_missing_cost=_count_runs_missing_cost(user_jobs),
                 shared_runs=shared,
                 last_activity=last_activity,
             )
@@ -902,6 +900,7 @@ def compute_user_detail(userid: str) -> UserDetailMetrics:
         success_rate=round(sr, 4),
         total_experiments=total_experiments,
         llm_cost_usd=round(total_llm, 4),
+        runs_missing_cost=_count_runs_missing_cost(user_jobs),
         shared_runs=shared,
         last_activity=last_activity,
     )
@@ -924,6 +923,7 @@ def compute_user_detail(userid: str) -> UserDetailMetrics:
                 is_shared=j.is_shared,
                 model=j.model,
                 llm_cost_usd=j.llm_cost_usd,
+                llm_cost_status=j.llm_cost_status,
             )
         )
 
@@ -962,6 +962,7 @@ def compute_run_metrics(userid: str, runid: str) -> dict | None:
         "duration_seconds": job.duration_seconds,
         "llm_usage_summary": job.llm_usage_summary,
         "llm_cost_usd": job.llm_cost_usd,
+        "llm_cost_status": job.llm_cost_status,
         "llm_cost_by_model": llm_cost_by_model,
         "n_experiments_requested": job.n_experiments_requested,
         "n_experiments_completed": job.n_experiments_completed,
@@ -974,6 +975,7 @@ def _build_aggregated_bucket(
     per_run_tokens: list[int],
     per_run_costs: list[float],
     total_calls: int,
+    priced_calls: int,
     total_prompt: int,
     total_completion: int,
     total_reasoning: int,
@@ -992,6 +994,7 @@ def _build_aggregated_bucket(
 
     return AggregatedUsageBucket(
         total_calls=total_calls,
+        priced_calls=priced_calls,
         total_prompt_tokens=total_prompt,
         total_completion_tokens=total_completion,
         total_reasoning_tokens=total_reasoning,
@@ -1022,27 +1025,16 @@ def compute_aggregated_usage(
         return AggregatedUsageResponse()
 
     def _extract_run_costs_by_type(llm_summary: dict | None) -> tuple[float, float, float]:
-        """Compute per-run prompt/completion/reasoning costs from by_model usage."""
-        if not llm_summary:
-            return 0.0, 0.0, 0.0
-
-        by_model = llm_summary.get("by_model", {})
-        prompt_cost = 0.0
-        completion_cost = 0.0
-        reasoning_cost = 0.0
-
-        for model_name, bucket in by_model.items():
-            p_cost, c_cost, r_cost = _lookup_bucket_cost_by_type(model_name, bucket)
-            prompt_cost += p_cost
-            completion_cost += c_cost
-            reasoning_cost += r_cost
-
-        return prompt_cost, completion_cost, reasoning_cost
+        """Sum a run's recorded prompt/completion/reasoning costs across models."""
+        by_model = llm_summary.get("by_model", {}) if llm_summary else {}
+        parts = [bucket_costs(bucket) for bucket in by_model.values()]
+        return tuple(sum(v) for v in zip(*parts, strict=True)) if parts else (0.0, 0.0, 0.0)
 
     # --- Totals ---
     totals_per_run_tokens: list[int] = []
     totals_per_run_costs: list[float] = []
     totals_calls = 0
+    totals_priced_calls = 0
     totals_prompt = 0
     totals_completion = 0
     totals_reasoning = 0
@@ -1054,7 +1046,9 @@ def compute_aggregated_usage(
 
     for j in jobs_with_usage:
         t = j.llm_usage_summary.get("totals", {})  # type: ignore[union-attr]
-        totals_calls += t.get("calls", 0)
+        run_calls, run_priced_calls = bucket_call_counts(t)
+        totals_calls += run_calls
+        totals_priced_calls += run_priced_calls
         totals_prompt += t.get("prompt_tokens", 0)
         totals_completion += t.get("completion_tokens", 0)
         totals_reasoning += t.get("reasoning_tokens", 0)
@@ -1063,7 +1057,9 @@ def compute_aggregated_usage(
         run_prompt_cost, run_completion_cost, run_reasoning_cost = _extract_run_costs_by_type(
             j.llm_usage_summary,
         )
-        run_total_cost = run_prompt_cost + run_completion_cost + run_reasoning_cost
+        # Not the sum of the three parts: calls recorded from AG2's running
+        # per-agent totals know their total cost but not its split.
+        run_total_cost, _ = calculate_llm_cost(j.llm_usage_summary or {})
 
         totals_cost += run_total_cost
         totals_prompt_cost += run_prompt_cost
@@ -1074,7 +1070,7 @@ def compute_aggregated_usage(
 
     totals_bucket = _build_aggregated_bucket(
         totals_per_run_tokens, totals_per_run_costs,
-        totals_calls, totals_prompt, totals_completion,
+        totals_calls, totals_priced_calls, totals_prompt, totals_completion,
         totals_reasoning, totals_tokens, totals_cost,
         totals_prompt_cost, totals_completion_cost, totals_reasoning_cost,
     )
@@ -1082,11 +1078,21 @@ def compute_aggregated_usage(
     # --- Breakdown dimensions ---
     def _aggregate_dimension(
         dim_key: str,
-        cost_mode: str = "none",
+        cost_source: str,
     ) -> dict[str, AggregatedUsageBucket]:
+        """Aggregate one breakdown dimension across runs.
+
+        Args:
+            dim_key: The ``llm_usage_summary`` key to aggregate, e.g. ``by_model``.
+            cost_source: ``summary`` to read cost off the summary buckets, or
+                ``events`` to read the per-event attribution maps.
+
+        Returns:
+            Mapping of dimension key to its aggregated bucket.
+        """
         # Accumulate per-key data across runs
         key_data: dict[str, dict] = defaultdict(lambda: {
-            "calls": 0, "prompt": 0, "completion": 0, "reasoning": 0,
+            "calls": 0, "priced_calls": 0, "prompt": 0, "completion": 0, "reasoning": 0,
             "tokens": 0,
             "cost": 0.0,
             "prompt_cost": 0.0,
@@ -1100,54 +1106,40 @@ def compute_aggregated_usage(
             dim = j.llm_usage_summary.get(dim_key, {})  # type: ignore[union-attr]
             for key, bucket in dim.items():
                 d = key_data[key]
-                prompt_tokens = max(0, int(bucket.get("prompt_tokens", 0) or 0))
-                completion_tokens = max(0, int(bucket.get("completion_tokens", 0) or 0))
-                reasoning_tokens = max(0, int(bucket.get("reasoning_tokens", 0) or 0))
-                tok = max(0, int(bucket.get("total_tokens", 0) or 0))
-                d["calls"] += bucket.get("calls", 0)
-                d["prompt"] += prompt_tokens
-                d["completion"] += completion_tokens
-                d["reasoning"] += reasoning_tokens
+                tok = coerce_int(bucket.get("total_tokens"))
+                calls, priced_calls = bucket_call_counts(bucket)
+                d["calls"] += calls
+                d["prompt"] += coerce_int(bucket.get("prompt_tokens"))
+                d["completion"] += coerce_int(bucket.get("completion_tokens"))
+                d["reasoning"] += coerce_int(bucket.get("reasoning_tokens"))
                 d["tokens"] += tok
                 d["per_run_tokens"].append(tok)
 
-                prompt_cost = 0.0
-                completion_cost = 0.0
-                reasoning_cost = 0.0
-                if cost_mode == "model":
-                    prompt_cost, completion_cost, reasoning_cost = _lookup_bucket_cost_by_type(
-                        key,
-                        bucket,
+                if cost_source == "summary":
+                    total_cost = coerce_float(bucket.get("cost_usd"))
+                    prompt_cost, completion_cost, reasoning_cost = bucket_costs(bucket)
+                else:
+                    # The event-level maps attribute cost to the dimension the
+                    # summary buckets cannot: an agent, component or node.
+                    cost_bucket = getattr(j, f"llm_cost_{dim_key[3:]}", {}).get(
+                        key, _empty_cost_bucket()
                     )
-                elif cost_mode == "events_exact":
-                    by_dim_cost_map: dict[str, dict[str, float]] = {}
-                    if dim_key == "by_agent":
-                        by_dim_cost_map = getattr(j, "llm_cost_by_agent", {})
-                    elif dim_key == "by_component":
-                        by_dim_cost_map = getattr(j, "llm_cost_by_component", {})
-                    elif dim_key == "by_node":
-                        by_dim_cost_map = getattr(j, "llm_cost_by_node", {})
+                    priced_calls = coerce_int(cost_bucket.get("priced_calls"))
+                    total_cost = coerce_float(cost_bucket.get("total_cost_usd"))
+                    prompt_cost, completion_cost, reasoning_cost = bucket_costs(cost_bucket)
 
-                    cost_bucket = by_dim_cost_map.get(key, _empty_cost_bucket())
-                    prompt_cost = float(cost_bucket.get("prompt_cost_usd", 0.0))
-                    completion_cost = float(cost_bucket.get("completion_cost_usd", 0.0))
-                    reasoning_cost = float(cost_bucket.get("reasoning_cost_usd", 0.0))
-
-                total_cost = prompt_cost + completion_cost + reasoning_cost
+                d["priced_calls"] += priced_calls
                 d["cost"] += total_cost
                 d["prompt_cost"] += prompt_cost
                 d["completion_cost"] += completion_cost
                 d["reasoning_cost"] += reasoning_cost
-                if cost_mode == "none":
-                    d["per_run_costs"].append(0.0)
-                else:
-                    d["per_run_costs"].append(total_cost)
+                d["per_run_costs"].append(total_cost)
 
         result = {}
         for key, d in key_data.items():
             result[key] = _build_aggregated_bucket(
                 d["per_run_tokens"], d["per_run_costs"],
-                d["calls"], d["prompt"], d["completion"],
+                d["calls"], d["priced_calls"], d["prompt"], d["completion"],
                 d["reasoning"], d["tokens"], d["cost"],
                 d["prompt_cost"], d["completion_cost"], d["reasoning_cost"],
             )
@@ -1155,9 +1147,9 @@ def compute_aggregated_usage(
 
     return AggregatedUsageResponse(
         totals=totals_bucket,
-        by_model=_aggregate_dimension("by_model", cost_mode="model"),
-        by_agent=_aggregate_dimension("by_agent", cost_mode="events_exact"),
-        by_node=_aggregate_dimension("by_node", cost_mode="events_exact"),
-        by_component=_aggregate_dimension("by_component", cost_mode="events_exact"),
+        by_model=_aggregate_dimension("by_model", cost_source="summary"),
+        by_agent=_aggregate_dimension("by_agent", cost_source="events"),
+        by_node=_aggregate_dimension("by_node", cost_source="events"),
+        by_component=_aggregate_dimension("by_component", cost_source="events"),
         runs_included=len(jobs_with_usage),
     )

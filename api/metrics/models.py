@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+from .costs import COMPLETE, PARTIAL, UNAVAILABLE
+
+#: How much of a run's LLM cost is known. See :mod:`api.metrics.costs`.
+LLMCostStatus = Literal[COMPLETE, PARTIAL, UNAVAILABLE]
 
 
 class DailyMetrics(BaseModel):
@@ -32,6 +37,9 @@ class OverviewMetrics(BaseModel):
     total_experiments_requested: int = Field(0)
     experiment_completion_rate: float = Field(0.0)
     llm_cost_usd: float = Field(0.0)
+    runs_missing_cost: int = Field(
+        0, description="Runs contributing no cost, so the total is a lower bound"
+    )
     # Cost-per-hypothesis breakdown (only jobs with LLM usage data)
     hypotheses_with_usage: int = Field(0, description="Completed experiments from runs with LLM usage data")
     cost_per_hypothesis_usd: float | None = Field(None)
@@ -55,6 +63,9 @@ class UserMetricsSummary(BaseModel):
     success_rate: float = Field(0.0)
     total_experiments: int = Field(0)
     llm_cost_usd: float = Field(0.0)
+    runs_missing_cost: int = Field(
+        0, description="Runs contributing no cost, so the total is a lower bound"
+    )
     shared_runs: int = Field(0)
     last_activity: str | None = Field(None, description="Most recent run created_at")
 
@@ -83,6 +94,7 @@ class RunSummary(BaseModel):
     is_shared: bool = Field(False)
     model: str | None = None
     llm_cost_usd: float = Field(0.0)
+    llm_cost_status: LLMCostStatus = Field(UNAVAILABLE)
 
 
 class LLMUsageSummary(BaseModel):
@@ -108,6 +120,7 @@ class RunMetrics(BaseModel):
     duration_seconds: float | None = None
     llm_usage_summary: LLMUsageSummary | None = None
     llm_cost_usd: float = Field(0.0)
+    llm_cost_status: LLMCostStatus = Field(UNAVAILABLE)
     llm_cost_by_model: dict[str, float] = Field(default_factory=dict)
     n_experiments_requested: int = Field(0)
     n_experiments_completed: int = Field(0)
@@ -119,6 +132,7 @@ class AggregatedUsageBucket(BaseModel):
     """Aggregated LLM usage with statistics across runs."""
 
     total_calls: int = Field(0)
+    priced_calls: int = Field(0, description="Of total_calls, how many carried a cost")
     total_prompt_tokens: int = Field(0)
     total_completion_tokens: int = Field(0)
     total_reasoning_tokens: int = Field(0)

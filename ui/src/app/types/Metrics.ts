@@ -2,6 +2,13 @@
  * TypeScript types for the metrics dashboard API responses.
  */
 
+/**
+ * Whether every recorded LLM call for a run carried a cost. Runs from before
+ * per-call cost recording, and providers litellm cannot price per token, have
+ * no dollar figure at all.
+ */
+export type LLMCostStatus = 'complete' | 'partial' | 'unavailable';
+
 export interface DailyMetrics {
     date: string;
     runs_started: number;
@@ -23,6 +30,7 @@ export interface OverviewMetrics {
     total_experiments_requested: number;
     experiment_completion_rate: number;
     llm_cost_usd: number;
+    runs_missing_cost: number;
     hypotheses_with_usage: number;
     cost_per_hypothesis_usd: number | null;
     share_rate: number;
@@ -40,6 +48,7 @@ export interface UserMetricsSummary {
     success_rate: number;
     total_experiments: number;
     llm_cost_usd: number;
+    runs_missing_cost: number;
     shared_runs: number;
     last_activity: string | null;
 }
@@ -58,6 +67,7 @@ export interface RunSummary {
     is_shared: boolean;
     model: string | null;
     llm_cost_usd: number;
+    llm_cost_status: LLMCostStatus;
 }
 
 export interface UserDetailMetrics {
@@ -93,6 +103,7 @@ export interface RunMetrics {
     duration_seconds: number | null;
     llm_usage_summary: LLMUsageSummary | null;
     llm_cost_usd: number;
+    llm_cost_status: LLMCostStatus;
     llm_cost_by_model: Record<string, number>;
     n_experiments_requested: number;
     n_experiments_completed: number;
@@ -107,6 +118,7 @@ export interface UsersListResponse {
 
 export interface AggregatedUsageBucket {
     total_calls: number;
+    priced_calls: number;
     total_prompt_tokens: number;
     total_completion_tokens: number;
     total_reasoning_tokens: number;

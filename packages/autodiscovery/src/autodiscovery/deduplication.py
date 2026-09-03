@@ -173,6 +173,7 @@ def get_embedding(
                     usage_tracker.record_response(
                         response,
                         source=llm.provider_of(model),
+                        request_model=model,
                         component="dedupe.embeddings",
                         agent_name="dedupe",
                     )

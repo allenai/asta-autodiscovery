@@ -125,6 +125,7 @@ class UsageTracker:
         node_id: str | None = None,
         metadata: dict[str, Any] | None = None,
         usage: Any | None = None,
+        cost: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         """Record one token-usage event.
 
@@ -139,6 +140,9 @@ class UsageTracker:
             node_id: Optional node identifier.
             metadata: Optional metadata map.
             usage: Optional raw provider usage payload in standardized response form.
+            cost: Optional cost breakdown, as returned by
+                :func:`autodiscovery.llm.cost_of`. ``None`` records the call's cost
+                as unavailable, which is not the same as a cost of zero.
 
         Returns:
             The recorded event dictionary.
@@ -155,6 +159,7 @@ class UsageTracker:
             "node_id": node_id,
             "model": model,
             "metadata": metadata or {},
+            "cost": _normalize_cost(cost),
         }
         usage_payload = _usage_payload_with_token_counts(
             usage=usage,
@@ -173,6 +178,7 @@ class UsageTracker:
         *,
         source: str,
         component: str,
+        request_model: str | None = None,
         agent_name: str | None = None,
         node_id: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -183,6 +189,10 @@ class UsageTracker:
             response: API response object that may contain ``usage`` and ``model``.
             source: Source identifier.
             component: Component label for the call path.
+            request_model: The litellm-qualified model name the request was made
+                with. Supplying it records what the call cost; without it the
+                event's cost is unavailable, because pricing a call needs the
+                provider and a response only reports the bare model name.
             agent_name: Optional agent name.
             node_id: Optional node identifier.
             metadata: Optional metadata map.
@@ -204,6 +214,7 @@ class UsageTracker:
             node_id=node_id,
             metadata=dict(metadata or {}),
             usage=usage.get("usage"),
+            cost=_response_cost(response, request_model),
         )
 
     def record_agent_usage_deltas(
@@ -251,6 +262,7 @@ class UsageTracker:
                     total_tokens=total,
                     agent_name=agent_name,
                     node_id=node_id,
+                    cost=_delta_cost(model_usage, prev_usage),
                 )
 
     def get_node_summary(self, node_id: str) -> dict[str, Any]:
@@ -352,12 +364,14 @@ def record_ag2_response_usage(
     response: Any,
     *,
     agent_name: str | None = None,
+    request_model: str | None = None,
 ) -> dict[str, Any] | None:
     """Record one AG2 response usage event using configured global context.
 
     Args:
         response: OpenAI-compatible response returned by AG2.
         agent_name: Optional agent name for attribution.
+        request_model: The litellm-qualified model name the request was made with.
 
     Returns:
         The recorded event dictionary, or ``None`` if tracking is disabled or
@@ -372,6 +386,7 @@ def record_ag2_response_usage(
         response,
         source="ag2",
         component=component,
+        request_model=request_model,
         agent_name=agent_name,
         node_id=node_id,
     )
@@ -406,6 +421,18 @@ def _accumulate(target: dict[str, Any], event: dict[str, Any], key: str | None =
     bucket["total_tokens"] += total
     bucket["reasoning_tokens"] += reasoning
 
+    cost = event.get("cost")
+    if not isinstance(cost, dict):
+        return
+    # Counted separately from ``calls`` so a consumer can tell "these calls cost
+    # nothing" from "nobody knows what these calls cost" -- the two are only
+    # distinguishable at this granularity, and a bucket may hold both.
+    bucket["calls_with_cost"] += 1
+    bucket["cost_usd"] += float(cost.get("total_usd") or 0.0)
+    bucket["prompt_cost_usd"] += float(cost.get("prompt_usd") or 0.0)
+    bucket["completion_cost_usd"] += float(cost.get("completion_usd") or 0.0)
+    bucket["reasoning_cost_usd"] += float(cost.get("reasoning_usd") or 0.0)
+
 
 def _empty_bucket() -> dict[str, Any]:
     """Return an empty aggregate bucket."""
@@ -415,7 +442,73 @@ def _empty_bucket() -> dict[str, Any]:
         "completion_tokens": 0,
         "total_tokens": 0,
         "reasoning_tokens": 0,
+        "calls_with_cost": 0,
+        "cost_usd": 0.0,
+        "prompt_cost_usd": 0.0,
+        "completion_cost_usd": 0.0,
+        "reasoning_cost_usd": 0.0,
     }
+
+
+def _normalize_cost(cost: dict[str, float] | None) -> dict[str, float] | None:
+    """Coerce a cost breakdown into JSON-safe floats, or None if unusable."""
+    if not isinstance(cost, dict):
+        return None
+    normalized: dict[str, float] = {}
+    for key in ("total_usd", "prompt_usd", "completion_usd", "reasoning_usd"):
+        if cost.get(key) is None:
+            continue
+        try:
+            normalized[key] = round(float(cost[key]), 12)
+        except (TypeError, ValueError):
+            continue
+    return normalized if "total_usd" in normalized else None
+
+
+def _response_cost(response: Any, request_model: str | None) -> dict[str, float] | None:
+    """Price one response via litellm, or None when it cannot be priced."""
+    if not request_model:
+        return None
+    # Imported here rather than at module scope: this module is also loaded by
+    # the code-executor sandbox, where paying litellm's import cost to track
+    # tokens would be wasted.
+    from autodiscovery import llm
+
+    try:
+        return llm.cost_of(response, request_model)
+    except Exception:
+        # Usage tracking is bookkeeping around a call that already succeeded.
+        # An unpriceable model reports an unavailable cost, it does not fail the run.
+        return None
+
+
+def _delta_cost(
+    model_usage: dict[str, Any],
+    previous_usage: dict[str, Any],
+) -> dict[str, float] | None:
+    """Get the cost delta between two AG2 per-model usage summaries.
+
+    AG2 records the per-call cost :meth:`LiteLLMAG2Client.get_usage` hands it,
+    which is litellm's own figure, but only as a running total -- so this yields
+    a total with no prompt/completion split, unlike the per-response path.
+
+    Args:
+        model_usage: The later AG2 usage summary for one model.
+        previous_usage: The earlier summary for the same model.
+
+    Returns:
+        ``{"total_usd": delta}``, or None when the cost is unavailable.
+    """
+    if model_usage.get("cost") is None:
+        return None
+    try:
+        delta = float(model_usage["cost"]) - float(previous_usage.get("cost") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    # A priced call always costs something, and this only runs for a window that
+    # did consume tokens -- so a zero delta means the model is unpriced (AG2's
+    # interface forced it to zero) rather than that the calls were free.
+    return {"total_usd": delta} if delta > 0 else None
 
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""

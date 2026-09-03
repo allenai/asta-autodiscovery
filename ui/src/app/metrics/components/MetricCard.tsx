@@ -6,11 +6,12 @@ interface MetricCardProps {
     value: string | number;
     label: string;
     subValue?: string;
+    title?: string;
 }
 
-export default function MetricCard({ value, label, subValue }: MetricCardProps) {
+export default function MetricCard({ value, label, subValue, title }: MetricCardProps) {
     return (
-        <Card>
+        <Card title={title}>
             <Value>{value}</Value>
             <Label>{label}</Label>
             {subValue && <SubValue>{subValue}</SubValue>}

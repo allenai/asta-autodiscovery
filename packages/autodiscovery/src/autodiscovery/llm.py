@@ -336,6 +336,120 @@ def validate(
         )
 
 
+def reported_cost(response: Any) -> float | None:
+    """Return the cost litellm computed for a response, if it computed one.
+
+    This is the only place ``_hidden_params`` is read. litellm sets
+    ``response_cost`` on every response it returns, derived from its own
+    maintained per-model prices.
+
+    Args:
+        response: A litellm response object.
+
+    Returns:
+        The cost in USD, or None when litellm did not price the call.
+    """
+    hidden = getattr(response, "_hidden_params", None)
+    if not isinstance(hidden, dict):
+        return None
+    try:
+        cost = hidden.get("response_cost")
+        return None if cost is None else float(cost)
+    except (TypeError, ValueError):
+        return None
+
+
+def cost_of(response: Any, model: str) -> dict[str, float] | None:
+    """Return litellm's cost for one response, split by token type.
+
+    litellm computes the cost of every call it makes and hangs it on the
+    response as ``_hidden_params["response_cost"]``; that figure is
+    authoritative here and is never recomputed. The prompt/completion split is
+    not on the response, so it comes from ``litellm.cost_per_token`` and is then
+    scaled onto the authoritative total -- ``response_cost`` also covers cache
+    reads, image input and built-in tools, which a plain prompt/completion split
+    does not, so the two disagree on some calls and the total is the one to keep.
+
+    None means the cost is *unknown*, which is the honest answer for a model
+    litellm has no prices for and is not the same as a cost of zero. Two cases
+    reach it: a model litellm has not mapped yet, which preview models routinely
+    are, and a provider that does not bill per token at all -- ``github_copilot``
+    bills "premium requests", and litellm reports every one of its models at a
+    zero token price, so a per-token figure for it would be fiction.
+
+    Args:
+        response: A litellm ``ModelResponse`` or ``EmbeddingResponse``.
+        model: The litellm-qualified model name the request was made with.
+
+    Returns:
+        Mapping with ``total_usd`` and, when the split is derivable,
+        ``prompt_usd``, ``completion_usd`` and ``reasoning_usd`` -- which sum to
+        ``total_usd``. None when the model cannot be priced.
+    """
+    total = reported_cost(response)
+    usage = getattr(response, "usage", None)
+    prompt_tokens = _usage_int(usage, "prompt_tokens")
+    completion_tokens = _usage_int(usage, "completion_tokens")
+    # Reasoning tokens are a subset of completion_tokens in the OpenAI usage
+    # shape litellm normalizes to, not an addition to them.
+    reasoning_tokens = min(
+        completion_tokens,
+        _usage_int(_usage_get(usage, "completion_tokens_details"), "reasoning_tokens"),
+    )
+
+    try:
+        prompt_usd, completion_usd = _configure().cost_per_token(
+            model=model.split("/", 1)[1],
+            custom_llm_provider=provider_of(model),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+    except Exception:
+        # litellm has not mapped the model, so it has no prices for it.
+        return None
+    split_total = float(prompt_usd) + float(completion_usd)
+    if total is None:
+        total = split_total
+
+    if total <= 0:
+        # A priced call over a non-empty prompt always costs something, so zero
+        # here means an unpriced model rather than a free one.
+        return None if prompt_tokens + completion_tokens > 0 else {"total_usd": 0.0}
+    if split_total <= 0:
+        return {"total_usd": total}
+
+    scale = total / split_total
+    prompt_usd = float(prompt_usd) * scale
+    completion_usd = float(completion_usd) * scale
+    # Reasoning tokens bill at the output rate, so reporting them separately is
+    # a share of the completion cost rather than a price of their own.
+    reasoning_usd = (
+        completion_usd * (reasoning_tokens / completion_tokens) if completion_tokens else 0.0
+    )
+    return {
+        "total_usd": total,
+        "prompt_usd": prompt_usd,
+        "completion_usd": completion_usd - reasoning_usd,
+        "reasoning_usd": reasoning_usd,
+    }
+
+
+def _usage_get(usage: Any, key: str) -> Any:
+    """Read a field off a usage payload, dict-like or object-like."""
+    if isinstance(usage, dict):
+        return usage.get(key)
+    return getattr(usage, key, None)
+
+
+def _usage_int(usage: Any, key: str) -> int:
+    """Read a non-negative token count off a usage payload, dict-like or not."""
+    value = _usage_get(usage, key)
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _provider_kwargs(model: str) -> dict[str, Any]:
     """Return provider-scoped kwargs for a litellm call."""
     if provider_of(model) != VERTEX_AI:

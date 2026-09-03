@@ -14,6 +14,9 @@ import DailyEnvelopeCharts from './components/DailyEnvelopeCharts';
 
 const WARMING_UP_POLL_MS = 5000;
 
+const missingCostNote = (n: number) =>
+    n > 0 ? `excludes ${n} run${n === 1 ? '' : 's'} with no recorded cost` : undefined;
+
 export default function MetricsOverviewPage() {
     const [data, setData] = useState<OverviewMetrics | null>(null);
     const [loading, setLoading] = useState(true);
@@ -162,7 +165,11 @@ export default function MetricsOverviewPage() {
                     </Button>
                 </SubsectionHeader>
                 <CardGrid>
-                    <MetricCard value={fmtCost(data.llm_cost_usd)} label="Total LLM Cost" />
+                    <MetricCard
+                        value={fmtCost(data.llm_cost_usd)}
+                        label="Total LLM Cost"
+                        subValue={missingCostNote(data.runs_missing_cost)}
+                    />
                     <MetricCard
                         value={
                             data.cost_per_hypothesis_usd != null

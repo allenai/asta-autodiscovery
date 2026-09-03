@@ -9,6 +9,9 @@ import { scrollbarStyles } from '@/utils/scrollbar';
 
 type SortKey = keyof UserMetricsSummary;
 
+const missingCostTitle = (n: number) =>
+    `Excludes ${n} run${n === 1 ? '' : 's'} with no recorded cost`;
+
 interface UsersTableProps {
     users: UserMetricsSummary[];
 }
@@ -87,9 +90,18 @@ export default function UsersTable({ users }: UsersTableProps) {
                             {columns.map((col) => {
                                 const raw = user[col.key];
                                 const formatted = col.format ? col.format(raw) : String(raw ?? '-');
+                                // The cost only covers runs that recorded one, so flag the rest.
+                                const costCaveat =
+                                    col.key === 'llm_cost_usd' && user.runs_missing_cost > 0
+                                        ? missingCostTitle(user.runs_missing_cost)
+                                        : undefined;
                                 return (
-                                    <Td key={col.key} $align={col.align || 'right'}>
+                                    <Td
+                                        key={col.key}
+                                        $align={col.align || 'right'}
+                                        title={costCaveat}>
                                         {formatted}
+                                        {costCaveat && <CaveatMark>*</CaveatMark>}
                                     </Td>
                                 );
                             })}
@@ -153,6 +165,11 @@ const Td = styled('td')<{ $align?: string }>`
     border-bottom: 1px solid
         ${({ theme }) => theme.color['cream-4']?.rgba?.toString() || 'rgba(255,255,255,0.04)'};
     color: ${({ theme }) => theme.color['cream-80']?.rgba?.toString() || 'rgba(255,255,255,0.8)'};
+`;
+
+const CaveatMark = styled('span')`
+    margin-left: 3px;
+    color: ${({ theme }) => theme.color['cream-40']?.rgba?.toString() || 'rgba(255,255,255,0.4)'};
 `;
 
 const ClickableRow = styled('tr')`

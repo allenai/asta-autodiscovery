@@ -659,6 +659,7 @@ def run_mcts(
                                 total_tokens=usage_entry.get("total_tokens"),
                                 agent_name=usage_entry.get("agent_name", "code_executor"),
                                 node_id=node.id,
+                                cost=usage_entry.get("cost"),
                             )
                         node.code_output = cleaned_output
                     rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])

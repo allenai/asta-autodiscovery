@@ -28,13 +28,15 @@ Example usage:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
+from time import monotonic
 from typing import Any, NamedTuple
 
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import (
     count_experiment_results,
     get_job_args,
-    get_metadata,
+    get_metadata_or_none,
     list_user_jobs,
 )
 from autodiscovery_jobs.run_details import get_run_details
@@ -47,6 +49,14 @@ DEFAULT_CREDITS_GRANTED = 500
 
 # Max number of experiments that can run in a single job
 DEFAULT_EXPERIMENT_LIMIT = 500
+
+# The credits display is polled frequently by every open browser tab. Keep this
+# deliberately short so the UI remains current while repeated reads share one
+# GCS aggregation. Credit checks before run submission bypass this cache.
+CREDITS_CACHE_TTL_SECONDS = 5.0
+
+# Cap on distinct (user, config) entries kept per worker process.
+CREDITS_CACHE_MAX_ENTRIES = 512
 
 
 class JobStats(NamedTuple):
@@ -174,7 +184,7 @@ def get_job_stats(userid: str, jobid: str, config: JobConfig | None = None) -> J
     """
     config = config or JobConfig()
 
-    metadata = get_metadata(userid=userid, jobid=jobid, config=config)
+    metadata = get_metadata_or_none(userid=userid, jobid=jobid, config=config)
     if metadata is None:
         return None
 
@@ -292,6 +302,34 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
         pending=total_pending,
         available=available,
     )
+
+
+@lru_cache(maxsize=CREDITS_CACHE_MAX_ENTRIES)
+def _aggregate_user_credits(userid: str, config: JobConfig, _ttl_bucket: int) -> UserCredits:
+    """Cache key holder for :func:`get_cached_user_credits`.
+
+    ``JobConfig`` is a frozen dataclass, so it is hashable and usable as part of
+    the cache key directly; ``_ttl_bucket`` changes every
+    ``CREDITS_CACHE_TTL_SECONDS`` so entries age out.
+
+    There is deliberately no in-flight lock around the miss: ``start.sh`` runs
+    gunicorn sync workers with no ``--threads``, so a process handles one
+    request at a time and has nothing to coalesce. Concurrency here is between
+    the 10 worker processes, which no in-process lock can serialise. Revisit if
+    the server ever moves to threaded or async workers.
+    """
+    return get_user_credits(userid=userid, config=config)
+
+
+def get_cached_user_credits(userid: str, config: JobConfig | None = None) -> UserCredits:
+    """Return a short-lived, per-user cached credits summary.
+
+    Callers that enforce credit limits must use :func:`get_user_credits`
+    directly so authorization always uses fresh data.
+    """
+    config = config or JobConfig()
+    ttl_bucket = int(monotonic() // CREDITS_CACHE_TTL_SECONDS)
+    return _aggregate_user_credits(userid, config, ttl_bucket)
 
 
 def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | None = None) -> bool:

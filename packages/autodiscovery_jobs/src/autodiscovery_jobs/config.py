@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 # How many days uploaded datasets are retained before the cleanup cron deletes
 # them from GCS.  Both the cleanup script and the API's expiry estimate read
@@ -11,9 +11,14 @@ from dataclasses import dataclass
 DATASET_EXPIRY_DAYS: int = 7
 
 
-@dataclass
+@dataclass(frozen=True)
 class JobConfig:
-    """Configuration for Cloud Run job management."""
+    """Configuration for Cloud Run job management.
+
+    Frozen so instances are hashable and can be used directly as cache keys
+    (see ``api/utils/credits.py``); use :func:`dataclasses.replace` to derive a
+    modified copy.
+    """
 
     # GCS Configuration
     bucket: str = "autodiscovery"
@@ -70,9 +75,6 @@ class JobConfig:
             modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
         )
 
-        # Apply overrides
-        for key, value in overrides.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
-
-        return config
+        # Apply overrides (unknown keys are ignored)
+        known = {key: value for key, value in overrides.items() if hasattr(config, key)}
+        return replace(config, **known) if known else config

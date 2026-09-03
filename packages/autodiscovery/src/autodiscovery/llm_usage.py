@@ -510,6 +510,7 @@ def _delta_cost(
     # interface forced it to zero) rather than that the calls were free.
     return {"total_usd": delta} if delta > 0 else None
 
+
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""
     usage_obj = getattr(response, "usage", None)

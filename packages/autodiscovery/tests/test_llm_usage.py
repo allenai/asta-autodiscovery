@@ -305,3 +305,213 @@ def test_query_llm_keeps_minimal_reasoning_effort_for_gpt5(transport) -> None:
     )
 
     assert transport.calls[0]["reasoning_effort"] == "minimal"
+
+
+# --- cost recording --------------------------------------------------------
+
+
+class _FakePricedResponse:
+    """Stand-in for a litellm response, which carries its cost in _hidden_params."""
+
+    def __init__(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        response_cost: float,
+    ):
+        self.model = model
+        self.usage = _FakeUsage(prompt_tokens, completion_tokens, prompt_tokens + completion_tokens)
+        self._hidden_params = {"response_cost": response_cost}
+
+
+def _cost_fields(bucket: dict) -> dict:
+    return {key: bucket[key] for key in bucket if key.endswith("_usd") or key == "calls_with_cost"}
+
+
+def test_record_event_aggregates_cost_into_every_breakdown() -> None:
+    """A recorded cost lands in totals and in each keyed breakdown alike."""
+    tracker = UsageTracker()
+    tracker.record_event(
+        source="openai",
+        component="belief.main.prior",
+        model="openai/o4-mini",
+        prompt_tokens=1000,
+        completion_tokens=500,
+        agent_name="belief_agent",
+        node_id="node_2_0",
+        cost={
+            "total_usd": 0.0022,
+            "prompt_usd": 0.0011,
+            "completion_usd": 0.0004,
+            "reasoning_usd": 0.0007,
+        },
+    )
+
+    summary = tracker.get_summary()
+    expected = {
+        "calls_with_cost": 1,
+        "cost_usd": 0.0022,
+        "prompt_cost_usd": 0.0011,
+        "completion_cost_usd": 0.0004,
+        "reasoning_cost_usd": 0.0007,
+    }
+    assert _cost_fields(summary["totals"]) == expected
+    assert _cost_fields(summary["by_model"]["openai/o4-mini"]) == expected
+    assert _cost_fields(summary["by_agent"]["belief_agent"]) == expected
+    assert _cost_fields(summary["by_node"]["node_2_0"]) == expected
+    assert _cost_fields(summary["by_component"]["belief.main.prior"]) == expected
+
+
+def test_record_event_sums_costs_across_calls() -> None:
+    tracker = UsageTracker()
+    for total, prompt in ((0.25, 0.10), (0.75, 0.30)):
+        tracker.record_event(
+            source="openai",
+            component="belief.main.prior",
+            model="openai/gpt-4o",
+            prompt_tokens=10,
+            completion_tokens=2,
+            agent_name="belief_agent",
+            cost={"total_usd": total, "prompt_usd": prompt, "completion_usd": total - prompt},
+        )
+
+    totals = tracker.get_summary()["totals"]
+    assert totals["calls"] == 2
+    assert totals["calls_with_cost"] == 2
+    assert totals["cost_usd"] == 1.0
+    assert totals["prompt_cost_usd"] == pytest.approx(0.4)
+    assert totals["completion_cost_usd"] == pytest.approx(0.6)
+
+
+def test_uncosted_calls_are_counted_but_priced_at_nothing() -> None:
+    """calls_with_cost is what separates "these were free" from "nobody knows"."""
+    tracker = UsageTracker()
+    tracker.record_event(
+        source="openai",
+        component="belief.main.prior",
+        model="github_copilot/gpt-4o",
+        prompt_tokens=10,
+        completion_tokens=2,
+    )
+
+    totals = tracker.get_summary()["totals"]
+    assert totals["calls"] == 1
+    assert totals["calls_with_cost"] == 0
+    assert totals["cost_usd"] == 0.0
+    assert totals["prompt_cost_usd"] == 0.0
+    assert totals["completion_cost_usd"] == 0.0
+    assert totals["reasoning_cost_usd"] == 0.0
+    assert tracker._events[0]["cost"] is None
+
+
+def test_a_bucket_may_mix_costed_and_uncosted_calls() -> None:
+    """A partially-priced bucket reports its total as a lower bound, not a gap."""
+    tracker = UsageTracker()
+    tracker.record_event(
+        source="openai",
+        component="belief.main.prior",
+        model="openai/gpt-4o",
+        prompt_tokens=10,
+        completion_tokens=2,
+        cost={"total_usd": 0.25},
+    )
+    tracker.record_event(
+        source="openai",
+        component="belief.main.prior",
+        model="openai/gpt-4o",
+        prompt_tokens=10,
+        completion_tokens=2,
+    )
+
+    bucket = tracker.get_summary()["by_component"]["belief.main.prior"]
+    assert bucket["calls"] == 2
+    assert bucket["calls_with_cost"] == 1
+    assert bucket["cost_usd"] == 0.25
+
+
+def test_record_response_prices_the_call_when_given_the_request_model() -> None:
+    """A response reports a bare model name; pricing it needs the provider too."""
+    tracker = UsageTracker()
+    tracker.record_response(
+        _FakePricedResponse(
+            "gpt-4o", prompt_tokens=1000, completion_tokens=500, response_cost=0.0075
+        ),
+        source="openai",
+        component="belief.main.prior",
+        request_model="openai/gpt-4o",
+    )
+
+    cost = tracker._events[0]["cost"]
+    assert cost["total_usd"] == 0.0075
+    assert cost["prompt_usd"] + cost["completion_usd"] + cost["reasoning_usd"] == pytest.approx(
+        0.0075, rel=1e-9
+    )
+    totals = tracker.get_summary()["totals"]
+    assert totals["cost_usd"] == 0.0075
+    assert totals["calls_with_cost"] == 1
+
+
+def test_record_response_without_a_request_model_records_no_cost() -> None:
+    tracker = UsageTracker()
+    tracker.record_response(
+        _FakePricedResponse(
+            "gpt-4o", prompt_tokens=1000, completion_tokens=500, response_cost=0.0075
+        ),
+        source="openai",
+        component="belief.main.prior",
+    )
+
+    assert tracker._events[0]["cost"] is None
+    totals = tracker.get_summary()["totals"]
+    assert totals["calls"] == 1
+    assert totals["calls_with_cost"] == 0
+    assert totals["cost_usd"] == 0.0
+
+
+def _ag2_snapshot(cost: float | None, prompt: int, completion: int) -> dict:
+    return {
+        "experiment_generator": {
+            "total_cost": cost,
+            "gpt-4o": {
+                "cost": cost,
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "total_tokens": prompt + completion,
+            },
+        }
+    }
+
+
+def test_agent_usage_deltas_carry_the_ag2_cost_delta_as_a_total() -> None:
+    """AG2 only keeps a running total, so the delta has no prompt/completion split."""
+    tracker = UsageTracker()
+    tracker.record_agent_usage_deltas(
+        _ag2_snapshot(1.0, 10, 5),
+        _ag2_snapshot(1.5, 30, 15),
+        node_id="node_3_1",
+    )
+
+    assert tracker._events[0]["cost"] == {"total_usd": 0.5}
+    totals = tracker.get_node_summary("node_3_1")["totals"]
+    assert totals["calls_with_cost"] == 1
+    assert totals["cost_usd"] == 0.5
+    assert totals["prompt_cost_usd"] == 0.0
+    assert totals["completion_cost_usd"] == 0.0
+
+
+def test_agent_usage_deltas_report_a_zero_cost_delta_as_unavailable() -> None:
+    """AG2's interface forces an unpriced model to 0.0; real tokens cost something."""
+    tracker = UsageTracker()
+    tracker.record_agent_usage_deltas(
+        _ag2_snapshot(0.0, 10, 5),
+        _ag2_snapshot(0.0, 30, 15),
+        node_id="node_3_1",
+    )
+
+    assert tracker._events[0]["cost"] is None
+    totals = tracker.get_node_summary("node_3_1")["totals"]
+    assert totals["calls"] == 1
+    assert totals["prompt_tokens"] == 20
+    assert totals["calls_with_cost"] == 0
+    assert totals["cost_usd"] == 0.0

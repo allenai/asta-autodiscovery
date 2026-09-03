@@ -384,7 +384,7 @@ def cost_of(response: Any, model: str) -> dict[str, float] | None:
     Returns:
         Mapping with ``total_usd`` and, when the split is derivable,
         ``prompt_usd``, ``completion_usd`` and ``reasoning_usd`` -- which sum to
-        ``total_usd``. None when the model cannot be priced.
+        ``total_usd`` up to float precision. None when the model cannot be priced.
     """
     total = reported_cost(response)
     usage = getattr(response, "usage", None)

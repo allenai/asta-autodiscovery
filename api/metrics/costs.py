@@ -1,71 +1,88 @@
-"""LLM cost calculation for metrics dashboard."""
+"""LLM cost reporting for the metrics dashboard.
+
+Cost is computed where the calls are made, not here. litellm prices every call
+from its own maintained per-model rate table and the run's ``UsageTracker``
+records that number on each event, so this module only sums recorded dollars.
+There is deliberately no price table and no fallback rate: a call litellm could
+not price is reported as unavailable rather than approximated, and litellm is
+not a dependency of this service.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
-
-# Pricing per 1M tokens (USD) — Vertex AI standard pricing
-# Source: https://cloud.google.com/vertex-ai/generative-ai/pricing
-LLM_PRICING: dict[str, dict[str, float]] = {
-    # Google Gemini models
-    "gemini-3.7-flash": {"input": 0.75, "output": 3.75},
-    "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00},
-    "gemini-3-pro-preview": {"input": 2.00, "output": 12.00},
-    "gemini-3-flash-preview": {"input": 0.50, "output": 3.00},
-    "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
-    "gemini-2.5-pro-preview-05-06": {"input": 1.25, "output": 10.00},
-    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
-    "gemini-2.5-flash-preview-04-17": {"input": 0.30, "output": 2.50},
-    "gemini-2.0-flash": {"input": 0.15, "output": 0.60},
-    "gemini-2.0-flash-001": {"input": 0.15, "output": 0.60},
-    # OpenAI models
-    "gpt-4o": {"input": 2.50, "output": 10.00},
-    "gpt-4o-2024-08-06": {"input": 2.50, "output": 10.00},
-    "gpt-5-mini": {"input": 0.40, "output": 1.60},
-    "o4-mini": {"input": 1.10, "output": 4.40},
-    "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
-    "o3-mini": {"input": 1.10, "output": 4.40},
-}
-
-# Fallback pricing for unknown models (conservative: uses gemini-3.1-pro rates)
-_FALLBACK_PRICING = {"input": 2.00, "output": 12.00}
+from typing import Any
 
 
-def _lookup_pricing(model_name: str) -> dict[str, float]:
-    """Look up pricing for a model name, stripping provider prefixes."""
-    if model_name in LLM_PRICING:
-        return LLM_PRICING[model_name]
+def _coerce_float(value: Any) -> float:
+    """Parse a value into a non-negative float, returning 0.0 on invalid input."""
+    try:
+        return max(0.0, float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
 
-    # Strip provider prefix (e.g., "google/gemini-3.1-pro-preview" -> "gemini-3.1-pro-preview")
-    stripped = model_name.split("/")[-1] if "/" in model_name else model_name
-    if stripped in LLM_PRICING:
-        return LLM_PRICING[stripped]
 
-    return _FALLBACK_PRICING
+def bucket_costs_by_type(bucket: Any) -> tuple[float, float, float]:
+    """Return the recorded prompt/completion/reasoning costs for one bucket.
+
+    Args:
+        bucket: A ``by_model``/``by_agent``/... bucket from a usage summary.
+
+    Returns:
+        Tuple of (prompt_cost_usd, completion_cost_usd, reasoning_cost_usd).
+        All zero for runs recorded before costs were tracked at the source.
+    """
+    if not isinstance(bucket, dict):
+        return 0.0, 0.0, 0.0
+    return (
+        _coerce_float(bucket.get("prompt_cost_usd")),
+        _coerce_float(bucket.get("completion_cost_usd")),
+        _coerce_float(bucket.get("reasoning_cost_usd")),
+    )
+
+
+def has_cost_data(usage_summary: dict | None) -> bool:
+    """Whether a usage summary carries costs recorded at the source.
+
+    Runs completed before cost recording landed have usage summaries with no
+    cost fields at all. Their cost is unknown, not zero, and the dashboard
+    reports it as unavailable rather than mixing two costing methods.
+
+    Args:
+        usage_summary: The ``llm_usage_summary.json`` data, if any.
+
+    Returns:
+        True when at least one call in the summary was priced.
+    """
+    if not usage_summary:
+        return False
+    totals = usage_summary.get("totals")
+    if isinstance(totals, dict) and "calls_with_cost" in totals:
+        return int(totals.get("calls_with_cost") or 0) > 0
+    # Summaries predating cost recording carry no cost fields whatsoever.
+    return any(
+        isinstance(bucket, dict) and "cost_usd" in bucket
+        for bucket in (usage_summary.get("by_model") or {}).values()
+    )
 
 
 def calculate_llm_cost(usage_summary: dict) -> tuple[float, dict[str, float]]:
-    """Calculate LLM cost from a usage summary.
+    """Sum the recorded LLM cost of a run.
 
     Args:
         usage_summary: The llm_usage_summary.json data with by_model breakdown.
 
     Returns:
-        Tuple of (total_cost_usd, {model_name: cost_usd}).
+        Tuple of (total_cost_usd, {model_name: cost_usd}). Both are zero/empty
+        for runs with no recorded cost -- use :func:`has_cost_data` to tell that
+        apart from a run that genuinely cost nothing.
     """
     by_model = usage_summary.get("by_model", {})
     total_cost = 0.0
     cost_by_model: dict[str, float] = {}
 
     for model_name, usage in by_model.items():
-        pricing = _lookup_pricing(model_name)
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        total_tokens = usage.get("total_tokens", 0)
-        # Use total - prompt to capture all output tokens including reasoning
-        output_tokens = max(0, total_tokens - prompt_tokens)
-        input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
-        output_cost = (output_tokens / 1_000_000) * pricing["output"]
-        model_cost = input_cost + output_cost
+        model_cost = _coerce_float(usage.get("cost_usd")) if isinstance(usage, dict) else 0.0
         cost_by_model[model_name] = round(model_cost, 6)
         total_cost += model_cost
 

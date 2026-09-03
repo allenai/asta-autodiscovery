@@ -125,6 +125,7 @@ class UsageTracker:
         node_id: str | None = None,
         metadata: dict[str, Any] | None = None,
         usage: Any | None = None,
+        cost_usd: float | None = None,
     ) -> dict[str, Any]:
         """Record one token-usage event.
 
@@ -139,6 +140,8 @@ class UsageTracker:
             node_id: Optional node identifier.
             metadata: Optional metadata map.
             usage: Optional raw provider usage payload in standardized response form.
+            cost_usd: Cost litellm computed for the call, or None when the call
+                could not be priced. None is recorded as unknown, not as zero.
 
         Returns:
             The recorded event dictionary.
@@ -163,6 +166,12 @@ class UsageTracker:
             total_tokens=total,
         )
         event["usage"] = usage_payload
+        event["cost"] = _build_cost_payload(
+            model=model,
+            cost_usd=cost_usd,
+            prompt_tokens=prompt,
+            output_tokens=max(0, total - prompt),
+        )
         with self._lock:
             self._events.append(event)
         return event
@@ -204,6 +213,7 @@ class UsageTracker:
             node_id=node_id,
             metadata=dict(metadata or {}),
             usage=usage.get("usage"),
+            cost_usd=usage.get("cost_usd"),
         )
 
     def record_agent_usage_deltas(
@@ -242,6 +252,15 @@ class UsageTracker:
                 )
                 if prompt == 0 and completion == 0 and total == 0:
                     continue
+                # AG2 accumulates the cost LiteLLMAG2Client.get_usage reports,
+                # so the delta carries litellm's own number in this mode too.
+                cost_usd = None
+                if model_usage.get("cost") is not None:
+                    cost_usd = max(
+                        0.0,
+                        _coerce_float(model_usage.get("cost"))
+                        - _coerce_float(prev_usage.get("cost")),
+                    )
                 self.record_event(
                     source="ag2",
                     component=component,
@@ -251,6 +270,7 @@ class UsageTracker:
                     total_tokens=total,
                     agent_name=agent_name,
                     node_id=node_id,
+                    cost_usd=cost_usd,
                 )
 
     def get_node_summary(self, node_id: str) -> dict[str, Any]:
@@ -405,16 +425,58 @@ def _accumulate(target: dict[str, Any], event: dict[str, Any], key: str | None =
     bucket["completion_tokens"] += completion
     bucket["total_tokens"] += total
     bucket["reasoning_tokens"] += reasoning
+    _accumulate_cost(bucket, event, completion=completion, reasoning=reasoning)
+
+
+def _accumulate_cost(
+    bucket: dict[str, Any],
+    event: dict[str, Any],
+    *,
+    completion: int,
+    reasoning: int,
+) -> None:
+    """Accumulate one event's litellm-computed cost into an aggregate bucket."""
+    cost = event.get("cost")
+    if not isinstance(cost, dict):
+        # Unpriced call. Counting it in ``calls`` but not in ``calls_with_cost``
+        # is what lets a consumer tell a partially-priced bucket from a fully
+        # priced one instead of reading the gap as zero dollars.
+        return
+
+    total_usd = _coerce_float(cost.get("total_usd"))
+    prompt_usd = _coerce_float(cost.get("prompt_usd"))
+    output_usd = _coerce_float(cost.get("output_usd"))
+
+    # litellm prices output as one number; the dashboard shows completion and
+    # reasoning separately, so attribute the output share by token count.
+    output_tokens = completion + reasoning
+    if output_tokens > 0:
+        completion_usd = output_usd * (completion / output_tokens)
+        reasoning_usd = output_usd - completion_usd
+    else:
+        completion_usd = output_usd
+        reasoning_usd = 0.0
+
+    bucket["calls_with_cost"] += 1
+    bucket["cost_usd"] += total_usd
+    bucket["prompt_cost_usd"] += prompt_usd
+    bucket["completion_cost_usd"] += completion_usd
+    bucket["reasoning_cost_usd"] += reasoning_usd
 
 
 def _empty_bucket() -> dict[str, Any]:
     """Return an empty aggregate bucket."""
     return {
         "calls": 0,
+        "calls_with_cost": 0,
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "total_tokens": 0,
         "reasoning_tokens": 0,
+        "cost_usd": 0.0,
+        "prompt_cost_usd": 0.0,
+        "completion_cost_usd": 0.0,
+        "reasoning_cost_usd": 0.0,
     }
 
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
@@ -434,12 +496,49 @@ def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     total_tokens = _coerce_int(_get_usage_value(usage_obj, "total_tokens"))
     usage_payload = _normalize_usage_payload(usage_obj)
 
+    from autodiscovery import llm
+
     return {
         "model": model,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "total_tokens": total_tokens,
         "usage": usage_payload,
+        "cost_usd": llm.response_cost(response),
+    }
+
+
+def _build_cost_payload(
+    *,
+    model: str | None,
+    cost_usd: float | None,
+    prompt_tokens: int,
+    output_tokens: int,
+) -> dict[str, Any] | None:
+    """Build the per-event cost payload from litellm's computed cost.
+
+    Args:
+        model: Model name the call reported.
+        cost_usd: Total cost litellm computed, or None when unpriced.
+        prompt_tokens: Prompt token count.
+        output_tokens: Output token count (completion plus reasoning).
+
+    Returns:
+        Cost payload with the total and its prompt/output attribution, or None
+        when the call could not be priced. None means unknown, not free -- the
+        dashboard reports cost as unavailable rather than as zero.
+    """
+    if cost_usd is None:
+        return None
+
+    from autodiscovery import llm
+
+    total = max(0.0, float(cost_usd))
+    prompt_usd, output_usd = llm.cost_split(model, total, prompt_tokens, output_tokens)
+    return {
+        "total_usd": total,
+        "prompt_usd": prompt_usd,
+        "output_usd": output_usd,
     }
 
 
@@ -567,6 +666,16 @@ def _coerce_int(value: Any) -> int:
         return max(0, int(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _coerce_float(value: Any) -> float:
+    """Convert a cost value to a non-negative float."""
+    if value is None:
+        return 0.0
+    try:
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _positive_delta(current: Any, previous: Any) -> int:

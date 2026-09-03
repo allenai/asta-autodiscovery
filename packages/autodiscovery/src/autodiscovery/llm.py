@@ -376,6 +376,88 @@ def complete(model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
     )
 
 
+def response_cost(response: Any) -> float | None:
+    """Return the USD cost litellm computed for a response.
+
+    litellm prices every call it makes from its own maintained per-model rate
+    table and stashes the result on the response. Reading it here is what lets
+    the rest of the codebase avoid keeping a price table of its own.
+
+    Args:
+        response: A litellm response object.
+
+    Returns:
+        The cost in USD, or None when litellm could not price the call (an
+        unmapped model, or a provider such as ``github_copilot`` that does not
+        bill per token). None means "unknown", not "free".
+    """
+    hidden = getattr(response, "_hidden_params", None)
+    if hidden is None and isinstance(response, dict):
+        hidden = response.get("_hidden_params")
+    if not isinstance(hidden, dict):
+        return None
+    cost = hidden.get("response_cost")
+    if cost is None:
+        return None
+    try:
+        value = float(cost)
+    except (TypeError, ValueError):
+        return None
+    return value if value >= 0 else None
+
+
+def cost_split(
+    model: str | None,
+    total_usd: float,
+    prompt_tokens: int,
+    output_tokens: int,
+) -> tuple[float, float]:
+    """Split a call's total cost into its prompt and output shares.
+
+    litellm reports one authoritative total per call. The dashboard breaks cost
+    down by token type, so the total is apportioned using litellm's own
+    per-token rates for the model and then rescaled to sum back to the total --
+    the split is an attribution, the total is never altered.
+
+    Args:
+        model: Model name as litellm reports it on the response.
+        total_usd: The authoritative total cost of the call.
+        prompt_tokens: Prompt token count.
+        output_tokens: Output token count (completion plus reasoning).
+
+    Returns:
+        Tuple of (prompt_usd, output_usd) summing to ``total_usd``.
+    """
+    if total_usd <= 0:
+        return 0.0, 0.0
+
+    prompt_weight = float(max(0, prompt_tokens))
+    output_weight = float(max(0, output_tokens))
+    info = _model_info_for_response(model)
+    if info:
+        prompt_weight *= float(info.get("input_cost_per_token") or 0.0)
+        output_weight *= float(info.get("output_cost_per_token") or 0.0)
+
+    weight_total = prompt_weight + output_weight
+    if weight_total <= 0:
+        return 0.0, total_usd
+
+    prompt_usd = total_usd * (prompt_weight / weight_total)
+    return prompt_usd, total_usd - prompt_usd
+
+
+def _model_info_for_response(model: str | None) -> dict[str, Any] | None:
+    """Look up registry pricing for a model name off a response, if possible."""
+    if not model:
+        return None
+    try:
+        return model_info(model)
+    except ModelError:
+        # Responses may carry a bare model name with no provider prefix. The
+        # token-count split is a fine fallback; erroring here is not.
+        return None
+
+
 def embed(model: str, inputs: list[str], **kwargs: Any) -> Any:
     """Compute embeddings.
 

@@ -83,6 +83,10 @@ class RunSummary(BaseModel):
     is_shared: bool = Field(False)
     model: str | None = None
     llm_cost_usd: float = Field(0.0)
+    llm_cost_available: bool = Field(
+        False,
+        description="False when the run predates source-recorded cost; cost is unknown, not zero.",
+    )
 
 
 class LLMUsageSummary(BaseModel):
@@ -108,6 +112,10 @@ class RunMetrics(BaseModel):
     duration_seconds: float | None = None
     llm_usage_summary: LLMUsageSummary | None = None
     llm_cost_usd: float = Field(0.0)
+    llm_cost_available: bool = Field(
+        False,
+        description="False when the run predates source-recorded cost; cost is unknown, not zero.",
+    )
     llm_cost_by_model: dict[str, float] = Field(default_factory=dict)
     n_experiments_requested: int = Field(0)
     n_experiments_completed: int = Field(0)

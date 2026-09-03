@@ -305,3 +305,103 @@ def test_query_llm_keeps_minimal_reasoning_effort_for_gpt5(transport) -> None:
     )
 
     assert transport.calls[0]["reasoning_effort"] == "minimal"
+
+
+class _CostedResponse:
+    """A litellm-shaped response carrying the cost litellm computed."""
+
+    def __init__(self, model: str, cost: float | None, **tokens: int):
+        self.model = model
+        self.usage = _FakeUsage(**tokens)
+        self._hidden_params = {} if cost is None else {"response_cost": cost}
+
+
+def test_usage_tracker_records_litellm_cost() -> None:
+    """litellm's own per-call cost is recorded and aggregated, not re-derived."""
+    tracker = UsageTracker()
+    tracker.record_response(
+        _CostedResponse(
+            "openai/gpt-4o",
+            0.5,
+            prompt_tokens=100,
+            completion_tokens=20,
+            total_tokens=120,
+        ),
+        source="openai",
+        component="belief.main.posterior",
+        agent_name="belief_agent",
+        node_id="node_2_3",
+    )
+
+    summary = tracker.get_summary()
+    totals = summary["totals"]
+    assert totals["calls_with_cost"] == 1
+    assert totals["cost_usd"] == pytest.approx(0.5)
+    # The prompt/output attribution always sums back to litellm's total.
+    assert totals["prompt_cost_usd"] + totals["completion_cost_usd"] + totals[
+        "reasoning_cost_usd"
+    ] == pytest.approx(0.5)
+    assert summary["by_model"]["openai/gpt-4o"]["cost_usd"] == pytest.approx(0.5)
+    assert summary["by_agent"]["belief_agent"]["cost_usd"] == pytest.approx(0.5)
+    assert summary["by_node"]["node_2_3"]["cost_usd"] == pytest.approx(0.5)
+
+
+def test_usage_tracker_leaves_unpriced_calls_uncosted() -> None:
+    """A call litellm cannot price is unknown, not free -- and is flagged as such."""
+    tracker = UsageTracker()
+    tracker.record_response(
+        _CostedResponse(
+            "github_copilot/gpt-4o",
+            None,
+            prompt_tokens=100,
+            completion_tokens=20,
+            total_tokens=120,
+        ),
+        source="github_copilot",
+        component="agents.chat",
+    )
+
+    summary = tracker.get_summary()
+    assert summary["totals"]["calls"] == 1
+    assert summary["totals"]["calls_with_cost"] == 0
+    assert summary["totals"]["cost_usd"] == 0.0
+    assert tracker._events[0]["cost"] is None
+
+
+def test_usage_tracker_splits_output_cost_across_reasoning() -> None:
+    """The output share of a call's cost is attributed by completion/reasoning tokens."""
+    tracker = UsageTracker()
+    tracker.record_response(
+        {
+            "model": "openai/o4-mini",
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 30,
+                "total_tokens": 120,
+                "completion_tokens_details": {"reasoning_tokens": 90},
+            },
+            "_hidden_params": {"response_cost": 1.0},
+        },
+        source="openai",
+        component="agents.chat",
+    )
+
+    totals = tracker.get_summary()["totals"]
+    assert totals["cost_usd"] == pytest.approx(1.0)
+    assert totals["prompt_cost_usd"] == pytest.approx(0.0)
+    assert totals["completion_cost_usd"] == pytest.approx(0.25)
+    assert totals["reasoning_cost_usd"] == pytest.approx(0.75)
+
+
+def test_usage_tracker_records_agent_usage_delta_cost() -> None:
+    """AG2 summary-delta mode carries litellm's cost through too."""
+    tracker = UsageTracker()
+    before = {"belief_agent": {"openai/gpt-4o": {"prompt_tokens": 10, "completion_tokens": 2,
+                                                 "total_tokens": 12, "cost": 0.1}}}
+    after = {"belief_agent": {"openai/gpt-4o": {"prompt_tokens": 30, "completion_tokens": 6,
+                                                "total_tokens": 36, "cost": 0.4}}}
+    tracker.record_agent_usage_deltas(before, after, node_id="node_3_1")
+
+    totals = tracker.get_summary()["totals"]
+    assert totals["calls_with_cost"] == 1
+    assert totals["cost_usd"] == pytest.approx(0.3)

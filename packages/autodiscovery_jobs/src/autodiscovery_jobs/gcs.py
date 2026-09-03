@@ -690,6 +690,28 @@ def upload_job_args(
         raise GCSError(f"Failed to save job args: {e}")
 
 
+def get_metadata_or_none(
+    userid: str, jobid: str, config: JobConfig | None = None
+) -> dict[str, Any] | None:
+    """Download metadata.json, returning ``None`` when it is absent.
+
+    This is the single-round-trip form for callers, such as credit
+    aggregation, where a job prefix without metadata is expected to be
+    skipped rather than distinguished from an entirely absent job.
+    """
+    config = config or JobConfig()
+    client = get_storage_client(config.project_id)
+    bucket = client.bucket(config.bucket)
+    blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
+
+    try:
+        return json.loads(bucket.blob(blob_path).download_as_text())
+    except NotFound:
+        return None
+    except Exception as e:
+        raise GCSError(f"Failed to download metadata: {e}") from e
+
+
 def get_metadata(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
     """Download and parse metadata.json from job directory.
 
@@ -707,27 +729,16 @@ def get_metadata(userid: str, jobid: str, config: JobConfig | None = None) -> di
     """
     config = config or JobConfig()
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
-
     # Download directly instead of pre-checking existence with a separate list
     # request. On a miss we fall back to job_exists() only to preserve the
     # historical exception contract (JobNotFoundError vs GCSError); the common
     # case where metadata.json exists costs a single round-trip.
-    try:
-        blob = bucket.blob(blob_path)
-        metadata_str = blob.download_as_text()
-        return json.loads(metadata_str)
-    except NotFound:
-        if not job_exists(userid, jobid, config):
-            raise JobNotFoundError(f"Job {jobid} not found for user {userid}") from None
-        raise GCSError(
-            f"Failed to download metadata: metadata.json not found for job {jobid}"
-        ) from None
-    except Exception as e:
-        raise GCSError(f"Failed to download metadata: {e}")
+    metadata = get_metadata_or_none(userid, jobid, config)
+    if metadata is not None:
+        return metadata
+    if not job_exists(userid, jobid, config):
+        raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
+    raise GCSError(f"Failed to download metadata: metadata.json not found for job {jobid}")
 
 
 def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:

@@ -31,8 +31,9 @@ docs = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["packages"]
+testpaths = ["packages", "api/tests"]
 pythonpath = [
+    "api",
     "packages/code_execution/src",
     "packages/agents/src",
     "packages/autodiscovery/src",

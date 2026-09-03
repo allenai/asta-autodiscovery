@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from autodiscovery_jobs import gcs
 from autodiscovery_jobs.exceptions import JobAlreadyExistsError, JobNotFoundError
+from google.cloud.exceptions import NotFound
 
 
 def test_parse_gcs_path():
@@ -69,6 +70,19 @@ def test_job_exists(mock_config, mock_storage_client):
     # Job doesn't exist
     bucket.list_blobs.return_value = iter([])
     assert gcs.job_exists("testuser", "job2", mock_config) is False
+
+
+def test_get_metadata_or_none_skips_existence_check_on_missing_metadata(
+    mock_config, mock_storage_client
+):
+    """Credit aggregation should spend one request on orphaned job prefixes."""
+    _, bucket = mock_storage_client
+    bucket.blob.return_value.download_as_text.side_effect = NotFound("missing")
+
+    with patch("autodiscovery_jobs.gcs.job_exists") as exists:
+        assert gcs.get_metadata_or_none("testuser", "orphan", mock_config) is None
+
+    exists.assert_not_called()
 
 
 def test_create_job_directory(mock_config, mock_storage_client):

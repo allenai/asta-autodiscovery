@@ -15,6 +15,10 @@ jobs:
     name: Build and publish to PyPI
     runs-on: ubuntu-latest
 
+    # Split from the release job below so neither token carries the other's
+    # authority. These steps run third-party code -- each package's build
+    # backend, and the publish action on a moving tag -- so this token must
+    # not be able to write to the repo.
     permissions:
       id-token: write  # Required for trusted publishing
       contents: read   # Required to checkout the repo
@@ -58,3 +62,35 @@ jobs:
           packages-dir: dist/asta-autodiscovery
           print-hash: true
 
+  # PyPI renders only the current long description, so a GitHub release is the
+  # only place per-version notes live and the only thing watchers can subscribe
+  # to. Gated on publish, so a release cannot appear for a version that never
+  # reached PyPI.
+  release:
+    name: Create GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+
+    # The only scope this job needs. No id-token, so it cannot reach PyPI.
+    permissions:
+      contents: write
+
+    steps:
+      # No checkout needed: gh works against the API given --repo, and the body
+      # links the tag's CHANGELOG.md rather than reading it off disk.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > release-notes.md <<EOF
+          Published to PyPI: [asta-autodiscovery ${VERSION#v}](https://pypi.org/project/asta-autodiscovery/${VERSION#v}/)
+
+          Release notes, including breaking changes: [CHANGELOG.md](https://github.com/$REPO/blob/$VERSION/CHANGELOG.md)
+          EOF
+          gh release create "$VERSION" \
+            --repo "$REPO" \
+            --title "$VERSION" \
+            --verify-tag \
+            --notes-file release-notes.md

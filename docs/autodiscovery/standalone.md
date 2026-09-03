@@ -177,3 +177,8 @@ Steps:
 
 3. **Trigger the workflow**: in GitHub Actions, run the *Publish to PyPI*
    workflow with the tag (e.g. `v1.1.7`) as the `version` input.
+
+   The workflow publishes the three packages and then creates the matching
+   GitHub release, pointing at the tag's `CHANGELOG.md`. Add the version's
+   changelog entry before releasing — that link is the only per-version notes
+   PyPI consumers get, since PyPI renders only the current long description.

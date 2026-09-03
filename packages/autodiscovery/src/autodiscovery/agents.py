@@ -3,18 +3,15 @@ import concurrent.futures
 import copy
 import json
 import os
+from typing import Any
 
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
 from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
 
-from autodiscovery.llm_retry import (
-    apply_openai_client_backoff_retry,
-    apply_openai_client_vertex_token_refresh,
-    call_with_backoff,
-)
-from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER, UsageTracker
+from autodiscovery import llm
+from autodiscovery.llm_usage import UsageTracker, record_ag2_response_usage
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -22,11 +19,7 @@ from autodiscovery.structured_outputs import (
     ExperimentHypothesisList,
     ExperimentList,
     ExperimentReviewer,
-    ImageAnalysis,
 )
-from autodiscovery.utils import get_vertex_access_token, is_gemini_model, normalize_vertex_model_name
-from autodiscovery.vertex_client import OpenAICredentialsRefresher
-from autodiscovery.vertex_config import get_vertex_openai_base_url
 
 IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the following:
 
@@ -95,9 +88,9 @@ class ModalSandboxExecutor(CodeExecutor):
     def __init__(
         self,
         backend,
+        *,
+        vision_model: str,
         timeout: int = 30 * 60,
-        vision_model: str = "gpt-4o",
-        llm_provider: str | None = None,
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
@@ -105,36 +98,14 @@ class ModalSandboxExecutor(CodeExecutor):
         Args:
             backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
             timeout: Timeout in seconds (for Autogen compatibility)
-            vision_model: Model to use for image analysis
-            llm_provider: LLM provider used for image analysis.
+            vision_model: Vision model, as litellm's ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
         """
         self._executor = backend
         self._timeout = timeout
         self.vision_model = vision_model
-        self.llm_provider = llm_provider
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
-
-    def _get_vision_client(self):
-        from openai import OpenAI
-
-        is_gemini = is_gemini_model(self.vision_model)
-        if is_gemini:
-            try:
-                base_url = get_vertex_openai_base_url()
-            except ValueError as exc:
-                return None, f"Image analysis skipped: {exc}"
-        else:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                return (
-                    None,
-                    f"Image analysis skipped: OPENAI_API_KEY is not set for {self.vision_model}.",
-                )
-        if is_gemini:
-            return OpenAICredentialsRefresher(base_url=base_url), None
-        return OpenAI(api_key=api_key), None
 
     def _analyze_image(self, image_data: str) -> str:
         """Analyze a base64-encoded image using the configured vision model.
@@ -145,56 +116,13 @@ class ModalSandboxExecutor(CodeExecutor):
         Returns:
             Analysis text
         """
-        if self.llm_provider == "copilot":
-            from autodiscovery.copilot_provider import get_copilot_runtime
-
-            completion = get_copilot_runtime().complete(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a research scientist responsible for analyzing plots and "
-                            "figures from experiments."
-                        ),
-                    },
-                    {"role": "user", "content": IMAGE_ANALYST_PROMPT},
-                ],
-                model=self.vision_model,
-                response_format=ImageAnalysis,
-                attachments=[
-                    {
-                        "type": "blob",
-                        "data": image_data,
-                        "mimeType": "image/png",
-                        "displayName": "experiment-plot.png",
-                    }
-                ],
-            )
-            if self._usage_tracker is not None:
-                self._usage_tracker.record_event(
-                    source="copilot",
-                    component="image_analysis.modal",
-                    model=completion.usage.model,
-                    prompt_tokens=completion.usage.input_tokens,
-                    completion_tokens=completion.usage.output_tokens,
-                    total_tokens=completion.usage.total_tokens,
-                    agent_name="code_executor",
-                    node_id=self._usage_node_id,
-                    metadata={
-                        "provider_cost": completion.usage.provider_cost,
-                        "reasoning_tokens": completion.usage.reasoning_tokens,
-                    },
-                )
-            return completion.content
-
-        client, error_msg = self._get_vision_client()
-        if client is None:
-            return error_msg
-
         messages = [
             {
                 "role": "system",
-                "content": "You are a research scientist responsible for analyzing plots and figures from running experiments and providing detailed descriptions.",
+                "content": (
+                    "You are a research scientist responsible for analyzing plots and figures "
+                    "from running experiments and providing detailed descriptions."
+                ),
             },
             {
                 "role": "user",
@@ -207,25 +135,20 @@ class ModalSandboxExecutor(CodeExecutor):
                 ],
             },
         ]
+        # Deliberately not caught here: execute_code_blocks already wraps this
+        # call and records "Failed to analyze image: ..." per figure, which is
+        # what main did. Swallowing it here would duplicate that handling and
+        # hide the failure behind a different message.
+        response = llm.complete(self.vision_model, messages)
 
-        response = call_with_backoff(
-            lambda: client.chat.completions.create(
-                model=normalize_vertex_model_name(self.vision_model)
-                if is_gemini_model(self.vision_model)
-                else self.vision_model,
-                messages=messages,
-            ),
-            label=f"vision_analysis(model={self.vision_model})",
-        )
         if self._usage_tracker is not None:
             self._usage_tracker.record_response(
                 response,
-                source="openai",
+                source=llm.provider_of(self.vision_model),
                 component="image_analysis.modal",
                 agent_name="code_executor",
                 node_id=self._usage_node_id,
             )
-
         return response.choices[0].message.content
 
     def execute_code_blocks(self, code_blocks: list[CodeBlock]) -> CodeResult:
@@ -375,89 +298,34 @@ def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
 
 
 def build_image_analysis_patch(vision_model: str) -> str:
+    """Build the matplotlib patch injected into locally executed experiment code.
+
+    Only the ``local`` backend uses this, and it runs in-process, so the patch
+    can call straight back into :mod:`autodiscovery.llm` rather than
+    reimplementing provider routing and auth for the execution context.
+    """
+    # Fail fast here, in the parent, rather than inside generated code.
+    llm.provider_of(vision_model)
     template = """\
 import matplotlib.pyplot as plt
 import functools
-from io import BytesIO
 import base64
 import json
-import os
-from openai import OpenAI
+from io import BytesIO
+
+from autodiscovery import llm
+from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER
 
 VISION_MODEL = __VISION_MODEL__
-USAGE_MARKER = __USAGE_MARKER__
-VERTEX_OPENAI_BASE_URL_ENV = "VERTEX_OPENAI_BASE_URL"
-VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
-VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
-
-def _is_gemini_model(model: str) -> bool:
-    return model.split("/")[-1].startswith("gemini")
-
-def _normalize_vertex_model_name(model: str) -> str:
-    if _is_gemini_model(model) and "/" not in model:
-        return f"google/{model}"
-    return model
-
-def _get_vertex_base_url():
-    # Reference: https://github.com/GoogleCloudPlatform/generative-ai/blob/main/gemini/chat-completions/intro_chat_completions_api.ipynb
-    # NOTE: Duplicated here because this patch runs in an isolated execution context.
-    explicit_base_url = os.getenv(VERTEX_OPENAI_BASE_URL_ENV)
-    if explicit_base_url:
-        return explicit_base_url
-    project_id = os.getenv(VERTEX_PROJECT_ENV_VAR)
-    location = os.getenv(VERTEX_LOCATION_ENV_VAR)
-    if not project_id or not location:
-        return None
-    api_host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
-    return f"https://{api_host}/v1/projects/{project_id}/locations/{location}/endpoints/openapi"
-
-def _get_vertex_token():
-    token = os.getenv("VERTEX_ACCESS_TOKEN") or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
-    if token:
-        return token
-    try:
-        import google.auth
-        import google.auth.transport.requests
-    except Exception:
-        return None
-    try:
-        credentials, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        credentials.refresh(google.auth.transport.requests.Request())
-        return credentials.token
-    except Exception:
-        return None
-
-def _get_openai_client():
-    is_gemini = _is_gemini_model(VISION_MODEL)
-    if is_gemini:
-        api_key = _get_vertex_token()
-        base_url = _get_vertex_base_url()
-        if not api_key or not base_url:
-            return None
-        return OpenAI(api_key=api_key, base_url=base_url)
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    return OpenAI(api_key=api_key)
-
 image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
 
 
 def image_to_text():
-    client = _get_openai_client()
-    if client is None:
-        missing = "VERTEX_ACCESS_TOKEN/GOOGLE_OAUTH_ACCESS_TOKEN + Vertex base URL" if _is_gemini_model(VISION_MODEL) else "OPENAI_API_KEY"
-        print(f"Image analysis skipped: {{missing}} is not set for {{VISION_MODEL}}.")
-        return
     for fig_num in plt.get_fignums():
-        fig = plt.figure(fig_num)  # Get the current figure
+        fig = plt.figure(fig_num)
         with BytesIO() as buf:
-            # Save the figure to a PNG buffer
             fig.savefig(buf, format='png', dpi=200)
             buf.seek(0)
-            # Encode image to base64
             base64_image = base64.b64encode(buf.read()).decode('utf-8')
             messages = [
                 {
@@ -468,58 +336,47 @@ def image_to_text():
                     'role': 'user',
                     'content': [
                         {'type': 'text', 'text': image_analyst_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "data:image/png;base64," + base64_image
-                            }
-                        }
+                        {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64_image}},
                     ]
                 }
             ]
-            # Get image analysis from the LLM
-            response = client.chat.completions.create(
-                model=_normalize_vertex_model_name(VISION_MODEL) if _is_gemini_model(VISION_MODEL) else VISION_MODEL,
-                messages=messages,
-                max_tokens=1000,
-            )
-            usage = getattr(response, "usage", None)
+            try:
+                response = llm.complete(VISION_MODEL, messages, max_tokens=1000)
+            except Exception as exc:
+                print('Image analysis skipped: ' + str(exc))
+                plt.close(fig)
+                continue
+            usage = getattr(response, 'usage', None)
             if usage is not None:
-                usage_payload = {
-                    "source": "openai",
-                    "component": "image_analysis.local",
-                    "agent_name": "code_executor",
-                    "model": getattr(response, "model", VISION_MODEL),
-                    "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
-                    "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
-                    "total_tokens": getattr(usage, "total_tokens", 0) or 0,
-                }
-                print(USAGE_MARKER + json.dumps(usage_payload, sort_keys=True))
-            analysis = response.choices[0].message.content
-            print(f"\\n=== Plot Analysis (fig. {{fig_num}}) ===\\n")
-            print(analysis)
+                print(LOCAL_IMAGE_USAGE_MARKER + json.dumps({
+                    'source': llm.provider_of(VISION_MODEL),
+                    'component': 'image_analysis.local',
+                    'agent_name': 'code_executor',
+                    'model': getattr(response, 'model', VISION_MODEL),
+                    'prompt_tokens': getattr(usage, 'prompt_tokens', 0) or 0,
+                    'completion_tokens': getattr(usage, 'completion_tokens', 0) or 0,
+                    'total_tokens': getattr(usage, 'total_tokens', 0) or 0,
+                }, sort_keys=True))
+            print("\\n=== Plot Analysis (fig. {{}}) ===\\n".format(fig_num))
+            print(response.choices[0].message.content)
             print("\\n" + "="*50)
 
         plt.close(fig)
 
 
 def patch_matplotlib_show():
-    # Replace plt.show with our custom function
     plt.show = functools.partial(image_to_text)
 
 
-# Apply the patch
 patch_matplotlib_show()
 """
-    return (
-        template.replace("__VISION_MODEL__", repr(vision_model))
-        .replace("__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT))
-        .replace("__USAGE_MARKER__", repr(LOCAL_IMAGE_USAGE_MARKER))
+    return template.replace("__VISION_MODEL__", repr(vision_model)).replace(
+        "__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT)
     )
 
 
 class CodeBlockWrapperTransform(transforms.MessageTransform):
-    def __init__(self, vision_model: str = "gpt-4o"):
+    def __init__(self, vision_model: str):
         self.image_analysis_patch = build_image_analysis_patch(vision_model)
 
     def apply_transform(self, messages: list[dict]) -> list[dict]:
@@ -542,9 +399,7 @@ class CodeBlockWrapperTransform(transforms.MessageTransform):
         return "CodeBlockWrapperTransform", True
 
 
-def code_transform_working_dir(
-    backend: str, work_dir: str, modal_working_dir: str | None
-) -> str:
+def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: str | None) -> str:
     """Return the directory the code transform should ``os.chdir`` into per cell.
 
     For the process/local backends this must be **absolute**: their subprocess
@@ -592,76 +447,100 @@ class SimpleCodeBlockTransform(transforms.MessageTransform):
         return "SimpleCodeBlockTransform", True
 
 
-def get_openai_config(
-    api_key: str | None = None,
+class LiteLLMAG2Client:
+    """AG2 ModelClient that routes every provider through litellm.
+
+    AG2 0.10 ships clients for a fixed set of providers and picks one by
+    ``api_type``. Registering this instead means AG2 inherits litellm's provider
+    list, so a new provider needs no code here -- only a ``<provider>/<model>``
+    model flag.
+    """
+
+    def __init__(self, config: dict[str, Any], **_: Any) -> None:
+        """Initialize the adapter from an AG2 model configuration."""
+        self.model = str(config["model"])
+        self.config = config
+
+    def create(self, params: dict[str, Any]) -> Any:
+        """Run one completion and return a litellm response.
+
+        Args:
+            params: AG2 request parameters.
+
+        Returns:
+            A litellm ``ModelResponse``, which is OpenAI-shaped and so satisfies
+            AG2's expectations directly.
+        """
+        kwargs = {
+            key: params[key]
+            for key in ("temperature", "reasoning_effort", "response_format", "n", "stream")
+            if params.get(key) is not None
+        }
+        if not llm.accepts_temperature(self.model):
+            kwargs.pop("temperature", None)
+        response = llm.complete(self.model, params["messages"], **kwargs)
+        # This is the single point every AG2 response flows through, so usage is
+        # recorded here rather than by patching AG2's OpenAIWrapper.
+        record_ag2_response_usage(response, agent_name=self.config.get("agent_name"))
+        return response
+
+    def message_retrieval(self, response: Any) -> list[str]:
+        """Extract assistant message content from a response."""
+        return [choice.message.content for choice in response.choices]
+
+    def cost(self, response: Any) -> float:
+        """Return the response cost litellm computed, or zero."""
+        return float(getattr(response, "_hidden_params", {}).get("response_cost") or 0.0)
+
+    @staticmethod
+    def get_usage(response: Any) -> dict[str, Any]:
+        """Return AG2-compatible token usage metadata."""
+        usage = getattr(response, "usage", None)
+        return {
+            "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
+            "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+            "cost": float(getattr(response, "_hidden_params", {}).get("response_cost") or 0.0),
+            "model": getattr(response, "model", None),
+        }
+
+
+def get_llm_config(
+    model_name: str,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     timeout: int = 600,
-    model_name: str = "o4-mini",
-):
-    """Build a model config for AG2/Autogen clients.
+) -> dict[str, Any]:
+    """Build an AG2 llm_config backed by :class:`LiteLLMAG2Client`.
 
     Args:
-        api_key: API key for the provider. Defaults to env-based resolution.
-        temperature: Sampling temperature.
-        reasoning_effort: Optional reasoning effort for o-series models.
+        model_name: Model name, as litellm's ``<provider>/<model>``.
+        temperature: Sampling temperature. Omitted for models that reject it.
+        reasoning_effort: Optional reasoning effort; litellm drops it where
+            unsupported.
         timeout: Request timeout in seconds.
-        model_name: Target model name.
 
     Returns:
-        Configuration dict for the Autogen LLM client.
+        Configuration dict for AG2.
     """
-    # Apply retry policy for AG2 OpenAI-compatible client calls.
-    apply_openai_client_backoff_retry()
-
-    # Check if this is a Gemini model
-    is_gemini = is_gemini_model(model_name)
-
-    if is_gemini:
-        # Route Gemini through Vertex's OpenAI-compatible endpoint so usage metadata
-        # (including provider-native total token counts) is preserved.
-        apply_openai_client_vertex_token_refresh()
-        base_url = get_vertex_openai_base_url()
-        config = {
-            "api_type": "openai",
-            "model": normalize_vertex_model_name(model_name),
-            "timeout": timeout,
-            "api_key": get_vertex_access_token(),
-            "base_url": base_url,
-            # Retries are handled by apply_openai_client_backoff_retry().
-            "max_retries": 0,
-            "cache_seed": None,
-        }
-        if temperature is not None:
-            config["temperature"] = temperature
-    else:
-        # Configure for OpenAI models
-        config = {
-            "api_type": "openai",
-            "model": model_name,
-            "timeout": timeout,
-            "api_key": api_key,
-            # Retries are handled by apply_openai_client_backoff_retry().
-            "max_retries": 0,
-            "cache_seed": None,  # Disabling caching also addresses this bug: https://github.com/ag2ai/ag2/issues/1103
-        }
-        if temperature is not None:
-            config["temperature"] = temperature
-
-        # Make o-series specific changes
-        if model_name.startswith("o"):
-            if reasoning_effort is not None:
-                config["reasoning_effort"] = reasoning_effort  # Defaults to medium
-        else:
-            config["logprobs"] = True
-
-    return config
+    llm.provider_of(model_name)  # fail fast on an unusable name
+    entry: dict[str, Any] = {
+        "model": model_name,
+        "model_client_cls": LiteLLMAG2Client.__name__,
+        "timeout": timeout,
+    }
+    if temperature is not None and llm.accepts_temperature(model_name):
+        entry["temperature"] = temperature
+    if reasoning_effort is not None:
+        entry["reasoning_effort"] = reasoning_effort
+    return {"config_list": [entry], "cache_seed": None}
 
 
 def get_agents(
     work_dir,
-    model_name="o4-mini",
-    llm_provider: str | None = None,
+    *,
+    model_name,
+    vision_model,
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -671,15 +550,14 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
-    vision_model: str = "gpt-4o",
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
 
     Args:
         work_dir: Working directory for code execution.
-        model_name: Model used for AG2 conversational agents.
-        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
+        model_name: Model for AG2 conversational agents, as litellm's
+            ``<provider>/<model>``.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
         branching_factor: Number of experiment candidates to request.
@@ -689,42 +567,18 @@ def get_agents(
         backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
-        vision_model: Vision model used for plot analysis.
+        vision_model: Vision model for plot analysis, as litellm's
+            ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
 
     Returns:
         Dictionary mapping agent name to agent instance.
     """
-    if llm_provider not in {None, "copilot"}:
-        raise ValueError(f"Unknown LLM provider: {llm_provider}")
-    if llm_provider == "copilot" and backend == "local":
-        raise ValueError(
-            "Copilot requires the process or modal backend so plot analysis does not "
-            "fall back to an in-experiment OpenAI client"
-        )
-
-    if llm_provider == "copilot":
-        copilot_model_config = {
-            "model": model_name,
-            "model_client_cls": "CopilotAG2Client",
-        }
-        if reasoning_effort is not None:
-            copilot_model_config["reasoning_effort"] = reasoning_effort
-        llm_config = {
-            "config_list": [copilot_model_config],
-            "cache_seed": None,
-        }
-        if temperature is not None:
-            llm_config["temperature"] = temperature
-    else:
-        is_gemini = is_gemini_model(model_name)
-        api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
-        llm_config = get_openai_config(
-            api_key=api_key,
-            model_name=model_name,
-            temperature=temperature,
-            reasoning_effort=reasoning_effort,
-        )
+    llm_config = get_llm_config(
+        model_name=model_name,
+        temperature=temperature,
+        reasoning_effort=reasoning_effort,
+    )
 
     # Create token limit transform.
     # `model` must be set explicitly: MessageTokenLimiter defaults to "gpt-3.5-turbo-0613"
@@ -921,7 +775,6 @@ def install(package):
             modal_executor,
             timeout=code_timeout,
             vision_model=vision_model,
-            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         print(
@@ -937,7 +790,6 @@ def install(package):
             _ProcessBackendAdapter(process_backend),
             timeout=code_timeout,
             vision_model=vision_model,
-            llm_provider=llm_provider,
             usage_tracker=usage_tracker,
         )
         print(f"Using process backend with work_dir: {work_dir}")
@@ -990,12 +842,9 @@ def install(package):
         user_proxy,
     ]
 
-    if llm_provider == "copilot":
-        from autodiscovery.copilot_provider import CopilotAG2Client
-
-        for agent in agents:
-            if agent.llm_config is not False:
-                agent.register_model_client(CopilotAG2Client)
+    for agent in agents:
+        if agent.llm_config is not False:
+            agent.register_model_client(LiteLLMAG2Client)
 
     # Apply token limit to all agents
     for agent in agents:

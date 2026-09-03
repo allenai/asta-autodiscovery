@@ -98,9 +98,9 @@ echo "Executing Cloud Run Job..."
 JOB_ARGS="--dataset_metadata=${METADATA_PATH},--out_dir=${OUTPUT_PATH},--n_experiments=4,--work_dir=work,--use_modal_sandbox,--bucket_path=${BUCKET_PATH},--no-timestamp_dir"
 
 if [ "${USE_GEMINI}" = "true" ]; then
-    JOB_ARGS="${JOB_ARGS},--model=gemini-3.7-flash,--belief_model=gemini-3.7-flash,--vision_model=gemini-3.7-flash"
+    JOB_ARGS="${JOB_ARGS},--model=vertex_ai/gemini-3.7-flash,--belief_model=vertex_ai/gemini-3.7-flash,--vision_model=vertex_ai/gemini-3.7-flash"
 else
-    JOB_ARGS="${JOB_ARGS},--model=gpt-4o"
+    JOB_ARGS="${JOB_ARGS},--model=openai/gpt-4o"
 fi
 
 gcloud run jobs execute ${JOB_NAME} \

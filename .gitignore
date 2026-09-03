@@ -37,3 +37,6 @@ UI_DESIGN_GUIDE.md
 
 # mkdocs build output
 /site/
+
+# autodiscovery run output (--out_dir); contains local paths and run artifacts
+/results/

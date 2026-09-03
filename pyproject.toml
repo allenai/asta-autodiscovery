@@ -14,7 +14,6 @@ dependencies = []
 [dependency-groups]
 dev = [
     "bcrypt",
-    "github-copilot-sdk>=1.0.7,<2",
     "pyright",
     "pytest",
     "pytest-cov",

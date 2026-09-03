@@ -5,125 +5,19 @@ from typing import Any
 
 import boto3
 import numpy as np
-from openai import OpenAI
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
-from autodiscovery.llm_retry import call_with_backoff
+from autodiscovery import llm
 from autodiscovery.llm_usage import UsageTracker
-from autodiscovery.vertex_client import OpenAICredentialsRefresher
-from autodiscovery.vertex_config import VERTEX_ACCESS_TOKEN_ENV, get_vertex_openai_base_url
-
-
-def is_gemini_model(model: str) -> bool:
-    """Check if the model is a Gemini model."""
-    if not model:
-        return False
-    return model.split("/")[-1].startswith("gemini")
-
-
-def is_reasoning_model(model: str) -> bool:
-    """Check if the model is an OpenAI reasoning model with n<=8 limits."""
-    return any(model.startswith(prefix) for prefix in ["o", "gpt-5"])
-
-
-def normalize_vertex_model_name(model: str) -> str:
-    """Normalize Gemini model names for Vertex AI OpenAI-compatible requests.
-
-    Args:
-        model: Model name provided by the caller.
-
-    Returns:
-        Vertex-compatible model name, with publisher prefix when required.
-    """
-    if is_gemini_model(model) and "/" not in model:
-        return f"google/{model}"
-    return model
-
-
-def max_n_for_model(model: str) -> int | None:
-    """Return max supported n for the model, or None if no known cap."""
-    if is_gemini_model(model):
-        return 5
-    if is_reasoning_model(model):
-        return 8
-    return None
-
-
-def normalize_reasoning_effort(model: str, reasoning_effort: str | None) -> str | None:
-    """Normalize reasoning effort values across providers.
-
-    Args:
-        model: Model name provided by the caller.
-        reasoning_effort: Requested reasoning effort value.
-
-    Returns:
-        A provider-compatible reasoning effort value or ``None``.
-    """
-    if reasoning_effort is None:
-        return None
-    if is_gemini_model(model):
-        return reasoning_effort
-    if is_reasoning_model(model) and reasoning_effort == "minimal":
-        # OpenAI reasoning models use low/medium/high. Keep CLI semantics consistent
-        # by mapping minimal to low for non-Gemini models.
-        print(
-            f"[query_llm] model={model} does not support reasoning_effort='minimal'; "
-            "using 'low' instead."
-        )
-        return "low"
-    return reasoning_effort
-
-
-def get_vertex_access_token() -> str:
-    """Return the Vertex AI access token from environment variables.
-
-    Returns:
-        The OAuth access token for Vertex AI.
-
-    Raises:
-        ValueError: If no access token is configured.
-    """
-    # Static env tokens bypass ADC refresh. Prefer ADC for long-running jobs.
-    token = os.getenv(VERTEX_ACCESS_TOKEN_ENV) or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
-    if token:
-        return token
-
-    try:
-        import google.auth
-        import google.auth.transport.requests
-
-        credentials, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        credentials.refresh(google.auth.transport.requests.Request())
-        if credentials.token:
-            return credentials.token
-    except Exception:
-        pass
-
-    raise ValueError(
-        "Vertex AI access token is required for Gemini models. Set "
-        f"{VERTEX_ACCESS_TOKEN_ENV} or GOOGLE_OAUTH_ACCESS_TOKEN "
-        "to an OAuth access token, or configure Application Default Credentials."
-    )
-
-
-def get_openai_client_for_model(model: str, api_key: str | None = None) -> Any:
-    """Create an OpenAI-compatible client for the given model."""
-    if is_gemini_model(model):
-        return OpenAICredentialsRefresher(api_key=api_key, base_url=get_vertex_openai_base_url())
-    return OpenAI(api_key=api_key) if api_key else OpenAI()
 
 
 def query_llm(
     messages: list[dict[str, str]],
     n_samples: int,
-    model: str = "gpt-4o",
-    llm_provider: str | None = None,
+    model: str,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     response_format=None,
-    client: Any = None,
     debug_requests: bool = False,
     usage_tracker: UsageTracker | None = None,
     usage_component: str = "query_llm",
@@ -136,12 +30,11 @@ def query_llm(
     Args:
         messages: Chat messages to send to the model.
         n_samples: Number of samples to request.
-        model: Model name to use.
-        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
-        temperature: Sampling temperature.
-        reasoning_effort: Optional reasoning effort for reasoning-capable models.
+        model: Model name, as litellm's ``<provider>/<model>``.
+        temperature: Sampling temperature. Dropped for models that reject it.
+        reasoning_effort: Optional reasoning effort. Dropped by litellm for
+            models that do not accept it.
         response_format: Optional structured output schema.
-        client: Optional pre-configured client instance.
         debug_requests: Whether to log request batching details.
         usage_tracker: Optional usage tracker.
         usage_component: Usage component label for tracking.
@@ -153,163 +46,94 @@ def query_llm(
     Returns:
         A list of parsed response objects.
     """
-    if llm_provider == "copilot":
-        if response_format is None:
-            raise ValueError("Copilot queries require a Pydantic response_format")
-        from autodiscovery.copilot_provider import get_copilot_runtime
+    if n_samples <= 0:
+        return []
 
-        runtime = get_copilot_runtime()
+    kwargs: dict[str, Any] = {}
+    if temperature is not None and llm.accepts_temperature(model):
+        kwargs["temperature"] = temperature
+    if (effort := llm.normalize_reasoning_effort(model, reasoning_effort)) is not None:
+        kwargs["reasoning_effort"] = effort
+    if response_format is not None:
+        kwargs["response_format"] = response_format
 
-        def _sample() -> dict[str, Any]:
-            completion = runtime.complete(
-                messages=messages,
-                model=model,
-                response_format=response_format,
-                temperature=temperature,
-                reasoning_effort=reasoning_effort,
-            )
-            if usage_tracker is not None:
-                metadata = dict(usage_metadata or {})
-                metadata["n"] = 1
-                metadata["provider_cost"] = completion.usage.provider_cost
-                metadata["reasoning_tokens"] = completion.usage.reasoning_tokens
-                metadata["cache_read_tokens"] = completion.usage.cache_read_tokens
-                metadata["cache_write_tokens"] = completion.usage.cache_write_tokens
-                usage_tracker.record_event(
-                    source="copilot",
-                    component=usage_component,
-                    model=completion.usage.model,
-                    prompt_tokens=completion.usage.input_tokens,
-                    completion_tokens=completion.usage.output_tokens,
-                    total_tokens=completion.usage.total_tokens,
-                    agent_name=usage_agent_name,
-                    node_id=usage_node_id,
-                    metadata=metadata,
-                )
-            return response_format.model_validate_json(completion.content).model_dump()
-
-        if n_samples <= 0:
-            return []
-        responses = [_sample()]
-        if n_samples > 1:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, n_samples - 1)) as executor:
-                responses.extend(executor.map(lambda _: _sample(), range(n_samples - 1)))
-        return responses
-    if llm_provider is not None:
-        raise ValueError(f"Unknown LLM provider: {llm_provider}")
-
-    if client is None:
-        client = get_openai_client_for_model(model)
-    is_gemini = is_gemini_model(model)
-    is_reasoning = is_reasoning_model(model)
-    normalized_reasoning_effort = normalize_reasoning_effort(model, reasoning_effort)
-    model_name = normalize_vertex_model_name(model) if is_gemini else model
-
-    max_n = max_n_for_model(model)
-    if max_n is not None:
-        batch_sizes = []
-        remaining = n_samples
-        while remaining > 0:
-            batch = min(max_n, remaining)
-            batch_sizes.append(batch)
-            remaining -= batch
-    else:
-        batch_sizes = [n_samples]
-
+    # Some providers cap n per request, so split the sample count into batches.
+    cap = llm.max_n(model)
+    batch_sizes = _batch_sizes(n_samples, cap)
     if len(batch_sizes) > 1:
         print(
             f"[query_llm] model={model} requesting n={n_samples} via {len(batch_sizes)} calls "
-            f"(max_n={max_n})."
+            f"(max_n={cap})."
         )
         debug_requests = True
     elif debug_requests:
         print(f"[query_llm] model={model} requesting n={n_samples} via 1 call.")
 
-    request_counter = {"sent": 0}
-
-    def _call_llm(batch_n: int):
+    def _call(batch_n: int):
         if debug_requests:
-            request_counter["sent"] += 1
-            print(
-                f"[query_llm] sending request {request_counter['sent']}/{len(batch_sizes)} "
-                f"(n={batch_n})"
-            )
-        kwargs = {
-            "model": model_name,
-            "messages": messages,
-            "n": batch_n,
-        }
-        if temperature is not None and not is_reasoning:
-            kwargs["temperature"] = temperature
+            print(f"[query_llm] sending request (n={batch_n})")
+        return llm.complete(model, messages, n=batch_n, **kwargs)
 
-        if (is_reasoning or is_gemini) and normalized_reasoning_effort is not None:
-            kwargs["reasoning_effort"] = normalized_reasoning_effort
-
-        def _send_request():
-            try:
-                if response_format is not None:
-                    return client.beta.chat.completions.parse(
-                        **kwargs, response_format=response_format
-                    )
-                return client.chat.completions.create(**kwargs)
-            except ValidationError:
-                # Retry if the response format validation fails
-                return client.beta.chat.completions.parse(
-                    **kwargs, response_format=response_format
-                )
-
-        return call_with_backoff(
-            _send_request,
-            label=f"query_llm(model={model_name}, n={batch_n})",
-        )
+    if len(batch_sizes) == 1:
+        response_items = [(batch_sizes[0], _call(batch_sizes[0]))]
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(batch_sizes))) as pool:
+            futures = [(n, pool.submit(_call, n)) for n in batch_sizes]
+            response_items = [(n, future.result()) for n, future in futures]
 
     responses = []
-    response_items: list[tuple[int, Any]] = []
-    if len(batch_sizes) == 1:
-        batch_n = batch_sizes[0]
-        response_items = [(batch_n, _call_llm(batch_n))]
-    elif is_gemini:
-        max_workers = min(8, len(batch_sizes))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [(batch_n, executor.submit(_call_llm, batch_n)) for batch_n in batch_sizes]
-            response_items = [(batch_n, future.result()) for batch_n, future in futures]
-    else:
-        response_items = [(batch_n, _call_llm(batch_n)) for batch_n in batch_sizes]
-
     for batch_n, response in response_items:
         if usage_tracker is not None:
             metadata = dict(usage_metadata or {})
             metadata["n"] = batch_n
             usage_tracker.record_response(
                 response,
-                source="openai",
+                source=llm.provider_of(model),
                 component=usage_component,
                 agent_name=usage_agent_name,
                 node_id=usage_node_id,
                 metadata=metadata,
             )
-        for choice in response.choices:
-            if response_format is not None and getattr(choice.message, "parsed", None) is not None:
-                parsed = choice.message.parsed
-                if isinstance(parsed, BaseModel):
-                    responses.append(parsed.model_dump())
-                else:
-                    responses.append(parsed)
-                continue
-            if choice.message.content is None:
-                continue
-            try:
-                responses.append(json.loads(choice.message.content))
-            except json.JSONDecodeError:
-                parsed = try_loading_dict(choice.message.content)
-                if parsed:
-                    responses.append(parsed)
-                else:
-                    preview = choice.message.content[:200]
-                    raise ValueError(
-                        f"LLM response was not valid JSON for model {model}: {preview}"
-                    )
+        responses.extend(_parse_choices(response, model, response_format))
     return responses
+
+
+def _batch_sizes(n_samples: int, max_n: int | None) -> list[int]:
+    """Split a sample count into per-request batches under a provider's n cap."""
+    if max_n is None:
+        return [n_samples]
+    batches = []
+    remaining = n_samples
+    while remaining > 0:
+        batches.append(min(max_n, remaining))
+        remaining -= max_n
+    return batches
+
+
+def _parse_choices(response: Any, model: str, response_format) -> list[Any]:
+    """Extract parsed payloads from a litellm response's choices."""
+    parsed_responses = []
+    for choice in response.choices:
+        content = choice.message.content
+        if content is None:
+            continue
+        if response_format is not None:
+            try:
+                parsed_responses.append(response_format.model_validate_json(content).model_dump())
+                continue
+            except ValidationError:
+                # Fall through to lenient JSON parsing below.
+                pass
+        try:
+            parsed_responses.append(json.loads(content))
+        except json.JSONDecodeError:
+            if repaired := try_loading_dict(content):
+                parsed_responses.append(repaired)
+            else:
+                raise ValueError(
+                    f"LLM response was not valid JSON for model {model}: {content[:200]}"
+                ) from None
+    return parsed_responses
 
 
 def try_loading_dict(_dict_str):

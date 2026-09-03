@@ -13,63 +13,121 @@ pip install autodiscovery
 This pulls in `autodiscovery-modal` (sandboxed code execution) as a transitive
 dependency. Requires Python 3.13+.
 
+## Selecting models
+
+Every model flag — `--model`, `--belief_model`, `--vision_model`,
+`--embedding_model` — accepts [litellm's](https://docs.litellm.ai/docs/providers)
+`<provider>/<model>` naming, with snake_case provider slugs:
+
+```sh
+--model vertex_ai/gemini-3.7-flash
+--model openai/o4-mini
+--model github_copilot/claude-haiku-4.5
+```
+
+The prefix is **required**. A bare name is ambiguous — `claude-haiku-4.5` is
+Anthropic direct or Copilot depending on who you ask — and resolving one means
+asking litellm, which authenticates for some providers. Unqualified names are
+rejected at startup with the qualified form to use:
+
+```
+'gemini-3.7-flash' is missing a provider. Model names are litellm-qualified
+as <provider>/<model>, e.g. vertex_ai/gemini-3.7-flash or openai/gemini-3.7-flash.
+```
+
+`google/<model>` is also rejected: it was Vertex's OpenAI-compatible wire prefix,
+never a litellm provider. Use `vertex_ai/<model>`.
+
+Any of litellm's [~149 providers](https://docs.litellm.ai/docs/providers) can be
+named — there is no allow-list. The three documented below (`vertex_ai`,
+`openai`, `github_copilot`) are the ones this project configures credentials for
+and tests; using another means supplying its credentials yourself, per litellm's
+env-var conventions.
+
+Because the provider travels with each flag, roles can use different providers
+in one run — Copilot for chat, Vertex for plot analysis:
+
+```sh
+auto-discovery \
+   --model github_copilot/claude-haiku-4.5 \
+   --vision_model vertex_ai/gemini-3.7-flash \
+   ...
+```
+
+Each flag is checked at startup, before the first model call: the vision model
+must support image input, the embedding model must be an embedding model, and
+chat flags must be chat models. A model litellm has not mapped yet is a warning,
+not an error — providers ship models faster than litellm maps them.
+
+For `github_copilot/` the check uses Copilot's own `/models` endpoint instead of
+litellm's static catalog, which is inaccurate in both directions: it lists models
+an account cannot call (`gpt-5` → *"The requested model is not supported"*) and
+omits ones it can (`gpt-5.4`, `claude-opus-5`). The live list is read from
+litellm's cached API key and never triggers a login; with no usable cached key,
+validation falls back to the registry with a warning.
+
 ## Credentials
 
-The default model (`gemini-3.7-flash`) runs on Vertex AI. Set:
+All model traffic goes through [litellm](https://docs.litellm.ai/), so
+credentials follow litellm's conventions per provider.
+
+**Vertex AI** (the default model `vertex_ai/gemini-3.7-flash`) uses Application
+Default Credentials:
 
 ```sh
 export VERTEX_PROJECT_ID=your-gcp-project
 export VERTEX_LOCATION=global            # optional, defaults to global
-export VERTEX_ACCESS_TOKEN=$(gcloud auth print-access-token)
+
+# Either a service-account key...
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+# ...or local user credentials:
+gcloud auth application-default login
 ```
 
-To use OpenAI models instead, pass `--model gpt-...` and export `OPENAI_API_KEY`.
+**OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 
 ### GitHub Copilot
 
-GitHub Copilot is an optional provider. Install the extra and authenticate the
-Copilot CLI with an account that has an active Copilot seat:
+GitHub Copilot needs no extra install — litellm speaks it natively.
+
+On an interactive terminal, litellm runs GitHub's device-code login on first
+use — it prints a code to enter at github.com and caches the token itself. No
+setup needed.
+
+For **non-interactive** runs (deployed jobs, CI), pre-seed the token instead:
 
 ```sh
-pip install 'asta-autodiscovery[copilot]'
-copilot login
-python -m autodiscovery.copilot doctor --json
+export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # default ~/.config/litellm/github_copilot
+# the directory must contain a file named `access-token` holding a GitHub OAuth token
 ```
 
-If the SDK cannot download its runtime, install the Copilot CLI separately and
-point the SDK at it:
+litellm does no TTY detection, so without a cached token a headless run prints
+a device code and blocks for roughly three minutes before failing, rather than
+erroring immediately.
 
-```sh
-export COPILOT_CLI_PATH=/path/to/copilot
-```
-
-Select Copilot independently for chat and embeddings:
+Select Copilot per role with the `github_copilot/` prefix:
 
 ```sh
 auto-discovery \
-   --llm_provider copilot \
-   --model claude-haiku-4.5 \
-   --belief_model claude-haiku-4.5 \
-   --vision_model claude-haiku-4.5 \
-   --embedding_provider copilot \
-   --embedding_model text-embedding-3-small \
+   --model github_copilot/claude-haiku-4.5 \
+   --belief_model github_copilot/claude-haiku-4.5 \
+   --vision_model github_copilot/claude-haiku-4.5 \
+   --embedding_model github_copilot/text-embedding-3-small \
    --embedding_dimensions 1536 \
    --backend process \
    --dedupe \
    data/measurements.csv
 ```
 
-Omit `--llm_provider` and `--embedding_provider` to preserve the existing
-Vertex/OpenAI behavior. Copilot honors `--temperature` and
+Copilot honors `--temperature` and
 `--belief_temperature` when the selected model permits that value. Some reasoning
 modes constrain temperature at the provider.
 
-Copilot deduplication defaults to `text-embedding-3-small` with 1536 dimensions.
-This is not numerically identical to the existing OpenAI
-`text-embedding-3-large` default, so leave `--embedding_provider` unset when
-exact embedding geometry must be preserved. Copilot currently requires the
-`process` or `modal` execution backend; the `local` backend's generated image
-analysis code is tied to an OpenAI client.
+`github_copilot/text-embedding-3-small` at 1536 dimensions is not numerically
+identical to the OpenAI `text-embedding-3-large` default, so keep the OpenAI
+embedding model when exact embedding geometry must be preserved. Copilot
+currently requires the `process` or `modal` execution backend; the `local`
+backend's generated image analysis code is tied to an OpenAI client.
 
 ## Run
 

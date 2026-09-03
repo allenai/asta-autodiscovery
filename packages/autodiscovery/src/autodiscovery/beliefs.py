@@ -78,8 +78,7 @@ class BeliefTrueFalse:
             return self.mean
 
         def update(self, n_true: int = 0, n_false: int = 0, distr=None, normalize: bool = False):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.n_true += distr.n_true
                 self.n_false += distr.n_false
@@ -312,8 +311,7 @@ class BeliefCategorical:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.definitely_true += distr.definitely_true
                 self.maybe_true += distr.maybe_true
@@ -597,8 +595,7 @@ class BeliefCategoricalNumeric:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.bucket_02 += distr.bucket_02
                 self.bucket_24 += distr.bucket_24
@@ -808,8 +805,7 @@ class BeliefGauss:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new samples or another distribution.
-            """
+            """Update the distribution with new samples or another distribution."""
             if distr is not None:
                 self.n += distr.n
                 # TOFIX: samples don't take into account the original weight of the distribution
@@ -1035,8 +1031,7 @@ class BeliefTrueFalseCat:
             distr=None,
             normalize: bool = False,
         ):
-            """Update the distribution with new counts.
-            """
+            """Update the distribution with new counts."""
             if distr is not None:
                 self.definitely_true += distr.definitely_true
                 self.maybe_true += distr.maybe_true
@@ -1208,9 +1203,9 @@ BELIEF_MODE_TO_CLS = {
 
 def get_belief(
     hypothesis: str,
+    *,
+    model: str,
     evidence: list[dict[str, str]] | None = None,
-    model: str = "gpt-4o",
-    llm_provider: str | None = None,
     belief_mode: str = "boolean",
     n_samples: int = 5,
     temperature: float | None = None,
@@ -1229,8 +1224,7 @@ def get_belief(
     Args:
         hypothesis: The hypothesis to evaluate
         evidence: Optional evidence messages to condition the belief
-        model: The LLM model to use
-        llm_provider: LLM provider for belief sampling.
+        model: The LLM model to use, as litellm's ``<provider>/<model>``
         belief_mode: The belief mode to use for parsing responses (e.g., BeliefTrueFalse, BeliefCategorical)
         n_samples: Number of samples to draw from the LLM
         temperature: Temperature for sampling
@@ -1289,7 +1283,6 @@ def get_belief(
             response = query_llm(
                 all_msgs,
                 model=model,
-                llm_provider=llm_provider,
                 n_samples=n_samples,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
@@ -1323,9 +1316,9 @@ def get_belief(
 
 def calculate_prior_and_posterior_beliefs(
     node,
+    *,
+    model,
     n_samples=4,
-    model="gpt-4o",
-    llm_provider=None,
     temperature=None,
     reasoning_effort=None,
     implicit_bayes_posterior=False,
@@ -1343,8 +1336,7 @@ def calculate_prior_and_posterior_beliefs(
     Args:
         node: MCTSNode instance containing node information and messages or a dictionary with node data
         n_samples: Number of samples to draw from the LLM
-        model: The LLM model to use for querying
-        llm_provider: LLM provider for belief sampling.
+        model: The LLM model to use for querying, as litellm's ``<provider>/<model>``
         temperature: Temperature for sampling
         reasoning_effort: Reasoning effort for supported models.
         implicit_bayes_posterior: Whether to use implicit Bayesian posterior
@@ -1398,7 +1390,6 @@ def calculate_prior_and_posterior_beliefs(
             hypothesis=hypothesis,
             evidence=None,
             model=model,
-            llm_provider=llm_provider,
             belief_mode=belief_mode,
             n_samples=n_samples,
             temperature=temperature,
@@ -1413,7 +1404,6 @@ def calculate_prior_and_posterior_beliefs(
         hypothesis=hypothesis,
         evidence=evidence_msg,
         model=model,
-        llm_provider=llm_provider,
         belief_mode=belief_mode,
         n_samples=n_samples,
         temperature=temperature,

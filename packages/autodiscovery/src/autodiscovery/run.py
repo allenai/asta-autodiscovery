@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from time import time
 
+from autodiscovery import llm
 from autodiscovery.agents import get_agents
 from autodiscovery.args import ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
@@ -18,7 +19,6 @@ from autodiscovery.dataset import (
     resolve_local_dataset_source,
 )
 from autodiscovery.future_utils import gather_completed_futures
-from autodiscovery.llm_retry import apply_openai_wrapper_usage_tracking
 from autodiscovery.llm_usage import (
     UsageTracker,
     clear_ag2_usage_context,
@@ -82,7 +82,6 @@ def _theoretical_max_boolean_cat(
 def compute_and_store_reward(
     node,
     belief_model_name,
-    llm_provider,
     belief_temperature,
     belief_reasoning_effort,
     n_belief_samples,
@@ -103,7 +102,6 @@ def compute_and_store_reward(
     Args:
         node: Node whose reward will be computed.
         belief_model_name: Model name for belief elicitation.
-        llm_provider: LLM provider for belief elicitation.
         belief_temperature: Temperature for belief sampling.
         belief_reasoning_effort: Reasoning effort for belief-model calls.
         n_belief_samples: Number of belief samples.
@@ -143,7 +141,6 @@ def compute_and_store_reward(
             pt_prior, s_conditioned_prior, _, _ = calculate_prior_and_posterior_beliefs(
                 node,
                 model=belief_model_name,
-                llm_provider=llm_provider,
                 temperature=belief_temperature,
                 reasoning_effort=belief_reasoning_effort,
                 n_samples=n_belief_samples,
@@ -194,7 +191,6 @@ def compute_and_store_reward(
         prior, posterior, belief_change, kl_divergence = calculate_prior_and_posterior_beliefs(
             node,
             model=belief_model_name,
-            llm_provider=llm_provider,
             temperature=belief_temperature,
             reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
@@ -230,7 +226,6 @@ def compute_and_store_reward(
         _, _posterior, _belief_change, _kl_divergence = calculate_prior_and_posterior_beliefs(
             node,
             model=belief_model_name,
-            llm_provider=llm_provider,
             temperature=belief_temperature,
             reasoning_effort=belief_reasoning_effort,
             n_samples=n_belief_samples,
@@ -293,12 +288,12 @@ def run_mcts(
     dataset_paths,
     log_dirname,
     work_dir,
-    model_name="gpt-4o",
-    llm_provider=None,
-    embedding_provider=None,
-    embedding_model=None,
+    *,
+    model_name,
+    belief_model_name,
+    vision_model,
+    embedding_model,
     embedding_dimensions=None,
-    belief_model_name="gemini-3.7-flash",
     max_iterations=100,
     branching_factor=8,
     max_rounds=100000,
@@ -326,7 +321,6 @@ def run_mcts(
     warmstart_experiments=None,
     backend="process",
     bucket_path=None,
-    vision_model="gpt-4o",
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
@@ -339,10 +333,9 @@ def run_mcts(
         dataset_paths: List of paths to dataset files.
         log_dirname: Directory to save logs and MCTS nodes.
         work_dir: Working directory for agents.
-        model_name: LLM model name for agents.
-        llm_provider: Optional LLM provider. Omit to use OpenAI/Vertex model-name routing.
-        embedding_provider: Provider used for deduplication embeddings.
-        embedding_model: Optional deduplication embedding model override.
+        model_name: LLM model for agents, as litellm's ``<provider>/<model>``.
+        embedding_model: Deduplication embedding model, as litellm's
+            ``<provider>/<model>``.
         embedding_dimensions: Optional deduplication embedding dimensions.
         belief_model_name: LLM model name for belief distribution agent.
         max_iterations: Maximum number of MCTS iterations.
@@ -415,12 +408,7 @@ def run_mcts(
 
     try:
         if agent_usage_mode == "per_response":
-            if not apply_openai_wrapper_usage_tracking():
-                raise RuntimeError(
-                    "Agent usage mode 'per_response' requires AG2 OpenAIWrapper patching, "
-                    "but the patch could not be applied. Rerun with "
-                    "--agent_usage_mode=summary_delta to use explicit fallback mode."
-                )
+            # LiteLLMAG2Client records each response as it is produced.
             configure_ag2_usage_tracking(usage_tracker)
         elif agent_usage_mode == "summary_delta":
             configure_ag2_usage_tracking(None)
@@ -450,7 +438,6 @@ def run_mcts(
             base_agent_objs = get_agents(
                 work_dir,
                 model_name=model_name,
-                llm_provider=llm_provider,
                 temperature=temperature,
                 reasoning_effort=reasoning_effort,
                 branching_factor=branching_factor,
@@ -584,7 +571,9 @@ def run_mcts(
                             if root_context is not None:
                                 node_context.append(root_context)
                         path_context = node.get_path_context(k=k_parents - 1, skip_root=True) or []
-                        node_context.extend(context for context in path_context if context is not None)
+                        node_context.extend(
+                            context for context in path_context if context is not None
+                        )
 
                     node_messages = [
                         {
@@ -644,7 +633,9 @@ def run_mcts(
 
                     # Store the raw message logs for the node
                     logger_obj.log_node(
-                        node.level, node.node_idx, chat_manager.messages_to_string(groupchat.messages)
+                        node.level,
+                        node.node_idx,
+                        chat_manager.messages_to_string(groupchat.messages),
                     )
 
                     # Get messages starting from the current query and update the node
@@ -678,7 +669,6 @@ def run_mcts(
                         compute_and_store_reward(
                             node,
                             belief_model_name,
-                            llm_provider,
                             belief_temperature,
                             belief_reasoning_effort,
                             n_belief_samples,
@@ -757,7 +747,6 @@ def run_mcts(
                         thread_local.agent_objs = get_agents(
                             thread_work_dir,
                             model_name=model_name,
-                            llm_provider=llm_provider,
                             temperature=temperature,
                             reasoning_effort=reasoning_effort,
                             branching_factor=branching_factor,
@@ -810,7 +799,6 @@ def run_mcts(
                     base_agent_objs = get_agents(
                         work_dir,
                         model_name=model_name,
-                        llm_provider=llm_provider,
                         temperature=temperature,
                         reasoning_effort=reasoning_effort,
                         branching_factor=branching_factor,
@@ -876,10 +864,8 @@ def run_mcts(
     save_nodes(
         nodes_by_level,
         log_dirname,
-        run_dedupe,
-        belief_model_name,
-        llm_provider=llm_provider,
-        embedding_provider=embedding_provider,
+        run_dedupe=run_dedupe,
+        model=belief_model_name,
         embedding_model=embedding_model,
         embedding_dimensions=embedding_dimensions,
         time_elapsed=time_elapsed,
@@ -887,6 +873,26 @@ def run_mcts(
     )
     usage_tracker.save_events(log_dirname)
     usage_tracker.save_summary(log_dirname)
+
+
+def resolve_model_args(args) -> None:
+    """Validate every model flag before any model call.
+
+    Checks each flag against litellm's offline registry and fails fast on a
+    model that cannot do its job: a vision model without image support, an
+    embedding model passed as a chat model, a Copilot model absent from
+    Copilot's catalog.
+
+    Args:
+        args: Parsed argument namespace.
+
+    Raises:
+        ModelError: If a model flag cannot serve its role.
+    """
+    llm.validate(args.model, flag="--model")
+    llm.validate(args.belief_model, flag="--belief_model")
+    llm.validate(args.vision_model, flag="--vision_model", require_vision=True)
+    llm.validate(args.embedding_model, flag="--embedding_model", mode="embedding")
 
 
 def main(args):
@@ -898,14 +904,15 @@ def main(args):
     if getattr(args, "use_modal_sandbox", False) and args.backend == "process":
         args.backend = "modal"
 
-    # Validate and fix arguments
-    if "o4-mini" in args.model and args.temperature is not None:
-        print("Warning: Setting temperature for o4-mini is not permitted. Using default None.")
+    # Resolve provider/model selection before anything issues a model call.
+    resolve_model_args(args)
+
+    # OpenAI reasoning models reject temperature; drop it rather than fail mid-run.
+    if not llm.accepts_temperature(args.model) and args.temperature is not None:
+        print(f"Warning: {args.model} does not accept a temperature. Using None.")
         args.temperature = None
-    if "o4-mini" in args.belief_model and args.belief_temperature is not None:
-        print(
-            "Warning: Setting temperature for o4-mini belief model is not permitted. Using default None."
-        )
+    if not llm.accepts_temperature(args.belief_model) and args.belief_temperature is not None:
+        print(f"Warning: {args.belief_model} does not accept a temperature. Using None.")
         args.belief_temperature = None
 
     # Create log directory
@@ -955,9 +962,7 @@ def main(args):
                 log_dirname,
                 run_dedupe=args.dedupe,
                 model=args.belief_model,
-                llm_provider=getattr(args, "llm_provider", None),
-                embedding_provider=getattr(args, "embedding_provider", None),
-                embedding_model=getattr(args, "embedding_model", None),
+                embedding_model=args.embedding_model,
                 embedding_dimensions=getattr(args, "embedding_dimensions", None),
             )
             return
@@ -1038,9 +1043,7 @@ def main(args):
         n_belief_samples=args.n_belief_samples,
         k_parents=args.k_parents,
         model_name=args.model,
-        llm_provider=getattr(args, "llm_provider", None),
-        embedding_provider=getattr(args, "embedding_provider", None),
-        embedding_model=getattr(args, "embedding_model", None),
+        embedding_model=args.embedding_model,
         embedding_dimensions=getattr(args, "embedding_dimensions", None),
         belief_model_name=args.belief_model,
         temperature=args.temperature,

@@ -98,11 +98,10 @@ def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
 def save_nodes(
     nodes_dict_or_list,
     log_dirname,
+    *,
+    model,
+    embedding_model,
     run_dedupe=True,
-    model="gpt-4o",
-    llm_provider=None,
-    embedding_provider=None,
-    embedding_model=None,
     embedding_dimensions=None,
     save_csv=True,
     time_elapsed=None,
@@ -114,9 +113,9 @@ def save_nodes(
         nodes_dict_or_list: Dictionary or list of MCTSNode objects or dicts.
         log_dirname: Directory to save the JSON and CSV files.
         run_dedupe: Whether to deduplicate nodes based on hypothesis.
-        model: Model to use for deduplication.
-        llm_provider: LLM provider for deduplication votes.
-        embedding_provider: Embedding provider for deduplication candidates.
+        model: Model for deduplication, as litellm's ``<provider>/<model>``.
+        embedding_model: Embedding model, as litellm's ``<provider>/<model>``.
+        embedding_dimensions: Optional embedding dimensions override.
         save_csv: Whether to save nodes to a CSV file.
         time_elapsed: Optional time elapsed for logging purposes.
         usage_tracker: Optional usage tracker for dedupe-related LLM calls.
@@ -142,8 +141,6 @@ def save_nodes(
         log_dirname,
         run_dedupe=run_dedupe,
         dedupe_model=model,
-        llm_provider=llm_provider,
-        embedding_provider=embedding_provider,
         embedding_model=embedding_model,
         embedding_dimensions=embedding_dimensions,
         time_elapsed=time_elapsed,
@@ -159,11 +156,10 @@ def save_nodes(
 def save_nodes_to_json(
     nodes_list,
     log_dirname,
+    *,
+    dedupe_model,
+    embedding_model,
     run_dedupe=True,
-    dedupe_model="gpt-4o",
-    llm_provider=None,
-    embedding_provider=None,
-    embedding_model=None,
     embedding_dimensions=None,
     log_dedupe_comparisons=False,
     time_elapsed=None,
@@ -175,9 +171,9 @@ def save_nodes_to_json(
         nodes_list: List of MCTS node objects.
         log_dirname: Directory to save the JSON file
         run_dedupe: Whether to deduplicate nodes based on hypothesis.
-        dedupe_model: Model to use for deduplication.
-        llm_provider: LLM provider for deduplication votes.
-        embedding_provider: Embedding provider for deduplication candidates.
+        dedupe_model: Model for deduplication, as litellm's ``<provider>/<model>``.
+        embedding_model: Embedding model, as litellm's ``<provider>/<model>``.
+        embedding_dimensions: Optional embedding dimensions override.
         log_dedupe_comparisons: Whether to log deduplication comparisons to a file.
         time_elapsed: Optional time elapsed for logging purposes.
         usage_tracker: Optional usage tracker for dedupe-related LLM calls.
@@ -187,8 +183,6 @@ def save_nodes_to_json(
         deduped_nodes, duplicates = dedupe(
             nodes_list,
             model=dedupe_model,
-            llm_provider=llm_provider,
-            embedding_provider=embedding_provider,
             embedding_model=embedding_model,
             embedding_dimensions=embedding_dimensions,
             log_comparisons_fname=None

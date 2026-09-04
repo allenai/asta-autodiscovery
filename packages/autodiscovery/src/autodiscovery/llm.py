@@ -61,6 +61,11 @@ GITHUB_COPILOT = "github_copilot"
 #: Default Credentials happen to name, and the location to ``us-central1``,
 #: which does not serve the Gemini models this package defaults to. Most
 #: deployments want ``VERTEXAI_LOCATION=global``.
+#:
+#: These names specifically, and not litellm's shorter ``VERTEX_PROJECT`` /
+#: ``VERTEX_LOCATION`` aliases: litellm reads the short pair only in
+#: ``embedding()``, while every completion path reads the ``VERTEXAI_`` pair
+#: alone. Only these two are honoured by every call this package makes.
 _VERTEX_ENV_VAR_HELP = {
     "VERTEXAI_PROJECT": "your Google Cloud project id",
     "VERTEXAI_LOCATION": "the Vertex region, usually 'global'",

@@ -33,6 +33,10 @@ and it does so without a second set of names for the same two settings. The
 rename is safe to make loudly: a deployment still setting only the old names
 now fails at startup naming the new ones, rather than drifting onto a fallback.
 
+litellm also accepts shorter `VERTEX_PROJECT` / `VERTEX_LOCATION` aliases, but
+only in `embedding()` — every completion path reads the `VERTEXAI_` pair alone.
+Set the `VERTEXAI_` pair; the startup check does not accept the aliases.
+
 A model-flag mistake now exits with a one-line error instead of a traceback.
 That covers the `<provider>/<model>` prefix error every 0.2.x command line hits
 on upgrade.

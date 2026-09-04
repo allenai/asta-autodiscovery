@@ -347,6 +347,22 @@ def test_a_configured_vertex_model_validates(monkeypatch) -> None:
     validate("vertex_ai/gemini-3.7-flash", flag="--model")
 
 
+@pytest.mark.parametrize("alias", ["VERTEX_PROJECT", "VERTEX_LOCATION", "VERTEX_PROJECT_ID"])
+def test_litellms_short_aliases_do_not_satisfy_the_check(alias: str, monkeypatch) -> None:
+    """Only the ``VERTEXAI_`` pair counts, including over litellm's own aliases.
+
+    litellm reads ``VERTEX_PROJECT``/``VERTEX_LOCATION`` in ``embedding()`` but
+    not on any completion path, so accepting them here would let a run start on
+    configuration three quarters of its own model calls cannot see.
+    ``VERTEX_PROJECT_ID`` was this package's pre-1.0.1 name and litellm reads it
+    nowhere; it is here so the rename fails loudly rather than silently.
+    """
+    monkeypatch.setenv(alias, "something")
+
+    with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
+        validate("vertex_ai/gemini-3.7-flash", flag="--model")
+
+
 def test_a_missing_vertex_setting_stops_a_run_before_any_model_call() -> None:
     with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
         resolve_model_args(engine_args())

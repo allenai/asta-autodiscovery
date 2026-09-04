@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import { getMetricsApi } from '@/api/MetricsApi';
-import type { RunMetrics } from '@/types/Metrics';
+import type { LLMCostStatus, RunMetrics } from '@/types/Metrics';
 import MetricCard from '../../../components/MetricCard';
 import LLMUsageDashboard from '../../../components/LLMUsageDashboard';
 
@@ -18,6 +18,12 @@ const STATUS_COLORS: Record<string, string> = {
     PENDING: 'info',
     CREATED: 'default',
     DELETED: 'default',
+};
+
+const COST_STATUS_TITLES: Record<LLMCostStatus, string | undefined> = {
+    complete: undefined,
+    partial: 'Some calls could not be priced',
+    unavailable: 'No per-call cost recorded for this run',
 };
 
 export default function RunMetricsPage() {
@@ -63,6 +69,11 @@ export default function RunMetricsPage() {
     }
 
     const fmtCost = (v: number) => `$${v.toFixed(2)}`;
+    const fmtCostStatus = (v: number, status: LLMCostStatus) => {
+        if (status === 'unavailable') return 'n/a';
+        if (status === 'partial') return `≥ ${fmtCost(v)}`;
+        return fmtCost(v);
+    };
     const fmtDuration = (secs: number | null) => {
         if (secs == null) return '-';
         if (secs < 60) return `${secs.toFixed(0)}s`;
@@ -115,7 +126,11 @@ export default function RunMetricsPage() {
 
             {/* Cost & Experiment Cards */}
             <CardGrid>
-                <MetricCard value={fmtCost(data.llm_cost_usd)} label="LLM Cost" />
+                <MetricCard
+                    value={fmtCostStatus(data.llm_cost_usd, data.llm_cost_status)}
+                    label="LLM Cost"
+                    title={COST_STATUS_TITLES[data.llm_cost_status]}
+                />
                 <MetricCard
                     value={`${data.n_experiments_completed}/${data.n_experiments_requested}`}
                     label="Experiments"
@@ -123,21 +138,25 @@ export default function RunMetricsPage() {
             </CardGrid>
 
             {/* LLM Cost by Model */}
-            {data.llm_cost_by_model && Object.keys(data.llm_cost_by_model).length > 0 && (
-                <Panel>
-                    <PanelTitle>Cost by Model</PanelTitle>
-                    <CostList>
-                        {Object.entries(data.llm_cost_by_model)
-                            .sort((a, b) => b[1] - a[1])
-                            .map(([model, cost]) => (
-                                <CostRow key={model}>
-                                    <CostModel>{model}</CostModel>
-                                    <CostValue>{fmtCost(cost)}</CostValue>
-                                </CostRow>
-                            ))}
-                    </CostList>
-                </Panel>
-            )}
+            {data.llm_cost_status !== 'unavailable' &&
+                data.llm_cost_by_model &&
+                Object.keys(data.llm_cost_by_model).length > 0 && (
+                    <Panel>
+                        <PanelTitle>Cost by Model</PanelTitle>
+                        <CostList>
+                            {Object.entries(data.llm_cost_by_model)
+                                .sort((a, b) => b[1] - a[1])
+                                .map(([model, cost]) => (
+                                    <CostRow key={model}>
+                                        <CostModel>{model}</CostModel>
+                                        <CostValue title={COST_STATUS_TITLES[data.llm_cost_status]}>
+                                            {fmtCostStatus(cost, data.llm_cost_status)}
+                                        </CostValue>
+                                    </CostRow>
+                                ))}
+                        </CostList>
+                    </Panel>
+                )}
 
             {/* Full LLM Usage Dashboard */}
             {data.llm_usage_summary && (
@@ -147,7 +166,11 @@ export default function RunMetricsPage() {
                     </Typography>
                     <LLMUsageDashboard
                         usage={data.llm_usage_summary}
-                        costByModel={data.llm_cost_by_model}
+                        costByModel={
+                            data.llm_cost_status === 'unavailable'
+                                ? undefined
+                                : data.llm_cost_by_model
+                        }
                     />
                 </Box>
             )}

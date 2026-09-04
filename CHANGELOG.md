@@ -7,6 +7,30 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 [pypi]: https://pypi.org/project/asta-autodiscovery/
 
+## Unreleased
+
+### Runs record what each model call cost ([#70])
+
+A run's `llm_usage_summary.json` and `llm_usage_events.jsonl` now carry the cost
+litellm computed for each call, alongside the token counts. Every usage bucket
+gains `cost_usd`, `prompt_cost_usd`, `completion_cost_usd`, `reasoning_cost_usd`
+and `calls_with_cost`; each event gains a `cost` object.
+
+Cost is reported as **unavailable** — not as zero — where it is genuinely not
+known. litellm prices every `github_copilot` model at zero because Copilot bills
+"premium requests" rather than tokens, so no honest per-token figure exists for
+it, and models litellm has not mapped yet have no price at all.
+`calls_with_cost` is what tells an unpriced call apart from a free one.
+
+This replaces the metrics dashboard's hand-maintained price table, which billed
+any unlisted model at Gemini 3.1 Pro's rate and priced `github_copilot/gpt-4o`
+as OpenAI's `gpt-4o`. Runs that completed before this change carry no cost field
+and the dashboard reports their cost as unavailable; their previous figures were
+approximations from that table, and a gap is better than silently mixing two
+costing methods in one dashboard.
+
+[#70]: https://github.com/allenai/asta-autodiscovery/issues/70
+
 ## 1.0.0
 
 First release of the litellm-based model layer ([#67], [#68]). Every model call

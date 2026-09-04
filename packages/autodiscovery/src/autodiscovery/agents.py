@@ -145,6 +145,7 @@ class ModalSandboxExecutor(CodeExecutor):
             self._usage_tracker.record_response(
                 response,
                 source=llm.provider_of(self.vision_model),
+                request_model=self.vision_model,
                 component="image_analysis.modal",
                 agent_name="code_executor",
                 node_id=self._usage_node_id,
@@ -356,6 +357,9 @@ def image_to_text():
                     'prompt_tokens': getattr(usage, 'prompt_tokens', 0) or 0,
                     'completion_tokens': getattr(usage, 'completion_tokens', 0) or 0,
                     'total_tokens': getattr(usage, 'total_tokens', 0) or 0,
+                    # The response is only reachable in here, so the cost is
+                    # priced sandbox-side and carried out through the marker.
+                    'cost': llm.cost_of(response, VISION_MODEL),
                 }, sort_keys=True))
             print("\\n=== Plot Analysis (fig. {{}}) ===\\n".format(fig_num))
             print(response.choices[0].message.content)
@@ -481,7 +485,11 @@ class LiteLLMAG2Client:
         response = llm.complete(self.model, params["messages"], **kwargs)
         # This is the single point every AG2 response flows through, so usage is
         # recorded here rather than by patching AG2's OpenAIWrapper.
-        record_ag2_response_usage(response, agent_name=self.config.get("agent_name"))
+        record_ag2_response_usage(
+            response,
+            agent_name=self.config.get("agent_name"),
+            request_model=self.model,
+        )
         return response
 
     def message_retrieval(self, response: Any) -> list[str]:
@@ -490,17 +498,22 @@ class LiteLLMAG2Client:
 
     def cost(self, response: Any) -> float:
         """Return the response cost litellm computed, or zero."""
-        return float(getattr(response, "_hidden_params", {}).get("response_cost") or 0.0)
+        return llm.reported_cost(response) or 0.0
 
     @staticmethod
     def get_usage(response: Any) -> dict[str, Any]:
-        """Return AG2-compatible token usage metadata."""
+        """Return AG2-compatible token usage metadata.
+
+        AG2's interface requires a number, so an unpriced model reports zero
+        here. The usage tracker keeps the distinction between free and unpriced
+        that this loses; see :func:`autodiscovery.llm.cost_of`.
+        """
         usage = getattr(response, "usage", None)
         return {
             "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
             "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
             "total_tokens": getattr(usage, "total_tokens", 0) or 0,
-            "cost": float(getattr(response, "_hidden_params", {}).get("response_cost") or 0.0),
+            "cost": llm.reported_cost(response) or 0.0,
             "model": getattr(response, "model", None),
         }
 

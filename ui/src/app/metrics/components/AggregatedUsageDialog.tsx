@@ -32,12 +32,26 @@ const PALETTE = [
     '#fbbf24',
 ];
 
+// Cost recorded without a prompt / completion / reasoning split.
+const SPLIT_UNAVAILABLE_COLOR = '#6b7280';
+
 const fmt = (n: number) => (n || 0).toLocaleString();
 const fmtCost = (n: number) => `$${n.toFixed(2)}`;
+
+// One recording path knows a call's total cost but not how it splits across
+// prompt / completion / reasoning, so the parts can be zero while the total isn't.
+function hasCostSplit(b: AggregatedUsageBucket): boolean {
+    const parts =
+        (b.total_prompt_cost_usd || 0) +
+        (b.total_completion_cost_usd || 0) +
+        (b.total_reasoning_cost_usd || 0);
+    return parts > 1e-9;
+}
 
 function emptyBucket(): AggregatedUsageBucket {
     return {
         total_calls: 0,
+        priced_calls: 0,
         total_prompt_tokens: 0,
         total_completion_tokens: 0,
         total_reasoning_tokens: 0,
@@ -58,6 +72,7 @@ function sumBuckets(buckets: AggregatedUsageBucket[]): AggregatedUsageBucket {
     const acc = emptyBucket();
     buckets.forEach((b) => {
         acc.total_calls += b.total_calls || 0;
+        acc.priced_calls += b.priced_calls || 0;
         acc.total_prompt_tokens += b.total_prompt_tokens || 0;
         acc.total_completion_tokens += b.total_completion_tokens || 0;
         acc.total_reasoning_tokens += b.total_reasoning_tokens || 0;
@@ -199,7 +214,14 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
             l: 'Total Tokens',
             sub: `${fmt(Math.round(t.mean_tokens_per_run))} avg/run`,
         },
-        { v: String(t.total_calls), l: 'Total Calls' },
+        {
+            v: String(t.total_calls),
+            l: 'Total Calls',
+            sub:
+                t.total_calls > t.priced_calls
+                    ? `${fmt(t.total_calls - t.priced_calls)} calls unpriced`
+                    : undefined,
+        },
         {
             v: fmtCost(t.total_cost_usd),
             l: 'Total LLM Cost',
@@ -270,6 +292,15 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
         beliefPriorAggregate.total_cost_usd > 0
             ? beliefPosteriorAggregate.total_cost_usd / beliefPriorAggregate.total_cost_usd
             : null;
+
+    const costSplitUnavailable = activeCostBreakdownView
+        ? Object.values(data[activeCostBreakdownView.key]).some(
+              (b) => b.total_cost_usd > 0 && !hasCostSplit(b)
+          )
+        : false;
+    const beliefSplitUnavailable = [beliefPriorAggregate, beliefPosteriorAggregate].some(
+        (b) => b.total_cost_usd > 0 && !hasCostSplit(b)
+    );
 
     return (
         <Box>
@@ -401,6 +432,12 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         <LegendItem>
                             <LegendDot style={{ background: '#2dd4bf' }} /> Reasoning
                         </LegendItem>
+                        {costSplitUnavailable && (
+                            <LegendItem>
+                                <LegendDot style={{ background: SPLIT_UNAVAILABLE_COLOR }} /> Split
+                                unavailable
+                            </LegendItem>
+                        )}
                     </LegendRow>
                     <Tabs
                         value={costViewIndex}
@@ -460,6 +497,12 @@ function AggregatedUsageContent({ data }: { data: AggregatedUsageResponse }) {
                         <LegendItem>
                             <LegendDot style={{ background: '#2dd4bf' }} /> Reasoning
                         </LegendItem>
+                        {beliefSplitUnavailable && (
+                            <LegendItem>
+                                <LegendDot style={{ background: SPLIT_UNAVAILABLE_COLOR }} /> Split
+                                unavailable
+                            </LegendItem>
+                        )}
                     </LegendRow>
                     <BeliefPriorPosteriorBars
                         prior={beliefPriorAggregate}
@@ -509,11 +552,22 @@ function BeliefPriorPosteriorBars({
                 const completionPct = total > 0 ? (b.total_completion_cost_usd / total) * 100 : 0;
                 const reasoningPct = total > 0 ? (b.total_reasoning_cost_usd / total) * 100 : 0;
                 const small = widthPct < 20;
+                const splitKnown = hasCostSplit(b);
                 return (
                     <BarRow key={stage}>
                         <BarLabel>{stage === 'prior' ? 'Prior' : 'Posterior'}</BarLabel>
                         <BarTrack>
                             <CostBarFill style={{ width: `${Math.max(widthPct, 1.5)}%` }}>
+                                {/* Without a split the parts are all zero, so fill the bar with a
+                                    single neutral segment rather than leaving it empty. */}
+                                {!splitKnown && (
+                                    <CostSegment
+                                        style={{
+                                            width: '100%',
+                                            background: SPLIT_UNAVAILABLE_COLOR,
+                                        }}
+                                    />
+                                )}
                                 {promptPct > 0 && (
                                     <CostSegment
                                         style={{ width: `${promptPct}%`, background: '#818cf8' }}
@@ -668,12 +722,23 @@ function CostBreakdownBars({ data }: { data: Record<string, AggregatedUsageBucke
                 const completionPct = total > 0 ? (d.total_completion_cost_usd / total) * 100 : 0;
                 const reasoningPct = total > 0 ? (d.total_reasoning_cost_usd / total) * 100 : 0;
                 const small = widthPct < 20;
+                const splitKnown = hasCostSplit(d);
 
                 return (
                     <BarRow key={key}>
                         <BarLabel>{prettyName(key)}</BarLabel>
                         <BarTrack>
                             <CostBarFill style={{ width: `${Math.max(widthPct, 1.5)}%` }}>
+                                {/* Without a split the parts are all zero, so fill the bar with a
+                                    single neutral segment rather than leaving it empty. */}
+                                {!splitKnown && (
+                                    <CostSegment
+                                        style={{
+                                            width: '100%',
+                                            background: SPLIT_UNAVAILABLE_COLOR,
+                                        }}
+                                    />
+                                )}
                                 {promptPct > 0 && (
                                     <CostSegment
                                         style={{ width: `${promptPct}%`, background: '#818cf8' }}

@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import { getMetricsApi } from '@/api/MetricsApi';
-import type { UserDetailMetrics } from '@/types/Metrics';
+import type { LLMCostStatus, UserDetailMetrics } from '@/types/Metrics';
 import MetricCard from '../../components/MetricCard';
 import { scrollbarStyles } from '@/utils/scrollbar';
 
@@ -19,6 +19,15 @@ const STATUS_COLORS: Record<string, string> = {
     CREATED: 'default',
     DELETED: 'default',
 };
+
+const COST_STATUS_TITLES: Record<LLMCostStatus, string | undefined> = {
+    complete: undefined,
+    partial: 'Some calls could not be priced',
+    unavailable: 'No per-call cost recorded for this run',
+};
+
+const missingCostNote = (n: number) =>
+    n > 0 ? `excludes ${n} run${n === 1 ? '' : 's'} with no recorded cost` : undefined;
 
 export default function UserDetailPage() {
     const params = useParams();
@@ -63,6 +72,11 @@ export default function UserDetailPage() {
 
     const s = data.summary;
     const fmtCost = (v: number) => `$${v.toFixed(2)}`;
+    const fmtCostStatus = (v: number, status: LLMCostStatus) => {
+        if (status === 'unavailable') return 'n/a';
+        if (status === 'partial') return `≥ ${fmtCost(v)}`;
+        return fmtCost(v);
+    };
     const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
     const fmtDuration = (secs: number | null) => {
         if (secs == null) return '-';
@@ -102,7 +116,11 @@ export default function UserDetailPage() {
                 <MetricCard value={s.total_runs.toLocaleString()} label="Total Runs" />
                 <MetricCard value={fmtPct(s.success_rate)} label="Success Rate" />
                 <MetricCard value={s.total_experiments.toLocaleString()} label="Experiments" />
-                <MetricCard value={fmtCost(s.llm_cost_usd)} label="LLM Cost" />
+                <MetricCard
+                    value={fmtCost(s.llm_cost_usd)}
+                    label="LLM Cost"
+                    subValue={missingCostNote(s.runs_missing_cost)}
+                />
                 <MetricCard value={s.shared_runs.toLocaleString()} label="Shared Runs" />
             </CardGrid>
 
@@ -146,7 +164,9 @@ export default function UserDetailPage() {
                                     {run.n_experiments_completed}/{run.n_experiments_requested}
                                 </Td>
                                 <Td>{fmtDuration(run.duration_seconds)}</Td>
-                                <Td>{fmtCost(run.llm_cost_usd)}</Td>
+                                <Td title={COST_STATUS_TITLES[run.llm_cost_status]}>
+                                    {fmtCostStatus(run.llm_cost_usd, run.llm_cost_status)}
+                                </Td>
                                 <Td>
                                     {run.created_at
                                         ? new Date(run.created_at).toLocaleDateString()

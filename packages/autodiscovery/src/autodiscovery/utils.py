@@ -89,6 +89,7 @@ def query_llm(
             usage_tracker.record_response(
                 response,
                 source=llm.provider_of(model),
+                request_model=model,
                 component=usage_component,
                 agent_name=usage_agent_name,
                 node_id=usage_node_id,

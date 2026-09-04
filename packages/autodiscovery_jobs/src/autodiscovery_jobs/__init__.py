@@ -63,6 +63,7 @@ from .exceptions import (
 
 # Re-export functional APIs for direct use
 from .gcs import (
+    UserDataSummary,
     create_job_directory,
     delete_job_directory,
     download_job_results,
@@ -74,7 +75,9 @@ from .gcs import (
     list_user_ids,
     list_user_jobs,
     parse_gcs_path,
+    purge_user_data,
     soft_delete_job,
+    summarize_user_data,
     upload_dataset,
     upload_metadata,
 )
@@ -134,6 +137,10 @@ __all__ = [
     "create_job_directory",
     "delete_job_directory",
     "soft_delete_job",
+    # Per-user erasure (maintainer-only; see scripts/purge_user_data.py)
+    "UserDataSummary",
+    "summarize_user_data",
+    "purge_user_data",
     "upload_dataset",
     "expire_datasets",
     "upload_metadata",

@@ -7,7 +7,7 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 [pypi]: https://pypi.org/project/asta-autodiscovery/
 
-## Unreleased
+## 1.0.1
 
 ### Breaking: Vertex AI is configured with litellm's own variables ([#78])
 

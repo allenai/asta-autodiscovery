@@ -80,18 +80,19 @@ need to configure the providers you actually name in `--model`, `--belief_model`
 Used when a model flag names `vertex_ai/...`. The defaults are Vertex models, so this is required
 unless you override them all.
 
-Pick one of the following. In all cases, set the project (and optionally location) so the agent
-knows which Vertex endpoint to call:
+Pick one of the following. In all cases, set the project and location so the agent knows which
+Vertex endpoint to call — these are litellm's own variable names, read by litellm itself:
 
 ```sh
-export VERTEX_PROJECT_ID=your-gcp-project-id
-export VERTEX_LOCATION=global   # optional; defaults to "global"
+export VERTEXAI_PROJECT=your-gcp-project-id
+export VERTEXAI_LOCATION=global   # `global` serves the default models
 ```
 
-`VERTEX_PROJECT_ID` is required for a `vertex_ai/` model, and a run that names one without it
-stops at startup naming the variable. It is not inferred from your credentials: Application
-Default Credentials carry a project of their own, which is frequently not the project you meant,
-so relying on it turns a missing setting into a confusing 404 about an unrelated project.
+Both are required for a `vertex_ai/` model, and a run that names one without them stops at
+startup naming whichever is missing. Neither is inferred: Application Default Credentials carry
+a project of their own, which is frequently not the project you meant, and litellm's fallback
+location is `us-central1`, which does not serve the Gemini models the defaults name. Relying on
+either turns a missing setting into a confusing 404 mid-run.
 
 **Service account key file (recommended for non-interactive use):**
 

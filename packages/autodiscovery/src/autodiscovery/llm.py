@@ -25,11 +25,12 @@ package documents and tests:
 
 - ``vertex_ai`` uses Application Default Credentials. Set
   ``GOOGLE_APPLICATION_CREDENTIALS`` to a service-account key, or run
-  ``gcloud auth application-default login`` locally. ``VERTEX_PROJECT_ID`` and
-  ``VERTEX_LOCATION`` are mapped onto litellm's ``vertex_project`` /
-  ``vertex_location`` so existing deployment env vars keep working. A project is
-  required and checked at startup; a location is optional and defaults to
-  ``global``.
+  ``gcloud auth application-default login`` locally. The project and location
+  come from litellm's own ``VERTEXAI_PROJECT`` and ``VERTEXAI_LOCATION``, which
+  litellm reads itself -- nothing is mapped, defaulted or inferred here. Both
+  are required, and their presence is checked at startup so an unset one is a
+  named flag error rather than litellm's silent fallback to the credentials'
+  project and to ``us-central1`` (which does not serve the default models).
 - ``openai`` uses ``OPENAI_API_KEY``.
 - ``github_copilot`` caches a GitHub OAuth token at
   ``$GITHUB_COPILOT_TOKEN_DIR/access-token`` (default
@@ -53,20 +54,18 @@ OPENAI = "openai"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
 
-VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
-VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
-
-# litellm's own names for the same two settings, read as lower-priority
-# fallbacks: a deployment configured litellm's way must not be rejected by the
-# startup check, nor have its location overridden by the default below.
-_LITELLM_VERTEX_PROJECT_ENV_VARS = ("VERTEXAI_PROJECT", "VERTEX_PROJECT")
-_LITELLM_VERTEX_LOCATION_ENV_VARS = ("VERTEXAI_LOCATION",)
-
-#: Location used when none is configured. litellm's own default is
-#: ``us-central1``, which does not serve the Gemini models this package defaults
-#: to -- an unset location there yields a 404 that reads like the model does not
-#: exist. ``global`` serves them, so it is what unset has to mean here.
-VERTEX_DEFAULT_LOCATION = "global"
+#: Vertex settings this package requires, in litellm's own names. litellm reads
+#: these from the environment on its own, so they are never read or forwarded
+#: here -- only checked for presence, because each has a litellm fallback that
+#: is worse than an error: the project falls back to whatever the Application
+#: Default Credentials happen to name, and the location to ``us-central1``,
+#: which does not serve the Gemini models this package defaults to. Most
+#: deployments want ``VERTEXAI_LOCATION=global``.
+_VERTEX_ENV_VAR_HELP = {
+    "VERTEXAI_PROJECT": "your Google Cloud project id",
+    "VERTEXAI_LOCATION": "the Vertex region, usually 'global'",
+}
+VERTEX_ENV_VARS = tuple(_VERTEX_ENV_VAR_HELP)
 
 #: Per-request timeout, matching the previous AG2/OpenAI client default.
 REQUEST_TIMEOUT_S = 600
@@ -317,16 +316,13 @@ def validate(
     """
     provider = provider_of(model)
 
-    # Vertex needs a project named explicitly. Without one, litellm silently
-    # uses whatever project the local credentials carry, so the first call fails
-    # with a 404 naming a project the operator never chose -- as a per-call
-    # error, mid-run, rather than here.
-    if provider == VERTEX_AI and not _vertex_project():
-        raise ModelError(
-            f"{flag}={model} needs a Vertex AI project. Set {VERTEX_PROJECT_ENV_VAR} to your "
-            f"Google Cloud project id. {VERTEX_LOCATION_ENV_VAR} is optional and defaults "
-            f"to '{VERTEX_DEFAULT_LOCATION}'."
-        )
+    # Vertex needs both settings named explicitly. Unset, litellm falls back to
+    # the credentials' project and to us-central1, so the first call 404s naming
+    # a project and region the operator never chose -- as a per-call error,
+    # mid-run, rather than here.
+    if provider == VERTEX_AI and (missing := [v for v in VERTEX_ENV_VARS if not os.getenv(v)]):
+        settings = " and ".join(f"{var} to {_VERTEX_ENV_VAR_HELP[var]}" for var in missing)
+        raise ModelError(f"{flag}={model} needs Vertex AI configuration. Set {settings}.")
 
     # Copilot's own endpoint knows what this account can call; litellm's static
     # catalog does not. Prefer it whenever we can read it without authenticating.
@@ -362,49 +358,6 @@ def validate(
         )
 
 
-def _vertex_project() -> str | None:
-    """Return the configured Vertex project, or None if none is configured.
-
-    Application Default Credentials also carry a project, and litellm falls back
-    to it. That fallback is deliberately not treated as configuration here: it is
-    whatever quota project the local credentials happen to name, which is often
-    not the project the operator meant, so relying on it turns a missing setting
-    into a 404 about an unrelated project.
-
-    Returns:
-        The project id, or None.
-    """
-    for env_var in (VERTEX_PROJECT_ENV_VAR, *_LITELLM_VERTEX_PROJECT_ENV_VARS):
-        if project := os.getenv(env_var):
-            return project
-    return None
-
-
-def _vertex_location() -> str:
-    """Return the configured Vertex location, or the default.
-
-    Returns:
-        The location, defaulting to :data:`VERTEX_DEFAULT_LOCATION`.
-    """
-    for env_var in (VERTEX_LOCATION_ENV_VAR, *_LITELLM_VERTEX_LOCATION_ENV_VARS):
-        if location := os.getenv(env_var):
-            return location
-    return VERTEX_DEFAULT_LOCATION
-
-
-def _provider_kwargs(model: str) -> dict[str, Any]:
-    """Return provider-scoped kwargs for a litellm call."""
-    if provider_of(model) != VERTEX_AI:
-        return {}
-    # Map this package's long-standing env vars onto litellm's parameter names
-    # so existing deployment configuration keeps working unchanged. The location
-    # is always passed: leaving it out would take litellm's us-central1 default.
-    kwargs: dict[str, Any] = {"vertex_location": _vertex_location()}
-    if project := _vertex_project():
-        kwargs["vertex_project"] = project
-    return kwargs
-
-
 def complete(model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
     """Run a chat completion.
 
@@ -424,7 +377,6 @@ def complete(model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
             model=model,
             messages=messages,
             timeout=REQUEST_TIMEOUT_S,
-            **_provider_kwargs(model),
             **kwargs,
         ),
         label=f"completion(model={model})",
@@ -447,7 +399,6 @@ def embed(model: str, inputs: list[str], **kwargs: Any) -> Any:
         lambda: litellm.embedding(
             model=model,
             input=inputs,
-            **_provider_kwargs(model),
             **kwargs,
         ),
         label=f"embedding(model={model})",

@@ -9,23 +9,29 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
-### Fixed: Vertex AI configuration ([#78])
+### Breaking: Vertex AI is configured with litellm's own variables ([#78])
 
-Two 1.0.0 regressions, both on the path a first run takes, since the default
-models are Vertex.
+**`VERTEX_PROJECT_ID` and `VERTEX_LOCATION` are no longer read. Use
+`VERTEXAI_PROJECT` and `VERTEXAI_LOCATION`, and set both.**
 
-- **`VERTEX_LOCATION` unset means `global` again.** 1.0.0 passed the location to
-  litellm only when the variable happened to be set, so unset took litellm's own
-  default of `us-central1` — which does not serve `vertex_ai/gemini-3.7-flash`.
-  The 404 that came back read as if the model did not exist. `global` is now
-  passed when nothing is configured, matching what the docs have said all along.
-- **A missing `VERTEX_PROJECT_ID` fails at startup again**, with a message naming
-  the variable, rather than letting litellm fall back to the Application Default
-  Credentials project and 404 on a project you never chose.
+```sh
+export VERTEXAI_PROJECT=your-gcp-project    # was VERTEX_PROJECT_ID
+export VERTEXAI_LOCATION=global             # was VERTEX_LOCATION, was optional
+```
 
-litellm's own `VERTEXAI_PROJECT`/`VERTEX_PROJECT` and `VERTEXAI_LOCATION` are
-also read, at lower precedence, so a deployment configured litellm's way is
-neither rejected by the new check nor overridden by the default location.
+litellm reads both variables itself, so this package no longer maps, defaults or
+infers any Vertex setting — it only checks at startup that both are set, and
+names the missing one in a one-line error. That check is the point of the
+change: each of litellm's fallbacks silently produces a mid-run 404 that reads
+as if the model does not exist. An unset project takes whatever project the
+Application Default Credentials carry, and an unset location takes
+`us-central1`, which does not serve `vertex_ai/gemini-3.7-flash`.
+
+This fixes both 1.0.0 regressions in [#78] — an unset location no longer means
+`us-central1`, and an unset project no longer means the credentials' project —
+and it does so without a second set of names for the same two settings. The
+rename is safe to make loudly: a deployment still setting only the old names
+now fails at startup naming the new ones, rather than drifting onto a fallback.
 
 A model-flag mistake now exits with a one-line error instead of a traceback.
 That covers the `<provider>/<model>` prefix error every 0.2.x command line hits
@@ -106,6 +112,9 @@ gcloud auth application-default login
 `VERTEX_PROJECT_ID` and `VERTEX_LOCATION` keep working — they are mapped onto
 litellm's `vertex_project` / `vertex_location` — so existing deployment config
 needs no change beyond credentials. `OPENAI_API_KEY` is unchanged.
+
+> Superseded: as of the next release these two names are no longer read. See
+> [Vertex AI is configured with litellm's own variables](#breaking-vertex-ai-is-configured-with-litellms-own-variables-78) above.
 
 ### Breaking: default models changed
 

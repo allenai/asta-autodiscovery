@@ -75,8 +75,8 @@ credentials follow litellm's conventions per provider.
 Default Credentials:
 
 ```sh
-export VERTEX_PROJECT_ID=your-gcp-project
-export VERTEX_LOCATION=global            # optional, defaults to global
+export VERTEXAI_PROJECT=your-gcp-project
+export VERTEXAI_LOCATION=global          # `global` serves the default models
 
 # Either a service-account key...
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
@@ -84,16 +84,15 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 gcloud auth application-default login
 ```
 
-The project is required and is not inferred from your credentials — a run
-naming a `vertex_ai/` model without `VERTEX_PROJECT_ID` stops at startup naming
-the variable. Application Default Credentials carry a project of their own, but
-it is frequently not the one you meant, and using it silently would turn a
-missing setting into a 404 about an unrelated project. The location is optional
-because `global` serves the Gemini models this package defaults to; litellm's
-own default, `us-central1`, does not.
-
-litellm's own `VERTEXAI_PROJECT`/`VERTEX_PROJECT` and `VERTEXAI_LOCATION` work
-too, and take lower precedence than the names above.
+Both variables are litellm's own — this package defines no Vertex settings of
+its own and maps nothing. Both are required: a run naming a `vertex_ai/` model
+without them stops at startup naming the ones that are missing, because
+litellm's fallback for each is worse than an error. An unset project takes
+whatever project your Application Default Credentials carry, which is
+frequently not the one you meant; an unset location takes `us-central1`, which
+does not serve the Gemini models this package defaults to. Either way the first
+model call 404s mid-run, and the 404 reads as if the model does not exist. Set
+`VERTEXAI_LOCATION=global` unless you have a specific region in mind.
 
 **OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 

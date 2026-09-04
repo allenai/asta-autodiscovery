@@ -6,9 +6,8 @@ import pytest
 from autodiscovery.args import ArgParser
 from autodiscovery.easy import build_parser, cli_main
 from autodiscovery.llm import (
-    VERTEX_DEFAULT_LOCATION,
+    VERTEX_ENV_VARS,
     ModelError,
-    _provider_kwargs,
     accepts_temperature,
     max_n,
     model_info,
@@ -18,26 +17,22 @@ from autodiscovery.llm import (
 )
 from autodiscovery.run import resolve_model_args
 
-#: Every env var that can configure a Vertex project or location -- this
-#: package's own names plus litellm's, which are read as fallbacks.
-VERTEX_ENV_VARS = (
-    "VERTEX_PROJECT_ID",
-    "VERTEXAI_PROJECT",
-    "VERTEX_PROJECT",
-    "VERTEX_LOCATION",
-    "VERTEXAI_LOCATION",
-)
-
 
 @pytest.fixture(autouse=True)
 def _unconfigured_vertex_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Start every test from an unconfigured Vertex environment.
 
     Validation reads these, so a developer's own exports would otherwise decide
-    whether a test here passes. Tests that need a project configure one.
+    whether a test here passes. Tests that need Vertex configure them.
     """
     for env_var in VERTEX_ENV_VARS:
         monkeypatch.delenv(env_var, raising=False)
+
+
+def configure_vertex(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set every Vertex variable the startup check requires."""
+    monkeypatch.setenv("VERTEXAI_PROJECT", "test-project")
+    monkeypatch.setenv("VERTEXAI_LOCATION", "global")
 
 
 def engine_args(*extra: str) -> Namespace:
@@ -233,7 +228,7 @@ def test_copilot_live_catalog_never_authenticates(monkeypatch, tmp_path) -> None
 
 def test_validate_allows_models_litellm_has_not_mapped(monkeypatch) -> None:
     """Open-catalog providers ship models before litellm maps them."""
-    monkeypatch.setenv("VERTEX_PROJECT_ID", "test-project")
+    configure_vertex(monkeypatch)
 
     validate("vertex_ai/gemini-4.7-pro-preview", flag="--model")
 
@@ -264,7 +259,7 @@ def test_validation_never_triggers_copilot_device_flow(monkeypatch) -> None:
 
 
 def test_engine_defaults_are_litellm_qualified(monkeypatch) -> None:
-    monkeypatch.setenv("VERTEX_PROJECT_ID", "test-project")
+    configure_vertex(monkeypatch)
     args = engine_args()
 
     assert args.model == "vertex_ai/gemini-3.7-flash"
@@ -292,7 +287,7 @@ def test_provider_flags_are_gone(flag: str) -> None:
 
 def test_mixed_provider_runs_are_expressible(monkeypatch) -> None:
     """One flag per role, so chat and vision need not share a provider."""
-    monkeypatch.setenv("VERTEX_PROJECT_ID", "test-project")
+    configure_vertex(monkeypatch)
     args = engine_args(
         "--model",
         "github_copilot/claude-haiku-4.5",
@@ -315,81 +310,49 @@ def test_unqualified_model_flag_fails_at_startup() -> None:
 # --- Vertex configuration --------------------------------------------------
 
 
-def test_unset_location_means_global(monkeypatch) -> None:
-    """litellm's default is us-central1, which does not serve our default model.
+def test_the_required_vertex_env_vars_are_litellms_own() -> None:
+    """The package defines no Vertex env vars of its own.
 
-    Leaving ``vertex_location`` out of the call takes that default, and the
-    resulting 404 reads as if the model does not exist. So an unset location has
-    to resolve to ``global`` here rather than simply be omitted.
+    litellm reads these two itself, so naming them is the whole integration:
+    nothing is mapped onto ``vertex_project``/``vertex_location`` and nothing is
+    defaulted here. The check below is only a presence check.
     """
-    monkeypatch.setenv("VERTEX_PROJECT_ID", "my-project")
-
-    assert _provider_kwargs("vertex_ai/gemini-3.7-flash") == {
-        "vertex_project": "my-project",
-        "vertex_location": VERTEX_DEFAULT_LOCATION,
-    }
-    assert VERTEX_DEFAULT_LOCATION == "global"
+    assert VERTEX_ENV_VARS == ("VERTEXAI_PROJECT", "VERTEXAI_LOCATION")
 
 
-def test_a_configured_location_is_passed_through(monkeypatch) -> None:
-    monkeypatch.setenv("VERTEX_PROJECT_ID", "my-project")
-    monkeypatch.setenv("VERTEX_LOCATION", "us-east4")
+@pytest.mark.parametrize("configured", ["VERTEXAI_PROJECT", "VERTEXAI_LOCATION", None])
+def test_a_vertex_model_needs_both_settings(configured: str | None, monkeypatch) -> None:
+    """Neither litellm fallback is acceptable, so both must be set.
 
-    assert _provider_kwargs("vertex_ai/gemini-3.7-flash")["vertex_location"] == "us-east4"
-
-
-def test_litellms_own_vertex_env_vars_are_honoured(monkeypatch) -> None:
-    """A deployment configured litellm's way must not be rejected or overridden.
-
-    litellm reads ``VERTEXAI_PROJECT``/``VERTEX_PROJECT`` and
-    ``VERTEXAI_LOCATION`` itself, so those configure a run just as much as this
-    package's own names do.
+    An unset project falls back to whatever the Application Default Credentials
+    carry, and an unset location to ``us-central1``, which does not serve the
+    default models -- both as a 404 mid-run rather than at startup. The message
+    has to name the variables that are missing.
     """
-    monkeypatch.setenv("VERTEXAI_PROJECT", "litellm-project")
-    monkeypatch.setenv("VERTEXAI_LOCATION", "europe-west4")
+    if configured:
+        monkeypatch.setenv(configured, "something")
+    missing = [var for var in VERTEX_ENV_VARS if var != configured]
+
+    with pytest.raises(ModelError) as excinfo:
+        validate("vertex_ai/gemini-3.7-flash", flag="--model")
+
+    assert all(var in str(excinfo.value) for var in missing)
+    if configured:
+        assert configured not in str(excinfo.value)
+
+
+def test_a_configured_vertex_model_validates(monkeypatch) -> None:
+    configure_vertex(monkeypatch)
 
     validate("vertex_ai/gemini-3.7-flash", flag="--model")
 
-    assert _provider_kwargs("vertex_ai/gemini-3.7-flash") == {
-        "vertex_project": "litellm-project",
-        "vertex_location": "europe-west4",
-    }
 
-
-def test_this_packages_env_vars_win_over_litellms(monkeypatch) -> None:
-    monkeypatch.setenv("VERTEX_PROJECT_ID", "ours")
-    monkeypatch.setenv("VERTEXAI_PROJECT", "litellms")
-    monkeypatch.setenv("VERTEX_LOCATION", "us-east4")
-    monkeypatch.setenv("VERTEXAI_LOCATION", "europe-west4")
-
-    assert _provider_kwargs("vertex_ai/gemini-3.7-flash") == {
-        "vertex_project": "ours",
-        "vertex_location": "us-east4",
-    }
-
-
-def test_non_vertex_models_get_no_vertex_kwargs() -> None:
-    assert _provider_kwargs("openai/gpt-4o") == {}
-    assert _provider_kwargs("github_copilot/claude-haiku-4.5") == {}
-
-
-def test_a_vertex_model_without_a_project_fails_validation() -> None:
-    """Unset must not mean "whatever project the local credentials carry".
-
-    litellm falls back to the Application Default Credentials project, so the
-    first call 404s naming a project the operator never chose -- mid-run, as a
-    per-call error. The message has to name the variable to set.
-    """
-    with pytest.raises(ModelError, match="VERTEX_PROJECT_ID"):
-        validate("vertex_ai/gemini-3.7-flash", flag="--model")
-
-
-def test_a_missing_vertex_project_stops_a_run_before_any_model_call() -> None:
-    with pytest.raises(ModelError, match="VERTEX_PROJECT_ID"):
+def test_a_missing_vertex_setting_stops_a_run_before_any_model_call() -> None:
+    with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
         resolve_model_args(engine_args())
 
 
-def test_a_run_naming_no_vertex_model_needs_no_vertex_project() -> None:
+def test_a_run_naming_no_vertex_model_needs_no_vertex_settings() -> None:
     """The check is scoped to the provider that needs it."""
     resolve_model_args(
         engine_args(
@@ -408,7 +371,7 @@ def test_a_run_naming_no_vertex_model_needs_no_vertex_project() -> None:
     [
         # The default models are Vertex, so an unconfigured project is the most
         # likely first-run failure of all.
-        ([], "VERTEX_PROJECT_ID"),
+        ([], "VERTEXAI_PROJECT"),
         # Every 0.2.x user hits this one on upgrade.
         (["--model", "gemini-3.7-flash"], "missing a provider"),
     ],

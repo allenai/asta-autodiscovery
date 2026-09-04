@@ -1143,12 +1143,6 @@ def generate_upload_url(
 # run by a system maintainer. See scripts/README.md.
 # ---------------------------------------------------------------------------
 
-# Derived metrics snapshot. It caches one record per job -- including the owning
-# userid -- so a subject erasure has to strip the subject's rows from it too.
-# api/metrics/aggregator.py imports this as its PERSIST_BLOB_PATH so the path has
-# a single definition.
-METRICS_CACHE_BLOB_PATH = "_metrics/jobs_cache.json"
-
 
 @dataclass
 class UserDataSummary:
@@ -1166,7 +1160,6 @@ class UserDataSummary:
         shared_run_ids: Jobs with an ``index/shared-runs/`` entry naming the user.
             The entry itself stores the userid, so it is in scope for erasure.
         has_user_profile: Whether ``users/{userid}/user.json`` (credits) exists.
-        metrics_cache_entries: Rows naming the user in the derived metrics cache.
         object_paths: Every object path under the user prefix, sorted.
     """
 
@@ -1178,15 +1171,12 @@ class UserDataSummary:
     active_job_ids: list[str]
     shared_run_ids: list[str]
     has_user_profile: bool
-    metrics_cache_entries: int
     object_paths: list[str]
 
     @property
     def is_empty(self) -> bool:
         """Whether the subject has no data left anywhere this summary covers."""
-        return (
-            self.object_count == 0 and not self.shared_run_ids and self.metrics_cache_entries == 0
-        )
+        return self.object_count == 0 and not self.shared_run_ids
 
 
 def _validate_userid(userid: str) -> str:
@@ -1237,59 +1227,6 @@ def _shared_run_ids_for_user(bucket: storage.Bucket, userid: str) -> list[str]:
     return sorted(matches)
 
 
-def _load_metrics_cache(bucket: storage.Bucket) -> dict[str, Any] | None:
-    """Read the derived metrics cache, or None when absent or unreadable."""
-    try:
-        payload = json.loads(bucket.blob(METRICS_CACHE_BLOB_PATH).download_as_text())
-    except Exception:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _count_metrics_cache_entries(bucket: storage.Bucket, userid: str) -> int:
-    """Count rows in the derived metrics cache that name a user."""
-    payload = _load_metrics_cache(bucket)
-    if payload is None:
-        return 0
-    jobs = payload.get("jobs")
-    if not isinstance(jobs, list):
-        return 0
-    return sum(1 for job in jobs if isinstance(job, dict) and job.get("userid") == userid)
-
-
-def _purge_metrics_cache_entries(bucket: storage.Bucket, userid: str) -> int:
-    """Strip a user's rows from the derived metrics cache.
-
-    Rewrites the snapshot in place. A running API pod may still hold the
-    pre-purge cache in memory until it rescans or restarts; the authoritative
-    job data it would rescan from is gone by then, so the rows do not come back.
-
-    Args:
-        bucket: Bucket holding the cache.
-        userid: User identifier to strip.
-
-    Returns:
-        Number of rows removed.
-    """
-    payload = _load_metrics_cache(bucket)
-    if payload is None:
-        return 0
-    jobs = payload.get("jobs")
-    if not isinstance(jobs, list):
-        return 0
-
-    kept = [job for job in jobs if not (isinstance(job, dict) and job.get("userid") == userid)]
-    removed = len(jobs) - len(kept)
-    if removed == 0:
-        return 0
-
-    payload["jobs"] = kept
-    bucket.blob(METRICS_CACHE_BLOB_PATH).upload_from_string(
-        json.dumps(payload), content_type="application/json"
-    )
-    return removed
-
-
 def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDataSummary:
     """Inventory every object stored for a user, without deleting anything.
 
@@ -1337,7 +1274,6 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
                     job_ids.add(jobid)
 
         shared_run_ids = _shared_run_ids_for_user(bucket, userid)
-        metrics_cache_entries = _count_metrics_cache_entries(bucket, userid)
     except Exception as e:
         raise GCSError(f"Failed to summarize data for user {userid}: {e}")
 
@@ -1356,7 +1292,6 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
         active_job_ids=active_job_ids,
         shared_run_ids=shared_run_ids,
         has_user_profile=has_user_profile,
-        metrics_cache_entries=metrics_cache_entries,
         object_paths=sorted(object_paths),
     )
 
@@ -1371,16 +1306,20 @@ def purge_user_data(
     Unlike :func:`soft_delete_job`, this preserves nothing: uploaded datasets,
     results, metadata, run details and the credits profile under
     ``users/{userid}/`` are deleted outright, along with the user's shared-run
-    index entries and rows in the derived metrics cache. **There is no recovery
-    path.** Only :func:`summarize_user_data` should run before it.
+    index entries. **There is no recovery path.** Only
+    :func:`summarize_user_data` should run before it.
 
     Maintainer-only. Do not wire this to an HTTP route -- it is called from
     scripts/purge_user_data.py, which gates it behind an interactive
     confirmation.
 
-    This covers the primary ``autodiscovery`` bucket only. Datasets copied into
-    the Asta workspaces bucket are keyed by a different identifier; see
-    :func:`autodiscovery_jobs.asta_gcs.purge_asta_workspace_data`.
+    This covers the primary ``autodiscovery`` bucket only. Two nearby surfaces
+    are deliberately out of scope: dataset copies handed to the Asta workspaces
+    bucket by :func:`asta_gcs.copy_dataset_to_asta_workspace` belong to Asta
+    once the session there has been started, and the metrics dashboard's
+    derived job snapshot rebuilds itself by rescanning the job directories, so
+    the subject's rows drop out of it on the next refresh with no maintenance
+    here.
 
     Args:
         userid: User identifier (Auth0 ``sub``).
@@ -1395,7 +1334,6 @@ def purge_user_data(
         - deleted_objects: Object paths deleted (or that would be)
         - deleted_bytes: Combined size of those objects
         - deleted_shared_run_ids: Shared-run index entries removed
-        - metrics_cache_entries_removed: Rows stripped from the metrics cache
 
     Raises:
         ValueError: If ``userid`` is empty or contains a path separator.
@@ -1422,11 +1360,6 @@ def purge_user_data(
         if not dry_run:
             for jobid in shared_run_ids:
                 delete_shared_run_index(jobid, config)
-
-        if dry_run:
-            metrics_removed = _count_metrics_cache_entries(bucket, userid)
-        else:
-            metrics_removed = _purge_metrics_cache_entries(bucket, userid)
     except Exception as e:
         raise GCSError(f"Failed to purge data for user {userid}: {e}")
 
@@ -1437,5 +1370,4 @@ def purge_user_data(
         "deleted_objects": sorted(deleted_objects),
         "deleted_bytes": deleted_bytes,
         "deleted_shared_run_ids": shared_run_ids,
-        "metrics_cache_entries_removed": metrics_removed,
     }

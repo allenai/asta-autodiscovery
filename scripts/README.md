@@ -75,17 +75,18 @@ window), this preserves nothing and cannot be undone.
 | Uploaded datasets, results, run metadata | `gs://{bucket}/users/{sub}/**` |
 | Credits profile | `gs://{bucket}/users/{sub}/user.json` |
 | Shared-run index entries naming the user | `gs://{bucket}/index/shared-runs/*` |
-| The user's rows in the derived metrics cache | `gs://{bucket}/_metrics/jobs_cache.json` |
-| Dataset copies in the Asta workspaces bucket (with `--asta-user-uuid`) | `gs://{ASTA_BUCKET}/owners/{uuid}/**` |
 
 **What it does not erase** — each needs its own request, and the script prints
-this list on every run: asta-context-service artifacts under
-`/owners/{uuid}/artifacts`, the Asta user record and threads, the Auth0 profile,
-and application logs.
+this list on every run: the dataset copies AutoDiscovery hands to the Asta
+workspaces bucket (`owners/{uuid}/`) plus the asta-context-service artifacts
+registered from them, the Asta user record and threads, the Auth0 profile, and
+application logs. Once a dataset has been copied into the workspaces bucket and
+a session started on it, that copy belongs to Asta; AutoDiscovery is a client of
+that system and does not delete from it.
 
-AutoDiscovery never persists the Auth0 `sub` → Asta user UUID mapping (it is
-resolved per-request through Asta's login endpoint), so the Asta workspace UUID
-has to be looked up in Asta and passed in explicitly.
+The metrics dashboard's job snapshot needs no maintenance: it is derived by
+rescanning the job directories, so the subject's rows fall out of it on the next
+refresh once the directories are gone.
 
 ### Usage
 
@@ -97,8 +98,7 @@ uv run python scripts/purge_user_data.py --sub 'google-oauth2|123' --dry-run
 uv run python scripts/purge_user_data.py --sub 'google-oauth2|123' --dry-run --show-paths
 
 # 2. Purge. Prints the same inventory, then requires the sub to be retyped.
-uv run python scripts/purge_user_data.py --sub 'google-oauth2|123' \
-    --asta-user-uuid 00000000-0000-0000-0000-000000000000
+uv run python scripts/purge_user_data.py --sub 'google-oauth2|123'
 ```
 
 The confirmation step needs a TTY, so run it attached (`docker run -it ...`) —

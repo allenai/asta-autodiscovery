@@ -23,7 +23,6 @@ from autodiscovery.llm_usage import (
     UsageTracker,
     clear_ag2_usage_context,
     configure_ag2_usage_tracking,
-    extract_local_image_usage_markers,
     set_ag2_usage_context,
     snapshot_agents_actual_usage,
 )
@@ -645,22 +644,6 @@ def run_mcts(
                         if node.level == 1 and _warmstart_experiments is not None
                         else True
                     )
-                    if node.code_output:
-                        image_usage_entries, cleaned_output = extract_local_image_usage_markers(
-                            node.code_output
-                        )
-                        for usage_entry in image_usage_entries:
-                            usage_tracker.record_event(
-                                source=usage_entry.get("source", "openai"),
-                                component=usage_entry.get("component", "image_analysis.local"),
-                                model=usage_entry.get("model"),
-                                prompt_tokens=usage_entry.get("prompt_tokens", 0),
-                                completion_tokens=usage_entry.get("completion_tokens", 0),
-                                total_tokens=usage_entry.get("total_tokens"),
-                                agent_name=usage_entry.get("agent_name", "code_executor"),
-                                node_id=node.id,
-                            )
-                        node.code_output = cleaned_output
                     rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
                     _write_rich_outputs(node.level, node.node_idx, rich_outputs)
 

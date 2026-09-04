@@ -125,9 +125,9 @@ modes constrain temperature at the provider.
 
 `github_copilot/text-embedding-3-small` at 1536 dimensions is not numerically
 identical to the OpenAI `text-embedding-3-large` default, so keep the OpenAI
-embedding model when exact embedding geometry must be preserved. Copilot
-currently requires the `process` or `modal` execution backend; the `local`
-backend's generated image analysis code is tied to an OpenAI client.
+embedding model when exact embedding geometry must be preserved. Copilot works
+with every execution backend, including `local`: figures are interpreted in the
+CLI's own process, so `--vision_model` is never resolved inside the sandbox.
 
 ## Run
 

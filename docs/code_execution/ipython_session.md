@@ -56,7 +56,9 @@ If `timeout_s` is set while `use_subprocess=False`, `run_cell` raises a
 - `stdout` (str): Captured stdout during execution.
 - `stderr` (str): Captured stderr during execution.
 - `rich_outputs` (list[dict[str, Any]]): A list of MIME bundles corresponding to
-  display outputs.
+  display outputs. Matplotlib figures the cell left open are flushed into this
+  list once the cell finishes, so a figure is returned whether or not the cell
+  called `plt.show()`.
 - `success` (bool): Whether IPython reports successful execution.
 - `error` (dict[str, str] | None): Error details when execution fails.
 

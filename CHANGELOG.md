@@ -7,6 +7,35 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 [pypi]: https://pypi.org/project/asta-autodiscovery/
 
+## Unreleased
+
+### Plot interpretation always happens outside the execution environment ([#74])
+
+Every `--backend` now returns figures as structured outputs, and the CLI process
+interprets them with `--vision_model`. Previously only `process` and `modal` did
+that; `--backend local` instead had a generated matplotlib patch prepended to
+each code block, which called the vision model from *inside* the executed
+program and reported its token usage back as a marker line on stdout.
+
+- Model credentials are no longer needed inside any execution environment, and
+  `--vision_model` may name any provider on any backend — including
+  `github_copilot`, which `local` previously could not use.
+- The agent's code is no longer rewritten before execution.
+- `local` figures now persist to `rich_outputs/` and appear in the HTML report,
+  which they never did before.
+- Image-analysis token usage is recorded through the usage tracker like every
+  other call, under the `image_analysis` component (`image_analysis.local` and
+  `image_analysis.modal` are gone).
+- `asta-code-execution` returns matplotlib figures a cell left open, so a figure
+  is captured whether or not the code called `plt.show()`.
+
+`--backend local` now runs each cell as an IPython cell in a child process using
+the CLI's own Python environment, rather than as a script through AG2's
+`LocalCommandLineCodeExecutor`. It remains the least isolated backend; `process`
+(the default) is unchanged.
+
+[#74]: https://github.com/allenai/asta-autodiscovery/issues/74
+
 ## 1.0.0
 
 First release of the litellm-based model layer ([#67], [#68]). Every model call

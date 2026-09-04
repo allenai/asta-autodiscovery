@@ -6,7 +6,6 @@ import pytest
 from autodiscovery.args import ArgParser
 from autodiscovery.easy import build_parser, cli_main
 from autodiscovery.llm import (
-    VERTEX_ENV_VARS,
     ModelError,
     accepts_temperature,
     max_n,
@@ -25,7 +24,7 @@ def _unconfigured_vertex_env(monkeypatch: pytest.MonkeyPatch) -> None:
     Validation reads these, so a developer's own exports would otherwise decide
     whether a test here passes. Tests that need Vertex configure them.
     """
-    for env_var in VERTEX_ENV_VARS:
+    for env_var in ("VERTEXAI_PROJECT", "VERTEXAI_LOCATION"):
         monkeypatch.delenv(env_var, raising=False)
 
 
@@ -310,35 +309,21 @@ def test_unqualified_model_flag_fails_at_startup() -> None:
 # --- Vertex configuration --------------------------------------------------
 
 
-def test_the_required_vertex_env_vars_are_litellms_own() -> None:
-    """The package defines no Vertex env vars of its own.
-
-    litellm reads these two itself, so naming them is the whole integration:
-    nothing is mapped onto ``vertex_project``/``vertex_location`` and nothing is
-    defaulted here. The check below is only a presence check.
-    """
-    assert VERTEX_ENV_VARS == ("VERTEXAI_PROJECT", "VERTEXAI_LOCATION")
-
-
 @pytest.mark.parametrize("configured", ["VERTEXAI_PROJECT", "VERTEXAI_LOCATION", None])
 def test_a_vertex_model_needs_both_settings(configured: str | None, monkeypatch) -> None:
     """Neither litellm fallback is acceptable, so both must be set.
 
     An unset project falls back to whatever the Application Default Credentials
     carry, and an unset location to ``us-central1``, which does not serve the
-    default models -- both as a 404 mid-run rather than at startup. The message
-    has to name the variables that are missing.
+    default models -- both as a 404 mid-run rather than at startup.
     """
     if configured:
         monkeypatch.setenv(configured, "something")
-    missing = [var for var in VERTEX_ENV_VARS if var != configured]
-
     with pytest.raises(ModelError) as excinfo:
         validate("vertex_ai/gemini-3.7-flash", flag="--model")
 
-    assert all(var in str(excinfo.value) for var in missing)
-    if configured:
-        assert configured not in str(excinfo.value)
+    assert "VERTEXAI_PROJECT" in str(excinfo.value)
+    assert "VERTEXAI_LOCATION" in str(excinfo.value)
 
 
 def test_a_configured_vertex_model_validates(monkeypatch) -> None:

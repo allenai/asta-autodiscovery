@@ -54,24 +54,6 @@ OPENAI = "openai"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
 
-#: Vertex settings this package requires, in litellm's own names. litellm reads
-#: these from the environment on its own, so they are never read or forwarded
-#: here -- only checked for presence, because each has a litellm fallback that
-#: is worse than an error: the project falls back to whatever the Application
-#: Default Credentials happen to name, and the location to ``us-central1``,
-#: which does not serve the Gemini models this package defaults to. Most
-#: deployments want ``VERTEXAI_LOCATION=global``.
-#:
-#: These names specifically, and not litellm's shorter ``VERTEX_PROJECT`` /
-#: ``VERTEX_LOCATION`` aliases: litellm reads the short pair only in
-#: ``embedding()``, while every completion path reads the ``VERTEXAI_`` pair
-#: alone. Only these two are honoured by every call this package makes.
-_VERTEX_ENV_VAR_HELP = {
-    "VERTEXAI_PROJECT": "your Google Cloud project id",
-    "VERTEXAI_LOCATION": "the Vertex region, usually 'global'",
-}
-VERTEX_ENV_VARS = tuple(_VERTEX_ENV_VAR_HELP)
-
 #: Per-request timeout, matching the previous AG2/OpenAI client default.
 REQUEST_TIMEOUT_S = 600
 
@@ -325,9 +307,14 @@ def validate(
     # the credentials' project and to us-central1, so the first call 404s naming
     # a project and region the operator never chose -- as a per-call error,
     # mid-run, rather than here.
-    if provider == VERTEX_AI and (missing := [v for v in VERTEX_ENV_VARS if not os.getenv(v)]):
-        settings = " and ".join(f"{var} to {_VERTEX_ENV_VAR_HELP[var]}" for var in missing)
-        raise ModelError(f"{flag}={model} needs Vertex AI configuration. Set {settings}.")
+    if provider == VERTEX_AI and (
+        not os.getenv("VERTEXAI_PROJECT") or not os.getenv("VERTEXAI_LOCATION")
+    ):
+        raise ModelError(
+            f"{flag}={model} needs Vertex AI configuration. Set VERTEXAI_PROJECT "
+            "to your Google Cloud project id and VERTEXAI_LOCATION to the Vertex "
+            "region, usually 'global'."
+        )
 
     # Copilot's own endpoint knows what this account can call; litellm's static
     # catalog does not. Prefer it whenever we can read it without authenticating.

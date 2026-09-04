@@ -8,7 +8,7 @@ cd "${ROOT_DIR}"
 # Configuration
 PROJECT_ID=$(gcloud config get-value project)
 REGION="us-west1"
-VERTEX_LOCATION="${VERTEX_LOCATION:-$REGION}"
+VERTEXAI_LOCATION="${VERTEXAI_LOCATION:-global}"
 ENV_TAG="${ENV_TAG:-dev}"  # Default to dev, override with ENV_TAG=prod
 SKIP_BUILD="${SKIP_BUILD:-false}"  # Set SKIP_BUILD=true to skip image build
 IMAGE="us-west1-docker.pkg.dev/${PROJECT_ID}/autodiscovery/autodiscovery:${ENV_TAG}"
@@ -92,7 +92,7 @@ gcloud run jobs update ${JOB_NAME} \
     --region ${REGION} \
     --image ${IMAGE} \
     --update-secrets "${UPDATE_SECRETS_ARG}" \
-    --update-env-vars "VERTEX_PROJECT_ID=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION}" \
+    --update-env-vars "VERTEXAI_PROJECT=${PROJECT_ID},VERTEXAI_LOCATION=${VERTEXAI_LOCATION}" \
     --add-volume name=job-storage,type=cloud-storage,bucket=${BUCKET} \
     --add-volume-mount volume=job-storage,mount-path=/mnt/gcs
 

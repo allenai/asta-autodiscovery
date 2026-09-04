@@ -165,8 +165,8 @@ Model access for the discovery agents.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `OPENAI_API_KEY` | Conditional | *(none)* | OpenAI API key. Required when using OpenAI models. |
-| `VERTEX_PROJECT_ID` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models. |
-| `VERTEX_LOCATION` | No | `global` | Vertex AI location/region. |
+| `VERTEXAI_PROJECT` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models, and checked at startup; it is not inferred from the Application Default Credentials project. Read by litellm itself — this is litellm's own variable name, not one this package defines. |
+| `VERTEXAI_LOCATION` | Conditional | *(none)* | Vertex AI location/region, required alongside `VERTEXAI_PROJECT` and checked at startup. Use `global` unless you have a reason not to: it serves the Gemini models the CLI defaults to, and litellm's own fallback, `us-central1`, does not. Also litellm's variable. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Conditional | *(none)* | Service-account key for Vertex. Vertex uses Application Default Credentials; run `gcloud auth application-default login` instead for local development. |
 | `GITHUB_COPILOT_TOKEN_DIR` | No | `~/.config/litellm/github_copilot` | Directory holding an `access-token` file with a GitHub OAuth token. Interactive runs obtain and cache this via device-code login; pre-seed it for non-interactive runs, which otherwise block on a device prompt. |
 | `ASTA_AGENTS_MODEL` | No | `openai/gpt-5-mini` | Model used by the `agents` package (LiteLLM model string). |

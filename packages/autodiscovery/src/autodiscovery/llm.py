@@ -25,9 +25,12 @@ package documents and tests:
 
 - ``vertex_ai`` uses Application Default Credentials. Set
   ``GOOGLE_APPLICATION_CREDENTIALS`` to a service-account key, or run
-  ``gcloud auth application-default login`` locally. ``VERTEX_PROJECT_ID`` and
-  ``VERTEX_LOCATION`` are mapped onto litellm's ``vertex_project`` /
-  ``vertex_location`` so existing deployment env vars keep working.
+  ``gcloud auth application-default login`` locally. The project and location
+  come from litellm's own ``VERTEXAI_PROJECT`` and ``VERTEXAI_LOCATION``, which
+  litellm reads itself -- nothing is mapped, defaulted or inferred here. Both
+  are required, and their presence is checked at startup so an unset one is a
+  named flag error rather than litellm's silent fallback to the credentials'
+  project and to ``us-central1`` (which does not serve the default models).
 - ``openai`` uses ``OPENAI_API_KEY``.
 - ``github_copilot`` caches a GitHub OAuth token at
   ``$GITHUB_COPILOT_TOKEN_DIR/access-token`` (default
@@ -50,9 +53,6 @@ from autodiscovery.llm_retry import call_with_backoff
 OPENAI = "openai"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
-
-VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
-VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
 
 #: Per-request timeout, matching the previous AG2/OpenAI client default.
 REQUEST_TIMEOUT_S = 600
@@ -298,9 +298,23 @@ def validate(
         require_vision: Whether the model must accept image input.
 
     Raises:
-        ModelError: If the model cannot serve its role.
+        ModelError: If the model cannot serve its role, or its provider is
+            missing configuration the run cannot proceed without.
     """
     provider = provider_of(model)
+
+    # Vertex needs both settings named explicitly. Unset, litellm falls back to
+    # the credentials' project and to us-central1, so the first call 404s naming
+    # a project and region the operator never chose -- as a per-call error,
+    # mid-run, rather than here.
+    if provider == VERTEX_AI and (
+        not os.getenv("VERTEXAI_PROJECT") or not os.getenv("VERTEXAI_LOCATION")
+    ):
+        raise ModelError(
+            f"{flag}={model} needs Vertex AI configuration. Set VERTEXAI_PROJECT "
+            "to your Google Cloud project id and VERTEXAI_LOCATION to the Vertex "
+            "region, usually 'global'."
+        )
 
     # Copilot's own endpoint knows what this account can call; litellm's static
     # catalog does not. Prefer it whenever we can read it without authenticating.
@@ -336,20 +350,6 @@ def validate(
         )
 
 
-def _provider_kwargs(model: str) -> dict[str, Any]:
-    """Return provider-scoped kwargs for a litellm call."""
-    if provider_of(model) != VERTEX_AI:
-        return {}
-    kwargs: dict[str, Any] = {}
-    # Map this package's long-standing env vars onto litellm's parameter names
-    # so existing deployment configuration keeps working unchanged.
-    if project := os.getenv(VERTEX_PROJECT_ENV_VAR):
-        kwargs["vertex_project"] = project
-    if location := os.getenv(VERTEX_LOCATION_ENV_VAR):
-        kwargs["vertex_location"] = location
-    return kwargs
-
-
 def complete(model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
     """Run a chat completion.
 
@@ -369,7 +369,6 @@ def complete(model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
             model=model,
             messages=messages,
             timeout=REQUEST_TIMEOUT_S,
-            **_provider_kwargs(model),
             **kwargs,
         ),
         label=f"completion(model={model})",
@@ -392,7 +391,6 @@ def embed(model: str, inputs: list[str], **kwargs: Any) -> Any:
         lambda: litellm.embedding(
             model=model,
             input=inputs,
-            **_provider_kwargs(model),
             **kwargs,
         ),
         label=f"embedding(model={model})",

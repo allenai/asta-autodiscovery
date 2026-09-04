@@ -4,7 +4,7 @@ from argparse import Namespace
 
 import pytest
 from autodiscovery.args import ArgParser
-from autodiscovery.easy import build_parser
+from autodiscovery.easy import build_parser, cli_main
 from autodiscovery.llm import (
     ModelError,
     accepts_temperature,
@@ -15,6 +15,23 @@ from autodiscovery.llm import (
     validate,
 )
 from autodiscovery.run import resolve_model_args
+
+
+@pytest.fixture(autouse=True)
+def _unconfigured_vertex_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Start every test from an unconfigured Vertex environment.
+
+    Validation reads these, so a developer's own exports would otherwise decide
+    whether a test here passes. Tests that need Vertex configure them.
+    """
+    for env_var in ("VERTEXAI_PROJECT", "VERTEXAI_LOCATION"):
+        monkeypatch.delenv(env_var, raising=False)
+
+
+def configure_vertex(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set every Vertex variable the startup check requires."""
+    monkeypatch.setenv("VERTEXAI_PROJECT", "test-project")
+    monkeypatch.setenv("VERTEXAI_LOCATION", "global")
 
 
 def engine_args(*extra: str) -> Namespace:
@@ -208,8 +225,10 @@ def test_copilot_live_catalog_never_authenticates(monkeypatch, tmp_path) -> None
         _copilot_live_catalog.cache_clear()
 
 
-def test_validate_allows_models_litellm_has_not_mapped() -> None:
+def test_validate_allows_models_litellm_has_not_mapped(monkeypatch) -> None:
     """Open-catalog providers ship models before litellm maps them."""
+    configure_vertex(monkeypatch)
+
     validate("vertex_ai/gemini-4.7-pro-preview", flag="--model")
 
 
@@ -238,7 +257,8 @@ def test_validation_never_triggers_copilot_device_flow(monkeypatch) -> None:
 # --- CLI boundary ----------------------------------------------------------
 
 
-def test_engine_defaults_are_litellm_qualified() -> None:
+def test_engine_defaults_are_litellm_qualified(monkeypatch) -> None:
+    configure_vertex(monkeypatch)
     args = engine_args()
 
     assert args.model == "vertex_ai/gemini-3.7-flash"
@@ -264,8 +284,9 @@ def test_provider_flags_are_gone(flag: str) -> None:
         engine_args(flag, "copilot")
 
 
-def test_mixed_provider_runs_are_expressible() -> None:
+def test_mixed_provider_runs_are_expressible(monkeypatch) -> None:
     """One flag per role, so chat and vision need not share a provider."""
+    configure_vertex(monkeypatch)
     args = engine_args(
         "--model",
         "github_copilot/claude-haiku-4.5",
@@ -283,3 +304,96 @@ def test_unqualified_model_flag_fails_at_startup() -> None:
 
     with pytest.raises(ModelError, match="missing a provider"):
         resolve_model_args(args)
+
+
+# --- Vertex configuration --------------------------------------------------
+
+
+@pytest.mark.parametrize("configured", ["VERTEXAI_PROJECT", "VERTEXAI_LOCATION", None])
+def test_a_vertex_model_needs_both_settings(configured: str | None, monkeypatch) -> None:
+    """Neither litellm fallback is acceptable, so both must be set.
+
+    An unset project falls back to whatever the Application Default Credentials
+    carry, and an unset location to ``us-central1``, which does not serve the
+    default models -- both as a 404 mid-run rather than at startup.
+    """
+    if configured:
+        monkeypatch.setenv(configured, "something")
+    with pytest.raises(ModelError) as excinfo:
+        validate("vertex_ai/gemini-3.7-flash", flag="--model")
+
+    assert "VERTEXAI_PROJECT" in str(excinfo.value)
+    assert "VERTEXAI_LOCATION" in str(excinfo.value)
+
+
+def test_a_configured_vertex_model_validates(monkeypatch) -> None:
+    configure_vertex(monkeypatch)
+
+    validate("vertex_ai/gemini-3.7-flash", flag="--model")
+
+
+@pytest.mark.parametrize("alias", ["VERTEX_PROJECT", "VERTEX_LOCATION", "VERTEX_PROJECT_ID"])
+def test_litellms_short_aliases_do_not_satisfy_the_check(alias: str, monkeypatch) -> None:
+    """Only the ``VERTEXAI_`` pair counts, including over litellm's own aliases.
+
+    litellm reads ``VERTEX_PROJECT``/``VERTEX_LOCATION`` in ``embedding()`` but
+    not on any completion path, so accepting them here would let a run start on
+    configuration three quarters of its own model calls cannot see.
+    ``VERTEX_PROJECT_ID`` was this package's pre-1.0.1 name and litellm reads it
+    nowhere; it is here so the rename fails loudly rather than silently.
+    """
+    monkeypatch.setenv(alias, "something")
+
+    with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
+        validate("vertex_ai/gemini-3.7-flash", flag="--model")
+
+
+def test_a_missing_vertex_setting_stops_a_run_before_any_model_call() -> None:
+    with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
+        resolve_model_args(engine_args())
+
+
+def test_a_run_naming_no_vertex_model_needs_no_vertex_settings() -> None:
+    """The check is scoped to the provider that needs it."""
+    resolve_model_args(
+        engine_args(
+            "--model",
+            "openai/gpt-4o",
+            "--belief_model",
+            "openai/gpt-4o",
+            "--vision_model",
+            "openai/gpt-4o",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        # The default models are Vertex, so an unconfigured project is the most
+        # likely first-run failure of all.
+        ([], "VERTEXAI_PROJECT"),
+        # Every 0.2.x user hits this one on upgrade.
+        (["--model", "gemini-3.7-flash"], "missing a provider"),
+    ],
+)
+def test_easy_cli_reports_a_model_error_as_a_flag_error(
+    extra: list[str], expected: str, tmp_path
+) -> None:
+    """A model-flag mistake must read as a flag error, not look like a crash."""
+    dataset = tmp_path / "data.csv"
+    dataset.write_text("a,b\n1,2\n")
+
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main(
+            [
+                "--out_dir",
+                str(tmp_path / "out"),
+                "--n_experiments",
+                "1",
+                *extra,
+                str(dataset),
+            ]
+        )
+
+    assert expected in str(excinfo.value)

@@ -35,6 +35,35 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 4. Annotations and Legends: Describe key annotations or legends.
 5. Statistical Insights: Provide insights based on the information presented in the plot."""
 
+# Cap on how much of a code block's output is kept. Generated code regularly prints
+# an entire dataset (a raw .sql dump, a full dataframe), and the executor's output
+# becomes a chat message that is then re-serialized into every subsequent LLM
+# request — so an uncapped output is copied many times over and OOM-kills the job.
+# Observed in production: a single block emitted 676 MB of stdout and the container
+# was SIGKILLed (exit 137) on the next turn.
+DEFAULT_MAX_CODE_OUTPUT_CHARS = 200_000
+
+
+def _truncate_output(output: str, max_chars: int) -> str:
+    """Clip an over-long code output to ``max_chars``, keeping both ends.
+
+    The head carries whatever the code printed first (headers, schema, counts) and
+    the tail carries the final result, so both are worth keeping; only the middle
+    is dropped. A non-positive ``max_chars`` disables truncation.
+    """
+    if max_chars <= 0 or len(output) <= max_chars:
+        return output
+
+    dropped = len(output) - max_chars
+    notice = (
+        f"\n\n... [output truncated: {dropped} of {len(output)} characters omitted; "
+        f"limit is {max_chars}. Do not print whole datasets — aggregate, sample, or "
+        f"write to a file and read back only what you need.] ...\n\n"
+    )
+    head = max_chars // 2
+    tail = max_chars - head
+    return output[:head] + notice + output[-tail:]
+
 
 def _run_async(coro):
     """Run a coroutine from a synchronous context.
@@ -92,6 +121,7 @@ class ModalSandboxExecutor(CodeExecutor):
         vision_model: str,
         timeout: int = 30 * 60,
         usage_tracker: UsageTracker | None = None,
+        max_output_chars: int | None = None,
     ):
         """Initialize the sandbox executor wrapper.
 
@@ -100,9 +130,19 @@ class ModalSandboxExecutor(CodeExecutor):
             timeout: Timeout in seconds (for Autogen compatibility)
             vision_model: Vision model, as litellm's ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
+            max_output_chars: Cap on the output handed back to the chat, overriding
+                ``AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS`` and
+                ``DEFAULT_MAX_CODE_OUTPUT_CHARS``. Non-positive disables the cap.
         """
         self._executor = backend
         self._timeout = timeout
+        if max_output_chars is None:
+            max_output_chars = int(
+                os.environ.get(
+                    "AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS", DEFAULT_MAX_CODE_OUTPUT_CHARS
+                )
+            )
+        self._max_output_chars = max_output_chars
         self.vision_model = vision_model
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
@@ -175,9 +215,14 @@ class ModalSandboxExecutor(CodeExecutor):
 
             print(f"[CodeExecutor] Stdout length: {len(output)} characters")
 
+            output = _truncate_output(output, self._max_output_chars)
+            if len(output) != len(result.stdout or ""):
+                print(f"[CodeExecutor] Stdout truncated to {len(output)} characters")
+
             if result.stderr:
                 print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
-                output += f"\nSTDERR:\n{result.stderr}"
+                stderr = _truncate_output(result.stderr, self._max_output_chars)
+                output += f"\nSTDERR:\n{stderr}"
 
             if not result.success:
                 if result.error:
@@ -192,6 +237,7 @@ class ModalSandboxExecutor(CodeExecutor):
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"
+                error_msg = _truncate_output(error_msg, self._max_output_chars)
                 print(f"[CodeExecutor] Error: {error_msg}")
                 output += f"\nERROR: {error_msg}"
 

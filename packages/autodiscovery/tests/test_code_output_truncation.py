@@ -5,6 +5,7 @@ chat message that is re-serialized into every later LLM request, so an uncapped
 output OOM-kills the job (observed: 676 MB of stdout, container SIGKILLed).
 """
 
+import autodiscovery.agents as agents
 import pytest
 from autodiscovery.agents import (
     MAX_CODE_OUTPUT_CHARS,
@@ -20,6 +21,25 @@ def test_short_output_is_returned_verbatim():
 def test_output_at_the_limit_is_not_truncated():
     output = "x" * MAX_CODE_OUTPUT_CHARS
     assert _truncate_output(output) == output
+
+
+def test_tiny_fixed_cap_cannot_leak_the_full_output(monkeypatch):
+    monkeypatch.setattr(agents, "MAX_CODE_OUTPUT_CHARS", 32)
+
+    truncated = _truncate_output("x" * 1_000)
+
+    assert len(truncated) == 32
+    assert "output truncated" in truncated
+
+
+def test_one_character_over_limit_reports_exact_omission():
+    output = "x" * (MAX_CODE_OUTPUT_CHARS + 1)
+
+    truncated = _truncate_output(output)
+
+    retained = truncated.count("x")
+    assert len(truncated) == MAX_CODE_OUTPUT_CHARS
+    assert f"output truncated: {len(output) - retained} of {len(output)}" in truncated
 
 
 def test_long_output_keeps_both_ends_and_reports_the_drop():

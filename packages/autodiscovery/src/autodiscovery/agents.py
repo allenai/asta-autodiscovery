@@ -67,11 +67,17 @@ def _truncate_output_parts(parts: list[str]) -> str:
             f"aggregate, sample, or write to a file and read back only what you "
             f"need.] ...\n\n"
         )
-        retained = MAX_CODE_OUTPUT_CHARS - len(notice)
+        retained = max(0, MAX_CODE_OUTPUT_CHARS - len(notice))
         actual_dropped = output_length - retained
         if actual_dropped == dropped:
             break
         dropped = actual_dropped
+
+    # The cap is intentionally fixed well above the notice length, but preserve
+    # the size invariant if a future edit lowers it: no Python ``[-0:]`` slice
+    # should accidentally retain an entire output section.
+    if retained == 0:
+        return notice[: max(0, MAX_CODE_OUTPUT_CHARS)]
 
     head = retained // 2
     tail = retained - head

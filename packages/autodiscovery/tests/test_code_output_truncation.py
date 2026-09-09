@@ -88,6 +88,7 @@ def test_stderr_is_capped_too():
     assert result.output.startswith("ok\n")
     assert len(result.output) == MAX_CODE_OUTPUT_CHARS
     assert "output truncated" in result.output
+    assert "of 1000012 characters omitted" in result.output
 
 
 if __name__ == "__main__":

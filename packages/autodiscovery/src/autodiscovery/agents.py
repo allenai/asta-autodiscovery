@@ -47,33 +47,57 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 MAX_CODE_OUTPUT_CHARS = 20_000
 
 
-def _truncate_output(output: str) -> str:
-    """Clip an over-long code output to the fixed cap, keeping both ends.
+def _truncate_output_parts(parts: list[str]) -> str:
+    """Assemble and clip code-output sections to the fixed cap, keeping both ends.
 
     The head carries whatever the code printed first (headers, schema, counts) and
     the tail carries the final result, so both are worth keeping; only the middle
-    is dropped. The truncation notice itself counts toward the cap.
+    is dropped. The truncation notice itself counts toward the cap. Working from
+    sections avoids first concatenating potentially enormous stdout and stderr.
     """
-    if len(output) <= MAX_CODE_OUTPUT_CHARS:
-        return output
+    output_length = sum(len(part) for part in parts)
+    if output_length <= MAX_CODE_OUTPUT_CHARS:
+        return "".join(parts)
 
-    dropped = len(output) - MAX_CODE_OUTPUT_CHARS
+    dropped = output_length - MAX_CODE_OUTPUT_CHARS
     while True:
         notice = (
-            f"\n\n... [output truncated: {dropped} of {len(output)} characters omitted; "
+            f"\n\n... [output truncated: {dropped} of {output_length} characters omitted; "
             f"limit is {MAX_CODE_OUTPUT_CHARS}. Do not print whole datasets — "
             f"aggregate, sample, or write to a file and read back only what you "
             f"need.] ...\n\n"
         )
         retained = MAX_CODE_OUTPUT_CHARS - len(notice)
-        actual_dropped = len(output) - retained
+        actual_dropped = output_length - retained
         if actual_dropped == dropped:
             break
         dropped = actual_dropped
 
     head = retained // 2
     tail = retained - head
-    return output[:head] + notice + output[-tail:]
+    prefix_parts = []
+    prefix_remaining = head
+    for part in parts:
+        prefix_parts.append(part[:prefix_remaining])
+        prefix_remaining -= min(len(part), prefix_remaining)
+        if prefix_remaining == 0:
+            break
+    prefix = "".join(prefix_parts)
+
+    suffix_parts = []
+    suffix_remaining = tail
+    for part in reversed(parts):
+        suffix_parts.append(part[-suffix_remaining:])
+        suffix_remaining -= min(len(part), suffix_remaining)
+        if suffix_remaining == 0:
+            break
+    suffix = "".join(reversed(suffix_parts))
+    return prefix + notice + suffix
+
+
+def _truncate_output(output: str) -> str:
+    """Clip an over-long code output to the fixed cap, keeping both ends."""
+    return _truncate_output_parts([output])
 
 
 def _run_async(coro):
@@ -211,18 +235,13 @@ class ModalSandboxExecutor(CodeExecutor):
             print("[CodeExecutor] Execution completed")
             print(f"[CodeExecutor] Success: {result.success}")
 
-            output = result.stdout or ""
+            output_parts = [result.stdout or ""]
 
-            print(f"[CodeExecutor] Stdout length: {len(output)} characters")
-
-            output = _truncate_output(output)
-            if len(output) != len(result.stdout or ""):
-                print(f"[CodeExecutor] Stdout truncated to {len(output)} characters")
+            print(f"[CodeExecutor] Stdout length: {len(output_parts[0])} characters")
 
             if result.stderr:
                 print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
-                stderr = _truncate_output(result.stderr)
-                output += f"\nSTDERR:\n{stderr}"
+                output_parts.append(f"\nSTDERR:\n{result.stderr}")
 
             if not result.success:
                 if result.error:
@@ -237,12 +256,11 @@ class ModalSandboxExecutor(CodeExecutor):
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"
-                error_msg = _truncate_output(error_msg)
-                print(f"[CodeExecutor] Error: {error_msg}")
-                output += f"\nERROR: {error_msg}"
+                print(f"[CodeExecutor] Error: {error_msg[:200]}")
+                output_parts.append(f"\nERROR: {error_msg}")
 
-            if not output.strip():
-                output = "[CodeExecutor] Code executed but produced no output"
+            if not any(part.strip() for part in output_parts):
+                output_parts = ["[CodeExecutor] Code executed but produced no output"]
                 print("[CodeExecutor] Warning: No output produced")
 
             # Store rich output data dicts for image analysis
@@ -267,9 +285,12 @@ class ModalSandboxExecutor(CodeExecutor):
                             )
 
                 if image_analyses:
-                    output += "\n" + "\n".join(image_analyses)
+                    output_parts.append("\n" + "\n".join(image_analyses))
 
-            output = _truncate_output(output)
+            output_length = sum(len(part) for part in output_parts)
+            output = _truncate_output_parts(output_parts)
+            if len(output) != output_length:
+                print(f"[CodeExecutor] Output truncated to {len(output)} characters")
             return CodeResult(exit_code=0 if result.success else 1, output=output)
 
         except Exception as e:

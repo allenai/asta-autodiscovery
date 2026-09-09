@@ -29,6 +29,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from autodiscovery.args import MODEL_FLAG_HELP
+from autodiscovery.llm import ModelError
 
 
 def _sniff_columns(path: Path) -> list[dict[str, str]] | None:
@@ -272,6 +273,17 @@ def cli_main(argv: list[str] | None = None) -> None:
     for p in dataset_paths:
         if not p.exists():
             parser.error(f"Dataset path not found: {p}")
+
+    # Check the model flags here, before any directory is created, so a bad flag
+    # or missing provider configuration reads as a flag error like any other
+    # rather than a traceback out of the engine. run.main() checks them again;
+    # the check is pure and cheap, so the duplicate costs nothing.
+    from autodiscovery.run import resolve_model_args
+
+    try:
+        resolve_model_args(args)
+    except ModelError as e:
+        raise SystemExit(f"{parser.prog}: error: {e}") from e
 
     # Create a working directory with symlinks to datasets + metadata.json.
     # Symlinks let the sandbox (which chdir's to work_dir) find files by

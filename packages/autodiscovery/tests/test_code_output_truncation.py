@@ -6,41 +6,32 @@ output OOM-kills the job (observed: 676 MB of stdout, container SIGKILLed).
 """
 
 import pytest
-
 from autodiscovery.agents import (
-    DEFAULT_MAX_CODE_OUTPUT_CHARS,
+    MAX_CODE_OUTPUT_CHARS,
     ModalSandboxExecutor,
     _truncate_output,
 )
 
 
 def test_short_output_is_returned_verbatim():
-    assert _truncate_output("hello", 100) == "hello"
+    assert _truncate_output("hello") == "hello"
 
 
 def test_output_at_the_limit_is_not_truncated():
-    output = "x" * 100
-    assert _truncate_output(output, 100) == output
-
-
-def test_non_positive_limit_disables_truncation():
-    output = "x" * 10_000
-    assert _truncate_output(output, 0) == output
-    assert _truncate_output(output, -1) == output
+    output = "x" * MAX_CODE_OUTPUT_CHARS
+    assert _truncate_output(output) == output
 
 
 def test_long_output_keeps_both_ends_and_reports_the_drop():
-    output = "H" * 5_000 + "M" * 90_000 + "T" * 5_000
-    truncated = _truncate_output(output, 10_000)
+    output = "H" * 10_000 + "M" * 80_000 + "T" * 10_000
+    truncated = _truncate_output(output)
 
     assert truncated.startswith("H")
     assert truncated.endswith("T")
     assert "output truncated" in truncated
-    # 90k characters omitted out of 100k, and the middle is gone.
-    assert "90000 of 100000 characters omitted" in truncated
+    assert "of 100000 characters omitted" in truncated
     assert "M" not in truncated
-    # The notice adds a bounded amount on top of the limit.
-    assert len(truncated) < 10_000 + 500
+    assert len(truncated) == MAX_CODE_OUTPUT_CHARS
 
 
 class _StubBackend:
@@ -71,11 +62,11 @@ def _executor(stdout, stderr="", **kwargs):
 def test_execute_code_blocks_caps_a_giant_stdout():
     from autogen.coding import CodeBlock
 
-    executor = _executor("x" * 5_000_000, max_output_chars=50_000)
+    executor = _executor("x" * 5_000_000)
     result = executor.execute_code_blocks([CodeBlock(code="print(dump)", language="python")])
 
     assert result.exit_code == 0
-    assert len(result.output) < 51_000
+    assert len(result.output) == MAX_CODE_OUTPUT_CHARS
     assert "output truncated" in result.output
 
 
@@ -88,26 +79,14 @@ def test_execute_code_blocks_leaves_a_small_stdout_alone():
     assert result.output == "42\n"
 
 
-def test_limit_comes_from_the_environment_then_the_default(monkeypatch):
-    monkeypatch.setenv("AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS", "1234")
-    assert _executor("")._max_output_chars == 1234
-
-    monkeypatch.delenv("AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS")
-    assert _executor("")._max_output_chars == DEFAULT_MAX_CODE_OUTPUT_CHARS
-
-    # An explicit argument wins over the environment.
-    monkeypatch.setenv("AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS", "1234")
-    assert _executor("", max_output_chars=99)._max_output_chars == 99
-
-
 def test_stderr_is_capped_too():
     from autogen.coding import CodeBlock
 
-    executor = _executor("ok\n", stderr="e" * 1_000_000, max_output_chars=20_000)
+    executor = _executor("ok\n", stderr="e" * 1_000_000)
     result = executor.execute_code_blocks([CodeBlock(code="pass", language="python")])
 
     assert result.output.startswith("ok\n")
-    assert len(result.output) < 41_000
+    assert len(result.output) == MAX_CODE_OUTPUT_CHARS
     assert "output truncated" in result.output
 
 

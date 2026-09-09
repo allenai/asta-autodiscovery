@@ -40,28 +40,39 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 # becomes a chat message that is then re-serialized into every subsequent LLM
 # request — so an uncapped output is copied many times over and OOM-kills the job.
 # Observed in production: a single block emitted 676 MB of stdout and the container
-# was SIGKILLed (exit 137) on the next turn.
-DEFAULT_MAX_CODE_OUTPUT_CHARS = 200_000
+# was SIGKILLed (exit 137) on the next turn. 20k characters is roughly 5k LLM
+# tokens: enough for about 10k characters from each end (including a typical
+# traceback or many tabular rows) without letting one tool result consume a large
+# fraction of a future model request.
+MAX_CODE_OUTPUT_CHARS = 20_000
 
 
-def _truncate_output(output: str, max_chars: int) -> str:
-    """Clip an over-long code output to ``max_chars``, keeping both ends.
+def _truncate_output(output: str) -> str:
+    """Clip an over-long code output to the fixed cap, keeping both ends.
 
     The head carries whatever the code printed first (headers, schema, counts) and
     the tail carries the final result, so both are worth keeping; only the middle
-    is dropped. A non-positive ``max_chars`` disables truncation.
+    is dropped. The truncation notice itself counts toward the cap.
     """
-    if max_chars <= 0 or len(output) <= max_chars:
+    if len(output) <= MAX_CODE_OUTPUT_CHARS:
         return output
 
-    dropped = len(output) - max_chars
-    notice = (
-        f"\n\n... [output truncated: {dropped} of {len(output)} characters omitted; "
-        f"limit is {max_chars}. Do not print whole datasets — aggregate, sample, or "
-        f"write to a file and read back only what you need.] ...\n\n"
-    )
-    head = max_chars // 2
-    tail = max_chars - head
+    dropped = len(output) - MAX_CODE_OUTPUT_CHARS
+    while True:
+        notice = (
+            f"\n\n... [output truncated: {dropped} of {len(output)} characters omitted; "
+            f"limit is {MAX_CODE_OUTPUT_CHARS}. Do not print whole datasets — "
+            f"aggregate, sample, or write to a file and read back only what you "
+            f"need.] ...\n\n"
+        )
+        retained = MAX_CODE_OUTPUT_CHARS - len(notice)
+        actual_dropped = len(output) - retained
+        if actual_dropped == dropped:
+            break
+        dropped = actual_dropped
+
+    head = retained // 2
+    tail = retained - head
     return output[:head] + notice + output[-tail:]
 
 
@@ -121,7 +132,6 @@ class ModalSandboxExecutor(CodeExecutor):
         vision_model: str,
         timeout: int = 30 * 60,
         usage_tracker: UsageTracker | None = None,
-        max_output_chars: int | None = None,
     ):
         """Initialize the sandbox executor wrapper.
 
@@ -130,19 +140,9 @@ class ModalSandboxExecutor(CodeExecutor):
             timeout: Timeout in seconds (for Autogen compatibility)
             vision_model: Vision model, as litellm's ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
-            max_output_chars: Cap on the output handed back to the chat, overriding
-                ``AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS`` and
-                ``DEFAULT_MAX_CODE_OUTPUT_CHARS``. Non-positive disables the cap.
         """
         self._executor = backend
         self._timeout = timeout
-        if max_output_chars is None:
-            max_output_chars = int(
-                os.environ.get(
-                    "AUTODISCOVERY_MAX_CODE_OUTPUT_CHARS", DEFAULT_MAX_CODE_OUTPUT_CHARS
-                )
-            )
-        self._max_output_chars = max_output_chars
         self.vision_model = vision_model
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
@@ -215,13 +215,13 @@ class ModalSandboxExecutor(CodeExecutor):
 
             print(f"[CodeExecutor] Stdout length: {len(output)} characters")
 
-            output = _truncate_output(output, self._max_output_chars)
+            output = _truncate_output(output)
             if len(output) != len(result.stdout or ""):
                 print(f"[CodeExecutor] Stdout truncated to {len(output)} characters")
 
             if result.stderr:
                 print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
-                stderr = _truncate_output(result.stderr, self._max_output_chars)
+                stderr = _truncate_output(result.stderr)
                 output += f"\nSTDERR:\n{stderr}"
 
             if not result.success:
@@ -237,7 +237,7 @@ class ModalSandboxExecutor(CodeExecutor):
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"
-                error_msg = _truncate_output(error_msg, self._max_output_chars)
+                error_msg = _truncate_output(error_msg)
                 print(f"[CodeExecutor] Error: {error_msg}")
                 output += f"\nERROR: {error_msg}"
 
@@ -269,6 +269,7 @@ class ModalSandboxExecutor(CodeExecutor):
                 if image_analyses:
                     output += "\n" + "\n".join(image_analyses)
 
+            output = _truncate_output(output)
             return CodeResult(exit_code=0 if result.success else 1, output=output)
 
         except Exception as e:
@@ -277,9 +278,8 @@ class ModalSandboxExecutor(CodeExecutor):
             error_details = traceback.format_exc()
             print(f"[CodeExecutor] Exception occurred: {str(e)}")
             print(f"[CodeExecutor] Traceback:\n{error_details}")
-            return CodeResult(
-                exit_code=1, output=f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
-            )
+            output = f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
+            return CodeResult(exit_code=1, output=_truncate_output(output))
 
     def get_last_rich_outputs(self):
         """Get rich outputs from the last execution."""

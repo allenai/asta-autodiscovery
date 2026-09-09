@@ -78,6 +78,23 @@ plt.show()
     assert len(pngs) == 1
 
 
+def test_displayed_figures_are_not_published_twice() -> None:
+    """Flushing open figures must not duplicate an explicitly displayed figure."""
+    session = IPythonSession()
+    code = """
+import matplotlib.pyplot as plt
+from IPython.display import display
+
+figure, axis = plt.subplots()
+axis.plot([0, 1], [0, 1])
+display(figure)
+"""
+    outputs = session.run_cell(code)
+
+    pngs = [bundle for bundle in outputs["rich_outputs"] if bundle.get("image/png")]
+    assert len(pngs) == 1
+
+
 def test_matplotlib_formats_respect_allow_mime() -> None:
     default_session = IPythonSession()
     code = """

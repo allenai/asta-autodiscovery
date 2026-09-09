@@ -133,5 +133,5 @@ def test_figures_are_analyzed_once_in_the_parent_process(monkeypatch, tmp_path) 
 
 def test_unknown_backend_is_rejected(tmp_path) -> None:
     """The final branch is `local`, not a catch-all that silently accepts a typo."""
-    with pytest.raises(AssertionError, match="unknown code execution backend"):
+    with pytest.raises(ValueError, match="unknown code execution backend"):
         _code_executor("locl", str(tmp_path))

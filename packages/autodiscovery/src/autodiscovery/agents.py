@@ -783,8 +783,7 @@ def install(package):
             usage_tracker=usage_tracker,
         )
         print(f"Using process backend with work_dir: {work_dir}")
-    else:
-        assert backend == "local", f"unknown code execution backend: {backend!r}"
+    elif backend == "local":
         # Local: the job's own Python environment, with no per-cell venv.
         # It still runs each cell in a child process (use_subprocess), which is
         # what LocalCommandLineCodeExecutor used to give us and what makes the
@@ -799,6 +798,8 @@ def install(package):
             usage_tracker=usage_tracker,
         )
         print(f"Using local backend with work_dir: {work_dir}")
+    else:
+        raise ValueError(f"unknown code execution backend: {backend!r}")
 
     # Create an agent with code executor configuration.
     code_executor = ConversableAgent(

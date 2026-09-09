@@ -70,7 +70,7 @@ def _format_error(exc: BaseException | None) -> dict[str, str] | None:
     }
 
 
-def _flush_open_figures() -> None:
+def _flush_open_figures(formatted_object_ids: set[int]) -> None:
     """Emit any matplotlib figures the cell left open as display data.
 
     The inline backend only publishes a figure when the code calls
@@ -91,7 +91,8 @@ def _flush_open_figures() -> None:
 
         for fig_num in pyplot.get_fignums():
             figure = pyplot.figure(fig_num)
-            display(figure)
+            if id(figure) not in formatted_object_ids:
+                display(figure)
             pyplot.close(figure)
     except Exception:
         # A figure that cannot be rendered must not fail the cell it came from;
@@ -105,11 +106,23 @@ def _run_cell_with_shell(
     allow_mime: frozenset[str],
 ) -> dict[str, Any]:
     # Execute in-process to preserve state between calls when isolation isn't needed.
-    with capture_output() as captured:
-        result = shell.run_cell(code_str)
-        # Inside the capture block so the flushed figures land in captured.outputs
-        # alongside the ones the cell published itself.
-        _flush_open_figures()
+    formatted_object_ids: set[int] = set()
+    formatter = cast(DisplayFormatter, shell.display_formatter)
+    original_format = formatter.format
+
+    def tracking_format(obj: Any, *args: Any, **kwargs: Any):
+        formatted_object_ids.add(id(obj))
+        return original_format(obj, *args, **kwargs)
+
+    formatter.format = tracking_format
+    try:
+        with capture_output() as captured:
+            result = shell.run_cell(code_str)
+            # Inside the capture block so newly flushed figures land in
+            # captured.outputs alongside figures the cell published itself.
+            _flush_open_figures(formatted_object_ids)
+    finally:
+        formatter.format = original_format
 
     error = result.error_before_exec or result.error_in_exec
     outputs = {

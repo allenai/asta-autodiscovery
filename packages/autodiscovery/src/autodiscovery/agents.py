@@ -784,6 +784,7 @@ def install(package):
         )
         print(f"Using process backend with work_dir: {work_dir}")
     else:
+        assert backend == "local", f"unknown code execution backend: {backend!r}"
         # Local: the job's own Python environment, with no per-cell venv.
         # It still runs each cell in a child process (use_subprocess), which is
         # what LocalCommandLineCodeExecutor used to give us and what makes the

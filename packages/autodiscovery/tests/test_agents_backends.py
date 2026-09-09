@@ -12,6 +12,8 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import pytest
+
 import autodiscovery.agents as agents_module
 from autodiscovery.agents import (
     SandboxCodeExecutor,
@@ -127,3 +129,9 @@ def test_figures_are_analyzed_once_in_the_parent_process(monkeypatch, tmp_path) 
     assert result.exit_code == 0
     assert result.output.count("an analysis") == 2
     assert [call["component"] for call in recorded] == ["image_analysis", "image_analysis"]
+
+
+def test_unknown_backend_is_rejected(tmp_path) -> None:
+    """The final branch is `local`, not a catch-all that silently accepts a typo."""
+    with pytest.raises(AssertionError, match="unknown code execution backend"):
+        _code_executor("locl", str(tmp_path))

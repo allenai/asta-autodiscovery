@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from code_execution import ProcessIPythonBackend
+from code_execution.process_backend import strip_provider_credentials
 
 
 @pytest.fixture
@@ -106,3 +107,56 @@ def test_sandbox_python_is_not_host_python(tmp_path: Path) -> None:
     sandbox_py = result["stdout"].strip()
     assert sandbox_py != sys.executable
     assert "sandbox_venv" in sandbox_py
+
+
+def test_strip_provider_credentials_drops_only_provider_vars() -> None:
+    stripped = strip_provider_credentials(
+        {
+            "OPENAI_API_KEY": "dummy-secret",
+            "GOOGLE_APPLICATION_CREDENTIALS": "/secrets/gcp-key.json",
+            "PATH": "/usr/bin",
+            "DATASET_ROOT": "/data",
+        }
+    )
+
+    assert stripped == {"PATH": "/usr/bin", "DATASET_ROOT": "/data"}
+
+
+def test_cell_does_not_inherit_provider_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Executed cells never call a model, so they must not inherit the job's keys."""
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-should-not-reach-the-cell")
+    monkeypatch.setenv("PROC_TEST_KEEP", "kept")
+    backend = ProcessIPythonBackend(
+        sandbox_venv_path=str(tmp_path / "sandbox_venv"),
+        packages=[],
+    )
+
+    result = backend.run_cell(
+        "import os\n"
+        "print(os.environ.get('OPENAI_API_KEY'))\n"
+        "print(os.environ.get('PROC_TEST_KEEP'))"
+    )
+
+    assert result["success"] is True
+    lines = [line.strip() for line in result["stdout"].splitlines() if line.strip()]
+    assert lines[0] == "None"
+    assert lines[1] == "kept"
+
+
+def test_explicit_env_can_restore_a_provider_credential(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scrub is a default, not a wall: `env=` is applied after it."""
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-inherited")
+    backend = ProcessIPythonBackend(
+        env={"OPENAI_API_KEY": "dummy-explicit"},
+        sandbox_venv_path=str(tmp_path / "sandbox_venv"),
+        packages=[],
+    )
+
+    result = backend.run_cell("import os\nprint(os.environ.get('OPENAI_API_KEY'))")
+
+    assert result["success"] is True
+    assert "dummy-explicit" in result["stdout"]

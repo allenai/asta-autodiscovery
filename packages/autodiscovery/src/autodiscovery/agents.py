@@ -241,7 +241,7 @@ class ModalSandboxExecutor(CodeExecutor):
 
             if result.stderr:
                 print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
-                output_parts.append(f"\nSTDERR:\n{result.stderr}")
+                output_parts.extend(("\nSTDERR:\n", result.stderr))
 
             if not result.success:
                 if result.error:

@@ -654,8 +654,16 @@ class MetricsCache:
                 return
             self._last_refresh_attempt_monotonic = now
             self._refreshing = True
-        thread = threading.Thread(target=self._background_refresh, daemon=True)
-        thread.start()
+        try:
+            thread = threading.Thread(target=self._background_refresh, daemon=True)
+            thread.start()
+        except Exception:
+            # A thread that never started cannot run ``_background_refresh``'s
+            # cleanup. Restore the state before preserving the existing error
+            # behavior for the caller.
+            with self._lock:
+                self._refreshing = False
+            raise
 
     def _background_refresh(self) -> None:
         """Run a refresh, but only if no other worker on this pod is already scanning.

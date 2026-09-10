@@ -65,6 +65,20 @@ def test_failed_refresh_preserves_previous_data_and_records_error():
     assert cache.last_error == "refresh_failed"
 
 
+def test_cold_start_returns_empty_data_while_background_refresh_runs():
+    cache = MetricsCache()
+
+    with (
+        patch.object(aggregator.storage, "Client", side_effect=RuntimeError("no cache")),
+        patch.object(aggregator.threading, "Thread"),
+    ):
+        data = cache.get_data()
+
+    assert isinstance(data, AggregatedData)
+    assert data.jobs == []
+    assert data.refreshed_at is None
+
+
 def test_automatic_refresh_respects_backoff_after_attempt():
     cache = MetricsCache(refresh_interval_seconds=300)
 
@@ -93,6 +107,17 @@ def test_forced_refresh_bypasses_attempt_backoff():
 
     thread.assert_called_once()
     thread.return_value.start.assert_called_once()
+
+
+def test_failed_thread_start_clears_refreshing_state():
+    cache = MetricsCache()
+
+    with patch.object(aggregator.threading, "Thread") as thread:
+        thread.return_value.start.side_effect = RuntimeError("cannot start thread")
+        with pytest.raises(RuntimeError, match="cannot start thread"):
+            cache.force_refresh()
+
+    assert cache.is_refreshing is False
 
 
 def test_successful_refresh_clears_recorded_error():

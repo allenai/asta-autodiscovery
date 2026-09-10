@@ -548,6 +548,7 @@ class MetricsCache:
         self._refresh_interval = refresh_interval_seconds
         self._refreshing = False
         self._last_error: str | None = None
+        self._last_refresh_attempt_monotonic: float | None = None
         # Must be ``from_env()``: the plain constructor yields the built-in
         # defaults (including the default bucket name), so a deployment that
         # points GCS_BUCKET elsewhere would be scanned against the wrong bucket.
@@ -560,10 +561,11 @@ class MetricsCache:
 
     @property
     def last_error(self) -> str | None:
-        """Message from the most recent failed refresh, cleared on success.
+        """Status code for the most recent failed refresh, cleared on success.
 
         Surfaced by the cache-status endpoint so an unreadable bucket reads as a
-        failure rather than as a legitimately empty dataset.
+        failure rather than as a legitimately empty dataset. Detailed exception
+        text is retained only in logs.
         """
         with self._lock:
             return self._last_error
@@ -627,7 +629,7 @@ class MetricsCache:
 
     def force_refresh(self) -> None:
         """Force a background refresh regardless of staleness."""
-        self._trigger_background_refresh()
+        self._trigger_background_refresh(force=True)
 
     def _is_stale(self) -> bool:
         if not self._data or not self._data.refreshed_at:
@@ -639,10 +641,18 @@ class MetricsCache:
         except (ValueError, TypeError):
             return True
 
-    def _trigger_background_refresh(self) -> None:
+    def _trigger_background_refresh(self, force: bool = False) -> None:
         with self._lock:
             if self._refreshing:
                 return
+            now = time.monotonic()
+            if (
+                not force
+                and self._last_refresh_attempt_monotonic is not None
+                and now - self._last_refresh_attempt_monotonic < self._refresh_interval
+            ):
+                return
+            self._last_refresh_attempt_monotonic = now
             self._refreshing = True
         thread = threading.Thread(target=self._background_refresh, daemon=True)
         thread.start()
@@ -693,13 +703,15 @@ class MetricsCache:
                 _save_persisted_cache(bucket, data)
             except Exception as e:
                 logger.warning(f"Failed to persist metrics cache after refresh: {e}")
-        except Exception as e:
+        except Exception:
             # Leave ``self._data`` alone: a previously good scan is far more
             # useful than an empty one, and the recorded error keeps the
             # failure visible instead of it reading as "no data".
-            logger.error(f"Metrics cache refresh failed: {e}")
+            logger.exception("Metrics cache refresh failed")
             with self._lock:
-                self._last_error = str(e)
+                # Keep provider details in logs; the API exposes only this
+                # stable, non-sensitive status code.
+                self._last_error = "refresh_failed"
         finally:
             with self._lock:
                 self._refreshing = False

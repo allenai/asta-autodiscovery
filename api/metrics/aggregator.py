@@ -470,15 +470,17 @@ def _scan_all_jobs(
                     continue
                 cached_terminal[(j.userid, j.jobid)] = j
 
-    # Discover all jobs in one glob call
+    # Discover all jobs in one glob call.
+    #
+    # A discovery failure means we learned nothing about the bucket's contents,
+    # so it must propagate. Returning an empty result stamped with a fresh
+    # ``refreshed_at`` is indistinguishable from "this deployment has no runs":
+    # it overwrites a good cache with zeros, reports itself as fresh, and hides
+    # the outage from every dashboard reading this cache.
     try:
         all_job_keys = _discover_jobs_via_glob(bucket)
     except Exception as e:
-        logger.error(f"Failed to discover jobs via glob: {e}")
-        return AggregatedData(
-            refreshed_at=datetime.now(UTC).isoformat(),
-            scan_duration_seconds=time.monotonic() - start_time,
-        )
+        raise RuntimeError(f"failed to discover jobs in bucket {config.bucket!r}: {e}") from e
 
     # Separate into cached (skip) and need-to-scan
     all_snapshots: list[JobSnapshot] = []
@@ -545,12 +547,26 @@ class MetricsCache:
         self._data: AggregatedData | None = None
         self._refresh_interval = refresh_interval_seconds
         self._refreshing = False
-        self._config = JobConfig()
+        self._last_error: str | None = None
+        # Must be ``from_env()``: the plain constructor yields the built-in
+        # defaults (including the default bucket name), so a deployment that
+        # points GCS_BUCKET elsewhere would be scanned against the wrong bucket.
+        self._config = JobConfig.from_env()
 
     @property
     def is_refreshing(self) -> bool:
         with self._lock:
             return self._refreshing
+
+    @property
+    def last_error(self) -> str | None:
+        """Message from the most recent failed refresh, cleared on success.
+
+        Surfaced by the cache-status endpoint so an unreadable bucket reads as a
+        failure rather than as a legitimately empty dataset.
+        """
+        with self._lock:
+            return self._last_error
 
     def get_data(self) -> AggregatedData:
         """Get cached data, triggering refresh if stale or empty.
@@ -670,6 +686,7 @@ class MetricsCache:
             data = _scan_all_jobs(self._config, previous=previous)
             with self._lock:
                 self._data = data
+                self._last_error = None
             try:
                 client = storage.Client(project=self._config.project_id)
                 bucket = client.bucket(self._config.bucket)
@@ -677,7 +694,12 @@ class MetricsCache:
             except Exception as e:
                 logger.warning(f"Failed to persist metrics cache after refresh: {e}")
         except Exception as e:
+            # Leave ``self._data`` alone: a previously good scan is far more
+            # useful than an empty one, and the recorded error keeps the
+            # failure visible instead of it reading as "no data".
             logger.error(f"Metrics cache refresh failed: {e}")
+            with self._lock:
+                self._last_error = str(e)
         finally:
             with self._lock:
                 self._refreshing = False

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from code_execution.ipython_session import (
     IPythonSession,
+    _flush_open_figures,
     _normalize_mime_bundle,
     _normalize_value,
 )
@@ -43,6 +44,80 @@ plt.show()
 
     assert outputs["success"] is True
     assert any("image/png" in bundle and bundle["image/png"] for bundle in outputs["rich_outputs"])
+
+
+def test_run_cell_captures_figures_left_open() -> None:
+    """A figure the cell never showed is still returned as a rich output.
+
+    The inline backend only publishes on ``plt.show()``, so without this the
+    caller's view of a cell's figures depends on the cell remembering to call it.
+    """
+    session = IPythonSession()
+    code = """
+import matplotlib.pyplot as plt
+
+plt.plot([0, 1], [0, 1])
+"""
+    outputs = session.run_cell(code)
+
+    assert outputs["success"] is True
+    assert any("image/png" in bundle and bundle["image/png"] for bundle in outputs["rich_outputs"])
+
+
+def test_shown_figures_are_not_published_twice() -> None:
+    """Flushing open figures must not duplicate the ones the cell already showed."""
+    session = IPythonSession()
+    code = """
+import matplotlib.pyplot as plt
+
+plt.plot([0, 1], [0, 1])
+plt.show()
+"""
+    outputs = session.run_cell(code)
+
+    pngs = [bundle for bundle in outputs["rich_outputs"] if bundle.get("image/png")]
+    assert len(pngs) == 1
+
+
+def test_displayed_figures_are_not_published_twice() -> None:
+    """Flushing open figures must not duplicate an explicitly displayed figure."""
+    session = IPythonSession()
+    code = """
+import matplotlib.pyplot as plt
+from IPython.display import display
+
+figure, axis = plt.subplots()
+axis.plot([0, 1], [0, 1])
+display(figure)
+"""
+    outputs = session.run_cell(code)
+
+    pngs = [bundle for bundle in outputs["rich_outputs"] if bundle.get("image/png")]
+    assert len(pngs) == 1
+
+
+def test_open_figure_flush_continues_after_render_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One broken figure must not prevent later figures from being flushed."""
+    import matplotlib.pyplot as plt
+    from IPython import display as display_module
+
+    first = plt.figure()
+    second = plt.figure()
+    attempted: list[object] = []
+
+    def flaky_display(figure: object) -> None:
+        attempted.append(figure)
+        if figure is first:
+            raise RuntimeError("cannot render first figure")
+
+    monkeypatch.setattr(display_module, "display", flaky_display)
+
+    _flush_open_figures(set())
+
+    assert attempted == [first, second]
+    assert plt.get_fignums() == []
 
 
 def test_matplotlib_formats_respect_allow_mime() -> None:

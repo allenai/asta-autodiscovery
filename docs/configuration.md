@@ -113,14 +113,20 @@ The AD job runs the LLM-generated experiment code through a configurable executo
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (in-process, no isolation), or `modal` (remote sandbox). |
+| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (subprocess sharing the job's own environment), or `modal` (remote sandbox). |
 
 - `process` (default) — runs code in an isolated subprocess inside the job container, in a separate
   sandbox venv; per-cell package installs are discarded, and no state carries across cells. No cloud
   dependency (Modal is not required). Reads the dataset from the job's `/mnt/gcs` mount.
-- `local` — runs code in-process with no isolation. Lowest overhead, least safe.
+- `local` — runs code in a subprocess that shares the job's own Python environment, with no separate
+  sandbox venv. Lowest overhead, least isolated: generated code sees, and installs into, the packages
+  the job itself runs on.
 - `modal` — runs code in a remote Modal sandbox that mounts **only** the per-job data prefix,
   read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables.
+
+All three return the figures a run produced as structured outputs, which the job then interprets
+with `--vision_model` in its own process. No backend needs model credentials inside the execution
+environment, and every backend persists its figures to `rich_outputs/` for the HTML report.
 
 ### Choosing a safe combination
 

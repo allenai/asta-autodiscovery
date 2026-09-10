@@ -1,6 +1,7 @@
 """IPython-backed execution helpers with optional subprocess isolation."""
 
 import base64
+import sys
 import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -69,14 +70,60 @@ def _format_error(exc: BaseException | None) -> dict[str, str] | None:
     }
 
 
+def _flush_open_figures(formatted_object_ids: set[int]) -> None:
+    """Emit any matplotlib figures the cell left open as display data.
+
+    The inline backend only publishes a figure when the code calls
+    ``plt.show()``, which also closes it. Anything still open once the cell
+    finishes was therefore never published -- a figure the code built but
+    saved, or simply forgot to show. Publishing it here means a caller's view
+    of the figures a cell produced does not depend on the cell calling
+    ``plt.show()``.
+
+    Only touches pyplot if the cell actually imported it, so a cell that draws
+    nothing pays no import cost.
+    """
+    pyplot = sys.modules.get("matplotlib.pyplot")
+    if pyplot is None:
+        return
+    from IPython.display import display
+
+    for fig_num in pyplot.get_fignums():
+        figure = pyplot.figure(fig_num)
+        try:
+            if id(figure) not in formatted_object_ids:
+                display(figure)
+        except Exception:
+            # A figure that cannot be rendered must not fail the cell it came
+            # from or prevent later figures from being published.
+            pass
+        finally:
+            pyplot.close(figure)
+
+
 def _run_cell_with_shell(
     shell: InteractiveShell,
     code_str: str,
     allow_mime: frozenset[str],
 ) -> dict[str, Any]:
     # Execute in-process to preserve state between calls when isolation isn't needed.
-    with capture_output() as captured:
-        result = shell.run_cell(code_str)
+    formatted_object_ids: set[int] = set()
+    formatter = cast(DisplayFormatter, shell.display_formatter)
+    original_format = formatter.format
+
+    def tracking_format(obj: Any, *args: Any, **kwargs: Any):
+        formatted_object_ids.add(id(obj))
+        return original_format(obj, *args, **kwargs)
+
+    formatter.format = tracking_format
+    try:
+        with capture_output() as captured:
+            result = shell.run_cell(code_str)
+            # Inside the capture block so newly flushed figures land in
+            # captured.outputs alongside figures the cell published itself.
+            _flush_open_figures(formatted_object_ids)
+    finally:
+        formatter.format = original_format
 
     error = result.error_before_exec or result.error_in_exec
     outputs = {

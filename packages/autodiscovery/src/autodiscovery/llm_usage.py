@@ -10,7 +10,6 @@ from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-LOCAL_IMAGE_USAGE_MARKER = "__AUTODISCOVERY_LLM_USAGE__"
 _AG2_USAGE_TRACKER = None
 _AG2_USAGE_CONTEXT = threading.local()
 
@@ -67,41 +66,6 @@ def snapshot_agents_actual_usage(agents: dict[str, Any]) -> dict[str, dict[str, 
         if isinstance(usage, dict):
             snapshots[agent_name] = copy.deepcopy(usage)
     return snapshots
-
-
-def extract_local_image_usage_markers(text: str) -> tuple[list[dict[str, Any]], str]:
-    """Extract JSON usage markers emitted by local image-analysis patches.
-
-    Args:
-        text: Raw text output.
-
-    Returns:
-        Tuple of parsed usage entries and cleaned text with marker lines removed.
-    """
-    if not text:
-        return [], text
-
-    usage_entries: list[dict[str, Any]] = []
-    cleaned_lines: list[str] = []
-    for line in text.splitlines():
-        marker_idx = line.find(LOCAL_IMAGE_USAGE_MARKER)
-        if marker_idx < 0:
-            cleaned_lines.append(line)
-            continue
-
-        payload = line[marker_idx + len(LOCAL_IMAGE_USAGE_MARKER) :].strip()
-        try:
-            parsed = json.loads(payload)
-        except json.JSONDecodeError:
-            cleaned_lines.append(line)
-            continue
-        if isinstance(parsed, dict):
-            usage_entries.append(parsed)
-
-    cleaned_text = "\n".join(cleaned_lines)
-    if text.endswith("\n"):
-        cleaned_text += "\n"
-    return usage_entries, cleaned_text
 
 
 class UsageTracker:

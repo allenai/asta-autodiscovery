@@ -73,6 +73,50 @@ if __name__ == "__main__":
 """
 
 
+# LLM-provider credentials are dropped from the child environment.  Executed
+# cells never need to call a model -- figure interpretation runs in the parent
+# process -- so an inherited key would be ambient authority handed to generated
+# code for no benefit.  A caller that genuinely needs one can pass it back
+# explicitly via ``env=``, which is applied after this scrub.
+#
+# ``GOOGLE_APPLICATION_CREDENTIALS`` is here because it is how ``vertex_ai``
+# models authenticate; it is dual-use, so a cell that needs GCP access for
+# something other than a model must pass it explicitly.
+_PROVIDER_CREDENTIAL_ENV_VARS = frozenset(
+    {
+        "ANTHROPIC_API_KEY",
+        "ANYSCALE_API_KEY",
+        "AZURE_API_KEY",
+        "AZURE_OPENAI_API_KEY",
+        "CEREBRAS_API_KEY",
+        "COHERE_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "FIREWORKS_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GROQ_API_KEY",
+        "HUGGINGFACE_API_KEY",
+        "HF_TOKEN",
+        "MISTRAL_API_KEY",
+        "NVIDIA_NIM_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENAI_ORGANIZATION",
+        "OPENROUTER_API_KEY",
+        "PERPLEXITYAI_API_KEY",
+        "REPLICATE_API_KEY",
+        "TOGETHERAI_API_KEY",
+        "VOYAGE_API_KEY",
+        "XAI_API_KEY",
+    }
+)
+
+
+def strip_provider_credentials(env: dict[str, str]) -> dict[str, str]:
+    """Return ``env`` without any known LLM-provider credential."""
+    return {k: v for k, v in env.items() if k not in _PROVIDER_CREDENTIAL_ENV_VARS}
+
+
 def _find_uv() -> str:
     """Return path to the ``uv`` binary, or raise if not found."""
     uv = shutil.which("uv")
@@ -86,7 +130,7 @@ def _find_uv() -> str:
 # TODO: Transplant this implementation onto asta_sandbox.SandboxBase (making run_cell
 # async via asyncio.to_thread) and move it into the asta-sandbox library as a first-class
 # local process backend alongside InProcessExecutor and ModalEphemeralExecutor. Once done,
-# _ProcessBackendAdapter in agents.py can be removed and ProcessIPythonBackend can be used
+# _IPythonBackendAdapter in agents.py can be removed and ProcessIPythonBackend can be used
 # directly wherever a SandboxBase is expected.
 class ProcessIPythonBackend:
     """Backend that executes IPython cells in isolated subprocesses.
@@ -197,7 +241,9 @@ class ProcessIPythonBackend:
             "matplotlib_backend": matplotlib_backend,
         }
 
-        child_env = os.environ.copy()
+        # Inherit the job's environment minus LLM-provider credentials, then
+        # apply any explicitly configured vars (which may re-add one).
+        child_env = strip_provider_credentials(os.environ.copy())
         if self._env:
             child_env.update(self._env)
 

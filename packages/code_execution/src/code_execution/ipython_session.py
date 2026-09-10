@@ -86,18 +86,19 @@ def _flush_open_figures(formatted_object_ids: set[int]) -> None:
     pyplot = sys.modules.get("matplotlib.pyplot")
     if pyplot is None:
         return
-    try:
-        from IPython.display import display
+    from IPython.display import display
 
-        for fig_num in pyplot.get_fignums():
-            figure = pyplot.figure(fig_num)
+    for fig_num in pyplot.get_fignums():
+        figure = pyplot.figure(fig_num)
+        try:
             if id(figure) not in formatted_object_ids:
                 display(figure)
+        except Exception:
+            # A figure that cannot be rendered must not fail the cell it came
+            # from or prevent later figures from being published.
+            pass
+        finally:
             pyplot.close(figure)
-    except Exception:
-        # A figure that cannot be rendered must not fail the cell it came from;
-        # the cell's own stdout/stderr and other outputs are still worth returning.
-        return
 
 
 def _run_cell_with_shell(

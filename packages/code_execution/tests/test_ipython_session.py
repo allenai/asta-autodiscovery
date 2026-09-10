@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from code_execution.ipython_session import (
     IPythonSession,
+    _flush_open_figures,
     _normalize_mime_bundle,
     _normalize_value,
 )
@@ -93,6 +94,30 @@ display(figure)
 
     pngs = [bundle for bundle in outputs["rich_outputs"] if bundle.get("image/png")]
     assert len(pngs) == 1
+
+
+def test_open_figure_flush_continues_after_render_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One broken figure must not prevent later figures from being flushed."""
+    import matplotlib.pyplot as plt
+    from IPython import display as display_module
+
+    first = plt.figure()
+    second = plt.figure()
+    attempted: list[object] = []
+
+    def flaky_display(figure: object) -> None:
+        attempted.append(figure)
+        if figure is first:
+            raise RuntimeError("cannot render first figure")
+
+    monkeypatch.setattr(display_module, "display", flaky_display)
+
+    _flush_open_figures(set())
+
+    assert attempted == [first, second]
+    assert plt.get_fignums() == []
 
 
 def test_matplotlib_formats_respect_allow_mime() -> None:

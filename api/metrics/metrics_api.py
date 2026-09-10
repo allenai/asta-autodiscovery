@@ -81,6 +81,7 @@ def create() -> Blueprint:
             "user_count": unique_users,
             "scan_duration_seconds": data.scan_duration_seconds,
             "is_refreshing": cache.is_refreshing,
+            "last_error": cache.last_error,
         })
 
     @api.route("/cache/refresh", methods=["POST"])

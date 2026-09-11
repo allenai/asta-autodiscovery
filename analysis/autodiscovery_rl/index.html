@@ -30,12 +30,12 @@
   <h1>AutoDiscovery-RL artifacts</h1>
   <p class="muted">Git-safe export · 2026-09-11 · <code>allenai/asta-autodiscovery@sijia/generator-dev</code></p>
   <div class="cards">
-    <div class="card"><strong>37</strong>curated source artifacts</div>
+    <div class="card"><strong>38</strong>curated source artifacts</div>
     <div class="card"><strong>206</strong>Beaker experiments</div>
     <div class="card"><strong>209</strong>result datasets</div>
-    <div class="card"><strong>5.9 GiB</strong>indexed externally</div>
+    <div class="card"><strong>5.8 GiB</strong>stored on Weka</div>
   </div>
-  <section class="panel"><strong>Storage policy.</strong> Reports, summaries, plots, specifications, analysis code, and complete provenance are committed here. Raw tensors, JSONL, logs, checkpoints, dashboard builds, and dependency caches stay outside Git and are recoverable through the registered Beaker IDs.</section>
+  <section class="panel"><strong>Storage policy.</strong> Reports, summaries, plots, specifications, analysis code, and complete provenance are committed here. The 194-file raw log collection is stored at <code>/weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11</code>; tensors, logs, checkpoints, dashboard builds, and dependency caches stay outside Git.</section>
 
   <h2>Portable artifacts</h2>
   <table><thead><tr><th>Artifact</th><th>Description</th></tr></thead><tbody>
@@ -47,6 +47,7 @@
     <tr><td><a href="summaries/belief-model-sweep.md">Belief-model sweep</a></td><td>Gpt-5-mini, Gemini 3.8 Flash, and GPT-5.6 Luna comparison.</td></tr>
     <tr><td><a href="summaries/archaeology-g64-diagnostics.md">G64 diagnostics</a></td><td>Outer success-guard false failure and reward diagnostics.</td></tr>
     <tr><td><a href="launch-specs/autods-complexity4-g256-gpt5mini-2026-09-09.md">Four-task g256 launch</a></td><td>Recipe, Beaker provenance, and final status; YAML included.</td></tr>
+    <tr><td><a href="launch-specs/autods-training-logs-to-weka-2026-09-11.md">Weka training-log copy</a></td><td>Verified destination, archive checksum, file count, and Beaker transfer provenance; YAML included.</td></tr>
     <tr><td><a href="catalog/rollout-runs.json">Experiment catalog</a></td><td>Historical dashboard metadata for 200 experiments.</td></tr>
     <tr><td><a href="scripts/">Analysis source</a></td><td>Reproducible analyzers, renderers, plots, summaries, and registry generation.</td></tr>
     <tr><td><a href="patches/slime-keyword-truncation-penalty.patch">Keyword truncation-penalty patch</a></td><td>Uncommitted slime implementation and test preserved as a portable patch.</td></tr>

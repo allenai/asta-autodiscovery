@@ -1,0 +1,64 @@
+version: v2
+description: >-
+  One-time copy of the AutoDiscovery-RL training-log archive from Beaker staging
+  dataset 01M290EXVHSY41S4SKBDPZ3VRJ into the user's Weka training-logs area.
+  Verifies the archive SHA-256 and extracted file count, then atomically renames
+  the completed staging directory into place.
+tasks:
+  - name: copy-autodiscovery-rl-logs
+    image:
+      docker: slimerl/slime:latest
+    command:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        archive=/stage/autodiscovery-rl-training-logs-2026-09-11.tar.gz
+        expected_sha=cfc59538cb195100244de973ef7e459cb1a3cd9edb6b131193d2e7ee4794ea7b
+        expected_files=194
+        base=/weka/nora-default/sijial/training-logs
+        final="$base/autodiscovery-rl-2026-09-11"
+        staging="$base/.autodiscovery-rl-2026-09-11.uploading"
+
+        test -f "$archive"
+        actual_sha=$(sha256sum "$archive" | awk '{print $1}')
+        test "$actual_sha" = "$expected_sha"
+        mkdir -p "$base"
+        test ! -e "$final"
+        test ! -e "$staging"
+        mkdir "$staging"
+        trap 'rm -rf "$staging"' EXIT
+
+        tar -xzf "$archive" -C "$staging" --strip-components=1
+        actual_files=$(find "$staging" -type f | wc -l)
+        test "$actual_files" -eq "$expected_files"
+        sync
+        mv "$staging" "$final"
+        trap - EXIT
+
+        mkdir -p /results
+        printf '%s\n' "$final" > /results/destination.txt
+        printf '%s  %s\n' "$actual_sha" "$(basename "$archive")" > /results/archive-sha256.txt
+        printf '%s\n' "$actual_files" > /results/file-count.txt
+        du -sh "$final" | tee /results/disk-usage.txt
+        find "$final" -mindepth 1 -maxdepth 1 -print | sort | tee /results/top-level-paths.txt
+    datasets:
+      - mountPath: /stage
+        source:
+          beaker: 01M290EXVHSY41S4SKBDPZ3VRJ
+    result:
+      path: /results
+    resources:
+      cpuCount: 2
+      memory: 8 GiB
+    constraints:
+      cluster:
+        - ai2/rhea
+        - ai2/neptune
+        - ai2/saturn
+    context:
+      priority: urgent
+    hostNetworking: false
+    propagateFailure: true
+    propagatePreemption: true
+    timeout: 3h0m0s

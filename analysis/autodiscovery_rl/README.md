@@ -11,7 +11,7 @@ Open [`index.html`](index.html) for the portable artifact index. The complete so
 | [`reports/`](reports/) | Reward-hacking similarity report, g256 hypothesis rollouts, and the 29-task dataset-complexity report package |
 | [`figures/`](figures/) | Reward-versus-rollout PNG and PDF |
 | [`summaries/`](summaries/) | Group-size and belief-model comparisons, g64 diagnostics, g128 summary, collection manifest, and August outcome table |
-| [`launch-specs/`](launch-specs/) | Reproducible four-task g256 launch YAML and outcome manifest |
+| [`launch-specs/`](launch-specs/) | Reproducible four-task g256 launch and Weka transfer specifications/manifests |
 | [`scripts/`](scripts/) | Analysis, report-rendering, plotting, comparison, and registry generators |
 | [`catalog/`](catalog/) | Historical 200-experiment dashboard catalog |
 | [`patches/`](patches/) | The uncommitted slime keyword truncation-penalty change preserved as a patch |
@@ -19,7 +19,7 @@ Open [`index.html`](index.html) for the portable artifact index. The complete so
 
 ## Storage boundary
 
-The source registry covers 37 curated artifact groups, 590 local files totaling 5.9 GiB, 206 Beaker experiments, and 209 referenced result datasets. This Git snapshot intentionally excludes raw rollout tensors, JSONL records, reward-server logs, model/optimizer checkpoints, generated dashboard builds, and dependency caches. Experiment IDs, result-dataset IDs, checksums for small files, run status, and local source paths remain in the source registry and summary manifests so the raw data can be retrieved from Beaker without placing multi-gigabyte binaries in Git.
+The source registry covers 38 curated artifact groups, 594 local files totaling 5.9 GiB, 206 training experiments, and 209 referenced result datasets. This Git snapshot intentionally excludes raw rollout tensors, JSONL records, reward-server logs, model/optimizer checkpoints, generated dashboard builds, and dependency caches. The 194-file, 5.8 GiB log collection is stored at `/weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11`; its verified transfer provenance is in [`launch-specs/autods-training-logs-to-weka-2026-09-11.md`](launch-specs/autods-training-logs-to-weka-2026-09-11.md).
 
 ## Provenance
 

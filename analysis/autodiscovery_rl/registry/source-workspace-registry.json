@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-11T01:54:14.910448-07:00",
+  "generated_at": "2026-09-11T13:19:59.428166-07:00",
   "workspace": "<source-workspace>/slime",
   "scope": {
     "included": [
@@ -9,7 +9,8 @@
       "collected result logs, JSONL records, and PyTorch rollout archives",
       "launch specifications and analysis scripts",
       "keyword truncation-penalty implementation and test",
-      "historical and refreshed Beaker experiment/result-dataset provenance"
+      "historical and refreshed Beaker experiment/result-dataset provenance",
+      "verified Weka mirror at /weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11"
     ],
     "excluded": [
       "node_modules and .pnpm-store dependency caches",
@@ -25,9 +26,9 @@
     "sites_project_id": "appgprj_6a951676a0dc81918e95ce1e3aa19e04"
   },
   "summary": {
-    "curated_artifacts": 37,
-    "inventory_files": 590,
-    "inventory_bytes": 6316487593,
+    "curated_artifacts": 38,
+    "inventory_files": 594,
+    "inventory_bytes": 6316505272,
     "external_experiments": 206,
     "historical_dashboard_experiments": 200,
     "result_datasets": 209,
@@ -36,7 +37,7 @@
       "Interactive tools": 2,
       "Reports": 4,
       "Plots": 1,
-      "Collected run data": 19,
+      "Collected run data": 20,
       "Run analyses": 5,
       "Experiment specifications": 1,
       "Analysis source": 3,
@@ -48,11 +49,11 @@
       "dashboard-data": 138,
       "analysis-source": 7,
       "plot": 2,
-      "standalone-report": 4,
+      "standalone-report": 5,
+      "collected-run-data": 156,
       "run-analysis": 8,
-      "collected-run-data": 155,
       "legacy-run-data": 26,
-      "launch-provenance": 2,
+      "launch-provenance": 4,
       "dataset-complexity": 3,
       "implementation": 2
     },
@@ -93,8 +94,8 @@
       ],
       "exists": true,
       "file_count": 4,
-      "size_bytes": 1058690,
-      "modified_latest": "2026-09-11T01:53:51.653465-07:00"
+      "size_bytes": 1066920,
+      "modified_latest": "2026-09-11T13:19:37.375107-07:00"
     },
     {
       "id": "rollout-dashboard",
@@ -283,9 +284,42 @@
       "provenance": {},
       "notes": [],
       "exists": true,
-      "file_count": 163,
-      "size_bytes": 3809681416,
-      "modified_latest": "2026-09-09T20:34:29.903652-07:00"
+      "file_count": 164,
+      "size_bytes": 3809687967,
+      "modified_latest": "2026-09-11T13:19:07.208570-07:00"
+    },
+    {
+      "id": "weka-training-logs",
+      "title": "AutoDiscovery-RL training logs on Weka",
+      "category": "Collected run data",
+      "kind": "5.8 GiB Weka collection + transfer manifest",
+      "status": "available",
+      "paths": [
+        "logs/launch-specs/autods-training-logs-to-weka-2026-09-11.md",
+        "logs/launch-specs/autods-training-logs-to-weka-2026-09-11.yaml"
+      ],
+      "description": "Verified 194-file copy of the collected runs and early fmt* bundles on Weka.",
+      "tags": [
+        "weka",
+        "training-logs",
+        "external-storage",
+        "transfer"
+      ],
+      "provenance": {
+        "experiment_id": "01M291TJTE5N6XWJT3FHZVPF81",
+        "job_id": "01M291TJYNFTGMVT0C139BN818",
+        "result_dataset_id": "01M291TJTPP7DV7A05WG03WSAJ",
+        "staging_dataset_id": "01M290EXVHSY41S4SKBDPZ3VRJ",
+        "weka_path": "/weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11",
+        "archive_sha256": "cfc59538cb195100244de973ef7e459cb1a3cd9edb6b131193d2e7ee4794ea7b"
+      },
+      "notes": [
+        "Weka reports 5.8 GiB; the verified extracted file count is 194."
+      ],
+      "exists": true,
+      "file_count": 2,
+      "size_bytes": 3555,
+      "modified_latest": "2026-09-11T13:19:07.072447-07:00"
     },
     {
       "id": "group-size-summary",
@@ -8812,11 +8846,27 @@
       "git_state": "untracked"
     },
     {
+      "path": "logs/.DS_Store",
+      "category": "standalone-report",
+      "size_bytes": 6148,
+      "modified": "2026-09-11T12:47:07.580319-07:00",
+      "sha256": "dd862d4d9e0340f817eda08b249ec2e7f09bc26eac759de02610729934957fbc",
+      "git_state": "outside-index"
+    },
+    {
+      "path": "logs/collected-runs-2026-09-06/.DS_Store",
+      "category": "collected-run-data",
+      "size_bytes": 6148,
+      "modified": "2026-09-11T12:47:53.133546-07:00",
+      "sha256": "c01c5981ac24d8a725c53dad350c057b89e02bcd7120095c12bd5dde271d96d7",
+      "git_state": "outside-index"
+    },
+    {
       "path": "logs/collected-runs-2026-09-06/README.md",
       "category": "run-analysis",
-      "size_bytes": 3818,
-      "modified": "2026-09-09T20:34:29.903652-07:00",
-      "sha256": "8601d08552b0e9af29fda64f664b664c2d92ef61fbb5e0bc878bb3ca7be341c4",
+      "size_bytes": 4221,
+      "modified": "2026-09-11T13:19:07.208570-07:00",
+      "sha256": "fdaf67a4f27b43b7abe1b72304f9c46ad1949e0980480b29bd2492bf0210c601",
       "git_state": "untracked"
     },
     {
@@ -10340,6 +10390,22 @@
       "git_state": "untracked"
     },
     {
+      "path": "logs/launch-specs/autods-training-logs-to-weka-2026-09-11.md",
+      "category": "launch-provenance",
+      "size_bytes": 1400,
+      "modified": "2026-09-11T13:19:07.072447-07:00",
+      "sha256": "ec5a2860f81af2e436cc1e8489d270ed0037cfc6e823851f9a2474c43fec440e",
+      "git_state": "untracked"
+    },
+    {
+      "path": "logs/launch-specs/autods-training-logs-to-weka-2026-09-11.yaml",
+      "category": "launch-provenance",
+      "size_bytes": 2155,
+      "modified": "2026-09-11T13:16:22.065806-07:00",
+      "sha256": "8877d830c3f80ca233ec8563ad22df96ebec1f681f9fb0d990d469bdd8726d15",
+      "git_state": "untracked"
+    },
+    {
       "path": "logs/results_2026-08-27_28.tsv",
       "category": "standalone-report",
       "size_bytes": 1137,
@@ -10406,9 +10472,9 @@
     {
       "path": "scripts/build_autodiscovery_rl_artifact_registry.py",
       "category": "analysis-source",
-      "size_bytes": 43358,
-      "modified": "2026-09-11T01:53:10.749915-07:00",
-      "sha256": "2b86d4af584d8b5a8235440e371aa6a6c4515fa61405f0a8db38714a925aafe5",
+      "size_bytes": 44783,
+      "modified": "2026-09-11T13:19:07.348982-07:00",
+      "sha256": "2cadbdf5a59dd2968faba6fbb2b9d6e65170b5c41458ff7f67126df7d44cdee1",
       "git_state": "untracked"
     },
     {

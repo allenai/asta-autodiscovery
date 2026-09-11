@@ -312,6 +312,27 @@ def curated_artifacts() -> list[dict[str, Any]]:
             tags=["rollouts", "reward-logs", "pytorch", "beaker-results"],
         ),
         artifact(
+            "weka-training-logs",
+            "AutoDiscovery-RL training logs on Weka",
+            "Collected run data",
+            "5.8 GiB Weka collection + transfer manifest",
+            [
+                "logs/launch-specs/autods-training-logs-to-weka-2026-09-11.md",
+                "logs/launch-specs/autods-training-logs-to-weka-2026-09-11.yaml",
+            ],
+            "Verified 194-file copy of the collected runs and early fmt* bundles on Weka.",
+            tags=["weka", "training-logs", "external-storage", "transfer"],
+            provenance={
+                "experiment_id": "01M291TJTE5N6XWJT3FHZVPF81",
+                "job_id": "01M291TJYNFTGMVT0C139BN818",
+                "result_dataset_id": "01M291TJTPP7DV7A05WG03WSAJ",
+                "staging_dataset_id": "01M290EXVHSY41S4SKBDPZ3VRJ",
+                "weka_path": "/weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11",
+                "archive_sha256": "cfc59538cb195100244de973ef7e459cb1a3cd9edb6b131193d2e7ee4794ea7b",
+            },
+            notes=["Weka reports 5.8 GiB; the verified extracted file count is 194."],
+        ),
+        artifact(
             "group-size-summary",
             "Archaeology binary-reward group-size sweep",
             "Run analyses",
@@ -654,7 +675,7 @@ def markdown(payload: dict[str, Any]) -> str:
             "",
             "## Scope",
             "",
-            "Included: generated reports, charts, dashboard source/build/data, collected logs and rollout tensors, launch specs, analysis scripts, and the keyword truncation-penalty working-tree change and test.",
+            "Included: generated reports, charts, dashboard source/build/data, collected logs and rollout tensors, Weka transfer provenance, launch specs, analysis scripts, and the keyword truncation-penalty working-tree change and test.",
             "",
             "Excluded: third-party dependency caches (`node_modules`, `.pnpm-store`), Git internals, Python bytecode, base repository files not created or changed during the investigation, and unrelated `output/pdf` and `tmp/pdfs` artifacts.",
             "",
@@ -768,7 +789,7 @@ code{{font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}} a{{color:#245c
   <div class=card><strong>{format_bytes(summary['inventory_bytes'])}</strong><span>inventoried storage</span></div>
   <div class=card><strong>{summary['external_experiments']}</strong><span>Beaker experiments</span></div>
 </div>
-<section class=panel><strong>Scope.</strong> Generated reports/charts, dashboard source/build/data, logs/rollout tensors, launch specs, analysis scripts, and the keyword truncation-penalty change are included. Dependency caches, Git internals, bytecode, untouched base-repository files, and unrelated PDF work are excluded.</section>
+<section class=panel><strong>Scope.</strong> Generated reports/charts, dashboard source/build/data, logs/rollout tensors, Weka transfer provenance, launch specs, analysis scripts, and the keyword truncation-penalty change are included. The bulk logs are stored at <code>/weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11</code>. Dependency caches, Git internals, bytecode, untouched base-repository files, and unrelated PDF work are excluded.</section>
 
 <h2>Curated artifacts <span class=muted id=artifact-count></span></h2>
 <div class=controls><input id=artifact-search placeholder="Search artifacts, tags, paths, experiment IDs…"><select id=artifact-category><option value="">All categories</option>{options(artifact_categories)}</select></div>
@@ -829,6 +850,7 @@ def main() -> None:
                 "launch specifications and analysis scripts",
                 "keyword truncation-penalty implementation and test",
                 "historical and refreshed Beaker experiment/result-dataset provenance",
+                "verified Weka mirror at /weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11",
             ],
             "excluded": [
                 "node_modules and .pnpm-store dependency caches",

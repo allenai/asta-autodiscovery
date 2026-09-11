@@ -1,6 +1,6 @@
 # AutoDiscovery-RL artifact registry
 
-Generated 2026-09-11T01:54:14.910448-07:00. This registry covers 37 curated artifacts, 590 underlying local files (5.9 GiB), and 206 Beaker experiments.
+Generated 2026-09-11T13:19:59.428166-07:00. This registry covers 38 curated artifacts, 594 underlying local files (5.9 GiB), and 206 Beaker experiments.
 
 Open the [searchable HTML registry](artifact-registry.html) or use [`artifact-registry.json`](artifact-registry.json) for the full file- and experiment-level inventory.
 
@@ -11,6 +11,7 @@ Open the [searchable HTML registry](artifact-registry.html) or use [`artifact-re
 | Analysis source | Dataset-complexity analyzer | Python | available | 32.1 KiB | [`scripts/analyze_autods_dataset_complexity.py`](../../scripts/analyze_autods_dataset_complexity.py) |
 | Analysis source | Group-size and belief-model summary generators | Python | available | 19.8 KiB | [`scripts/summarize_group_size_collection.py`](../../scripts/summarize_group_size_collection.py)<br>[`scripts/summarize_belief_model_collection.py`](../../scripts/summarize_belief_model_collection.py) |
 | Analysis source | Reward-hacking analysis and renderer | Python | available | 50.7 KiB | [`scripts/analyze_reward_hacking_runs.py`](../../scripts/analyze_reward_hacking_runs.py)<br>[`scripts/render_reward_hacking_report.py`](../../scripts/render_reward_hacking_report.py) |
+| Collected run data | AutoDiscovery-RL training logs on Weka | 5.8 GiB Weka collection + transfer manifest | available | 3.5 KiB | [`logs/launch-specs/autods-training-logs-to-weka-2026-09-11.md`](../../logs/launch-specs/autods-training-logs-to-weka-2026-09-11.md)<br>[`logs/launch-specs/autods-training-logs-to-weka-2026-09-11.yaml`](../../logs/launch-specs/autods-training-logs-to-weka-2026-09-11.yaml) |
 | Collected run data | Collected reward-experiment runs | 3.5 GiB result collection | available | 3.5 GiB | [`logs/collected-runs-2026-09-06`](../../logs/collected-runs-2026-09-06) |
 | Collected run data | Collected run · archaeology-g128 | result bundle | succeeded | 483.6 MiB | [`logs/collected-runs-2026-09-06/archaeology-g128`](../../logs/collected-runs-2026-09-06/archaeology-g128) |
 | Collected run data | Collected run · archaeology-g16 | result bundle | succeeded | 46.1 MiB | [`logs/collected-runs-2026-09-06/archaeology-g16`](../../logs/collected-runs-2026-09-06/archaeology-g16) |
@@ -55,6 +56,6 @@ Open the [searchable HTML registry](artifact-registry.html) or use [`artifact-re
 
 ## Scope
 
-Included: generated reports, charts, dashboard source/build/data, collected logs and rollout tensors, launch specs, analysis scripts, and the keyword truncation-penalty working-tree change and test.
+Included: generated reports, charts, dashboard source/build/data, collected logs and rollout tensors, Weka transfer provenance, launch specs, analysis scripts, and the keyword truncation-penalty working-tree change and test.
 
 Excluded: third-party dependency caches (`node_modules`, `.pnpm-store`), Git internals, Python bytecode, base repository files not created or changed during the investigation, and unrelated `output/pdf` and `tmp/pdfs` artifacts.

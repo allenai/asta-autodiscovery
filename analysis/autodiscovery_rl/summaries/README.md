@@ -43,6 +43,10 @@ main/
 - Distributed model/optimizer checkpoints were intentionally excluded. Their dataset IDs are retained above for later retrieval.
 - Pending jobs have no result artifacts yet and therefore were not downloaded.
 
+## Weka copy
+
+The local training-log collection and the sibling `logs/fmt*` bundles were copied to `/weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11` on 2026-09-11. The verified copy contains 194 files and occupies 5.8 GiB. Transfer provenance is recorded in [`../launch-specs/autods-training-logs-to-weka-2026-09-11.md`](../launch-specs/autods-training-logs-to-weka-2026-09-11.md).
+
 ## Pending 28-task jobs
 
 `amtl`, `boxes`, `caschools`, `conversation`, `crofoot`, `evolution-freshwater-fish`, `fertility`, `fish`, `hurricane`, `immigration-offshoring-effect-on-employment`, `introduction-pathways-non-native-plants`, `meta-regression-raw`, `meta-regression`, `mortgage`, `nls-bmi-raw`, `nls-bmi`, `nls-incarceration`, `nls-raw`, `nls-ses`, `panda-nuts`, `reading`, `requirements-engineering-for-ml-enabled-systems`, `soccer`, `teachingratings`, `toy`, `worldbank-education-gdp-indicators`, and `worldbank-education-gdp`.

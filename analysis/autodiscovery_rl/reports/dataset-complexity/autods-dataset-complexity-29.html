@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AutoDiscovery · 29-task dataset complexity</title>
+<style>
+:root{--ink:#17233a;--muted:#687386;--paper:#f5f6f8;--card:#fff;--line:#dfe3e8;--blue:#275dad;--teal:#16867a;--amber:#bd6c00;--red:#b42318}
+*{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:40px 28px 80px} h1{font-size:31px;letter-spacing:-.035em;margin:0 0 8px} h2{font-size:20px;margin:0 0 14px} h3{margin:0} p{margin:7px 0} .lede{max-width:900px;color:var(--muted);font-size:16px}
+.meta{margin-top:12px;color:var(--muted);font-size:12px} .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:26px 0}
+.metric,.panel,.top article{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px #17233a0a} .metric{padding:18px} .metric span{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em} .metric strong{font-size:27px;display:block;margin-top:5px} .metric p{color:var(--muted);font-size:12px}
+.warning{border-left:5px solid var(--red);background:#fff6f5;padding:17px 20px;margin:18px 0;border-radius:8px} .warning strong{color:var(--red)}
+.panel{padding:22px;margin:18px 0} .top{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px} .top article{padding:16px;position:relative} .top article>span{color:var(--muted);font-size:11px} .top article strong{font-size:25px;color:var(--blue)} .top article p{font-size:12px;color:var(--muted)}
+.split{display:grid;grid-template-columns:1.1fr .9fr;gap:18px} .component{display:grid;grid-template-columns:170px 1fr 35px;gap:10px;align-items:center;margin:9px 0} .component span{font-size:12px} .component small{color:var(--muted)} .component i{height:8px;background:#e8ebef;border-radius:9px;overflow:hidden} .component b{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--blue))} .component em{font-style:normal;text-align:right;color:var(--muted)}
+.controls{display:flex;gap:10px;align-items:center;margin:0 0 12px} input{min-width:300px;padding:9px 11px;border:1px solid var(--line);border-radius:7px;font:inherit} .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:9px} table{width:100%;border-collapse:collapse;background:#fff} th{position:sticky;top:0;background:#26364f;color:#fff;text-align:center;font-size:11px;letter-spacing:.035em;padding:10px 8px;white-space:nowrap;cursor:pointer} td{border-bottom:1px solid #ebedf0;padding:9px 8px;text-align:right;white-space:nowrap} td.task,td.flags{text-align:left} td.task span{display:block;color:var(--muted);font-size:11px} tbody tr:hover{background:#f5f9ff} .score{font-weight:700;font-size:16px;display:block} .tier,.risk,.chip{display:inline-block;border-radius:999px;padding:2px 7px;font-size:10px} .tier{background:#e9eef6;color:#31496d} .tier-very-high{background:#fde7e5;color:#8f2018} .tier-high{background:#fff0d8;color:#8a5000} .tier-medium{background:#e5f1fb;color:#245a8c} .risk-high{background:#fde7e5;color:#8f2018} .risk-moderate{background:#fff0d8;color:#8a5000} .risk-lower{background:#e3f5ed;color:#17663d} .chip{margin:1px 3px 1px 0;background:#edf0f4;color:#526075} .prompt-filtered{background:#fff0ef;color:var(--red);font-weight:700} .prompt-near-cap{background:#fff6e8;color:#8a5000;font-weight:700} .muted{color:var(--muted)}
+details{background:#fff;border:1px solid var(--line);border-radius:8px;margin:8px 0} summary{cursor:pointer;padding:12px 14px;font-weight:600} summary span{font-weight:400;color:var(--muted);margin-left:8px} .mini{border-top:1px solid var(--line)} .mini th{position:static;background:#eef1f5;color:var(--ink);cursor:default} .mini td{font-size:12px}
+.notes li{margin:7px 0} code{background:#edf0f4;padding:2px 5px;border-radius:4px} footer{color:var(--muted);font-size:12px;margin-top:24px} @media(max-width:900px){.grid,.top,.split{grid-template-columns:1fr 1fr}} @media(max-width:600px){main{padding:24px 14px}.grid,.top,.split{grid-template-columns:1fr}input{min-width:0;width:100%}}
+</style>
+</head>
+<body><main>
+<h1>AutoDiscovery dataset complexity · 29 tasks</h1>
+<p class="lede">A raw-data audit of the exact DiscoveryBench + BLADE bundle behind the group-size sweep. Complexity here is operational: how much data the reward-side analyst must load and reason over, how broad the hypothesis search space is, and how much cleaning/joining is implied. It is not a claim that one scientific domain is intrinsically harder than another.</p>
+<p class="meta">Generated 2026-09-08 04:50 UTC · Qwen3.5-9B tokenizer · sweep prompt cap 8,192 tokens · raw source snapshot s3://ai2-asta-workspaces/autods/datasets</p>
+
+<section class="grid">
+  <div class="metric"><span>Tasks</span><strong>29</strong><p>14 DiscoveryBench + 15 BLADE</p></div>
+  <div class="metric"><span>Raw data</span><strong>62.9 MiB</strong><p>Referenced analysis files only</p></div>
+  <div class="metric"><span>Largest table</span><strong>146,028</strong><p>soccer rows</p></div>
+  <div class="metric"><span>Widest schema</span><strong>258</strong><p>worldbank indicators, across 6 tables</p></div>
+</section>
+
+<div class="warning"><strong>One task is silently excluded by the current prompt cap.</strong> <code>worldbank-education-gdp-indicators</code> renders to 8,207 tokens—15 over the 8,192-token limit. Slime’s dataset loader filters over-length prompts instead of truncating them, leaving this one-row task empty. <code>requirements-engineering-for-ML-enabled-systems</code> is near the cap at 7,524 tokens.</div>
+
+<section class="panel"><h2>Highest operational complexity</h2><div class="top"><article><span>#1</span><h3>archaeology</h3><strong>67.3</strong><p>3 source files, wide schema, missing-heavy</p></article><article><span>#2</span><h3>worldbank-education-gdp-indicators</h3><strong>61.2</strong><p>prompt filtered at 8,192, 6 source files, wide schema</p></article><article><span>#3</span><h3>nls-raw</h3><strong>55.3</strong><p>wide schema, large-n, missing-heavy</p></article><article><span>#4</span><h3>nls-bmi-raw</h3><strong>55.3</strong><p>wide schema, large-n, missing-heavy</p></article><article><span>#5</span><h3>introduction-pathways-non-native-plants</h3><strong>53.7</strong><p>4 source files, wide schema, temporal fields</p></article></div></section>
+
+<section class="split">
+  <div class="panel"><h2>How the index is composed</h2><div class="component"><span>Data scale <small>23%</small></span><i><b style="width:86.2%"></b></i><em>86</em></div><div class="component"><span>Schema/search <small>23%</small></span><i><b style="width:78.6%"></b></i><em>79</em></div><div class="component"><span>Multi-file structure <small>18%</small></span><i><b style="width:56.0%"></b></i><em>56</em></div><div class="component"><span>Missingness <small>14%</small></span><i><b style="width:82.5%"></b></i><em>83</em></div><div class="component"><span>p/n shape <small>12%</small></span><i><b style="width:3.4%"></b></i><em>3</em></div><div class="component"><span>Type mix <small>10%</small></span><i><b style="width:73.8%"></b></i><em>74</em></div><p class="meta">Bars show component percentiles/severity for the top-ranked task (archaeology). Weights: data scale 23%, schema/search breadth 23%, multi-file structure 18%, missingness 14%, p/n shape 12%, type mix 10%.</p></div>
+  <div class="panel notes"><h2>Interpretation for g256</h2><ul>
+    <li><strong>Keep g256 for reward sparsity/diversity, not because tables are large.</strong> Sampling cost is fixed by group size; raw-data complexity mainly changes reward-evaluation latency and failure risk.</li>
+    <li><strong>Do not treat all 29 tasks as equivalent.</strong> The top cluster combines very wide schemas, multiple files, large n, or heavy missingness; the bottom cluster consists mostly of compact single tables.</li>
+    <li><strong>Separate power risk from operational complexity.</strong> Tiny or p≈n datasets can be statistically fragile even when cheap to load. That can make binary surprise noisier.</li>
+  </ul></div>
+</section>
+
+<section class="panel"><h2>Ranked task table</h2><div class="controls"><input id="search" type="search" placeholder="Filter task or flag…"><span class="meta">Click any header to sort.</span></div><div class="table-wrap"><table id="tasks"><thead><tr>
+<th>Rank</th><th>Task</th><th>Index</th><th>Files</th><th>Rows Σ</th><th>Cols Σ</th><th>Cells</th><th>Bytes</th><th>Missing</th><th>Schema tok.</th><th>Prompt max</th><th>Rows/col</th><th>Stat. risk</th><th>Flags</th>
+</tr></thead><tbody>
+            <tr data-search="archaeology dbench 3 source files wide schema missing-heavy temporal fields raw/schema width mismatch">
+              <td data-sort="1">1</td>
+              <td class="task"><strong>archaeology</strong><span>dbench · humanities</span></td>
+              <td data-sort="67.3348"><span class="score">67.3</span><span class="tier tier-very-high">very high</span></td>
+              <td data-sort="3">3</td>
+              <td data-sort="7724">7,724</td>
+              <td data-sort="65">65</td>
+              <td data-sort="186914">186,914</td>
+              <td data-sort="1967757">1.9 MiB</td>
+              <td data-sort="28.88976">28.9%</td>
+              <td data-sort="1135">1,135</td>
+              <td class="prompt-safe" data-sort="2024">2,024</td>
+              <td data-sort="118.83077">118.8</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">3 source files</span><span class="chip">wide schema</span><span class="chip">missing-heavy</span><span class="chip">temporal fields</span><span class="chip">raw/schema width mismatch</span></td>
+            </tr>
+            
+
+            <tr data-search="worldbank-education-gdp-indicators dbench prompt filtered at 8,192 6 source files wide schema small-n p≈n or p&gt;n">
+              <td data-sort="2">2</td>
+              <td class="task"><strong>worldbank-education-gdp-indicators</strong><span>dbench · economics</span></td>
+              <td data-sort="61.2350"><span class="score">61.2</span><span class="tier tier-very-high">very high</span></td>
+              <td data-sort="6">6</td>
+              <td data-sort="12">12</td>
+              <td data-sort="258">258</td>
+              <td data-sort="516">516</td>
+              <td data-sort="8841">8.6 KiB</td>
+              <td data-sort="16.27907">16.3%</td>
+              <td data-sort="7382">7,382</td>
+              <td class="prompt-filtered" data-sort="8207">8,207</td>
+              <td data-sort="0.04651">0.0</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">prompt filtered at 8,192</span><span class="chip">6 source files</span><span class="chip">wide schema</span><span class="chip">small-n</span><span class="chip">p≈n or p&gt;n</span></td>
+            </tr>
+            
+
+            <tr data-search="nls-raw dbench wide schema large-n missing-heavy temporal fields">
+              <td data-sort="3">3</td>
+              <td class="task"><strong>nls-raw</strong><span>dbench · sociology</span></td>
+              <td data-sort="55.3082"><span class="score">55.3</span><span class="tier tier-very-high">very high</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="12686">12,686</td>
+              <td data-sort="61">61</td>
+              <td data-sort="773846">773,846</td>
+              <td data-sort="3020753">2.9 MiB</td>
+              <td data-sort="33.30133">33.3%</td>
+              <td data-sort="5168">5,168</td>
+              <td class="prompt-safe" data-sort="5927">5,927</td>
+              <td data-sort="207.96721">208.0</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">wide schema</span><span class="chip">large-n</span><span class="chip">missing-heavy</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="nls-bmi-raw dbench wide schema large-n missing-heavy temporal fields">
+              <td data-sort="4">4</td>
+              <td class="task"><strong>nls-bmi-raw</strong><span>dbench · sociology</span></td>
+              <td data-sort="55.3082"><span class="score">55.3</span><span class="tier tier-very-high">very high</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="12686">12,686</td>
+              <td data-sort="61">61</td>
+              <td data-sort="773846">773,846</td>
+              <td data-sort="3020753">2.9 MiB</td>
+              <td data-sort="33.30133">33.3%</td>
+              <td data-sort="5168">5,168</td>
+              <td class="prompt-safe" data-sort="6070">6,070</td>
+              <td data-sort="207.96721">208.0</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">wide schema</span><span class="chip">large-n</span><span class="chip">missing-heavy</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="introduction-pathways-non-native-plants dbench 4 source files wide schema temporal fields">
+              <td data-sort="5">5</td>
+              <td class="task"><strong>introduction-pathways-non-native-plants</strong><span>dbench · biology</span></td>
+              <td data-sort="53.7447"><span class="score">53.7</span><span class="tier tier-high">high</span></td>
+              <td data-sort="4">4</td>
+              <td data-sort="725">725</td>
+              <td data-sort="59">59</td>
+              <td data-sort="24959">24,959</td>
+              <td data-sort="123883">121.0 KiB</td>
+              <td data-sort="0.62503">0.6%</td>
+              <td data-sort="2570">2,570</td>
+              <td class="prompt-safe" data-sort="3545">3,545</td>
+              <td data-sort="12.28814">12.3</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">4 source files</span><span class="chip">wide schema</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="meta-regression-raw dbench 2 source files wide schema temporal fields">
+              <td data-sort="6">6</td>
+              <td class="task"><strong>meta-regression-raw</strong><span>dbench · meta science</span></td>
+              <td data-sort="53.1936"><span class="score">53.2</span><span class="tier tier-high">high</span></td>
+              <td data-sort="2">2</td>
+              <td data-sort="1070">1,070</td>
+              <td data-sort="72">72</td>
+              <td data-sort="54984">54,984</td>
+              <td data-sort="543757">531.0 KiB</td>
+              <td data-sort="7.09843">7.1%</td>
+              <td data-sort="1341">1,341</td>
+              <td class="prompt-safe" data-sort="2210">2,210</td>
+              <td data-sort="14.86111">14.9</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">2 source files</span><span class="chip">wide schema</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="requirements-engineering-for-ML-enabled-systems dbench prompt near 8,192 cap wide schema p≈n or p&gt;n">
+              <td data-sort="7">7</td>
+              <td class="task"><strong>requirements-engineering-for-ML-enabled-systems</strong><span>dbench · engineering</span></td>
+              <td data-sort="52.3608"><span class="score">52.4</span><span class="tier tier-high">high</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="276">276</td>
+              <td data-sort="202">202</td>
+              <td data-sort="55752">55,752</td>
+              <td data-sort="507267">495.4 KiB</td>
+              <td data-sort="0.03408">0.0%</td>
+              <td data-sort="6743">6,743</td>
+              <td class="prompt-near-cap" data-sort="7524">7,524</td>
+              <td data-sort="1.36634">1.4</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">prompt near 8,192 cap</span><span class="chip">wide schema</span><span class="chip">p≈n or p&gt;n</span></td>
+            </tr>
+            
+
+            <tr data-search="conversation blade wide schema missing-heavy temporal fields">
+              <td data-sort="8">8</td>
+              <td class="task"><strong>conversation</strong><span>blade · blade</span></td>
+              <td data-sort="51.7677"><span class="score">51.8</span><span class="tier tier-high">high</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="7975">7,975</td>
+              <td data-sort="70">70</td>
+              <td data-sort="558250">558,250</td>
+              <td data-sort="26099022">24.9 MiB</td>
+              <td data-sort="23.27237">23.3%</td>
+              <td data-sort="669">669</td>
+              <td class="prompt-safe" data-sort="1358">1,358</td>
+              <td data-sort="113.92857">113.9</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">wide schema</span><span class="chip">missing-heavy</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="meta-regression dbench wide schema small-n p≈n or p&gt;n temporal fields">
+              <td data-sort="9">9</td>
+              <td class="task"><strong>meta-regression</strong><span>dbench · meta science</span></td>
+              <td data-sort="46.2732"><span class="score">46.3</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="86">86</td>
+              <td data-sort="60">60</td>
+              <td data-sort="5160">5,160</td>
+              <td data-sort="53421">52.2 KiB</td>
+              <td data-sort="6.91860">6.9%</td>
+              <td data-sort="1147">1,147</td>
+              <td class="prompt-safe" data-sort="1931">1,931</td>
+              <td data-sort="1.43333">1.4</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">wide schema</span><span class="chip">small-n</span><span class="chip">p≈n or p&gt;n</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="soccer blade large-n">
+              <td data-sort="10">10</td>
+              <td class="task"><strong>soccer</strong><span>blade · blade</span></td>
+              <td data-sort="44.5659"><span class="score">44.6</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="146028">146,028</td>
+              <td data-sort="27">27</td>
+              <td data-sort="3942756">3,942,756</td>
+              <td data-sort="28051316">26.8 MiB</td>
+              <td data-sort="2.16678">2.2%</td>
+              <td data-sort="844">844</td>
+              <td class="prompt-safe" data-sort="1547">1,547</td>
+              <td data-sort="5408.44444">5408.4</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">large-n</span></td>
+            </tr>
+            
+
+            <tr data-search="worldbank-education-gdp dbench small-n p≈n or p&gt;n">
+              <td data-sort="11">11</td>
+              <td class="task"><strong>worldbank-education-gdp</strong><span>dbench · economics</span></td>
+              <td data-sort="39.1931"><span class="score">39.2</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="12">12</td>
+              <td data-sort="45">45</td>
+              <td data-sort="540">540</td>
+              <td data-sort="6773">6.6 KiB</td>
+              <td data-sort="15.55556">15.6%</td>
+              <td data-sort="1666">1,666</td>
+              <td class="prompt-safe" data-sort="2722">2,722</td>
+              <td data-sort="0.26667">0.3</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">small-n</span><span class="chip">p≈n or p&gt;n</span></td>
+            </tr>
+            
+
+            <tr data-search="reading blade temporal fields">
+              <td data-sort="12">12</td>
+              <td class="task"><strong>reading</strong><span>blade · blade</span></td>
+              <td data-sort="34.8880"><span class="score">34.9</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="2568">2,568</td>
+              <td data-sort="20">20</td>
+              <td data-sort="51360">51,360</td>
+              <td data-sort="363175">354.7 KiB</td>
+              <td data-sort="3.17757">3.2%</td>
+              <td data-sort="436">436</td>
+              <td class="prompt-safe" data-sort="1216">1,216</td>
+              <td data-sort="128.40000">128.4</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="teachingratings blade ">
+              <td data-sort="13">13</td>
+              <td class="task"><strong>teachingratings</strong><span>blade · blade</span></td>
+              <td data-sort="30.7630"><span class="score">30.8</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="463">463</td>
+              <td data-sort="13">13</td>
+              <td data-sort="6019">6,019</td>
+              <td data-sort="26888">26.3 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="390">390</td>
+              <td class="prompt-safe" data-sort="1126">1,126</td>
+              <td data-sort="35.61538">35.6</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="amtl blade ">
+              <td data-sort="14">14</td>
+              <td class="task"><strong>amtl</strong><span>blade · blade</span></td>
+              <td data-sort="29.0937"><span class="score">29.1</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="1450">1,450</td>
+              <td data-sort="9">9</td>
+              <td data-sort="13050">13,050</td>
+              <td data-sort="104767">102.3 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="379">379</td>
+              <td class="prompt-safe" data-sort="1165">1,165</td>
+              <td data-sort="161.11111">161.1</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="nls-ses dbench raw/schema width mismatch">
+              <td data-sort="15">15</td>
+              <td class="task"><strong>nls-ses</strong><span>dbench · sociology</span></td>
+              <td data-sort="28.2075"><span class="score">28.2</span><span class="tier tier-medium">medium</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="8773">8,773</td>
+              <td data-sort="9">9</td>
+              <td data-sort="78957">78,957</td>
+              <td data-sort="679598">663.7 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="292">292</td>
+              <td class="prompt-safe" data-sort="991">991</td>
+              <td data-sort="974.77778">974.8</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">raw/schema width mismatch</span></td>
+            </tr>
+            
+
+            <tr data-search="evolution-freshwater-fish dbench ">
+              <td data-sort="16">16</td>
+              <td class="task"><strong>evolution-freshwater-fish</strong><span>dbench · biology</span></td>
+              <td data-sort="27.9275"><span class="score">27.9</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="460">460</td>
+              <td data-sort="21">21</td>
+              <td data-sort="9660">9,660</td>
+              <td data-sort="140981">137.7 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="666">666</td>
+              <td class="prompt-safe" data-sort="1561">1,561</td>
+              <td data-sort="21.90476">21.9</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="nls-incarceration dbench large-n">
+              <td data-sort="17">17</td>
+              <td class="task"><strong>nls-incarceration</strong><span>dbench · sociology</span></td>
+              <td data-sort="26.6967"><span class="score">26.7</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="12013">12,013</td>
+              <td data-sort="6">6</td>
+              <td data-sort="72078">72,078</td>
+              <td data-sort="343144">335.1 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="235">235</td>
+              <td class="prompt-safe" data-sort="1137">1,137</td>
+              <td data-sort="2002.16667">2002.2</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">large-n</span></td>
+            </tr>
+            
+
+            <tr data-search="hurricane blade small-n temporal fields">
+              <td data-sort="18">18</td>
+              <td class="task"><strong>hurricane</strong><span>blade · blade</span></td>
+              <td data-sort="26.5740"><span class="score">26.6</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="94">94</td>
+              <td data-sort="14">14</td>
+              <td data-sort="1316">1,316</td>
+              <td data-sort="6164">6.0 KiB</td>
+              <td data-sort="0.22796">0.2%</td>
+              <td data-sort="462">462</td>
+              <td class="prompt-safe" data-sort="1289">1,289</td>
+              <td data-sort="6.71429">6.7</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">small-n</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="nls-bmi dbench large-n">
+              <td data-sort="19">19</td>
+              <td class="task"><strong>nls-bmi</strong><span>dbench · sociology</span></td>
+              <td data-sort="26.3270"><span class="score">26.3</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="12686">12,686</td>
+              <td data-sort="9">9</td>
+              <td data-sort="114174">114,174</td>
+              <td data-sort="620595">606.0 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="291">291</td>
+              <td class="prompt-safe" data-sort="1065">1,065</td>
+              <td data-sort="1409.55556">1409.6</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">large-n</span></td>
+            </tr>
+            
+
+            <tr data-search="affairs blade ">
+              <td data-sort="20">20</td>
+              <td class="task"><strong>affairs</strong><span>blade · blade</span></td>
+              <td data-sort="26.1728"><span class="score">26.2</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="601">601</td>
+              <td data-sort="10">10</td>
+              <td data-sort="6010">6,010</td>
+              <td data-sort="21040">20.5 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="674">674</td>
+              <td class="prompt-safe" data-sort="1438">1,438</td>
+              <td data-sort="60.10000">60.1</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="fertility blade ">
+              <td data-sort="21">21</td>
+              <td class="task"><strong>fertility</strong><span>blade · blade</span></td>
+              <td data-sort="25.8014"><span class="score">25.8</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="275">275</td>
+              <td data-sort="11">11</td>
+              <td data-sort="3025">3,025</td>
+              <td data-sort="14001">13.7 KiB</td>
+              <td data-sort="2.94215">2.9%</td>
+              <td data-sort="615">615</td>
+              <td class="prompt-safe" data-sort="1337">1,337</td>
+              <td data-sort="25.00000">25.0</td>
+              <td><span class="risk risk-moderate">moderate</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="caschools blade ">
+              <td data-sort="22">22</td>
+              <td class="task"><strong>caschools</strong><span>blade · blade</span></td>
+              <td data-sort="25.5815"><span class="score">25.6</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="420">420</td>
+              <td data-sort="15">15</td>
+              <td data-sort="6300">6,300</td>
+              <td data-sort="61339">59.9 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="335">335</td>
+              <td class="prompt-safe" data-sort="1093">1,093</td>
+              <td data-sort="28.00000">28.0</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="mortgage blade ">
+              <td data-sort="23">23</td>
+              <td class="task"><strong>mortgage</strong><span>blade · blade</span></td>
+              <td data-sort="25.4339"><span class="score">25.4</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="2380">2,380</td>
+              <td data-sort="14">14</td>
+              <td data-sort="33320">33,320</td>
+              <td data-sort="117361">114.6 KiB</td>
+              <td data-sort="0.07503">0.1%</td>
+              <td data-sort="434">434</td>
+              <td class="prompt-safe" data-sort="1314">1,314</td>
+              <td data-sort="170.00000">170.0</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="crofoot blade small-n">
+              <td data-sort="24">24</td>
+              <td class="task"><strong>crofoot</strong><span>blade · blade</span></td>
+              <td data-sort="22.1845"><span class="score">22.2</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="58">58</td>
+              <td data-sort="12">12</td>
+              <td data-sort="696">696</td>
+              <td data-sort="1766">1.7 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="386">386</td>
+              <td class="prompt-safe" data-sort="1157">1,157</td>
+              <td data-sort="4.83333">4.8</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">small-n</span></td>
+            </tr>
+            
+
+            <tr data-search="immigration-offshoring-effect-on-employment dbench 2 source files temporal fields">
+              <td data-sort="25">25</td>
+              <td class="task"><strong>immigration-offshoring-effect-on-employment</strong><span>dbench · economics</span></td>
+              <td data-sort="19.9419"><span class="score">19.9</span><span class="tier tier-low">low</span></td>
+              <td data-sort="2">2</td>
+              <td data-sort="928">928</td>
+              <td data-sort="7">7</td>
+              <td data-sort="3248">3,248</td>
+              <td data-sort="17993">17.6 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="344">344</td>
+              <td class="prompt-safe" data-sort="1120">1,120</td>
+              <td data-sort="132.57143">132.6</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="chip">2 source files</span><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="panda-nuts blade small-n">
+              <td data-sort="26">26</td>
+              <td class="task"><strong>panda-nuts</strong><span>blade · blade</span></td>
+              <td data-sort="18.6585"><span class="score">18.7</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="84">84</td>
+              <td data-sort="7">7</td>
+              <td data-sort="588">588</td>
+              <td data-sort="1581">1.5 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="282">282</td>
+              <td class="prompt-safe" data-sort="1174">1,174</td>
+              <td data-sort="12.00000">12.0</td>
+              <td><span class="risk risk-high">high</span></td>
+              <td class="flags"><span class="chip">small-n</span></td>
+            </tr>
+            
+
+            <tr data-search="toy blade temporal fields">
+              <td data-sort="27">27</td>
+              <td class="task"><strong>toy</strong><span>blade · blade</span></td>
+              <td data-sort="15.8704"><span class="score">15.9</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="150">150</td>
+              <td data-sort="5">5</td>
+              <td data-sort="750">750</td>
+              <td data-sort="5572">5.4 KiB</td>
+              <td data-sort="3.33333">3.3%</td>
+              <td data-sort="88">88</td>
+              <td class="prompt-safe" data-sort="885">885</td>
+              <td data-sort="30.00000">30.0</td>
+              <td><span class="risk risk-moderate">moderate</span></td>
+              <td class="flags"><span class="chip">temporal fields</span></td>
+            </tr>
+            
+
+            <tr data-search="boxes blade ">
+              <td data-sort="28">28</td>
+              <td class="task"><strong>boxes</strong><span>blade · blade</span></td>
+              <td data-sort="11.5445"><span class="score">11.5</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="629">629</td>
+              <td data-sort="5">5</td>
+              <td data-sort="3145">3,145</td>
+              <td data-sort="6505">6.4 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="338">338</td>
+              <td class="prompt-safe" data-sort="1143">1,143</td>
+              <td data-sort="125.80000">125.8</td>
+              <td><span class="risk risk-lower">lower</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            
+
+            <tr data-search="fish blade ">
+              <td data-sort="29">29</td>
+              <td class="task"><strong>fish</strong><span>blade · blade</span></td>
+              <td data-sort="8.8253"><span class="score">8.8</span><span class="tier tier-low">low</span></td>
+              <td data-sort="1">1</td>
+              <td data-sort="250">250</td>
+              <td data-sort="6">6</td>
+              <td data-sort="1500">1,500</td>
+              <td data-sort="4089">4.0 KiB</td>
+              <td data-sort="0.00000">0.0%</td>
+              <td data-sort="162">162</td>
+              <td class="prompt-safe" data-sort="894">894</td>
+              <td data-sort="41.66667">41.7</td>
+              <td><span class="risk risk-moderate">moderate</span></td>
+              <td class="flags"><span class="muted">—</span></td>
+            </tr>
+            </tbody></table></div>
+<p class="meta">Rows Σ and columns Σ are summed across referenced tabular files; cells is the sum of rows × columns per table. Rows/col is a simple dimensionality diagnostic, not degrees of freedom. Prompt max includes the Qwen chat template and lineage history.</p></section>
+
+<section class="panel"><h2>File-level audit</h2>
+            <details>
+              <summary>archaeology <span>3 file(s), 7,724 rows, 65 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv</td><td>tabular</td><td>718.4 KiB</td><td>4,084</td><td>13</td><td>14.7%</td></tr><tr><td>time_series_data.csv</td><td>tabular</td><td>1.2 MiB</td><td>3,601</td><td>37</td><td>34.7%</td></tr><tr><td>capital.csv</td><td>tabular</td><td>5.0 KiB</td><td>39</td><td>15</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>worldbank-education-gdp-indicators <span>6 file(s), 12 rows, 258 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>Adjusted_savings_education_expenditure_percentage_of_GNI.csv</td><td>tabular</td><td>1.6 KiB</td><td>2</td><td>43</td><td>0.0%</td></tr><tr><td>Exports_of_goods_and_services_annual_percentage_growth.csv</td><td>tabular</td><td>1.4 KiB</td><td>2</td><td>43</td><td>18.6%</td></tr><tr><td>GNI_per_capita_constant_2015_USdollar.csv</td><td>tabular</td><td>1.2 KiB</td><td>2</td><td>43</td><td>41.9%</td></tr><tr><td>Labor_force_participation_rate_total_percentage_of_total_population_ages_15+_modeled_ILO_estimate.csv</td><td>tabular</td><td>1.2 KiB</td><td>2</td><td>43</td><td>37.2%</td></tr><tr><td>School_enrollment_primary_percentage_gross.csv</td><td>tabular</td><td>1.6 KiB</td><td>2</td><td>43</td><td>0.0%</td></tr><tr><td>School_enrollment_secondary_percentage_gross.csv</td><td>tabular</td><td>1.6 KiB</td><td>2</td><td>43</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>nls-raw <span>1 file(s), 12,686 rows, 61 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>nls_raw.csv</td><td>tabular</td><td>2.9 MiB</td><td>12,686</td><td>61</td><td>33.3%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>nls-bmi-raw <span>1 file(s), 12,686 rows, 61 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>nls_raw.csv</td><td>tabular</td><td>2.9 MiB</td><td>12,686</td><td>61</td><td>33.3%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>introduction-pathways-non-native-plants <span>4 file(s), 725 rows, 59 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>temporal_trends_contingency_table.csv</td><td>tabular</td><td>389 B</td><td>12</td><td>3</td><td>0.0%</td></tr><tr><td>phylogenetic_tree.txt</td><td>auxiliary</td><td>3.5 KiB</td><td>—</td><td>—</td><td>—</td></tr><tr><td>invasion_success_pathways.csv</td><td>tabular</td><td>13.0 KiB</td><td>81</td><td>19</td><td>10.1%</td></tr><tr><td>invaded_niche_pathways.csv</td><td>tabular</td><td>104.1 KiB</td><td>632</td><td>37</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>meta-regression-raw <span>2 file(s), 1,070 rows, 72 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>meta-regression_study_data_heterogeneity_in_replication_projects.csv</td><td>tabular</td><td>498.8 KiB</td><td>927</td><td>57</td><td>7.2%</td></tr><tr><td>meta-regression_replication_success_data_heterogeneity_in_replication_projects.csv</td><td>tabular</td><td>32.2 KiB</td><td>143</td><td>15</td><td>4.8%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>requirements-engineering-for-ML-enabled-systems <span>1 file(s), 276 rows, 202 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>requirements_engineering_for_ML-enabled_systems.csv</td><td>tabular</td><td>495.4 KiB</td><td>276</td><td>202</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>conversation <span>1 file(s), 7,975 rows, 70 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>24.9 MiB</td><td>7,975</td><td>70</td><td>23.3%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>meta-regression <span>1 file(s), 86 rows, 60 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>meta-regression_joined_data_heterogeneity_in_replication_projects.csv</td><td>tabular</td><td>52.2 KiB</td><td>86</td><td>60</td><td>6.9%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>soccer <span>1 file(s), 146,028 rows, 27 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>26.8 MiB</td><td>146,028</td><td>27</td><td>2.2%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>worldbank-education-gdp <span>1 file(s), 12 rows, 45 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>worldbank_education_gdp.csv</td><td>tabular</td><td>6.6 KiB</td><td>12</td><td>45</td><td>15.6%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>reading <span>1 file(s), 2,568 rows, 20 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>354.7 KiB</td><td>2,568</td><td>20</td><td>3.2%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>teachingratings <span>1 file(s), 463 rows, 13 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>26.3 KiB</td><td>463</td><td>13</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>amtl <span>1 file(s), 1,450 rows, 9 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>102.3 KiB</td><td>1,450</td><td>9</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>nls-ses <span>1 file(s), 8,773 rows, 9 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>nls_ses_processed.csv</td><td>tabular</td><td>663.7 KiB</td><td>8,773</td><td>9</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>evolution-freshwater-fish <span>1 file(s), 460 rows, 21 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>body-size-evolution-in-south-american-freshwater-fishes.csv</td><td>tabular</td><td>137.7 KiB</td><td>460</td><td>21</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>nls-incarceration <span>1 file(s), 12,013 rows, 6 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>nls_incarceration_processed.csv</td><td>tabular</td><td>335.1 KiB</td><td>12,013</td><td>6</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>hurricane <span>1 file(s), 94 rows, 14 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>6.0 KiB</td><td>94</td><td>14</td><td>0.2%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>nls-bmi <span>1 file(s), 12,686 rows, 9 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>nls_bmi_processed.csv</td><td>tabular</td><td>606.0 KiB</td><td>12,686</td><td>9</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>affairs <span>1 file(s), 601 rows, 10 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>20.5 KiB</td><td>601</td><td>10</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>fertility <span>1 file(s), 275 rows, 11 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>13.7 KiB</td><td>275</td><td>11</td><td>2.9%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>caschools <span>1 file(s), 420 rows, 15 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>59.9 KiB</td><td>420</td><td>15</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>mortgage <span>1 file(s), 2,380 rows, 14 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>114.6 KiB</td><td>2,380</td><td>14</td><td>0.1%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>crofoot <span>1 file(s), 58 rows, 12 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>1.7 KiB</td><td>58</td><td>12</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>immigration-offshoring-effect-on-employment <span>2 file(s), 928 rows, 7 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>offshoring_iv_mar2.dta</td><td>tabular</td><td>3.9 KiB</td><td>464</td><td>3</td><td>0.0%</td></tr><tr><td>immi_popimputed_00_07.dta</td><td>tabular</td><td>13.7 KiB</td><td>464</td><td>4</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>panda-nuts <span>1 file(s), 84 rows, 7 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>1.5 KiB</td><td>84</td><td>7</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>toy <span>1 file(s), 150 rows, 5 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>5.4 KiB</td><td>150</td><td>5</td><td>3.3%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>boxes <span>1 file(s), 629 rows, 5 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>6.4 KiB</td><td>629</td><td>5</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            
+
+            <details>
+              <summary>fish <span>1 file(s), 250 rows, 6 raw columns</span></summary>
+              <table class="mini"><thead><tr><th>File</th><th>Kind</th><th>Bytes</th><th>Rows</th><th>Columns</th><th>Missing</th></tr></thead>
+              <tbody><tr><td>data.csv</td><td>tabular</td><td>4.0 KiB</td><td>250</td><td>6</td><td>0.0%</td></tr></tbody></table>
+            </details>
+            </section>
+
+<section class="panel notes"><h2>Method and limitations</h2><ul>
+  <li>Raw CSV/DTA tables were read directly. Tab-delimited files with a <code>.csv</code> suffix were detected from their header. The phylogenetic tree is counted as an auxiliary source, not forced into a table.</li>
+  <li>The relative complexity index is intentionally transparent, but its weights are judgment calls. Use the component columns and flags for scheduling decisions rather than treating a one-point score difference as meaningful.</li>
+  <li>Missingness is cell-weighted. Type mix uses parsed storage types; numeric-coded categories are separately counted in the machine-readable export but do not change the headline index.</li>
+  <li><code>nls-raw</code> and <code>nls-bmi-raw</code> reference the same 12,686 × 61 raw NLS table. They remain separate because they are separate benchmark tasks and prompt histories.</li>
+  <li>Prompt measurements reproduce Slime’s filter path: apply the Qwen3.5 chat template, tokenize the rendered string with <code>add_special_tokens=False</code>, then compare with <code>--rollout-max-prompt-len</code>.</li>
+</ul></section>
+<footer>Companion CSV and JSON contain the exact metrics and per-file profiles.</footer>
+</main>
+<script>
+const table=document.getElementById('tasks'), body=table.tBodies[0], search=document.getElementById('search');
+search.addEventListener('input',()=>{const q=search.value.toLowerCase();[...body.rows].forEach(r=>r.hidden=!r.dataset.search.toLowerCase().includes(q));});
+[...table.tHead.rows[0].cells].forEach((th,i)=>{let asc=true;th.addEventListener('click',()=>{const rows=[...body.rows];rows.sort((a,b)=>{const av=a.cells[i].dataset.sort??a.cells[i].innerText.toLowerCase(),bv=b.cells[i].dataset.sort??b.cells[i].innerText.toLowerCase();const an=Number(av),bn=Number(bv);const cmp=Number.isFinite(an)&&Number.isFinite(bn)?an-bn:String(av).localeCompare(String(bv));return asc?cmp:-cmp;});rows.forEach(r=>body.appendChild(r));asc=!asc;});});
+</script></body></html>

@@ -1,0 +1,73 @@
+{
+  "experiment": {
+    "experiment_id": "01M1V3C7AC1B14HS4NB33Y4Y0J",
+    "job_id": "01M1V3C7E7KDMGXWVMX40M4HXC",
+    "result_dataset_id": "01M1V3C7ATNVH91FAY3836CZ0B",
+    "status": "succeeded",
+    "exit_code": 0,
+    "started": "2026-09-06T10:18:17.781588Z",
+    "exited": "2026-09-06T16:43:04.236022Z",
+    "group_size": 128,
+    "training_steps": 10,
+    "execution_model": "gpt-5-mini",
+    "belief_model": "gpt-5-mini",
+    "reward_type": "binary_surprise"
+  },
+  "artifacts": {
+    "local_size_approx": "497 MiB",
+    "reward_records": 1291,
+    "training_rollout_archives": 10,
+    "evaluation_rollout_archives": 10,
+    "pytorch_zip_integrity_check": "passed",
+    "distributed_checkpoint_downloaded": false
+  },
+  "training_steps": [
+    {"step": 0, "raw_reward_mean": 0.0625, "reward_1": 8, "success": 19, "executor_reviewer_failure": 109, "truncated": 0},
+    {"step": 1, "raw_reward_mean": 0.03125, "reward_1": 4, "success": 18, "executor_reviewer_failure": 110, "truncated": 0},
+    {"step": 2, "raw_reward_mean": 0.03125, "reward_1": 4, "success": 28, "executor_reviewer_failure": 100, "truncated": 0},
+    {"step": 3, "raw_reward_mean": 0.0390625, "reward_1": 5, "success": 28, "executor_reviewer_failure": 100, "truncated": 0},
+    {"step": 4, "raw_reward_mean": 0.078125, "reward_1": 10, "success": 33, "executor_reviewer_failure": 90, "truncated": 5},
+    {"step": 5, "raw_reward_mean": 0.0546875, "reward_1": 7, "success": 33, "executor_reviewer_failure": 94, "truncated": 1},
+    {"step": 6, "raw_reward_mean": 0.078125, "reward_1": 10, "success": 30, "executor_reviewer_failure": 98, "truncated": 0},
+    {"step": 7, "raw_reward_mean": 0.0390625, "reward_1": 5, "success": 21, "executor_reviewer_failure": 107, "truncated": 0},
+    {"step": 8, "raw_reward_mean": 0.0078125, "reward_1": 1, "success": 14, "executor_reviewer_failure": 114, "truncated": 0},
+    {"step": 9, "raw_reward_mean": 0.0546875, "reward_1": 7, "success": 19, "executor_reviewer_failure": 109, "truncated": 0}
+  ],
+  "training_totals": {
+    "samples": 1280,
+    "reward_1": 61,
+    "raw_reward_mean": 0.04765625,
+    "success": 243,
+    "executor_reviewer_failure": 1031,
+    "truncated": 6
+  },
+  "evaluation": {
+    "records": 11,
+    "reward_1": 2,
+    "reward_1_at": ["initial", "after_step_2"],
+    "success": 3,
+    "executor_reviewer_failure": 8,
+    "truncated": 0
+  },
+  "whole_jsonl": {
+    "records": 1291,
+    "reward_1": 63,
+    "raw_reward_mean": 0.048799380325329204,
+    "success": 246,
+    "executor_reviewer_failure": 1039,
+    "truncated": 6,
+    "surprising": 63,
+    "non_surprising_scored": 183,
+    "mean_belief_change_scored": 0.13717899083752744
+  },
+  "reward_server_final_counter": {
+    "experiments": 1292,
+    "executor_failures": 1046,
+    "scored": 246,
+    "surprising": 63,
+    "model_calls": 9912,
+    "prompt_tokens": 123586767,
+    "completion_tokens": 33097924,
+    "total_tokens": 156684691
+  }
+}

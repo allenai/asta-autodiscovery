@@ -1,0 +1,672 @@
+{
+  "collected_at": "2026-09-09",
+  "recipe": {
+    "dataset": "archaeology",
+    "split": "sanity1_fmt3_bin",
+    "format": "fmt3_w_verdict",
+    "advantage_estimator": "grpo",
+    "epochs": 10,
+    "reward": "binary belief-change surprise",
+    "execution_model": "gpt-5-mini",
+    "belief_model": "gpt-5-mini"
+  },
+  "deduplication": "last record per sample index; index 0 excluded because eval reused it",
+  "runs": [
+    {
+      "experiment_id": "01M0RQFD4QVN3BS85PYDPC0MNX",
+      "job_id": "01M0RQFD87PTQW9MC8H1RVHH9F",
+      "result_dataset_id": "01M0RQFD4W8P48EEDM9JK9CC4D",
+      "exit_code": 0,
+      "status": "succeeded",
+      "group_size": 16,
+      "local_directory": "logs/collected-runs-2026-09-06/archaeology-g16/main",
+      "jsonl_bytes": 7676250,
+      "jsonl_sha256": "c89b3fbe0a273f2bd7592b6e1c432390a31a59d38f5f19ef92af65dd7adcdc63",
+      "audit": {
+        "raw_records": 171,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 159
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.100629,
+      "reward_positive_count": 16,
+      "reward_positive_rate": 0.100629,
+      "reward_distribution": {
+        "0.0": 143,
+        "1.0": 16
+      },
+      "success_count": 26,
+      "success_rate": 0.163522,
+      "failure_rate": 0.836478,
+      "truncation_count": 1,
+      "truncation_rate": 0.006289,
+      "belief_change_count": 26,
+      "belief_change_mean": 0.223165,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 132,
+        "truncated_response": 1
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 15,
+          "reward_mean": 0.066667,
+          "reward_positive_rate": 0.066667,
+          "success_rate": 0.133333,
+          "failure_rate": 0.866667,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 16,
+          "reward_mean": 0.125,
+          "reward_positive_rate": 0.125,
+          "success_rate": 0.1875,
+          "failure_rate": 0.8125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 16,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0625,
+          "failure_rate": 0.9375,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 16,
+          "reward_mean": 0.0625,
+          "reward_positive_rate": 0.0625,
+          "success_rate": 0.125,
+          "failure_rate": 0.875,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 16,
+          "reward_mean": 0.0625,
+          "reward_positive_rate": 0.0625,
+          "success_rate": 0.25,
+          "failure_rate": 0.75,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 5,
+          "records": 16,
+          "reward_mean": 0.0625,
+          "reward_positive_rate": 0.0625,
+          "success_rate": 0.125,
+          "failure_rate": 0.875,
+          "truncation_rate": 0.0625
+        },
+        {
+          "step": 6,
+          "records": 16,
+          "reward_mean": 0.0625,
+          "reward_positive_rate": 0.0625,
+          "success_rate": 0.0625,
+          "failure_rate": 0.9375,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 7,
+          "records": 16,
+          "reward_mean": 0.1875,
+          "reward_positive_rate": 0.1875,
+          "success_rate": 0.3125,
+          "failure_rate": 0.6875,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 8,
+          "records": 16,
+          "reward_mean": 0.125,
+          "reward_positive_rate": 0.125,
+          "success_rate": 0.125,
+          "failure_rate": 0.875,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 9,
+          "records": 16,
+          "reward_mean": 0.25,
+          "reward_positive_rate": 0.25,
+          "success_rate": 0.25,
+          "failure_rate": 0.75,
+          "truncation_rate": 0.0
+        }
+      ]
+    },
+    {
+      "experiment_id": "01M115W5YND6WFMHTW59SAMTER",
+      "job_id": "01M115W64VD1YVXJTBJP1XG235",
+      "result_dataset_id": "01M115W5YWD83PX1275V4E3M3K",
+      "exit_code": 0,
+      "status": "succeeded",
+      "group_size": 32,
+      "local_directory": "logs/collected-runs-2026-09-06/archaeology-g32/main",
+      "jsonl_bytes": 23066230,
+      "jsonl_sha256": "7c22723db824f4d9d6fbd3279bcfe2ff9b96d9f941ad3982c77690214f1a9726",
+      "audit": {
+        "raw_records": 331,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 319
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.094044,
+      "reward_positive_count": 30,
+      "reward_positive_rate": 0.094044,
+      "reward_distribution": {
+        "0.0": 289,
+        "1.0": 30
+      },
+      "success_count": 77,
+      "success_rate": 0.241379,
+      "failure_rate": 0.758621,
+      "truncation_count": 24,
+      "truncation_rate": 0.075235,
+      "belief_change_count": 77,
+      "belief_change_mean": 0.156402,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 217,
+        "truncated_response": 24,
+        "APIConnectionError: Connection error.": 1
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 31,
+          "reward_mean": 0.096774,
+          "reward_positive_rate": 0.096774,
+          "success_rate": 0.16129,
+          "failure_rate": 0.83871,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 32,
+          "reward_mean": 0.125,
+          "reward_positive_rate": 0.125,
+          "success_rate": 0.25,
+          "failure_rate": 0.75,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 32,
+          "reward_mean": 0.09375,
+          "reward_positive_rate": 0.09375,
+          "success_rate": 0.21875,
+          "failure_rate": 0.78125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 32,
+          "reward_mean": 0.03125,
+          "reward_positive_rate": 0.03125,
+          "success_rate": 0.21875,
+          "failure_rate": 0.78125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 32,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.1875,
+          "failure_rate": 0.8125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 5,
+          "records": 32,
+          "reward_mean": 0.0625,
+          "reward_positive_rate": 0.0625,
+          "success_rate": 0.1875,
+          "failure_rate": 0.8125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 6,
+          "records": 32,
+          "reward_mean": 0.09375,
+          "reward_positive_rate": 0.09375,
+          "success_rate": 0.34375,
+          "failure_rate": 0.65625,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 7,
+          "records": 32,
+          "reward_mean": 0.21875,
+          "reward_positive_rate": 0.21875,
+          "success_rate": 0.40625,
+          "failure_rate": 0.59375,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 8,
+          "records": 32,
+          "reward_mean": 0.1875,
+          "reward_positive_rate": 0.1875,
+          "success_rate": 0.3125,
+          "failure_rate": 0.6875,
+          "truncation_rate": 0.1875
+        },
+        {
+          "step": 9,
+          "records": 32,
+          "reward_mean": 0.03125,
+          "reward_positive_rate": 0.03125,
+          "success_rate": 0.125,
+          "failure_rate": 0.875,
+          "truncation_rate": 0.5625
+        }
+      ]
+    },
+    {
+      "experiment_id": "01M1PQYZA5BMGHEZJKBDXRZEGC",
+      "job_id": "01M1PQYZHY0CR2XTT4CJAY27X5",
+      "result_dataset_id": "01M1PQYZAG2FSPKKX111DNK2YY",
+      "exit_code": 1,
+      "status": "Ray succeeded; outer success guard produced a false failure",
+      "group_size": 64,
+      "local_directory": "logs/collected-runs-2026-09-06/archaeology-g64/main",
+      "jsonl_bytes": 34168784,
+      "jsonl_sha256": "037308dc3c3ee8d805b82752d21a6050d1024a7f3cc65b98a4d81af71c3546a2",
+      "audit": {
+        "raw_records": 651,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 639
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.086072,
+      "reward_positive_count": 55,
+      "reward_positive_rate": 0.086072,
+      "reward_distribution": {
+        "0.0": 584,
+        "1.0": 55
+      },
+      "success_count": 140,
+      "success_rate": 0.219092,
+      "failure_rate": 0.780908,
+      "truncation_count": 149,
+      "truncation_rate": 0.233177,
+      "belief_change_count": 140,
+      "belief_change_mean": 0.160717,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 350,
+        "truncated_response": 149
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 63,
+          "reward_mean": 0.047619,
+          "reward_positive_rate": 0.047619,
+          "success_rate": 0.190476,
+          "failure_rate": 0.809524,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 64,
+          "reward_mean": 0.0625,
+          "reward_positive_rate": 0.0625,
+          "success_rate": 0.203125,
+          "failure_rate": 0.796875,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 64,
+          "reward_mean": 0.109375,
+          "reward_positive_rate": 0.109375,
+          "success_rate": 0.296875,
+          "failure_rate": 0.703125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 64,
+          "reward_mean": 0.09375,
+          "reward_positive_rate": 0.09375,
+          "success_rate": 0.171875,
+          "failure_rate": 0.828125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 64,
+          "reward_mean": 0.09375,
+          "reward_positive_rate": 0.09375,
+          "success_rate": 0.203125,
+          "failure_rate": 0.796875,
+          "truncation_rate": 0.015625
+        },
+        {
+          "step": 5,
+          "records": 64,
+          "reward_mean": 0.171875,
+          "reward_positive_rate": 0.171875,
+          "success_rate": 0.375,
+          "failure_rate": 0.625,
+          "truncation_rate": 0.046875
+        },
+        {
+          "step": 6,
+          "records": 64,
+          "reward_mean": 0.078125,
+          "reward_positive_rate": 0.078125,
+          "success_rate": 0.296875,
+          "failure_rate": 0.703125,
+          "truncation_rate": 0.140625
+        },
+        {
+          "step": 7,
+          "records": 64,
+          "reward_mean": 0.171875,
+          "reward_positive_rate": 0.171875,
+          "success_rate": 0.328125,
+          "failure_rate": 0.671875,
+          "truncation_rate": 0.359375
+        },
+        {
+          "step": 8,
+          "records": 64,
+          "reward_mean": 0.03125,
+          "reward_positive_rate": 0.03125,
+          "success_rate": 0.109375,
+          "failure_rate": 0.890625,
+          "truncation_rate": 0.796875
+        },
+        {
+          "step": 9,
+          "records": 64,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.015625,
+          "failure_rate": 0.984375,
+          "truncation_rate": 0.96875
+        }
+      ]
+    },
+    {
+      "experiment_id": "01M1V3C7AC1B14HS4NB33Y4Y0J",
+      "job_id": "01M1V3C7E7KDMGXWVMX40M4HXC",
+      "result_dataset_id": "01M1V3C7ATNVH91FAY3836CZ0B",
+      "exit_code": 0,
+      "status": "succeeded",
+      "group_size": 128,
+      "local_directory": "logs/collected-runs-2026-09-06/archaeology-g128/main",
+      "jsonl_bytes": 79070909,
+      "jsonl_sha256": "1f9891ccfb632828c101a63c1bcea27d40fdf92ce2f5828037cd672ae3aa4a46",
+      "audit": {
+        "raw_records": 1291,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 1279
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.047694,
+      "reward_positive_count": 61,
+      "reward_positive_rate": 0.047694,
+      "reward_distribution": {
+        "0.0": 1218,
+        "1.0": 61
+      },
+      "success_count": 243,
+      "success_rate": 0.189992,
+      "failure_rate": 0.810008,
+      "truncation_count": 6,
+      "truncation_rate": 0.004691,
+      "belief_change_count": 243,
+      "belief_change_mean": 0.136558,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 1030,
+        "truncated_response": 6
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 127,
+          "reward_mean": 0.062992,
+          "reward_positive_rate": 0.062992,
+          "success_rate": 0.149606,
+          "failure_rate": 0.850394,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 128,
+          "reward_mean": 0.03125,
+          "reward_positive_rate": 0.03125,
+          "success_rate": 0.140625,
+          "failure_rate": 0.859375,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 128,
+          "reward_mean": 0.03125,
+          "reward_positive_rate": 0.03125,
+          "success_rate": 0.21875,
+          "failure_rate": 0.78125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 128,
+          "reward_mean": 0.039062,
+          "reward_positive_rate": 0.039062,
+          "success_rate": 0.21875,
+          "failure_rate": 0.78125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 128,
+          "reward_mean": 0.078125,
+          "reward_positive_rate": 0.078125,
+          "success_rate": 0.257812,
+          "failure_rate": 0.742188,
+          "truncation_rate": 0.039062
+        },
+        {
+          "step": 5,
+          "records": 128,
+          "reward_mean": 0.054688,
+          "reward_positive_rate": 0.054688,
+          "success_rate": 0.257812,
+          "failure_rate": 0.742188,
+          "truncation_rate": 0.007812
+        },
+        {
+          "step": 6,
+          "records": 128,
+          "reward_mean": 0.078125,
+          "reward_positive_rate": 0.078125,
+          "success_rate": 0.234375,
+          "failure_rate": 0.765625,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 7,
+          "records": 128,
+          "reward_mean": 0.039062,
+          "reward_positive_rate": 0.039062,
+          "success_rate": 0.164062,
+          "failure_rate": 0.835938,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 8,
+          "records": 128,
+          "reward_mean": 0.007812,
+          "reward_positive_rate": 0.007812,
+          "success_rate": 0.109375,
+          "failure_rate": 0.890625,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 9,
+          "records": 128,
+          "reward_mean": 0.054688,
+          "reward_positive_rate": 0.054688,
+          "success_rate": 0.148438,
+          "failure_rate": 0.851562,
+          "truncation_rate": 0.0
+        }
+      ]
+    },
+    {
+      "experiment_id": "01M0RQFDKMHE1GVKJ67EZF9042",
+      "job_id": "01M0RQFDQ1MQS7RD82H02XZNRN",
+      "result_dataset_id": "01M0RQFDKR2HVNHM3J9KE01S3T",
+      "exit_code": 0,
+      "status": "succeeded",
+      "group_size": 256,
+      "local_directory": "logs/collected-runs-2026-09-06/archaeology-g256/main",
+      "jsonl_bytes": 103255144,
+      "jsonl_sha256": "c81a2c72b6282ad64bee4324eef3f7bd8e37fa79a82115e13f1e739707875941",
+      "audit": {
+        "raw_records": 2571,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 2559
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.182102,
+      "reward_positive_count": 466,
+      "reward_positive_rate": 0.182102,
+      "reward_distribution": {
+        "0.0": 2093,
+        "1.0": 466
+      },
+      "success_count": 1012,
+      "success_rate": 0.395467,
+      "failure_rate": 0.604533,
+      "truncation_count": 0,
+      "truncation_rate": 0.0,
+      "belief_change_count": 1012,
+      "belief_change_mean": 0.178409,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 1546,
+        "APIConnectionError: Connection error.": 1
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 255,
+          "reward_mean": 0.047059,
+          "reward_positive_rate": 0.047059,
+          "success_rate": 0.168627,
+          "failure_rate": 0.831373,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 256,
+          "reward_mean": 0.066406,
+          "reward_positive_rate": 0.066406,
+          "success_rate": 0.195312,
+          "failure_rate": 0.804688,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 256,
+          "reward_mean": 0.132812,
+          "reward_positive_rate": 0.132812,
+          "success_rate": 0.308594,
+          "failure_rate": 0.691406,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 256,
+          "reward_mean": 0.152344,
+          "reward_positive_rate": 0.152344,
+          "success_rate": 0.421875,
+          "failure_rate": 0.578125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 256,
+          "reward_mean": 0.175781,
+          "reward_positive_rate": 0.175781,
+          "success_rate": 0.355469,
+          "failure_rate": 0.644531,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 5,
+          "records": 256,
+          "reward_mean": 0.179688,
+          "reward_positive_rate": 0.179688,
+          "success_rate": 0.34375,
+          "failure_rate": 0.65625,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 6,
+          "records": 256,
+          "reward_mean": 0.242188,
+          "reward_positive_rate": 0.242188,
+          "success_rate": 0.507812,
+          "failure_rate": 0.492188,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 7,
+          "records": 256,
+          "reward_mean": 0.222656,
+          "reward_positive_rate": 0.222656,
+          "success_rate": 0.496094,
+          "failure_rate": 0.503906,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 8,
+          "records": 256,
+          "reward_mean": 0.300781,
+          "reward_positive_rate": 0.300781,
+          "success_rate": 0.5625,
+          "failure_rate": 0.4375,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 9,
+          "records": 256,
+          "reward_mean": 0.300781,
+          "reward_positive_rate": 0.300781,
+          "success_rate": 0.59375,
+          "failure_rate": 0.40625,
+          "truncation_rate": 0.0
+        }
+      ]
+    }
+  ]
+}

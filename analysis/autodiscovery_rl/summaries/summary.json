@@ -1,0 +1,114 @@
+{
+  "collected_at": "2026-09-06",
+  "jsonl_records_total": 7084,
+  "pytorch_archives": {
+    "count": 80,
+    "zip_integrity_check": "passed"
+  },
+  "runs": {
+    "archaeology-g128": {
+      "belief_change": {
+        "count": 246,
+        "mean": 0.13717899083752744
+      },
+      "errors": {
+        "experiment failed executor/reviewer checks": 1039,
+        "truncated_response": 6
+      },
+      "records": 1291,
+      "reward": {
+        "mean": 0.048799380325329204,
+        "positive": 63
+      },
+      "success": {
+        "false": 1045,
+        "true": 246
+      },
+      "surprising": {
+        "false": 183,
+        "null": 1045,
+        "true": 63
+      }
+    },
+    "archaeology-g64": {
+      "belief_change": {
+        "count": 142,
+        "mean": 0.1595098367985692
+      },
+      "errors": {
+        "experiment failed executor/reviewer checks": 356,
+        "truncated_response": 153
+      },
+      "records": 651,
+      "reward": {
+        "mean": 0.08448540706605223,
+        "positive": 55
+      },
+      "success": {
+        "false": 509,
+        "true": 142
+      },
+      "surprising": {
+        "false": 87,
+        "null": 509,
+        "true": 55
+      }
+    },
+    "gemini-g256": {
+      "errors": {
+        "ValueError: Belief distribution could not be computed.": 450,
+        "experiment failed executor/reviewer checks": 2121
+      },
+      "records": 2571,
+      "reward": {
+        "mean": 0.0,
+        "positive": 0
+      },
+      "success": {
+        "false": 2571,
+        "true": 0
+      },
+      "surprising": {
+        "false": 0,
+        "null": 2571,
+        "true": 0
+      }
+    },
+    "luna-g256": {
+      "belief_change": {
+        "count": 828,
+        "mean": 0.1694412094547964
+      },
+      "errors": {
+        "experiment failed executor/reviewer checks": 1732,
+        "truncated_response": 11
+      },
+      "records": 2571,
+      "reward": {
+        "mean": 0.20108907040062232,
+        "positive": 517
+      },
+      "success": {
+        "false": 1743,
+        "true": 828
+      },
+      "surprising": {
+        "false": 311,
+        "null": 1743,
+        "true": 517
+      }
+    }
+  },
+  "sweep_status": {
+    "other28-g256": {
+      "experiment_id": "01M1PQZF13581SVPXQMP8D2E92",
+      "failed": 1,
+      "failed_jobs": [
+        "affairs"
+      ],
+      "pending": 27,
+      "running": 0,
+      "succeeded": 0
+    }
+  }
+}

@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>G256 Hypothesis Rollouts</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1015;
+      --panel: #121a22;
+      --panel-2: #17222d;
+      --ink: #eef5f4;
+      --muted: #9bacae;
+      --line: #263743;
+      --cyan: #62d4d0;
+      --amber: #ffbd69;
+      --red: #ff7c79;
+      --green: #7ee0a4;
+      --blue: #7ab8ff;
+      --shadow: 0 18px 50px rgb(0 0 0 / 28%);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 4%, rgb(98 212 208 / 11%), transparent 30rem),
+        radial-gradient(circle at 92% 16%, rgb(255 189 105 / 9%), transparent 28rem),
+        var(--bg);
+      color: var(--ink);
+      font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 52px 0 80px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 9px 0 12px;
+      font-size: clamp(34px, 6vw, 68px);
+      line-height: .98;
+      letter-spacing: -.045em;
+    }
+
+    .lede {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .run-id {
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgb(18 26 34 / 78%);
+      color: var(--muted);
+      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: nowrap;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgb(23 34 45 / 94%), rgb(18 26 34 / 94%));
+      box-shadow: var(--shadow);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: -.04em;
+    }
+
+    .metric span { color: var(--muted); }
+    .metric.alert strong { color: var(--red); }
+    .metric.warning strong { color: var(--amber); }
+
+    .trajectory {
+      margin-bottom: 24px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgb(18 26 34 / 90%);
+      box-shadow: var(--shadow);
+    }
+
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: baseline;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -.02em;
+    }
+
+    .section-heading p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .bar-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 10px;
+      height: 180px;
+      align-items: end;
+    }
+
+    .bar-item {
+      display: grid;
+      grid-template-rows: 1fr auto auto;
+      gap: 6px;
+      height: 100%;
+      min-width: 0;
+      text-align: center;
+    }
+
+    .bar-track {
+      display: flex;
+      align-items: end;
+      min-height: 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .bar {
+      width: 100%;
+      min-height: 5px;
+      border-radius: 7px 7px 2px 2px;
+      background: linear-gradient(180deg, var(--cyan), #267b8b);
+      box-shadow: 0 0 18px rgb(98 212 208 / 18%);
+    }
+
+    .bar-value {
+      overflow: hidden;
+      color: var(--muted);
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-overflow: ellipsis;
+    }
+
+    .bar-step { color: var(--ink); font-size: 12px; font-weight: 800; }
+
+    .controls {
+      position: sticky;
+      top: 10px;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      align-items: center;
+      margin: 0 0 18px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgb(11 16 21 / 88%);
+      backdrop-filter: blur(14px);
+    }
+
+    button, input {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--panel);
+      color: var(--ink);
+      font: inherit;
+    }
+
+    button {
+      padding: 7px 11px;
+      cursor: pointer;
+    }
+
+    button:hover, button.active { border-color: var(--cyan); color: var(--cyan); }
+
+    input {
+      flex: 1 1 260px;
+      min-width: 160px;
+      padding: 8px 11px;
+      outline: none;
+    }
+
+    input:focus { border-color: var(--cyan); }
+
+    .rollouts { display: grid; gap: 16px; }
+
+    article {
+      scroll-margin-top: 90px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgb(23 34 45 / 94%), rgb(18 26 34 / 94%));
+      box-shadow: var(--shadow);
+    }
+
+    article.malformed { border-color: rgb(255 189 105 / 55%); }
+    article[hidden] { display: none; }
+
+    .card-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 15px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgb(255 255 255 / 1.5%);
+    }
+
+    .step {
+      margin-right: 3px;
+      font-size: 18px;
+      font-weight: 850;
+      letter-spacing: -.02em;
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .pill.reward { border-color: rgb(126 224 164 / 35%); color: var(--green); }
+    .pill.negative { border-color: rgb(255 124 121 / 35%); color: var(--red); }
+    .pill.positive { border-color: rgb(122 184 255 / 38%); color: var(--blue); }
+    .pill.bad { border-color: rgb(255 189 105 / 45%); color: var(--amber); }
+
+    .copy {
+      margin-left: auto;
+      padding: 5px 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .card-body { padding: 20px; }
+
+    blockquote {
+      margin: 0;
+      padding: 19px 20px;
+      border-left: 3px solid var(--cyan);
+      border-radius: 5px 12px 12px 5px;
+      background: #0d141b;
+      color: #f3f8f7;
+      font: 14px/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .malformed blockquote {
+      border-left-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .outcome {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px dashed var(--line);
+    }
+
+    .outcome strong {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .outcome p { margin: 0; }
+
+    .note {
+      margin-top: 24px;
+      padding: 18px 20px;
+      border: 1px solid rgb(255 189 105 / 30%);
+      border-radius: 14px;
+      background: rgb(255 189 105 / 6%);
+      color: #e9d8ba;
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 20px, 1180px); padding-top: 30px; }
+      header { grid-template-columns: 1fr; }
+      .run-id { justify-self: start; white-space: normal; }
+      .summary { grid-template-columns: repeat(2, 1fr); }
+      .bar-grid { gap: 5px; }
+      .bar-value { writing-mode: vertical-rl; justify-self: center; }
+      .outcome { grid-template-columns: 1fr; gap: 4px; }
+      .copy { width: 100%; margin-left: 0; }
+    }
+
+    @media print {
+      :root { color-scheme: light; }
+      body { background: white; color: #111; }
+      .shell { width: 100%; padding: 0; }
+      .controls, .copy { display: none; }
+      article, .metric, .trajectory { break-inside: avoid; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">Archaeology · reward inspection</div>
+        <h1>G256 hypothesis rollouts</h1>
+        <p class="lede">The highest-absolute-surprise rewarded hypothesis from each training step, shown verbatim as the reward harness received it.</p>
+      </div>
+      <div class="run-id">mainharness-g256-v4<br>10 × 256 training rollouts</div>
+    </header>
+
+    <section class="summary" aria-label="Summary metrics">
+      <div class="metric"><strong>10</strong><span>featured step-wise rollouts</span></div>
+      <div class="metric"><strong>1.0</strong><span>reward for every featured rollout</span></div>
+      <div class="metric alert"><strong>8</strong><span>negative belief shifts</span></div>
+      <div class="metric warning"><strong>2</strong><span>empty hypotheses rewarded</span></div>
+    </section>
+
+    <section class="trajectory" aria-labelledby="trajectory-title">
+      <div class="section-heading">
+        <h2 id="trajectory-title">Mean response length by training step</h2>
+        <p>Prompt length remained fixed at 3,179 tokens.</p>
+      </div>
+      <div class="bar-grid" aria-label="Mean response token bar chart">
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:100%"></div></div><div class="bar-value">8,613</div><div class="bar-step">0</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:50.6%"></div></div><div class="bar-value">4,358</div><div class="bar-step">1</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:7.1%"></div></div><div class="bar-value">610</div><div class="bar-step">2</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:6.8%"></div></div><div class="bar-value">583</div><div class="bar-step">3</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:5%"></div></div><div class="bar-value">428</div><div class="bar-step">4</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:5.1%"></div></div><div class="bar-value">439</div><div class="bar-step">5</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:5.8%"></div></div><div class="bar-value">498</div><div class="bar-step">6</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:7.5%"></div></div><div class="bar-value">643</div><div class="bar-step">7</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:8%"></div></div><div class="bar-value">687</div><div class="bar-step">8</div></div>
+        <div class="bar-item"><div class="bar-track"><div class="bar" style="height:8.7%"></div></div><div class="bar-value">749</div><div class="bar-step">9</div></div>
+      </div>
+    </section>
+
+    <div class="controls" aria-label="Rollout filters">
+      <button class="active" data-filter="all">All steps</button>
+      <button data-filter="negative">Negative shifts</button>
+      <button data-filter="malformed">Malformed</button>
+      <input id="search" type="search" placeholder="Search exact hypothesis text…" aria-label="Search hypotheses">
+    </div>
+
+    <section class="rollouts" aria-label="Exact hypothesis rollouts">
+      <article id="step-0" data-kind="negative" data-search="amber hatchetsword pollen openness trade goods">
+        <div class="card-head">
+          <span class="step">Step 0</span><span class="pill">rollout 11</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.574467</span><span class="pill">7,207 tokens</span><span class="pill">8 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>For events defined by sustained 100-year increases in smoothed pollen openness (positive 100-year slope and forward-100 mean &gt; prior-100 mean), the magnitude of the forward-100 pollen slope is positively associated with the 200-year post-onset change in `Amber_inter` (increment in interpolated z values for Amber), whereas this same magnitude of pollen slope is not significantly associated with the 200-year post-onset change in `HatchetSword_inter` (increment in interpolated z values for Hatchets and Swords), indicating that environmental openness selectively promotes long-distance trade goods over local tool production.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>Effects were weak, with near-zero explanatory power and sensitivity to plausible window choices.</p></div>
+        </div>
+      </article>
+
+      <article id="step-1" data-kind="negative" data-search="coppergold housesize pollen openness domestic wealth">
+        <div class="card-head">
+          <span class="step">Step 1</span><span class="pill">rollout 339</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.552372</span><span class="pill">594 tokens</span><span class="pill">5 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>Among events defined by sustained 100-year increases in smoothed pollen openness, the subsequent 200-year change in interpolated CopperGold values is positively associated with the magnitude of the forward-100 pollen slope, but this relationship is shadowed when pre-event HouseSize_inter is already high, indicating that established domestic wealth may decouple pollen-driven landscape changes from long-distance trade investment.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The completed evidence reduced belief in the hypothesis enough to trigger binary surprise reward.</p></div>
+        </div>
+      </article>
+
+      <article id="step-2" data-kind="negative" data-search="coppergold monumentsize high wealth interaction">
+        <div class="card-head">
+          <span class="step">Step 2</span><span class="pill">rollout 597</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.729132</span><span class="pill">527 tokens</span><span class="pill">5 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>Among archaeological periods characterized by high pre-event wealth accumulation (defined as mean CopperGold values in the 200-year prior window exceeding the dataset median), the association between sustained pollen openness increases and subsequent MonumentSize_inter growth is significantly stronger than in periods with low pre-event wealth accumulation.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The preregistered positive interaction was not supported; the experiment found a robust negative interaction instead.</p></div>
+        </div>
+      </article>
+
+      <article id="step-3" data-kind="negative" data-search="monumentsize monumentcount effect size 0.3">
+        <div class="card-head">
+          <span class="step">Step 3</span><span class="pill">rollout 997</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.828559</span><span class="pill">584 tokens</span><span class="pill">5 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>Among events defined by sustained 100-year increases in smoothed pollen openness, the response magnitude of monument quality (MonumentSize_inter) is significantly larger relative to the response magnitude of monument quantity (MonumentCount_inter) in the 200-year post-onset period compared to pre-event baselines; specifically, the standardized effect size for MonumentSize changes exceeds that for MonumentCount changes by more than 0.3 standard deviations after adjusting for prehistoric environmental stability.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The adjusted difference was essentially zero; the confidence interval and bootstrap distribution were well below 0.3 SD.</p></div>
+        </div>
+      </article>
+
+      <article id="step-4" class="malformed" data-kind="malformed" data-search="empty malformed end token">
+        <div class="card-head">
+          <span class="step">Step 4</span><span class="pill">rollout 1243</span><span class="pill reward">reward 1</span><span class="pill positive">signed +0.757539</span><span class="pill bad">malformed</span><span class="pill">340 tokens</span><span class="pill">8 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The harness substituted a generic CSV-summary experiment and then judged it successful and “surprising.”</p></div>
+        </div>
+      </article>
+
+      <article id="step-5" data-kind="negative" data-search="coppergold monumentsize prosperous wealth">
+        <div class="card-head">
+          <span class="step">Step 5</span><span class="pill">rollout 1476</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.729132</span><span class="pill">417 tokens</span><span class="pill">8 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>During economically prosperous periods (measured by interpolated CopperGold wealth above the median), sustained 100-year increases in pollen openness significantly correlate with subsequent 200-year increases in MonumentSize_inter, whereas during periods of lower material wealth, the same pollen signals show no statistically significant relationship with monument construction activity.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The completed evidence produced a large shift away from the stated hypothesis.</p></div>
+        </div>
+      </article>
+
+      <article id="step-6" data-kind="negative" data-search="coppergold monumentsize amplification economic prosperity moderator">
+        <div class="card-head">
+          <span class="step">Step 6</span><span class="pill">rollout 1584</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.729132</span><span class="pill">404 tokens</span><span class="pill">5 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>Among sustained 200-year post-event monument activity increases following pollen openness shifts, the relationship between forward pollen slope magnitude and MonumentSize_inter amplification is significantly stronger during periods of high pre-existing material wealth (mean CopperGold during the 200-year pre-window &gt; median), suggesting that economic prosperity acts as a positive moderator that enhances the archaeological monument response to ecological signals.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The wealth-amplification relationship was not supported under the implemented operationalization and model.</p></div>
+        </div>
+      </article>
+
+      <article id="step-7" class="malformed" data-kind="malformed" data-search="empty malformed end token">
+        <div class="card-head">
+          <span class="step">Step 7</span><span class="pill">rollout 1803</span><span class="pill reward">reward 1</span><span class="pill positive">signed +0.757539</span><span class="pill bad">malformed</span><span class="pill">609 tokens</span><span class="pill">5 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The harness again ran a generic three-CSV summary rather than testing a scientific hypothesis.</p></div>
+        </div>
+      </article>
+
+      <article id="step-8" data-kind="negative" data-search="coppergold monumentcount 1.8 material richness">
+        <div class="card-head">
+          <span class="step">Step 8</span><span class="pill">rollout 2115</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.785596</span><span class="pill">759 tokens</span><span class="pill">8 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>Pre-existing material wealth (mean CopperGold value during the 200-year pre-event period) positively moderates the pollen openness-to-monument response: during periods when pre-event material richness is high (mean CopperGold &gt; median), the 200-year post-onset increase in MonumentCount_inter following sustained pollen openness increases is 1.8× larger than during periods of low material richness (mean CopperGold ≤ median), suggesting that access to precious materials amplifies the pollen-monument relationship.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The observed ratio was approximately −0.45, and its confidence interval was far below the claimed 1.8× effect.</p></div>
+        </div>
+      </article>
+
+      <article id="step-9" data-kind="negative" data-search="coppergold amber monumentsize 2x affluence">
+        <div class="card-head">
+          <span class="step">Step 9</span><span class="pill">rollout 2307</span><span class="pill reward">reward 1</span><span class="pill negative">signed −0.729132</span><span class="pill">623 tokens</span><span class="pill">5 rounds</span>
+          <button class="copy" type="button">Copy hypothesis</button>
+        </div>
+        <div class="card-body">
+          <blockquote>Material affluence amplifies the pollen openness-to-monument-response relationship: when material wealth (mean(CopperGold, Amber)) is high at the pre-event period, the 200-year post-monument size increase (diff_size) following a positive forward-100 pollen slope is 2x larger than during material-scarce periods, indicating that ecological signals translate more effectively into monumental construction when material resources are abundant.&lt;|im_end|&gt;</blockquote>
+          <div class="outcome"><strong>Experiment outcome</strong><p>The result was consistently opposite: higher material wealth was associated with smaller monument-size increases.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <aside class="note"><strong>Reading the sign:</strong> a negative signed surprise means the posterior belief moved away from the hypothesis. Binary reward nevertheless remained 1 because this run rewards the absolute belief change. The end-of-message marker is intentionally preserved because it was included in the string received by the reward harness.</aside>
+
+    <footer>Generated from the ten saved training tensors for mainharness-g256-v4. Eval rollouts excluded.</footer>
+  </main>
+
+  <script>
+    const buttons = [...document.querySelectorAll('[data-filter]')];
+    const cards = [...document.querySelectorAll('article[data-kind]')];
+    const search = document.querySelector('#search');
+    let activeFilter = 'all';
+
+    function applyFilters() {
+      const query = search.value.trim().toLowerCase();
+      cards.forEach((card) => {
+        const kindMatches = activeFilter === 'all' || card.dataset.kind === activeFilter;
+        const textMatches = !query || `${card.dataset.search} ${card.textContent}`.toLowerCase().includes(query);
+        card.hidden = !(kindMatches && textMatches);
+      });
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        activeFilter = button.dataset.filter;
+        buttons.forEach((candidate) => candidate.classList.toggle('active', candidate === button));
+        applyFilters();
+      });
+    });
+
+    search.addEventListener('input', applyFilters);
+
+    document.querySelectorAll('.copy').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const text = button.closest('article').querySelector('blockquote').textContent;
+        await navigator.clipboard.writeText(text);
+        const original = button.textContent;
+        button.textContent = 'Copied';
+        window.setTimeout(() => { button.textContent = original; }, 1200);
+      });
+    });
+  </script>
+</body>
+</html>

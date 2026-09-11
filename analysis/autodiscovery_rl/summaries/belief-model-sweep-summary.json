@@ -1,0 +1,457 @@
+{
+  "collected_at": "2026-09-09",
+  "recipe": {
+    "dataset": "archaeology",
+    "split": "sanity1_fmt3_bin",
+    "format": "fmt3_w_verdict",
+    "advantage_estimator": "grpo",
+    "epochs": 10,
+    "group_size": 256,
+    "reward": "binary belief-change surprise",
+    "execution_model": "gpt-5-mini"
+  },
+  "varied_factor": "belief_model",
+  "deduplication": "last record per sample index; index 0 excluded because eval reused it",
+  "runs": [
+    {
+      "belief_model": "gpt-5-mini",
+      "belief_model_configuration": "implicit entry-script default",
+      "local_name": "archaeology-g256",
+      "experiment_id": "01M0RQFDKMHE1GVKJ67EZF9042",
+      "job_id": "01M0RQFDQ1MQS7RD82H02XZNRN",
+      "result_dataset_id": "01M0RQFDKR2HVNHM3J9KE01S3T",
+      "exit_code": 0,
+      "status": "succeeded",
+      "group_size": 256,
+      "local_directory": "logs/collected-runs-2026-09-06/archaeology-g256/main",
+      "jsonl_bytes": 103255144,
+      "jsonl_sha256": "c81a2c72b6282ad64bee4324eef3f7bd8e37fa79a82115e13f1e739707875941",
+      "audit": {
+        "raw_records": 2571,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 2559
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.182102,
+      "reward_positive_count": 466,
+      "reward_positive_rate": 0.182102,
+      "reward_distribution": {
+        "0.0": 2093,
+        "1.0": 466
+      },
+      "success_count": 1012,
+      "success_rate": 0.395467,
+      "belief_score_count": 1012,
+      "belief_score_rate": 0.395467,
+      "belief_change_mean": 0.178409,
+      "normalized_surprisal_mean": -0.287726,
+      "surprising_true_count": 466,
+      "failure_rate": 0.604533,
+      "truncation_count": 0,
+      "truncation_rate": 0.0,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 1546,
+        "APIConnectionError: Connection error.": 1
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 255,
+          "reward_mean": 0.047059,
+          "reward_positive_rate": 0.047059,
+          "success_rate": 0.168627,
+          "belief_score_rate": 0.168627,
+          "failure_rate": 0.831373,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 256,
+          "reward_mean": 0.066406,
+          "reward_positive_rate": 0.066406,
+          "success_rate": 0.195312,
+          "belief_score_rate": 0.195312,
+          "failure_rate": 0.804688,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 256,
+          "reward_mean": 0.132812,
+          "reward_positive_rate": 0.132812,
+          "success_rate": 0.308594,
+          "belief_score_rate": 0.308594,
+          "failure_rate": 0.691406,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 256,
+          "reward_mean": 0.152344,
+          "reward_positive_rate": 0.152344,
+          "success_rate": 0.421875,
+          "belief_score_rate": 0.421875,
+          "failure_rate": 0.578125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 256,
+          "reward_mean": 0.175781,
+          "reward_positive_rate": 0.175781,
+          "success_rate": 0.355469,
+          "belief_score_rate": 0.355469,
+          "failure_rate": 0.644531,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 5,
+          "records": 256,
+          "reward_mean": 0.179688,
+          "reward_positive_rate": 0.179688,
+          "success_rate": 0.34375,
+          "belief_score_rate": 0.34375,
+          "failure_rate": 0.65625,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 6,
+          "records": 256,
+          "reward_mean": 0.242188,
+          "reward_positive_rate": 0.242188,
+          "success_rate": 0.507812,
+          "belief_score_rate": 0.507812,
+          "failure_rate": 0.492188,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 7,
+          "records": 256,
+          "reward_mean": 0.222656,
+          "reward_positive_rate": 0.222656,
+          "success_rate": 0.496094,
+          "belief_score_rate": 0.496094,
+          "failure_rate": 0.503906,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 8,
+          "records": 256,
+          "reward_mean": 0.300781,
+          "reward_positive_rate": 0.300781,
+          "success_rate": 0.5625,
+          "belief_score_rate": 0.5625,
+          "failure_rate": 0.4375,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 9,
+          "records": 256,
+          "reward_mean": 0.300781,
+          "reward_positive_rate": 0.300781,
+          "success_rate": 0.59375,
+          "belief_score_rate": 0.59375,
+          "failure_rate": 0.40625,
+          "truncation_rate": 0.0
+        }
+      ]
+    },
+    {
+      "belief_model": "gemini-3.8-flash",
+      "belief_model_configuration": "explicit BELIEF_MODEL",
+      "local_name": "gemini-g256",
+      "experiment_id": "01M1PV4G4ZC4D5R82KB8WYNSR3",
+      "job_id": "01M1PV4G8EFQZ5MKF3A8RVRR01",
+      "result_dataset_id": "01M1PV4G53XXHE34KR9A41P4RZ",
+      "exit_code": 0,
+      "status": "job succeeded; belief scoring failed for every rollout",
+      "group_size": 256,
+      "local_directory": "logs/collected-runs-2026-09-06/gemini-g256/main",
+      "jsonl_bytes": 146574424,
+      "jsonl_sha256": "5a3669bdc3de8f97309fc4a6b114a447d1dddff0c7908481682d2d3fc426713b",
+      "audit": {
+        "raw_records": 2571,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 2559
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.0,
+      "reward_positive_count": 0,
+      "reward_positive_rate": 0.0,
+      "reward_distribution": {
+        "0.0": 2559
+      },
+      "success_count": 0,
+      "success_rate": 0.0,
+      "belief_score_count": 0,
+      "belief_score_rate": 0.0,
+      "belief_change_mean": null,
+      "normalized_surprisal_mean": null,
+      "surprising_true_count": 0,
+      "failure_rate": 1.0,
+      "truncation_count": 0,
+      "truncation_rate": 0.0,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 2109,
+        "ValueError: Belief distribution could not be computed.": 450
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 255,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 4,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 5,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 6,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 7,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 8,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 9,
+          "records": 256,
+          "reward_mean": 0.0,
+          "reward_positive_rate": 0.0,
+          "success_rate": 0.0,
+          "belief_score_rate": 0.0,
+          "failure_rate": 1.0,
+          "truncation_rate": 0.0
+        }
+      ]
+    },
+    {
+      "belief_model": "gpt-5.6-luna",
+      "belief_model_configuration": "explicit BELIEF_MODEL",
+      "local_name": "luna-g256",
+      "experiment_id": "01M1PV4GPCZN3RCTVVKN6SJNHG",
+      "job_id": "01M1PV4GT24SBS0MHYR35MCD47",
+      "result_dataset_id": "01M1PV4GPH2626EME2GKFBVBGJ",
+      "exit_code": 0,
+      "status": "succeeded",
+      "group_size": 256,
+      "local_directory": "logs/collected-runs-2026-09-06/luna-g256/main",
+      "jsonl_bytes": 175109644,
+      "jsonl_sha256": "42b4efcdea06e795a0c3f4e8143cc3a306e5911ec11f233d21c9623e1050ac5a",
+      "audit": {
+        "raw_records": 2571,
+        "retry_or_eval_duplicates": 11,
+        "removed_ambiguous_index_zero": 1,
+        "deduplicated_training_records": 2559
+      },
+      "steps_observed": 10,
+      "reward_mean": 0.20086,
+      "reward_positive_count": 514,
+      "reward_positive_rate": 0.20086,
+      "reward_distribution": {
+        "0.0": 2045,
+        "1.0": 514
+      },
+      "success_count": 824,
+      "success_rate": 0.322001,
+      "belief_score_count": 824,
+      "belief_score_rate": 0.322001,
+      "belief_change_mean": 0.169425,
+      "normalized_surprisal_mean": -0.230041,
+      "surprising_true_count": 514,
+      "failure_rate": 0.677999,
+      "truncation_count": 11,
+      "truncation_rate": 0.004299,
+      "error_counts": {
+        "experiment failed executor/reviewer checks": 1724,
+        "truncated_response": 11
+      },
+      "pytorch_archives": 20,
+      "pytorch_archive_integrity": "passed",
+      "corrupt_pytorch_archives": [],
+      "steps": [
+        {
+          "step": 0,
+          "records": 255,
+          "reward_mean": 0.145098,
+          "reward_positive_rate": 0.145098,
+          "success_rate": 0.2,
+          "belief_score_rate": 0.2,
+          "failure_rate": 0.8,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 1,
+          "records": 256,
+          "reward_mean": 0.132812,
+          "reward_positive_rate": 0.132812,
+          "success_rate": 0.203125,
+          "belief_score_rate": 0.203125,
+          "failure_rate": 0.796875,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 2,
+          "records": 256,
+          "reward_mean": 0.183594,
+          "reward_positive_rate": 0.183594,
+          "success_rate": 0.296875,
+          "belief_score_rate": 0.296875,
+          "failure_rate": 0.703125,
+          "truncation_rate": 0.0
+        },
+        {
+          "step": 3,
+          "records": 256,
+          "reward_mean": 0.183594,
+          "reward_positive_rate": 0.183594,
+          "success_rate": 0.316406,
+          "belief_score_rate": 0.316406,
+          "failure_rate": 0.683594,
+          "truncation_rate": 0.003906
+        },
+        {
+          "step": 4,
+          "records": 256,
+          "reward_mean": 0.25,
+          "reward_positive_rate": 0.25,
+          "success_rate": 0.378906,
+          "belief_score_rate": 0.378906,
+          "failure_rate": 0.621094,
+          "truncation_rate": 0.007812
+        },
+        {
+          "step": 5,
+          "records": 256,
+          "reward_mean": 0.222656,
+          "reward_positive_rate": 0.222656,
+          "success_rate": 0.371094,
+          "belief_score_rate": 0.371094,
+          "failure_rate": 0.628906,
+          "truncation_rate": 0.003906
+        },
+        {
+          "step": 6,
+          "records": 256,
+          "reward_mean": 0.246094,
+          "reward_positive_rate": 0.246094,
+          "success_rate": 0.355469,
+          "belief_score_rate": 0.355469,
+          "failure_rate": 0.644531,
+          "truncation_rate": 0.015625
+        },
+        {
+          "step": 7,
+          "records": 256,
+          "reward_mean": 0.230469,
+          "reward_positive_rate": 0.230469,
+          "success_rate": 0.367188,
+          "belief_score_rate": 0.367188,
+          "failure_rate": 0.632812,
+          "truncation_rate": 0.003906
+        },
+        {
+          "step": 8,
+          "records": 256,
+          "reward_mean": 0.242188,
+          "reward_positive_rate": 0.242188,
+          "success_rate": 0.421875,
+          "belief_score_rate": 0.421875,
+          "failure_rate": 0.578125,
+          "truncation_rate": 0.003906
+        },
+        {
+          "step": 9,
+          "records": 256,
+          "reward_mean": 0.171875,
+          "reward_positive_rate": 0.171875,
+          "success_rate": 0.308594,
+          "belief_score_rate": 0.308594,
+          "failure_rate": 0.691406,
+          "truncation_rate": 0.003906
+        }
+      ]
+    }
+  ]
+}

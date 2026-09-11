@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AutoDiscovery-RL artifacts</title>
+  <style>
+    :root { --ink:#17202c; --muted:#657184; --line:#d9dee7; --panel:#fff; --bg:#f3f5f8; --accent:#315f9b; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,-apple-system,sans-serif; }
+    main { max-width:1100px; margin:auto; padding:28px; }
+    h1 { margin:0 0 4px; font-size:30px; }
+    h2 { margin:28px 0 10px; }
+    .muted { color:var(--muted); }
+    .cards { display:grid; grid-template-columns:repeat(4,minmax(140px,1fr)); gap:12px; margin:20px 0; }
+    .card,.panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; }
+    .card { padding:16px; }
+    .card strong { display:block; color:var(--accent); font-size:25px; }
+    .panel { padding:16px; margin:12px 0; }
+    table { border-collapse:collapse; width:100%; background:#fff; border:1px solid var(--line); }
+    th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#26364f; color:#fff; }
+    a { color:#245c9b; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    code { font-size:12px; }
+    @media(max-width:760px) { main{padding:16px}.cards{grid-template-columns:repeat(2,1fr)} }
+  </style>
+</head>
+<body><main>
+  <h1>AutoDiscovery-RL artifacts</h1>
+  <p class="muted">Git-safe export · 2026-09-11 · <code>allenai/asta-autodiscovery@sijia/generator-dev</code></p>
+  <div class="cards">
+    <div class="card"><strong>37</strong>curated source artifacts</div>
+    <div class="card"><strong>206</strong>Beaker experiments</div>
+    <div class="card"><strong>209</strong>result datasets</div>
+    <div class="card"><strong>5.9 GiB</strong>indexed externally</div>
+  </div>
+  <section class="panel"><strong>Storage policy.</strong> Reports, summaries, plots, specifications, analysis code, and complete provenance are committed here. Raw tensors, JSONL, logs, checkpoints, dashboard builds, and dependency caches stay outside Git and are recoverable through the registered Beaker IDs.</section>
+
+  <h2>Portable artifacts</h2>
+  <table><thead><tr><th>Artifact</th><th>Description</th></tr></thead><tbody>
+    <tr><td><a href="reports/reward-hacking-similarity-investigation.html">Reward-hacking investigation</a></td><td>Reward trajectories, truncation/trace leakage, and semantic repetition.</td></tr>
+    <tr><td><a href="reports/g256_hypothesis_rollouts.html">G256 hypothesis rollouts</a></td><td>Generated-hypothesis inspection report.</td></tr>
+    <tr><td><a href="reports/dataset-complexity/autods-dataset-complexity-29.html">29-task dataset complexity</a></td><td>Interactive report, plus <a href="reports/dataset-complexity/autods-dataset-complexity-29.csv">CSV</a> and <a href="reports/dataset-complexity/autods-dataset-complexity-29.json">JSON</a>.</td></tr>
+    <tr><td><a href="figures/reward_data_vs_rollout.png">Reward versus rollout</a></td><td>PNG and <a href="figures/reward_data_vs_rollout.pdf">PDF</a>.</td></tr>
+    <tr><td><a href="summaries/group-size-sweep.md">Group-size sweep</a></td><td>Archaeology g16/g32/g64/g128/g256 comparison with a machine-readable summary.</td></tr>
+    <tr><td><a href="summaries/belief-model-sweep.md">Belief-model sweep</a></td><td>Gpt-5-mini, Gemini 3.8 Flash, and GPT-5.6 Luna comparison.</td></tr>
+    <tr><td><a href="summaries/archaeology-g64-diagnostics.md">G64 diagnostics</a></td><td>Outer success-guard false failure and reward diagnostics.</td></tr>
+    <tr><td><a href="launch-specs/autods-complexity4-g256-gpt5mini-2026-09-09.md">Four-task g256 launch</a></td><td>Recipe, Beaker provenance, and final status; YAML included.</td></tr>
+    <tr><td><a href="catalog/rollout-runs.json">Experiment catalog</a></td><td>Historical dashboard metadata for 200 experiments.</td></tr>
+    <tr><td><a href="scripts/">Analysis source</a></td><td>Reproducible analyzers, renderers, plots, summaries, and registry generation.</td></tr>
+    <tr><td><a href="patches/slime-keyword-truncation-penalty.patch">Keyword truncation-penalty patch</a></td><td>Uncommitted slime implementation and test preserved as a portable patch.</td></tr>
+  </tbody></table>
+
+  <h2>Complete source inventory</h2>
+  <p>The <a href="registry/source-workspace-registry.html">searchable source registry</a> contains the full file- and experiment-level view. Use <a href="registry/source-workspace-registry.json">JSON</a> for automation and <a href="registry/source-workspace-index.md">Markdown</a> for a concise index. Local links in those snapshot files refer to the original slime workspace; Beaker links and identifiers remain valid.</p>
+</main></body></html>

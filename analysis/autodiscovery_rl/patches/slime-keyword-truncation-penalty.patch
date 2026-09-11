@@ -1,0 +1,75 @@
+diff --git a/slime/rollout/rm_hub/keyword.py b/slime/rollout/rm_hub/keyword.py
+index 41e8a1db..60c1183c 100644
+--- a/slime/rollout/rm_hub/keyword.py
++++ b/slime/rollout/rm_hub/keyword.py
+@@ -8,8 +8,10 @@ matches), else 0.0. A working GRPO loop should push the policy toward
+ mentioning the keyword within a few epochs; failure to climb isolates
+ optimizer/plumbing problems from reward-model problems.
+ 
+-Samples with no extractable hypothesis score 0.0 — a degenerate response does
+-not mention the keyword in a usable hypothesis.
++Truncated samples receive ``AUTODISCOVERY_FAILURE_REWARD`` (default 0.0),
++regardless of their partial text. Samples with no extractable hypothesis score
++0.0 — a degenerate response does not mention the keyword in a usable
++hypothesis.
+ 
+ No experiment is run and no reward server is contacted.
+ 
+@@ -24,7 +26,7 @@ import re
+ 
+ from slime.utils.types import Sample
+ 
+-from .reward_utils import dump_record, extract_hypothesis, sample_base_record
++from .reward_utils import FAILURE_REWARD, dump_record, extract_hypothesis, sample_base_record
+ 
+ CONTROL = "keyword"
+ PATTERN = re.compile(os.environ.get("AUTODISCOVERY_KEYWORD_PATTERN", r"pottery\s*form"), re.IGNORECASE)
+@@ -33,6 +35,17 @@ PATTERN = re.compile(os.environ.get("AUTODISCOVERY_KEYWORD_PATTERN", r"pottery\s
+ async def reward(args, sample: Sample | list[Sample], **kwargs) -> float | list[float]:
+     if isinstance(sample, list):
+         return await asyncio.gather(*(reward(args, s, **kwargs) for s in sample))
++    if sample.status == Sample.Status.TRUNCATED:
++        dump_record({
++            **sample_base_record(sample, CONTROL),
++            "hypothesis": None,
++            "reward": FAILURE_REWARD,
++            "success": False,
++            "error": "truncated_response",
++            "keyword_pattern": PATTERN.pattern,
++            "keyword_matched": False,
++        })
++        return FAILURE_REWARD
+     hypothesis = extract_hypothesis(sample.response or "") or None
+     matched = bool(hypothesis and PATTERN.search(hypothesis))
+     rew = 1.0 if matched else 0.0
+diff --git a/tests/test_autodiscovery_reward_shaping.py b/tests/test_autodiscovery_reward_shaping.py
+index 60fa94af..e1eab6c5 100644
+--- a/tests/test_autodiscovery_reward_shaping.py
++++ b/tests/test_autodiscovery_reward_shaping.py
+@@ -3,7 +3,7 @@ from types import SimpleNamespace
+ 
+ import pytest
+ 
+-from slime.rollout.rm_hub import autodiscovery
++from slime.rollout.rm_hub import autodiscovery, keyword
+ from slime.rollout.rm_hub.autodiscovery import post_process_rewards
+ from slime.utils.types import Sample
+ 
+@@ -88,5 +88,17 @@ def test_feedback_accumulates_only_reward_one_rollouts(tmp_path, monkeypatch):
+     assert autodiscovery._successful_feedback("archaeology", k=1) == entries[:1]
+ 
+ 
++def test_keyword_reward_penalizes_truncated_matches(monkeypatch):
++    monkeypatch.setattr(keyword, "FAILURE_REWARD", -1.0)
++    samples = [
++        Sample(response="pottery form and copper", status=Sample.Status.TRUNCATED),
++        Sample(response="pottery form and copper", status=Sample.Status.COMPLETED),
++    ]
++
++    rewards = asyncio.run(keyword.reward(None, samples))
++
++    assert rewards == [-1.0, 1.0]
++
++
+ if __name__ == "__main__":
+     raise SystemExit(pytest.main([__file__]))

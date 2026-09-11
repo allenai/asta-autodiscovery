@@ -1,0 +1,276 @@
+{
+ "schema_version": 1,
+ "generated": "2026-09-11",
+ "about": "Reports, summaries, figures, launch specs, patches, catalogs and code exported from the Codex workspace into this folder, described for the merged index.",
+ "codex_provenance": [
+  "Exported: 2026-09-11 PDT",
+  "Source repository: `sijial430/slime`",
+  "Source branch: `codex/autodiscovery-success-context`",
+  "Source commit: `40a87e8a4ade4f938cbe63317590b6b2173cc3d5`",
+  "Dashboard source commit: `73b456f1e93bc7d2cc43e7f2f1d09010ab464ddf`",
+  "Destination: `allenai/asta-autodiscovery`, branch `sijia/generator-dev`",
+  "Destination base commit: `655e6ff`",
+  "Dashboard Sites project: `appgprj_6a951676a0dc81918e95ce1e3aa19e04`",
+  "The source files in `slime` were copied, not deleted."
+ ],
+ "items": [
+  {
+   "path": "reports/reward-hacking-similarity-investigation.html",
+   "extra_paths": [
+    "scripts/analyze_reward_hacking_runs.py",
+    "scripts/render_reward_hacking_report.py"
+   ],
+   "title": "Reward hacking and hypothesis repetition investigation",
+   "kind": "report",
+   "date": "Aug 31",
+   "what_it_shows": "Offline audit of 6,506 MiniLM-embedded training hypotheses from 12 Beaker conditions (the main-reward g16–g256 sweep, always-0/1/coin controls and keyword arms). It finds a clear hack in the g256 'pottery form AND copper' keyword arm: reward jumps from 26.6% at step 7 to 100% at steps 8–9 as the extracted 'hypothesis' grows from a median 56 to 7,681 words of leaked reasoning, because the reward scans the whole response when `</think>` is missing. Main-reward g256 improves (reward 4.7% → 30.1%) while its hypotheses grow repetitive (94.5% prior-step similarity).",
+   "related_claude_pages": [
+    "65d799a0",
+    "cd5b6a58",
+    "395f82b0",
+    "6578db9f",
+    "898ef2a3"
+   ],
+   "caution": "Coverage is uneven: g64 OOMed with no rollouts, g128 has 1 step, the three-keyword arm has no records, the single-keyword g256 arm has 3 saved steps, and step 9 of the conjunction arm is partial (177 records). The verdict text is hardcoded in the render template, the analysis JSON exists only inside the HTML, and re-running needs a local MiniLM model and the Beaker reward dumps. Its group-size sweep uses the earlier g64 and g128 runs, which OOMed; the repaired runs that completed are in summaries/group-size-sweep.md, so prefer that summary for group-size conclusions.",
+   "topic": "reward-signal-robustness-and-hacking"
+  },
+  {
+   "path": "reports/g256_hypothesis_rollouts.html",
+   "extra_paths": [],
+   "title": "G256 hypothesis rollouts",
+   "kind": "report",
+   "date": "Aug 28",
+   "what_it_shows": "For run mainharness-g256-v4 (one archaeology prompt, group 256, binary reward, 10 x 256 training rollouts), it shows the verbatim hypothesis with the highest absolute surprise from each of the 10 steps, plus mean response length per step: 8,613 tokens at step 0, 610 by step 2, then 428-749, with the prompt fixed at 3,179 tokens. All 10 featured rollouts got reward 1.0, but 8 were negative belief shifts (e.g. -0.729132, -0.828559). The other 2 (steps 4 and 7) were empty `<|im_end|>` hypotheses: the harness swapped in a generic CSV-summary experiment and still judged them surprising (+0.757539).",
+   "related_claude_pages": [
+    "15973224",
+    "1c9d7472",
+    "ee9f104f"
+   ],
+   "caution": "Shows only the top-surprise rollout per step (10 of 2,560 training rollouts), so it is not a representative sample, and no generator script or data is included. The run is also the gpt-5-mini arm of the belief-model comparison.",
+   "topic": "hypotheses-rollouts-and-logs"
+  },
+  {
+   "path": "reports/dataset-complexity/autods-dataset-complexity-29.html",
+   "extra_paths": [
+    "reports/dataset-complexity/autods-dataset-complexity-29.csv",
+    "reports/dataset-complexity/autods-dataset-complexity-29.json",
+    "scripts/analyze_autods_dataset_complexity.py"
+   ],
+   "title": "29-task dataset complexity audit",
+   "kind": "report",
+   "date": "Sep 8",
+   "what_it_shows": "A raw-data audit of the 29 DiscoveryBench + BLADE tasks (14 + 15, 62.9 MiB) behind the group-size sweep. It ranks them on a weighted operational-complexity index (scale 23%, schema breadth 23%, multi-file 18%, missingness 14%, p/n shape 12%, type mix 10%), with archaeology top at 67.3 and fish bottom at 8.8, and it finds that worldbank-education-gdp-indicators renders to 8,207 tokens, 15 over the 8,192 prompt cap, so Slime's loader silently drops it (requirements-engineering is close to the cap at 7,524).",
+   "related_claude_pages": [
+    "6db094e3",
+    "a8c2fb56",
+    "a1b11022"
+   ],
+   "caution": "The report itself says the index weights are judgment calls, so a one-point score difference means nothing. nls-raw and nls-bmi-raw use the same 12,686 x 61 table. The script cannot rerun from this repo with its defaults: it expects examples/autodiscovery_rl/datasets_dbench_blade.json under --repo-root (missing here), a local raw-data snapshot at /private/tmp/autods_dataset_complexity, and a local Qwen3.5 tokenizer (required). It also writes to output/autods-dataset-complexity-29/, which is the path the registry records, while the committed copy is under reports/dataset-complexity/.",
+   "topic": "datasets-tasks-and-prompts"
+  },
+  {
+   "path": "figures/reward_data_vs_rollout.png",
+   "extra_paths": [
+    "figures/reward_data_vs_rollout.pdf",
+    "scripts/plot_reward_data_vs_rollout.py"
+   ],
+   "title": "Training-data reference reward vs achieved rollout reward",
+   "kind": "figure",
+   "date": "Aug 4–5 (plotted Sep 1)",
+   "what_it_shows": "A density histogram of two reward distributions that are easy to confuse. One is the training data's reference reward, the |normalized surprisal| the reference MCTS node earned in the fmt1 prompt parquet (n=42,419, median 0.56). The other is the reward the policy actually earned across 9 runs of the Aug 4–5 LR×KL sweep (n=4,780 rewarded rollouts, median 0.38). Rollout rewards fall on a lattice of roughly 0.0663 steps, with only 67 distinct values, and 40% of them fall in [0.18, 0.4] against 25% of the training data's.",
+   "related_claude_pages": [
+    "2bb03df3",
+    "f6deb975",
+    "8819b064",
+    "ee9f104f"
+   ],
+   "caution": "You can't rerun the script from where it was committed. Its REPO constant climbs three directories, which assumes the file still lives at examples/autodiscovery_rl/. From analysis/autodiscovery_rl/scripts/ that resolves to analysis/. The inputs it needs (examples/autodiscovery_rl/data/fmt1/train.parquet and dashboard-reproduction/public/data/rollouts/) aren't in the repo either. The registry lists the originals as untracked files under examples/autodiscovery_rl/. The docstring says the fmt{1,2,3} parquets are used, but the code reads only fmt1/train.parquet, while the rollout side pools fmt1, fmt2 and fmt3 sweep runs. Only rollouts with reason=='rewarded' are counted, so failed experiments are left out. The shaded band is labelled 'remembered band 0.2 – 0.3' but is drawn over 0.18–0.40, and that wider range is the one the 40%/25% figures use.",
+   "topic": "reward-signal-robustness-and-hacking"
+  },
+  {
+   "path": "summaries/group-size-sweep.md",
+   "extra_paths": [
+    "summaries/group-size-sweep-summary.json",
+    "scripts/summarize_group_size_collection.py"
+   ],
+   "title": "Archaeology binary-reward group-size sweep (g16–g256)",
+   "kind": "summary",
+   "date": "Sep 9",
+   "what_it_shows": "Compares five single archaeology runs (sanity1_fmt3_bin, fmt3_w_verdict, GRPO, 10 epochs, binary surprise reward, gpt-5-mini executor and belief model) at group sizes 16/32/64/128/256 on positive-reward, success and truncation rates, with Beaker provenance. The JSON adds per-step rates, error counts, JSONL hashes and archive-integrity checks. g256 shows the clearest rise (4.7% positive at step 0 to 30.1% at step 9, 18.2% overall), g64 collapses into truncation (96.9% truncated and 0% reward at step 9), and g128 stays low (4.8% overall) without collapsing, so the failure does not track group size in one direction.",
+   "related_claude_pages": [
+    "ebb46794",
+    "cd5b6a58",
+    "65d799a0",
+    "395f82b0",
+    "898ef2a3",
+    "15973224",
+    "d1a888ec",
+    "ee9f104f"
+   ],
+   "caution": "There is one run per group size, and the arms come from different launches: g16 and g256 on Aug 24, g32 on Aug 27, the repaired g64 on Sep 4 and g128 on Sep 6. Differences therefore mix group size with run variance and environment changes. Beaker lists g64 as failed (exit 1), but that is a false failure. The script reads logs/collected-runs-2026-09-06 and writes its outputs there, and that bundle is not in this repo (it was copied to Weka). The script's 'Immediate readout' bullets are hardcoded text, not computed. summarize_belief_model_collection.py also imports this script.",
+   "topic": "group-size"
+  },
+  {
+   "path": "summaries/archaeology-g64-diagnostics.md",
+   "extra_paths": [],
+   "title": "Archaeology g64 diagnostics: false failure and truncation collapse",
+   "kind": "report",
+   "date": "Sep 4–6",
+   "what_it_shows": "Shows that the repaired g64 run finished all 10 train and eval steps. Beaker's exit 1 came from a case-sensitive shell guard that looked for 'SUCCEEDED' while Ray printed lowercase 'succeeded'. It also documents severe length degeneration: mean response length went from 8,715 to 16,335 tokens, truncation from 0% to 96.9%, and raw reward peaked at 0.1719 before hitting 0 at step 9 (55 of 640 training samples rewarded, 351 executor/reviewer failures); every validation eval scored 0.",
+   "related_claude_pages": [
+    "d1a888ec",
+    "395f82b0",
+    "65d799a0",
+    "cd5b6a58"
+   ],
+   "caution": "Beaker still shows this run as failed even though training succeeded. The custom rollout log hooks failed to import compute_metrics_from_samples, so custom logging fields are missing. Slime's rollout/rewards values are group-normalized advantages; use rollout/raw_reward for the actual reward. The report says the collapse is length degeneration, not successful reward hacking.",
+   "topic": "group-size"
+  },
+  {
+   "path": "summaries/archaeology-g128-summary.json",
+   "extra_paths": [],
+   "title": "Archaeology g128 run summary",
+   "kind": "summary",
+   "date": "Sep 6",
+   "what_it_shows": "Run-level and per-step JSON for the repaired g128 archaeology run (binary surprise reward, gpt-5-mini executor and belief model), which succeeded (exit 0) after 10 steps on Sep 6. Only 61 of 1,280 training samples earned reward 1 (raw mean 0.0477), 1,031 failed executor/reviewer checks and 6 were truncated. Per-step reward ranged from 0.0078 to 0.078, 2 of 11 evals were rewarded, and the reward server logged 9,912 model calls and 156.7M tokens.",
+   "related_claude_pages": [
+    "d1a888ec",
+    "95ef8a07"
+   ],
+   "caution": "Replaces the g128-24h run from the Aug 27–28 batch, which died of host-RAM OOM; a single run. Its totals count all 1,280 samples, while the group-size sweep drops one ambiguous record (1,279 samples; 1,030 vs 1,031 failures).",
+   "topic": "group-size"
+  },
+  {
+   "path": "summaries/results_2026-08-27_28.tsv",
+   "extra_paths": [],
+   "title": "August group-size run outcomes (g32/g64/g128 24h attempts)",
+   "kind": "summary",
+   "date": "Aug 27–28",
+   "what_it_shows": "Outcome table for the first 24h group-size attempts. g32-24h finished all 10 steps in 21h24m: raw reward went from 0.094 to a peak of 0.219 and ended at 0.031, truncation rose from 0 to 0.5625, and the final eval was 100% truncated. g64-24h and g128-24h died of host-RAM OOM in torch_memory_saver after 0 and 1 steps, and all three restarts (arch16, g64-v2, g128-v2) failed within 11 minutes on a removed wandb.util.generate_id (AttributeError).",
+   "related_claude_pages": [
+    "15973224",
+    "ee9f104f"
+   ],
+   "caution": "This table is superseded. Only g32-24h produced usable data, and g64 and g128 were rerun successfully on Sep 4 and Sep 6 (see group-size-sweep.md). Beaker reported exit 0 for both OOM deaths, so its status field is misleading. Later retries (g64-24h-v9, g128-24h-v6) appear in the Aug 24–29 hypotheses browser but are not in this table.",
+   "topic": "group-size"
+  },
+  {
+   "path": "summaries/belief-model-sweep.md",
+   "extra_paths": [
+    "summaries/belief-model-sweep-summary.json",
+    "scripts/summarize_belief_model_collection.py"
+   ],
+   "title": "Archaeology g256 belief-model comparison",
+   "kind": "summary",
+   "date": "Sep 9",
+   "what_it_shows": "A single-run comparison on archaeology g256 (sanity1_fmt3_bin, fmt3_w_verdict, GRPO, 10 epochs, binary belief-change surprise reward, gpt-5-mini executor) that changes only the belief model, with 2,559 deduplicated training records per arm. gpt-5.6-luna has a slightly higher positive-reward rate than gpt-5-mini (20.1% vs 18.2%) but drops to 17.2% at step 9, while mini climbs from 4.7% to 30.1%; gemini-3.8-flash scored 0 rollouts (450 hit 'Belief distribution could not be computed', 2,109 failed executor/reviewer checks), so its arm is invalid. The JSON adds per-step rates, error counts, mean belief_change (0.178 mini, 0.169 luna) and the beaker IDs.",
+   "related_claude_pages": [
+    "1c9d7472",
+    "d1a888ec"
+   ],
+   "caution": "Each arm is one run, so the file calls the results descriptive, not a model ranking, and the Gemini arm is an invalid measurement. The gpt-5-mini arm is the same archaeology-g256 run used in the group-size sweep, and its belief model came from the entry script's implicit default. The script can't be rerun from the repo for three reasons: it reads per-arm JSONLs of 100-175 MB from logs/collected-runs-2026-09-06, which isn't committed; it imports helpers from summarize_group_size_collection.py; and it writes its outputs to that logs folder, not to summaries/. Claude page 1c9d7472 blames Gemini's failure on 403s and says Luna's priors mostly failed to parse. This summary records only the ValueError and doesn't mention parse failures.",
+   "topic": "belief-models"
+  },
+  {
+   "path": "summaries/README.md",
+   "extra_paths": [
+    "summaries/summary.json"
+   ],
+   "title": "Collected reward-experiment runs",
+   "kind": "summary",
+   "date": "Sep 6–11",
+   "what_it_shows": "Manifest of the runs pulled from Beaker on Sep 6 (comparisons refreshed Sep 9): experiment, job and result-dataset IDs and the state of archaeology g16–g256, the gemini-g256 and luna-g256 belief-model runs, and the other28-g256 sweep, with 10,157 JSONL records and 140 .pt archives, all ZIP-validated. A Sep 11 addendum records the verified Weka copy (194 files, 5.8 GiB).",
+   "related_claude_pages": [
+    "1c9d7472",
+    "d1a888ec",
+    "ee9f104f"
+   ],
+   "caution": "The run data is not in this folder; it is on Weka at /weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11. summary.json predates the Sep 9 refresh and covers 4 of the 7 runs, the other28 status (1 failed, 27 pending) is a Sep 6 snapshot, 'see diagnostics.md' refers to archaeology-g64-diagnostics.md, and the g128 row's 'see summary.json' means the per-run archaeology-g128-summary.json, not summaries/summary.json.",
+   "topic": "hypotheses-rollouts-and-logs"
+  },
+  {
+   "path": "launch-specs/autods-complexity4-g256-gpt5mini-2026-09-09.md",
+   "extra_paths": [
+    "launch-specs/autods-complexity4-g256-gpt5mini-2026-09-09.yaml"
+   ],
+   "title": "Four-task complexity-stratified g256 launch",
+   "kind": "launch spec",
+   "date": "Sep 9–11",
+   "what_it_shows": "Beaker recipe (YAML) and outcome manifest for experiment 01M24Z64AC3CJCKY0522VYWYVP. It runs four independent one-prompt GRPO fmt3_pairs_related arms at group size 256 (10 epochs, binary belief-change reward, failure reward 0, gpt-5-mini as both executor and belief model, lr 5e-6, KL 0.01, slime ba17b587) on tasks picked from the 29-task complexity analysis: boxes (11.5, low), meta-regression-raw (53.2, high), conversation (51.8, high) and nls-raw (55.3, very high). At the Sep 11 status refresh, meta-regression-raw, conversation and nls-raw had succeeded with exit 0 and boxes had failed with exit 1, and the manifest lists the per-job IDs and result datasets.",
+   "related_claude_pages": [
+    "ee9f104f",
+    "a1b11022",
+    "6db094e3",
+    "69bb8c6e",
+    "8fe9e676",
+    "a40570c1",
+    "62f6a7fa"
+   ],
+   "caution": "Recipe, provenance IDs and exit status only, with no training results, and no stated cause for the boxes failure (the YAML has several fail-fast exit paths, including a host-memory preflight). The failed boxes arm was relaunched on Sep 10 as autods-complexity4-boxes-g256-gpt5mini-minrt1h-v2 (experiment 01M258DWZSJPBBGTPGXS5H8TB5), which succeeded; its rollout dumps are in the weka rollout_pt_dumps folder.",
+   "topic": "datasets-tasks-and-prompts"
+  },
+  {
+   "path": "catalog/rollout-runs.json",
+   "extra_paths": [],
+   "title": "Historical rollout-run catalog (200 Beaker experiments)",
+   "kind": "catalog",
+   "date": "Jul 28–Aug 31",
+   "what_it_shows": "JSON metadata for 200 Beaker RL experiments created Jul 28–Aug 31 (175 stopped, 24 finished, 1 running). Each run has its beaker link, family (125 continuous-legacy, 27 main-harness, 22 reward-ablation, 10 early-sanity, 6 failure-controls, 5 context, 5 multi-prompt), prompt format, reward signal, group size (1 to 256), epochs, prompts and rollout-record file; 135 runs have records, about 3.97 GB in total by recordBytes.",
+   "related_claude_pages": [
+    "ee9f104f",
+    "15973224",
+    "6578db9f",
+    "cd5b6a58"
+   ],
+   "caution": "An Aug 31 snapshot: one run is still marked 'running' and nothing from September is included. Its rewardSignal field is unreliable (the keyword, codex, 0, 1 and coin controls are tagged norm_surprisal), and the rollout records it names are not in this folder.",
+   "topic": "training-runs-and-dashboards"
+  },
+  {
+   "path": "patches/slime-keyword-truncation-penalty.patch",
+   "extra_paths": [],
+   "title": "Keyword reward truncation-penalty patch (slime)",
+   "kind": "patch",
+   "date": "Aug 31",
+   "what_it_shows": "A diff to slime's keyword control reward (slime/rollout/rm_hub/keyword.py): any TRUNCATED sample now gets FAILURE_REWARD (AUTODISCOVERY_FAILURE_REWARD, default 0.0) and is logged as truncated_response before keyword matching, so a truncated response that contains the keyword no longer earns 1.0. A new test sets FAILURE_REWARD to -1.0 and checks that the same text scores -1.0 truncated and 1.0 completed.",
+   "related_claude_pages": [
+    "65d799a0",
+    "395f82b0",
+    "cd5b6a58"
+   ],
+   "caution": "An uncommitted change from sijial430/slime (branch codex/autodiscovery-success-context), not applied anywhere in asta-autodiscovery. The run it was written for, autods-sanity1-fmt3-rwkeyword-pc-g256-truncpen1, launched from an earlier patch bundle, so this exact diff is not confirmed as the code it ran, and this folder has no result for it.",
+   "topic": "reward-signal-robustness-and-hacking"
+  },
+  {
+   "path": "registry/source-workspace-registry.html",
+   "extra_paths": [
+    "registry/source-workspace-registry.json",
+    "registry/source-workspace-index.md",
+    "scripts/build_autodiscovery_rl_artifact_registry.py"
+   ],
+   "title": "Source-workspace artifact registry",
+   "kind": "registry",
+   "date": "Sep 11",
+   "what_it_shows": "A searchable provenance registry for the original slime workspace. It lists 38 curated artifacts (reports, dashboard, collected runs, Weka logs, launch specs, scripts, keyword truncation-penalty change), a 594-file / 5.9 GiB SHA-256 inventory with 161 duplicate groups, and 206 Beaker experiments with 209 result-dataset IDs. It also gives per-run status and deduplicated reward-positive rates for the collected archaeology runs: g16 10.1%, g32 9.4%, g64 8.6%, g128 4.8%, g256 18.2%, luna-g256 20.1%, and gemini-g256 0.0%, because belief scoring failed for every rollout.",
+   "related_claude_pages": [
+    "ee9f104f",
+    "1c9d7472",
+    "65d799a0"
+   ],
+   "caution": "Local-path links in the registry snapshot point to the original slime checkout and don't work here, and its Markdown and HTML still link to the old artifact-registry.* names; Beaker links and IDs remain valid. 197 of the 206 experiment statuses are an Aug 31 dashboard snapshot. About 90 of those dead links have a counterpart in this folder: ../../scripts/* → scripts/, ../../logs/launch-specs/* → launch-specs/, the collected-runs summaries → summaries/, ../../examples/autodiscovery_rl/* → figures/ and scripts/, the two reports → reports/, dashboard-reproduction/scripts/rollout-runs.json → catalog/, and output/autods-dataset-complexity-29 → reports/dataset-complexity/. The rest point at the dashboard build, rollout tensors and logs, which are not in the repo. Its generator, scripts/build_autodiscovery_rl_artifact_registry.py, only runs inside the original slime workspace layout.",
+   "topic": "provenance-registries-and-code"
+  },
+  {
+   "path": "launch-specs/autods-training-logs-to-weka-2026-09-11.md",
+   "extra_paths": [
+    "launch-specs/autods-training-logs-to-weka-2026-09-11.yaml"
+   ],
+   "title": "Weka training-log archive",
+   "kind": "launch spec",
+   "date": "Sep 11",
+   "what_it_shows": "Verified copy of the Codex workspace's raw training logs to /weka/nora-default/sijial/training-logs/autodiscovery-rl-2026-09-11: 194 files, 5.8 GiB (the collected Sep 6 runs, nine early fmt* result bundles, launch specs and the August outcome table), with the archive checksum and the Beaker transfer job.",
+   "topic": "hypotheses-rollouts-and-logs",
+   "related_claude_pages": [],
+   "caution": ""
+  }
+ ]
+}

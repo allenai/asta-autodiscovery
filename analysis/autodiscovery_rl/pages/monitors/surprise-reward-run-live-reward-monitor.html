@@ -1,0 +1,129 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Surprise-reward run — live reward monitor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#eef1f4;--panel:#fff;--ink:#1a2230;--muted:#5b6675;--hair:#d6dce4;--hair2:#e9edf1;
+    --ns:#1f8f8f;--ns-soft:#dcefef;--ns-ink:#136767;--bc:#bf7a1c;--bc-soft:#f6ecd9;--bc-ink:#875410;
+    --run:#2f8f5b;--fail:#c0492f;--start:#c9922b;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--maxw:1180px;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#0d1118;--panel:#161c26;--ink:#e6ebf2;--muted:#95a2b6;--hair:#2a3342;--hair2:#20272f;--ns:#54c2c2;--ns-soft:#123030;--ns-ink:#8fdcdc;--bc:#e0a24a;--bc-soft:#2c2413;--bc-ink:#f0c483;--run:#5cc389;--fail:#e0785f;--start:#e0b45a}}
+  :root[data-theme="light"]{--bg:#eef1f4;--panel:#fff;--ink:#1a2230;--muted:#5b6675;--hair:#d6dce4;--hair2:#e9edf1;--ns:#1f8f8f;--ns-soft:#dcefef;--ns-ink:#136767;--bc:#bf7a1c;--bc-soft:#f6ecd9;--bc-ink:#875410;--run:#2f8f5b;--fail:#c0492f;--start:#c9922b}
+  :root[data-theme="dark"]{--bg:#0d1118;--panel:#161c26;--ink:#e6ebf2;--muted:#95a2b6;--hair:#2a3342;--hair2:#20272f;--ns:#54c2c2;--ns-soft:#123030;--ns-ink:#8fdcdc;--bc:#e0a24a;--bc-soft:#2c2413;--bc-ink:#f0c483;--run:#5cc389;--fail:#e0785f;--start:#e0b45a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(18px,3.5vw,40px)}
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
+  h1{font-size:clamp(21px,3vw,29px);margin:0;letter-spacing:-.02em;font-weight:680}
+  .asof{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:right}
+  .asof b{color:var(--ink)}
+  .summ{display:flex;gap:26px;flex-wrap:wrap;margin:18px 0 8px;padding:14px 18px;background:var(--panel);border:1px solid var(--hair);border-radius:11px}
+  .summ .v{font-size:22px;font-weight:680;font-variant-numeric:tabular-nums;line-height:1}
+  .summ .k{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  h2{font-size:12px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:28px 0 12px;display:flex;gap:10px;align-items:center}
+  h2 .rule{flex:1;height:1px;background:var(--hair)}
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:620px){.grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:960px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:12px;padding:14px 15px;border-left:3px solid var(--sig)}
+  .card.ns{--sig:var(--ns);--sigsoft:var(--ns-soft);--sigink:var(--ns-ink)}
+  .card.bc{--sig:var(--bc);--sigsoft:var(--bc-soft);--sigink:var(--bc-ink)}
+  .ch{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ch .tag{font-family:var(--mono);font-size:13.5px;font-weight:640}
+  .pill{font-family:var(--mono);font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em}
+  .pill.run{background:var(--run);color:#fff}.pill.fail{background:var(--fail);color:#fff}.pill.start{background:var(--start);color:#fff}.pill.done{background:var(--muted);color:#fff}
+  .badge{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;background:var(--sigsoft);color:var(--sigink);margin-left:auto}
+  .cf{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:3px 0 11px}
+  .st{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:11px}
+  .st .v{font-size:16px;font-weight:640;font-variant-numeric:tabular-nums;line-height:1}
+  .st .v.sig{color:var(--sig)}
+  .st .k{font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+  .lab{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:4px 0 4px;display:flex;justify-content:space-between}
+  .spark{display:flex;align-items:flex-end;gap:1px;height:34px}
+  .sp{flex:1;background:var(--sig);border-radius:1px;min-height:1px;opacity:.8}
+  .hist{display:flex;align-items:flex-end;gap:1.5px;height:34px;margin-top:2px}
+  .hb{flex:1;background:var(--sig);border-radius:1px 1px 0 0;min-height:1px;opacity:.55}
+  .ax{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;color:var(--muted);margin-top:2px}
+  .foot{margin-top:34px;padding-top:15px;border-top:1px solid var(--hair);font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div><p class="eyebrow">autodiscovery-rl · live reward monitor</p><h1>9-job surprise-reward run</h1></div>
+    <div class="asof">data as of<br><b id="asof"></b></div>
+  </div>
+  <div class="summ" id="summ"></div>
+
+  <h2>normalized_surprisal arm <span class="rule"></span></h2>
+  <div class="grid" id="gns"></div>
+  <h2>belief_change arm (comparison) <span class="rule"></span></h2>
+  <div class="grid" id="gbc"></div>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+const DATA = [{"tag": "fmt1-ns2", "format": "fmt1_hyps_open", "reward_signal": "norm_surprisal", "n": 1642, "reward_mean": 0.239, "reward_max": 0.893, "success_rate": 0.73, "hist": [581, 54, 48, 59, 101, 89, 78, 91, 310, 86, 39, 29, 43, 20, 11, 1, 0, 2, 0, 0], "hi": 1.0, "recent": [0.406, 0.446, 0.203, 0.365, 0.446, 0.0, 0.0, 0.284, 0.3, 0.341, 0.511, 0.446, 0.519, 0.154, 0.081, 0.649, 0.081, 0.146, 0.406, 0.106, 0.446, 0.479, 0.0, 0.454, 0.446, 0.041, 0.446, 0.243, 0.0, 0.0, 0.43, 0.162, 0.0, 0.0, 0.203, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.203, 0.446, 0.0, 0.284, 0.406, 0.0, 0.422], "ns_mean": 0.328, "step_est": 25, "trend": [0.219, 0.257, 0.286, 0.243, 0.205, 0.268, 0.273, 0.245, 0.247, 0.228, 0.144, 0.274, 0.235, 0.207, 0.253, 0.203, 0.219, 0.255, 0.302, 0.257], "status": "run"}, {"tag": "fmt2-ns2", "format": "fmt2_pairs_open", "reward_signal": "norm_surprisal", "n": 1700, "reward_mean": 0.222, "reward_max": 0.771, "success_rate": 0.728, "hist": [665, 57, 42, 46, 115, 83, 108, 92, 296, 72, 34, 29, 29, 25, 6, 1, 0, 0, 0, 0], "hi": 1.0, "recent": [0.0, 0.308, 0.467, 0.284, 0.284, 0.0, 0.446, 0.203, 0.325, 0.406, 0.195, 0.446, 0.446, 0.041, 0.028, 0.203, 0.446, 0.454, 0.348, 0.446, 0.252, 0.203, 0.446, 0.0, 0.0, 0.416, 0.041, 0.446, 0.284, 0.0, 0.0, 0.0, 0.203, 0.446, 0.0, 0.0, 0.0, 0.0, 0.0, 0.325, 0.0, 0.0, 0.398, 0.0, 0.0, 0.0, 0.0, 0.0], "ns_mean": 0.305, "step_est": 26, "trend": [0.167, 0.203, 0.305, 0.249, 0.215, 0.261, 0.218, 0.256, 0.226, 0.14, 0.172, 0.266, 0.237, 0.188, 0.234, 0.218, 0.242, 0.244, 0.317, 0.209, 0.236], "status": "run"}, {"tag": "fmt2v-ns3", "format": "fmt2_w_verdict", "reward_signal": "norm_surprisal", "n": 0, "reward_mean": 0, "reward_max": 0.0, "success_rate": 0, "hist": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hi": 1.0, "recent": [], "ns_mean": 0, "step_est": 0, "trend": [], "status": "start"}, {"tag": "fmt3-ns2", "format": "fmt3_pairs_related", "reward_signal": "norm_surprisal", "n": 1643, "reward_mean": 0.232, "reward_max": 0.708, "success_rate": 0.736, "hist": [568, 67, 62, 61, 88, 88, 99, 109, 318, 71, 39, 28, 22, 19, 4, 0, 0, 0, 0, 0], "hi": 1.0, "recent": [0.3, 0.208, 0.235, 0.162, 0.446, 0.69, 0.203, 0.3, 0.122, 0.26, 0.057, 0.446, 0.406, 0.365, 0.0, 0.317, 0.081, 0.0, 0.0, 0.649, 0.081, 0.203, 0.278, 0.0, 0.446, 0.0, 0.0, 0.398, 0.446, 0.349, 0.0, 0.406, 0.0, 0.0, 0.0, 0.0, 0.0, 0.406, 0.0, 0.0, 0.0, 0.203, 0.348, 0.081, 0.041, 0.041, 0.122, 0.0], "ns_mean": 0.315, "step_est": 25, "trend": [0.247, 0.242, 0.291, 0.253, 0.218, 0.283, 0.25, 0.202, 0.236, 0.185, 0.205, 0.241, 0.24, 0.158, 0.254, 0.173, 0.205, 0.244, 0.294, 0.282, 0.212], "status": "run"}, {"tag": "fmt3v-ns2", "format": "fmt3_w_verdict", "reward_signal": "norm_surprisal", "n": 1645, "reward_mean": 0.233, "reward_max": 0.893, "success_rate": 0.717, "hist": [595, 55, 45, 53, 118, 87, 83, 103, 311, 65, 26, 33, 35, 25, 9, 0, 1, 1, 0, 0], "hi": 1.0, "recent": [0.292, 0.0, 0.398, 0.0, 0.454, 0.203, 0.0, 0.446, 0.406, 0.349, 0.122, 0.0, 0.0, 0.081, 0.0, 0.0, 0.0, 0.446, 0.0, 0.016, 0.568, 0.284, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.446, 0.446, 0.0, 0.0, 0.668, 0.0, 0.227, 0.0, 0.0, 0.243, 0.406, 0.0, 0.17, 0.0, 0.0, 0.041, 0.162, 0.446], "ns_mean": 0.325, "step_est": 25, "trend": [0.237, 0.19, 0.283, 0.294, 0.268, 0.301, 0.257, 0.221, 0.244, 0.211, 0.204, 0.192, 0.217, 0.177, 0.223, 0.203, 0.207, 0.228, 0.311, 0.274, 0.189], "status": "run"}, {"tag": "fmt2-bc2", "format": "fmt2_pairs_open", "reward_signal": "belief_change", "n": 1597, "reward_mean": 0.753, "reward_max": 2.604, "success_rate": 0.733, "hist": [584, 49, 49, 37, 72, 68, 99, 121, 94, 257, 45, 34, 22, 26, 29, 8, 1, 2, 0, 0], "hi": 3.0, "recent": [1.094, 1.589, 0.911, 0.0, 0.0, 1.589, 1.042, 1.432, 1.432, 1.116, 1.276, 0.911, 0.0, 0.547, 0.0, 1.432, 0.0, 0.0, 0.0, 1.432, 0.0, 0.0, 1.172, 0.391, 0.0, 0.781, 0.0, 0.0, 1.432, 0.0, 0.67, 0.964, 1.302, 1.693, 1.198, 1.927, 1.51, 0.443, 0.0, 0.495, 1.406, 1.432, 1.432, 0.0, 1.432, 1.198, 1.484, 1.562], "ns_mean": 0.32, "step_est": 24, "trend": [0.634, 0.646, 0.819, 0.915, 0.726, 0.885, 0.84, 0.745, 0.767, 0.942, 0.556, 0.797, 0.78, 0.638, 0.837, 0.618, 0.722, 0.702, 0.955, 0.845], "status": "run"}, {"tag": "fmt2v-bc2", "format": "fmt2_w_verdict", "reward_signal": "belief_change", "n": 1450, "reward_mean": 0.69, "reward_max": 2.865, "success_rate": 0.692, "hist": [592, 44, 41, 43, 61, 62, 95, 82, 87, 199, 46, 24, 20, 26, 16, 6, 1, 4, 0, 1], "hi": 3.0, "recent": [2.214, 1.042, 0.0, 0.893, 1.302, 1.432, 0.781, 2.0, 0.13, 1.282, 1.19, 1.0, 0.982, 0.391, 1.333, 1.346, 0.714, 1.432, 0.308, 1.167, 2.214, 1.167, 0.0, 1.5, 0.0, 0.0, 1.016, 0.807, 1.432, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.962, 0.391, 1.198, 1.302, 0.391, 1.432, 1.172, 0.0, 0.0, 0.0, 0.0], "ns_mean": 0.311, "step_est": 22, "trend": [0.506, 0.703, 0.922, 0.783, 0.947, 0.952, 0.714, 0.711, 0.533, 0.839, 0.494, 0.818, 0.781, 0.479, 0.587, 0.7, 0.629], "status": "run"}, {"tag": "fmt3-bc2", "format": "fmt3_pairs_related", "reward_signal": "belief_change", "n": 1763, "reward_mean": 0.734, "reward_max": 2.865, "success_rate": 0.706, "hist": [649, 56, 48, 43, 89, 92, 113, 96, 118, 305, 48, 35, 18, 27, 20, 3, 1, 0, 0, 2], "hi": 3.0, "recent": [0.573, 0.651, 0.651, 0.667, 1.339, 1.432, 0.911, 0.807, 1.167, 0.495, 0.781, 1.333, 1.432, 0.781, 0.651, 1.432, 1.432, 1.589, 1.652, 1.198, 0.833, 1.333, 0.0, 1.432, 0.0, 1.432, 1.953, 1.432, 1.432, 1.068, 1.302, 1.432, 1.0, 0.0, 0.0, 1.432, 0.0, 1.346, 0.0, 1.432, 0.0, 0.0, 0.0, 0.0, 1.333, 0.0, 1.432, 0.0], "ns_mean": 0.324, "step_est": 27, "trend": [0.63, 0.769, 0.837, 0.953, 0.696, 0.876, 0.553, 0.713, 0.757, 0.625, 0.653, 0.843, 0.706, 0.607, 0.769, 0.71, 0.636, 0.688, 0.82, 0.863, 0.813, 0.649], "status": "run"}, {"tag": "fmt3v-bc2", "format": "fmt3_w_verdict", "reward_signal": "belief_change", "n": 1531, "reward_mean": 0.756, "reward_max": 2.604, "success_rate": 0.737, "hist": [523, 61, 58, 41, 63, 69, 98, 112, 117, 253, 32, 30, 19, 26, 21, 6, 0, 2, 0, 0], "hi": 3.0, "recent": [1.31, 0.833, 0.859, 1.282, 1.432, 1.432, 1.042, 0.911, 0.521, 1.432, 0.781, 0.0, 1.116, 0.911, 1.167, 2.214, 2.273, 0.391, 0.0, 1.589, 0.0, 1.042, 0.781, 0.911, 0.0, 0.909, 0.0, 0.911, 0.0, 1.432, 0.0, 0.0, 0.641, 1.432, 0.495, 0.67, 2.167, 1.5, 1.172, 1.432, 0.391, 1.302, 1.302, 1.745, 0.286, 0.911, 0.333, 0.0], "ns_mean": 0.319, "step_est": 23, "trend": [0.498, 0.804, 0.859, 0.868, 0.672, 0.84, 0.727, 0.8, 0.662, 0.523, 0.908, 0.73, 0.803, 0.664, 0.896, 0.58, 0.588, 0.807, 1.059], "status": "run"}];
+const ASOF = "2026-07-31 09:10 UTC";
+function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;}
+document.getElementById('asof').textContent=ASOF;
+
+const totalN=DATA.reduce((s,j)=>s+j.n,0);
+const running=DATA.filter(j=>j.status==='run').length;
+const failed=DATA.filter(j=>j.status==='fail').length;
+document.getElementById('summ').innerHTML=
+  `<div><div class="v">${DATA.length}</div><div class="k">jobs</div></div>`+
+  `<div><div class="v" style="color:var(--run)">${running}</div><div class="k">running</div></div>`+
+  (failed?`<div><div class="v" style="color:var(--fail)">${failed}</div><div class="k">failed</div></div>`:'')+
+  `<div><div class="v">${totalN.toLocaleString()}</div><div class="k">reward records</div></div>`+
+  `<div><div class="v">${Math.round(totalN/64)}</div><div class="k">≈ steps total</div></div>`;
+
+function card(j){
+  const a=j.reward_signal==='norm_surprisal'?'ns':'bc';
+  const c=el('div','card '+a);
+  const stat=j.status||'run';
+  c.appendChild(el('div','ch',
+    `<span class="tag">${j.tag}</span><span class="pill ${stat}">${stat}</span><span class="badge">${j.reward_signal}</span>`));
+  c.appendChild(el('div','cf',j.format));
+  c.appendChild(el('div','st',
+    `<div><div class="v sig">${j.reward_mean}</div><div class="k">rew mean</div></div>`+
+    `<div><div class="v">${j.reward_max}</div><div class="k">rew max</div></div>`+
+    `<div><div class="v">${Math.round(j.success_rate*100)}%</div><div class="k">exp ok</div></div>`+
+    `<div><div class="v">${j.n}</div><div class="k">records</div></div>`+
+    `<div><div class="v">~${j.step_est}</div><div class="k">step</div></div>`));
+  // per-step reward-mean trend (the pre-eval learning signal)
+  if (j.trend && j.trend.length>1){
+    const t=j.trend, lo=Math.min(...t), h2=Math.max(...t), rng=(h2-lo)||1, d0=t[t.length-1]-t[0];
+    c.appendChild(el('div','lab',`<span>reward / step (mean)</span><span>${t.length} steps · Δ${d0>=0?'+':''}${d0.toFixed(2)}</span>`));
+    const W=100,H=30,pts=t.map((v,i)=>`${(i/(t.length-1)*W).toFixed(1)},${(H-((v-lo)/rng)*H).toFixed(1)}`).join(' ');
+    const holder=el('div');
+    holder.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:32px;display:block;overflow:visible">`+
+      `<polyline points="${pts}" fill="none" stroke="var(--sig)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`+
+      `<circle cx="${W}" cy="${(H-((t[t.length-1]-lo)/rng)*H).toFixed(1)}" r="2.2" fill="var(--sig)"/></svg>`;
+    c.appendChild(holder);
+    c.appendChild(el('div','ax',`<span>${lo.toFixed(2)}</span><span>${h2.toFixed(2)}</span>`));
+  }
+  // recent reward sparkline
+  c.appendChild(el('div','lab',`<span>recent rewards (last ${j.recent.length})</span><span>0–${j.hi}</span>`));
+  const sp=el('div','spark');
+  j.recent.forEach(v=>{const b=el('div','sp');b.style.height=Math.max(3,100*Math.min(v,j.hi)/j.hi)+'%';b.title=v;if(v===0)b.style.opacity=.25;sp.appendChild(b);});
+  c.appendChild(sp);
+  // histogram
+  c.appendChild(el('div','lab',`<span>distribution</span><span>mean ${j.reward_mean}</span>`));
+  const mx=Math.max(...j.hist,1), h=el('div','hist');
+  j.hist.forEach(v=>{const b=el('div','hb');b.style.height=(100*v/mx)+'%';h.appendChild(b);});
+  c.appendChild(h);
+  c.appendChild(el('div','ax',a==='bc'?'<span>0</span><span>1.5</span><span>3</span>':'<span>0</span><span>0.5</span><span>1</span>'));
+  return c;
+}
+const gns=document.getElementById('gns'), gbc=document.getElementById('gbc');
+DATA.filter(j=>j.reward_signal==='norm_surprisal').forEach(j=>gns.appendChild(card(j)));
+DATA.filter(j=>j.reward_signal==='belief_change').forEach(j=>gbc.appendChild(card(j)));
+
+document.getElementById('foot').textContent=
+  'reward = server-scored Bayesian surprise · normalized_surprisal ≈[0,1] · belief_change=|Δbelief|/0.2 (can exceed 1) · faded bars = failed experiments (reward 0) · refresh the page for the latest republish';
+</script>
+
+</body></html>

@@ -1,0 +1,511 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>reading · Information Graph POC</title>
+<style>
+:root{
+  --plane:#f7f5f1; --surface:#fcfcfb; --card:#fdfdfc;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --baseline:#c3c2b7; --hairline:rgba(11,11,11,.10);
+  --accent:#8f6a33;
+  --pos:#2a78d6; --neg:#e34948; --pruned:#c9c7c0;
+  --bar:#2a78d6; --bar-dim:#d8d6cf;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --plane:#0f0e0c; --surface:#1a1a19; --card:#201f1d;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --baseline:#383835; --hairline:rgba(255,255,255,.10);
+    --accent:#c9a25e;
+    --pos:#3987e5; --neg:#e66767; --pruned:#45443f;
+    --bar:#3987e5; --bar-dim:#383835;
+  }
+}
+:root[data-theme="dark"]{
+  --plane:#0f0e0c; --surface:#1a1a19; --card:#201f1d;
+  --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --baseline:#383835; --hairline:rgba(255,255,255,.10);
+  --accent:#c9a25e;
+  --pos:#3987e5; --neg:#e66767; --pruned:#45443f;
+  --bar:#3987e5; --bar-dim:#383835;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.55}
+.wrap{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
+header{margin-bottom:28px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:30px;margin:6px 0 6px;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--ink-2);max-width:70ch;margin:0}
+h2{font-size:19px;margin:44px 0 4px;letter-spacing:-.005em}
+h2 .eyebrow{display:block;margin-bottom:2px}
+.sectionsub{color:var(--ink-2);font-size:14px;margin:0 0 16px;max-width:78ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px}
+.kpi{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:12px 14px}
+.kpi .label{font-size:12px;color:var(--ink-2)}
+.kpi .value{font-size:26px;font-weight:600;margin-top:2px}
+.kpi .note{font-size:12px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:16px}
+.panelgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.panel h3{margin:0 0 2px;font-size:14px}
+.panel .pstats{font-size:12px;color:var(--ink-2);margin-bottom:8px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--ink-2);margin:10px 2px 2px}
+.legend .key{display:inline-flex;align-items:center;gap:6px}
+.key .line{display:inline-block;width:16px;height:0;border-top:2.5px solid var(--pos);border-radius:2px}
+.key .line.neg{border-top-color:var(--neg)}
+.key .line.pruned{border-top:1.5px solid var(--pruned)}
+svg text{font-family:inherit}
+.chartcard{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+th{color:var(--ink-2);font-weight:600;text-align:left;font-size:12.5px}
+th,td{border-bottom:1px solid var(--grid);padding:8px 10px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right}
+.matrix td,.matrix th{padding:4px 8px;border-bottom:1px solid var(--grid)}
+.matrix .stmt{font-size:12.5px;color:var(--ink-2);max-width:62ch}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%}
+.dot.hit{background:var(--pos)}
+.dot.miss{border:1.5px solid var(--baseline)}
+details{margin-top:12px}
+summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
+details[open] summary{margin-bottom:8px}
+.tooltip{position:fixed;pointer-events:none;background:var(--card);border:1px solid var(--hairline);
+  box-shadow:0 4px 16px rgba(0,0,0,.14);border-radius:8px;padding:8px 11px;font-size:12.5px;
+  z-index:10;display:none;max-width:300px}
+.tooltip .tval{font-weight:650;font-size:13.5px}
+.tooltip .tsub{color:var(--ink-2)}
+.callout{border-left:3px solid var(--accent);background:var(--card);border-radius:0 10px 10px 0;
+  padding:12px 16px;margin:14px 0;font-size:14px}
+.callout strong{color:var(--accent)}
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
+.foot{margin-top:48px;padding-top:16px;border-top:1px solid var(--grid);font-size:12.5px;color:var(--muted);max-width:80ch}
+.scroll{overflow-x:auto}
+@media (prefers-reduced-motion: no-preference){
+  .edge,.bar{transition:opacity .12s ease}
+}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Adaptive Hypothesis Discovery · POC report</div>
+  <h1>reading · Information Graph POC</h1>
+  <p class="sub">This dataset contains information about a [study](https://dl.acm.org/doi/10.1145/3290605.3300754) investigating partipants reading speed when using a modified web page layout with various demographic and device-related characteristics. It includes data on reading and scrolling time, reading speed, device used, dyslexia status, education level, and more. Research question: Does 'Reader View' --- a modified web page… Search policies spend the same budget of conditional-association queries H(A,B | N); generation conditions are judged against the task's gold hypotheses where a gold set exists.</p>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<h2><span class="eyebrow">Information graphs</span>What each policy discovered with its query budget</h2>
+<p class="sectionsub">Nodes are the <span id="nendpoints"></span> endpoint variables<span id="condonlynote"></span>.
+A colored edge is a confirmed association (width ∝ partial correlation |r| of the strongest
+test on that pair); a faint edge is a candidate adjacency removed by a (conditional)
+independence finding — the PC-style pruning signal. Hover any edge for the underlying test.</p>
+<div class="panelgrid" id="graphs"></div>
+<div class="legend">
+  <span class="key"><span class="line"></span>positive association</span>
+  <span class="key"><span class="line neg"></span>negative association</span>
+  <span class="key"><span class="line pruned"></span>pruned (independence found)</span>
+  <span class="key" style="color:var(--muted)">untested pairs not drawn</span>
+</div>
+
+<h2><span class="eyebrow">Search efficiency</span>Query spend at the same budget</h2>
+<p class="sectionsub">Every policy had the same budget of <span id="effbudget"></span> queries
+(a policy stops early if it exhausts its reachable space). Structure shows up in what the
+queries bought: distinct pairs covered, independencies found, and candidate edges pruned —
+the discoveries that shrink the remaining hypothesis space.</p>
+<div class="chartcard"><div id="effchart"></div></div>
+
+<div id="evalwrap">
+<h2><span class="eyebrow">Conditions A–D</span>Expert-hypothesis recall at k = <span id="klabel"></span></h2>
+<p class="sectionsub">Each condition produced up to <span id="klabel2"></span> final hypotheses;
+an LLM judge matched them against the <span id="ngold"></span> gold expert hypotheses (recall)
+and scored a quality rubric.
+A: EDA→LLM · B: PC graph→LLM · C: PC search results ranked · D: adaptive graph→LLM.</p>
+<div class="chartcard">
+  <div id="recallchart"></div>
+</div>
+<div class="scroll" style="margin-top:14px"><table id="qualitytable"></table></div>
+<div class="verdicts" id="verdicts"></div>
+
+<h2><span class="eyebrow">Recall composition</span>Which gold hypotheses each condition captured</h2>
+<p class="sectionsub">The <span id="ngold2"></span> expert gold hypotheses; a filled dot means the judge found a
+matching generated hypothesis. This table is also the exact-values view for the recall chart.</p>
+<div class="scroll card"><table class="matrix" id="goldmatrix"></table></div>
+</div>
+
+<h2><span class="eyebrow">Strongest findings</span>Top associations in the PC information graph</h2>
+<div class="scroll card"><table id="topassoc"></table></div>
+
+<p class="foot" id="footnote"></p>
+</div>
+<div class="tooltip" id="tt"></div>
+
+<script>
+const DATA = {"dataset": {"name": "reading", "n_rows": 2568, "variables": [{"name": "adjusted_running_time", "desc": "How long participants spent on each webpage minus scrolling duration in milliseconds"}, {"name": "age", "desc": "Age of the reader"}, {"name": "correct_rate", "desc": "Rate of correct answers to comprehension questions after reading"}, {"name": "device", "desc": "Device used by the reader in the study"}, {"name": "dyslexia", "desc": "Dyslexia status of the reader (0 - No Dyslexia, 1 - Dyslexia, 2 - Severe Dyslexia)"}, {"name": "dyslexia_bin", "desc": "Indicates if the reader has dyslexia (1) or not (0)"}, {"name": "education", "desc": "Education level of the reader"}, {"name": "english_native", "desc": "Indicates if the reader is a native English speaker ('Y') or not ('N')"}, {"name": "gender", "desc": "Gender of the reader (0 - Male, 1 - Female, 2 - Other)"}, {"name": "img_width", "desc": "Width of the image on the page"}, {"name": "num_words", "desc": "Number of words on the page"}, {"name": "reader_view", "desc": "Indicates if the reader view was activated (1) or not (0)"}, {"name": "retake_trial", "desc": "Indicates if the trial was a retake (1) or not (0)"}, {"name": "running_time", "desc": "How long participants spent on each webpage in milliseconds"}, {"name": "scrolling_time", "desc": "Time spent scrolling in milliseconds"}], "endpoints": ["adjusted_running_time", "age", "correct_rate", "dyslexia", "dyslexia_bin", "gender", "img_width", "num_words", "reader_view", "retake_trial", "running_time", "scrolling_time"], "categorical": ["device", "education", "english_native"], "n_gold": 16, "gold": ["Indicates if the reader view was activated or not is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Number of words on the page is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Rate of correct answers to comprehension questions after reading is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Width of the image on the page is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Age of the reader is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Indicates if the trial was a retake or not is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Indicates if the reader has dyslexia or not is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Flesch-Kincaid readability score of the text is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Education one-hot representations is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "device one-hot representations is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Indicates if the reader is a native English speaker or not is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "binary education variable is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Gender is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "Binary variable indicating whether language is english is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "device is associated with How long participants spent on each webpage minus scrolling duration in milliseconds.", "education is associated with How long participants spent on each webpage minus scrolling duration in milliseconds."]}, "searches": {"pc": {"policy": "pc", "budget": 80, "max_depth": 1, "n_queries": 80, "n_dependent": 53, "n_independent": 27, "n_pruned": 27, "n_pairs_tested": 66, "pairs": [{"a": "adjusted_running_time", "b": "age", "adjacent": true, "sepset": null, "r": 0.17, "p": 4.0744453669530243e-17, "n": 2406, "cond": ["num_words"], "n_tests": 14}, {"a": "adjusted_running_time", "b": "correct_rate", "adjacent": true, "sepset": null, "r": 0.065, "p": 0.0010253334347453478, "n": 2568, "cond": [], "n_tests": 2}, {"a": "adjusted_running_time", "b": "dyslexia", "adjacent": true, "sepset": null, "r": 0.151, "p": 8.815504709131008e-14, "n": 2400, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "dyslexia_bin", "adjacent": true, "sepset": null, "r": 0.165, "p": 3.3134073879753926e-16, "n": 2400, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "gender", "adjacent": false, "sepset": [], "r": 0.006, "p": 0.7853428273884129, "n": 2406, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.068, "p": 0.0005214065537215417, "n": 2568, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "num_words", "adjacent": true, "sepset": null, "r": 0.417, "p": 4.6581590736376605e-112, "n": 2568, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "reader_view", "adjacent": true, "sepset": null, "r": -0.039, "p": 0.048076797729065035, "n": 2568, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "retake_trial", "adjacent": true, "sepset": null, "r": -0.073, "p": 0.00027726617348922025, "n": 2442, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.964, "p": 0.0, "n": 2568, "cond": [], "n_tests": 1}, {"a": "adjusted_running_time", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.053, "p": 0.007380496164953089, "n": 2568, "cond": [], "n_tests": 1}, {"a": "age", "b": "correct_rate", "adjacent": true, "sepset": null, "r": 0.078, "p": 0.0001305629438087502, "n": 2406, "cond": [], "n_tests": 1}, {"a": "age", "b": "dyslexia", "adjacent": false, "sepset": [], "r": 0.009, "p": 0.6481629592398441, "n": 2376, "cond": [], "n_tests": 1}, {"a": "age", "b": "dyslexia_bin", "adjacent": false, "sepset": [], "r": -0.014, "p": 0.49082125650209063, "n": 2376, "cond": [], "n_tests": 1}, {"a": "age", "b": "gender", "adjacent": true, "sepset": null, "r": 0.101, "p": 7.457542600034939e-07, "n": 2388, "cond": [], "n_tests": 1}, {"a": "age", "b": "img_width", "adjacent": false, "sepset": [], "r": 0.0, "p": 0.988847215416779, "n": 2406, "cond": [], "n_tests": 1}, {"a": "age", "b": "num_words", "adjacent": false, "sepset": [], "r": -0.0, "p": 0.9999999999999999, "n": 2406, "cond": [], "n_tests": 1}, {"a": "age", "b": "reader_view", "adjacent": false, "sepset": [], "r": 0.0, "p": 0.9999999999999999, "n": 2406, "cond": [], "n_tests": 1}, {"a": "age", "b": "retake_trial", "adjacent": true, "sepset": null, "r": -0.071, "p": 0.0005438447247158232, "n": 2394, "cond": [], "n_tests": 1}, {"a": "age", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.175, "p": 4.28950532494304e-18, "n": 2406, "cond": [], "n_tests": 1}, {"a": "age", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.107, "p": 1.5104626827043214e-07, "n": 2406, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "dyslexia", "adjacent": true, "sepset": null, "r": -0.057, "p": 0.005381934853730095, "n": 2400, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "dyslexia_bin", "adjacent": true, "sepset": null, "r": -0.054, "p": 0.007731586679889087, "n": 2400, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "gender", "adjacent": true, "sepset": null, "r": 0.062, "p": 0.0023363902892050304, "n": 2406, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "img_width", "adjacent": false, "sepset": [], "r": -0.032, "p": 0.10291403703471418, "n": 2568, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "num_words", "adjacent": true, "sepset": null, "r": -0.104, "p": 1.202844704465287e-07, "n": 2568, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "reader_view", "adjacent": false, "sepset": [], "r": 0.034, "p": 0.08126493923137852, "n": 2568, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "retake_trial", "adjacent": true, "sepset": null, "r": -0.056, "p": 0.005377578182205769, "n": 2442, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.071, "p": 0.000320296019057022, "n": 2568, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "scrolling_time", "adjacent": false, "sepset": [], "r": 0.035, "p": 0.0726426432558446, "n": 2568, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "dyslexia_bin", "adjacent": true, "sepset": null, "r": 0.932, "p": 0.0, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "gender", "adjacent": false, "sepset": [], "r": 0.014, "p": 0.48786326074562614, "n": 2376, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.202, "p": 1.010870366626988e-23, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "num_words", "adjacent": false, "sepset": [], "r": -0.0, "p": 0.9999999999999997, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "reader_view", "adjacent": false, "sepset": [], "r": -0.0, "p": 1.0, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "retake_trial", "adjacent": false, "sepset": [], "r": 0.011, "p": 0.5752348938502787, "n": 2388, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.166, "p": 2.0514382415171964e-16, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.084, "p": 3.985784314782651e-05, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "gender", "adjacent": false, "sepset": [], "r": 0.032, "p": 0.11960925928020122, "n": 2376, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.192, "p": 2.1465532051229946e-21, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "num_words", "adjacent": false, "sepset": [], "r": -0.0, "p": 0.9999999999999999, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "reader_view", "adjacent": false, "sepset": [], "r": 0.0, "p": 1.0, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "retake_trial", "adjacent": false, "sepset": [], "r": 0.017, "p": 0.4186826830952086, "n": 2388, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.184, "p": 9.632238474850442e-20, "n": 2400, "cond": [], "n_tests": 1}, {"a": "dyslexia_bin", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.098, "p": 1.3191205786679226e-06, "n": 2400, "cond": [], "n_tests": 1}, {"a": "gender", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.135, "p": 3.27452342920372e-11, "n": 2406, "cond": [], "n_tests": 1}, {"a": "gender", "b": "num_words", "adjacent": false, "sepset": [], "r": -0.0, "p": 0.9999999999999998, "n": 2406, "cond": [], "n_tests": 1}, {"a": "gender", "b": "reader_view", "adjacent": false, "sepset": [], "r": 0.0, "p": 1.0, "n": 2406, "cond": [], "n_tests": 1}, {"a": "gender", "b": "retake_trial", "adjacent": false, "sepset": [], "r": -0.005, "p": 0.7884207667195231, "n": 2400, "cond": [], "n_tests": 1}, {"a": "gender", "b": "running_time", "adjacent": false, "sepset": [], "r": 0.038, "p": 0.06302707182964996, "n": 2406, "cond": [], "n_tests": 1}, {"a": "gender", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.122, "p": 1.79335983298104e-09, "n": 2406, "cond": [], "n_tests": 1}, {"a": "img_width", "b": "num_words", "adjacent": false, "sepset": [], "r": 0.001, "p": 0.966611784454194, "n": 2568, "cond": [], "n_tests": 1}, {"a": "img_width", "b": "reader_view", "adjacent": false, "sepset": [], "r": -0.001, "p": 0.9623364326976419, "n": 2568, "cond": [], "n_tests": 1}, {"a": "img_width", "b": "retake_trial", "adjacent": true, "sepset": null, "r": 0.086, "p": 2.023142204035654e-05, "n": 2442, "cond": [], "n_tests": 1}, {"a": "img_width", "b": "running_time", "adjacent": true, "sepset": null, "r": -0.099, "p": 5.213944418755682e-07, "n": 2568, "cond": [], "n_tests": 1}, {"a": "img_width", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": -0.127, "p": 9.942704987303451e-11, "n": 2568, "cond": [], "n_tests": 1}, {"a": "num_words", "b": "reader_view", "adjacent": false, "sepset": [], "r": 0.014, "p": 0.4877791357946827, "n": 2568, "cond": [], "n_tests": 1}, {"a": "num_words", "b": "retake_trial", "adjacent": false, "sepset": [], "r": -0.0, "p": 0.9999999999999998, "n": 2442, "cond": [], "n_tests": 1}, {"a": "num_words", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.469, "p": 2.8882001319420948e-146, "n": 2568, "cond": [], "n_tests": 1}, {"a": "num_words", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.273, "p": 1.3506134123889681e-45, "n": 2568, "cond": [], "n_tests": 1}, {"a": "reader_view", "b": "retake_trial", "adjacent": false, "sepset": [], "r": -0.0, "p": 1.0, "n": 2442, "cond": [], "n_tests": 1}, {"a": "reader_view", "b": "running_time", "adjacent": true, "sepset": null, "r": -0.041, "p": 0.03660760423274718, "n": 2568, "cond": [], "n_tests": 1}, {"a": "reader_view", "b": "scrolling_time", "adjacent": false, "sepset": [], "r": -0.016, "p": 0.4254228682794826, "n": 2568, "cond": [], "n_tests": 1}, {"a": "retake_trial", "b": "running_time", "adjacent": true, "sepset": null, "r": -0.083, "p": 4.0020772835886866e-05, "n": 2442, "cond": [], "n_tests": 1}, {"a": "retake_trial", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": -0.049, "p": 0.0164602257438967, "n": 2442, "cond": [], "n_tests": 1}, {"a": "running_time", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.316, "p": 9.565222708303804e-62, "n": 2568, "cond": [], "n_tests": 1}]}, "random": {"policy": "random", "budget": 80, "max_depth": 1, "n_queries": 80, "n_dependent": 50, "n_independent": 30, "n_pruned": 21, "n_pairs_tested": 50, "pairs": [{"a": "reader_view", "b": "running_time", "adjacent": true, "sepset": null, "r": -0.043, "p": 0.03324548561788282, "n": 2400, "cond": ["dyslexia_bin"], "n_tests": 3}, {"a": "correct_rate", "b": "num_words", "adjacent": true, "sepset": null, "r": -0.102, "p": 5.271546643856324e-07, "n": 2400, "cond": ["dyslexia"], "n_tests": 1}, {"a": "img_width", "b": "running_time", "adjacent": true, "sepset": null, "r": -0.084, "p": 3.567475144699142e-05, "n": 2406, "cond": ["gender"], "n_tests": 2}, {"a": "running_time", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 1.0, "p": 0.0, "n": 2568, "cond": ["adjusted_running_time"], "n_tests": 1}, {"a": "correct_rate", "b": "running_time", "adjacent": false, "sepset": ["adjusted_running_time"], "r": 0.032, "p": 0.10374770562194366, "n": 2568, "cond": ["adjusted_running_time"], "n_tests": 1}, {"a": "dyslexia_bin", "b": "reader_view", "adjacent": false, "sepset": [], "r": 0.0, "p": 1.0, "n": 2400, "cond": [], "n_tests": 1}, {"a": "age", "b": "img_width", "adjacent": false, "sepset": ["dyslexia_bin"], "r": 0.005, "p": 0.8047012252340185, "n": 2376, "cond": ["dyslexia_bin"], "n_tests": 2}, {"a": "dyslexia", "b": "retake_trial", "adjacent": false, "sepset": ["correct_rate"], "r": 0.009, "p": 0.664865511968556, "n": 2388, "cond": ["correct_rate"], "n_tests": 2}, {"a": "dyslexia", "b": "num_words", "adjacent": false, "sepset": ["correct_rate"], "r": -0.0, "p": 0.9999999999999997, "n": 2388, "cond": ["retake_trial"], "n_tests": 2}, {"a": "correct_rate", "b": "reader_view", "adjacent": false, "sepset": ["retake_trial"], "r": 0.028, "p": 0.1660736263395507, "n": 2400, "cond": ["dyslexia_bin"], "n_tests": 2}, {"a": "num_words", "b": "reader_view", "adjacent": false, "sepset": ["gender"], "r": 0.012, "p": 0.5697066969380347, "n": 2406, "cond": ["gender"], "n_tests": 2}, {"a": "reader_view", "b": "retake_trial", "adjacent": false, "sepset": ["device"], "r": 0.0, "p": 0.9999999999999999, "n": 2370, "cond": ["device"], "n_tests": 2}, {"a": "age", "b": "retake_trial", "adjacent": true, "sepset": null, "r": -0.071, "p": 0.0005453065839079286, "n": 2394, "cond": ["reader_view"], "n_tests": 1}, {"a": "dyslexia", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.205, "p": 3.418613418795441e-24, "n": 2376, "cond": ["age"], "n_tests": 2}, {"a": "correct_rate", "b": "gender", "adjacent": true, "sepset": null, "r": 0.053, "p": 0.009634496595695877, "n": 2388, "cond": ["age"], "n_tests": 1}, {"a": "dyslexia_bin", "b": "num_words", "adjacent": true, "sepset": null, "r": -0.101, "p": 7.226301318787971e-07, "n": 2400, "cond": ["running_time"], "n_tests": 1}, {"a": "age", "b": "dyslexia", "adjacent": false, "sepset": ["correct_rate"], "r": 0.006, "p": 0.7637177581710353, "n": 2316, "cond": ["english_native"], "n_tests": 2}, {"a": "dyslexia", "b": "reader_view", "adjacent": false, "sepset": ["img_width"], "r": -0.0, "p": 0.9920828227913678, "n": 2400, "cond": ["img_width"], "n_tests": 1}, {"a": "adjusted_running_time", "b": "img_width", "adjacent": true, "sepset": null, "r": 0.101, "p": 2.528149984121662e-07, "n": 2568, "cond": ["running_time"], "n_tests": 2}, {"a": "age", "b": "reader_view", "adjacent": false, "sepset": ["correct_rate"], "r": -0.003, "p": 0.9010004499920827, "n": 2406, "cond": ["correct_rate"], "n_tests": 1}, {"a": "adjusted_running_time", "b": "dyslexia", "adjacent": false, "sepset": ["running_time"], "r": -0.008, "p": 0.6937530722269489, "n": 2400, "cond": ["dyslexia_bin"], "n_tests": 4}, {"a": "dyslexia_bin", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.19, "p": 7.322797387404266e-21, "n": 2376, "cond": ["age"], "n_tests": 3}, {"a": "num_words", "b": "retake_trial", "adjacent": true, "sepset": null, "r": 0.045, "p": 0.027012718349099667, "n": 2442, "cond": ["running_time"], "n_tests": 1}, {"a": "age", "b": "gender", "adjacent": true, "sepset": null, "r": 0.101, "p": 7.497398271430981e-07, "n": 2388, "cond": ["num_words"], "n_tests": 3}, {"a": "dyslexia", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.163, "p": 9.650067210160245e-16, "n": 2388, "cond": ["retake_trial"], "n_tests": 1}, {"a": "gender", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.124, "p": 9.123643214144013e-10, "n": 2400, "cond": ["retake_trial"], "n_tests": 3}, {"a": "num_words", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.482, "p": 6.627861631876804e-146, "n": 2400, "cond": ["dyslexia"], "n_tests": 3}, {"a": "dyslexia_bin", "b": "retake_trial", "adjacent": false, "sepset": ["dyslexia"], "r": 0.016, "p": 0.4286486237007746, "n": 2388, "cond": ["dyslexia"], "n_tests": 1}, {"a": "adjusted_running_time", "b": "num_words", "adjacent": true, "sepset": null, "r": 0.42, "p": 3.1844145060417955e-104, "n": 2346, "cond": ["english_native"], "n_tests": 1}, {"a": "age", "b": "running_time", "adjacent": true, "sepset": null, "r": 0.175, "p": 7.323147865890355e-18, "n": 2376, "cond": ["dyslexia_bin"], "n_tests": 2}, {"a": "img_width", "b": "reader_view", "adjacent": false, "sepset": ["dyslexia_bin"], "r": -0.001, "p": 0.9609554283182401, "n": 2400, "cond": ["dyslexia_bin"], "n_tests": 1}, {"a": "adjusted_running_time", "b": "age", "adjacent": true, "sepset": null, "r": 0.154, "p": 2.657813835525641e-14, "n": 2406, "cond": ["reader_view"], "n_tests": 1}, {"a": "gender", "b": "retake_trial", "adjacent": false, "sepset": ["reader_view"], "r": -0.005, "p": 0.7884638563644009, "n": 2400, "cond": ["reader_view"], "n_tests": 1}, {"a": "age", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.096, "p": 2.4822203074676755e-06, "n": 2388, "cond": ["gender"], "n_tests": 2}, {"a": "dyslexia_bin", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.192, "p": 2.187695310156439e-21, "n": 2400, "cond": ["num_words"], "n_tests": 2}, {"a": "correct_rate", "b": "dyslexia_bin", "adjacent": true, "sepset": null, "r": -0.051, "p": 0.012594466628512239, "n": 2388, "cond": ["retake_trial"], "n_tests": 1}, {"a": "correct_rate", "b": "scrolling_time", "adjacent": false, "sepset": ["age"], "r": 0.027, "p": 0.17958169044017902, "n": 2406, "cond": ["age"], "n_tests": 2}, {"a": "gender", "b": "img_width", "adjacent": true, "sepset": null, "r": -0.13, "p": 1.909113595416833e-10, "n": 2376, "cond": ["dyslexia"], "n_tests": 1}, {"a": "age", "b": "correct_rate", "adjacent": true, "sepset": null, "r": 0.07, "p": 0.0005921155147643146, "n": 2406, "cond": ["adjusted_running_time"], "n_tests": 1}, {"a": "dyslexia_bin", "b": "gender", "adjacent": false, "sepset": ["age"], "r": 0.034, "p": 0.09761793035429668, "n": 2358, "cond": ["age"], "n_tests": 2}, {"a": "retake_trial", "b": "scrolling_time", "adjacent": false, "sepset": ["running_time"], "r": -0.024, "p": 0.23032289262184347, "n": 2442, "cond": ["running_time"], "n_tests": 2}, {"a": "retake_trial", "b": "running_time", "adjacent": true, "sepset": null, "r": -0.083, "p": 4.0020772835886866e-05, "n": 2442, "cond": [], "n_tests": 2}, {"a": "img_width", "b": "num_words", "adjacent": false, "sepset": ["english_native"], "r": 0.001, "p": 0.9794066063355277, "n": 2346, "cond": ["english_native"], "n_tests": 1}, {"a": "num_words", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.273, "p": 1.9915299578366115e-43, "n": 2442, "cond": ["retake_trial"], "n_tests": 1}, {"a": "gender", "b": "reader_view", "adjacent": false, "sepset": ["english_native"], "r": 0.0, "p": 1.0, "n": 2328, "cond": ["english_native"], "n_tests": 1}, {"a": "dyslexia_bin", "b": "scrolling_time", "adjacent": true, "sepset": null, "r": 0.1, "p": 8.102291366038143e-07, "n": 2400, "cond": ["correct_rate"], "n_tests": 1}, {"a": "adjusted_running_time", "b": "correct_rate", "adjacent": true, "sepset": null, "r": 0.065, "p": 0.0010253334347453478, "n": 2568, "cond": [], "n_tests": 1}, {"a": "correct_rate", "b": "dyslexia", "adjacent": true, "sepset": null, "r": -0.053, "p": 0.010533393268519731, "n": 2358, "cond": ["device"], "n_tests": 1}, {"a": "adjusted_running_time", "b": "running_time", "adjacent": true, "sepset": null, "r": 1.0, "p": 0.0, "n": 2568, "cond": ["scrolling_time"], "n_tests": 1}, {"a": "age", "b": "dyslexia_bin", "adjacent": false, "sepset": ["reader_view"], "r": -0.014, "p": 0.49091262904985056, "n": 2376, "cond": ["reader_view"], "n_tests": 1}]}}, "generations": {"C": {"condition": "C", "dataset": "reading", "hypotheses": [{"statement": "adjusted_running_time is associated with running_time (r=+0.964, p=0.00e+00, n=2568)", "variables": ["adjusted_running_time", "running_time"]}, {"statement": "dyslexia is associated with dyslexia_bin (r=+0.932, p=0.00e+00, n=2400)", "variables": ["dyslexia", "dyslexia_bin"]}, {"statement": "num_words is associated with running_time (r=+0.469, p=2.89e-146, n=2568)", "variables": ["num_words", "running_time"]}, {"statement": "adjusted_running_time is associated with num_words (r=+0.417, p=4.66e-112, n=2568)", "variables": ["adjusted_running_time", "num_words"]}, {"statement": "running_time is associated with scrolling_time (r=+0.316, p=9.57e-62, n=2568)", "variables": ["running_time", "scrolling_time"]}, {"statement": "num_words is associated with scrolling_time (r=+0.273, p=1.35e-45, n=2568)", "variables": ["num_words", "scrolling_time"]}, {"statement": "dyslexia is associated with img_width (r=-0.202, p=1.01e-23, n=2400)", "variables": ["dyslexia", "img_width"]}, {"statement": "dyslexia_bin is associated with img_width (r=-0.192, p=2.15e-21, n=2400)", "variables": ["dyslexia_bin", "img_width"]}, {"statement": "dyslexia_bin is associated with running_time (r=+0.184, p=9.63e-20, n=2400)", "variables": ["dyslexia_bin", "running_time"]}, {"statement": "age is associated with running_time (r=+0.175, p=4.29e-18, n=2406)", "variables": ["age", "running_time"]}, {"statement": "adjusted_running_time is associated with age given {num_words} (r=+0.170, p=4.07e-17, n=2406)", "variables": ["adjusted_running_time", "age", "num_words"]}, {"statement": "dyslexia is associated with running_time (r=+0.166, p=2.05e-16, n=2400)", "variables": ["dyslexia", "running_time"]}, {"statement": "adjusted_running_time is associated with dyslexia_bin (r=+0.165, p=3.31e-16, n=2400)", "variables": ["adjusted_running_time", "dyslexia_bin"]}, {"statement": "adjusted_running_time is associated with age given {english_native} (r=+0.163, p=1.68e-15, n=2334)", "variables": ["adjusted_running_time", "age", "english_native"]}, {"statement": "adjusted_running_time is associated with age given {img_width} (r=+0.154, p=2.51e-14, n=2406)", "variables": ["adjusted_running_time", "age", "img_width"]}], "meta": {"search_log": "/Users/sijial/workspace/adaptive-hypothesis-discovery/results/reading_pc_b80.json", "search_policy": "pc", "queries_used": 80}}}, "eval": null, "meta": {"budget": 80, "max_depth": 1, "space_at_depth": 924, "space_full": 540672}};
+
+/* ---------- shared helpers ---------- */
+const NICE = {
+  CE:"Time (CE)", kde_all_mean:"Population", pollen_inter:"Openness",
+  HatchetSword_inter:"Hatchets · swords", Dagger_inter:"Daggers",
+  HouseSize_inter:"House size", CopperGold_inter:"Copper · gold",
+  Amber_inter:"Amber", MonumentCount_inter:"Monument count",
+  MonumentSize_inter:"Monument size", Depot_inter:"Hoards",
+  Sickle_inter:"Sickles", AxesCelts_inter:"Axes · celts",
+  PotteryForm_inter:"Pottery form", PotteryDecoration_inter:"Pottery decor.",
+  followed_majority:"Followed majority", majority_first:"Majority shown first",
+  age:"Age", gender:"Gender", culture:"Culture"
+};
+const nice = v => NICE[v] || v.replace(/_/g, " ");
+const fmtP = p => p < 1e-99 ? "<1e-99" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
+const el = (tag, attrs, parent) => {
+  const ns = "http://www.w3.org/2000/svg";
+  const e = ["svg","g","line","circle","rect","text","path","title"].includes(tag)
+    ? document.createElementNS(ns, tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const tt = document.getElementById("tt");
+function showTT(evt, html) {
+  tt.innerHTML = "";
+  for (const [cls, txt] of html) {
+    const d = document.createElement("div");
+    d.className = cls; d.textContent = txt; tt.appendChild(d);
+  }
+  tt.style.display = "block";
+  const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + w > innerWidth - 8) x = evt.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = evt.clientY - h - pad;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
+}
+const hideTT = () => tt.style.display = "none";
+
+/* ---------- KPI row ---------- */
+(function () {
+  const d = DATA.dataset, m = DATA.meta;
+  const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e4 ? Math.round(n / 1e3) + "k" : n.toLocaleString();
+  const catNote = d.categorical.length
+    ? `${d.endpoints.length} endpoints + ${d.categorical.length} conditioning-only`
+    : "all usable as endpoints";
+  const items = [
+    ["Variables", d.variables.length, catNote],
+    ["Rows", d.n_rows.toLocaleString(), "complete cases per test"],
+    ["Query budget", m.budget, `per policy, depth ≤ ${m.max_depth}`],
+    ["Gold hypotheses", d.n_gold, "expert annotation set"],
+    ["Hypothesis space", fmt(m.space_at_depth), `|H| at depth ≤ ${m.max_depth}; ${fmt(m.space_full)} unrestricted`],
+  ];
+  const root = document.getElementById("kpis");
+  for (const [label, value, note] of items) {
+    const k = el("div", { class: "kpi" }, root);
+    el("div", { class: "label" }, k).textContent = label;
+    el("div", { class: "value" }, k).textContent = value;
+    el("div", { class: "note" }, k).textContent = note;
+  }
+})();
+
+/* ---------- section numbers ---------- */
+(function () {
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set("effbudget", DATA.meta.budget);
+  const ks = Object.values(DATA.generations).map(g => g.hypotheses.length);
+  const k = ks.length ? Math.max(...ks) : "—";
+  set("klabel", k); set("klabel2", k);
+  set("ngold", DATA.dataset.n_gold); set("ngold2", DATA.dataset.n_gold);
+  set("nendpoints", DATA.dataset.endpoints.length);
+  if (DATA.dataset.categorical.length)
+    set("condonlynote", " (" + DATA.dataset.categorical.map(nice).join(", ") +
+        " is categorical and appears only inside conditioning sets)");
+  if (!DATA.eval || !DATA.eval.length)
+    document.getElementById("evalwrap").style.display = "none";
+})();
+
+/* ---------- network panels ---------- */
+function renderNetwork(container, search, title) {
+  const panel = el("div", { class: "panel card" }, container);
+  el("h3", {}, panel).textContent = title;
+  el("div", { class: "pstats" }, panel).textContent =
+    `${search.n_pairs_tested} pairs tested · ${search.n_dependent} dependent · ` +
+    `${search.n_independent} independent · ${search.n_pruned} edges pruned`;
+  const vars = DATA.dataset.endpoints;
+  const few = vars.length <= 8;
+  const S = 400, R = few ? 95 : 118, cx = S / 2, cy = (few ? S * 0.75 : S) / 2 + 2;
+  const svg = el("svg", { viewBox: `0 0 ${S} ${few ? S * 0.75 : S}`, width: "100%", role: "img",
+    "aria-label": `Information graph from ${title}` }, panel);
+  el("rect", { x: 0, y: 0, width: S, height: few ? S * 0.75 : S, fill: "var(--surface)", rx: 8 }, svg);
+  const pos = {};
+  vars.forEach((v, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / vars.length;
+    pos[v] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), a };
+  });
+  const edgeLayer = el("g", {}, svg);
+  const edges = [];
+  const sorted = [...search.pairs].sort((p, q) =>
+    (p.adjacent ? 1 : 0) - (q.adjacent ? 1 : 0) || Math.abs(p.r) - Math.abs(q.r));
+  for (const p of sorted) {
+    const a = pos[p.a], b = pos[p.b];
+    if (!a || !b) continue;
+    const stroke = !p.adjacent ? "var(--pruned)" : p.r >= 0 ? "var(--pos)" : "var(--neg)";
+    const w = !p.adjacent ? 1 : Math.max(1.2, 5.5 * Math.abs(p.r));
+    const ln = el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "edge",
+      stroke, "stroke-width": w, "stroke-linecap": "round",
+      opacity: p.adjacent ? 0.85 : 0.7 }, edgeLayer);
+    // transparent fat hit line so edges are hoverable
+    const hit = el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+      stroke: "transparent", "stroke-width": 11, tabindex: "0" }, edgeLayer);
+    const info = p.adjacent
+      ? [["tval", `r = ${p.r >= 0 ? "+" : ""}${p.r.toFixed(2)}${p.cond.length ? " | " + p.cond.map(nice).join(", ") : ""}`],
+         ["tsub", `${nice(p.a)} — ${nice(p.b)}`],
+         ["tsub", `p = ${fmtP(p.p)} · n = ${p.n} · ${p.n_tests} test${p.n_tests > 1 ? "s" : ""} on this pair`]]
+      : [["tval", `independent${p.sepset && p.sepset.length ? " given " + p.sepset.map(nice).join(", ") : ""}`],
+         ["tsub", `${nice(p.a)} — ${nice(p.b)} (edge pruned)`],
+         ["tsub", `r = ${p.r.toFixed(2)} · p = ${fmtP(p.p)} · n = ${p.n}`]];
+    const enter = evt => { showTT(evt, info); ln.setAttribute("opacity", 1); };
+    const leave = () => { hideTT(); ln.setAttribute("opacity", p.adjacent ? 0.85 : 0.7); };
+    hit.addEventListener("pointermove", enter);
+    hit.addEventListener("pointerleave", leave);
+    hit.addEventListener("focus", e => enter({ clientX: innerWidth / 2, clientY: innerHeight / 3 }));
+    hit.addEventListener("blur", leave);
+    edges.push({ ln, p });
+  }
+  for (const v of vars) {
+    const { x, y, a } = pos[v];
+    const g = el("g", {}, svg);
+    el("circle", { cx: x, cy: y, r: 4.5, fill: "var(--ink-2)",
+      stroke: "var(--surface)", "stroke-width": 2 }, g);
+    const deg = a * 180 / Math.PI;
+    const rightSide = Math.cos(a) >= 0;
+    const lx = cx + (R + 12) * Math.cos(a), ly = cy + (R + 12) * Math.sin(a);
+    const attrs = { x: lx, y: ly, "font-size": few ? 11 : 9.5, fill: "var(--ink-2)",
+      "dominant-baseline": "middle" };
+    if (few) {
+      // horizontal labels, anchored by side and clamped inside the panel
+      const w = nice(v).length * 5.7;
+      if (Math.abs(Math.cos(a)) < 0.35) {
+        attrs["text-anchor"] = "middle";
+        attrs.y = ly + (Math.sin(a) >= 0 ? 6 : -4);
+      } else if (rightSide) {
+        attrs["text-anchor"] = "start";
+        attrs.x = Math.min(lx, S - w - 8);
+      } else {
+        attrs["text-anchor"] = "end";
+        attrs.x = Math.max(lx, w + 8);
+      }
+    } else {
+      attrs["text-anchor"] = rightSide ? "start" : "end";
+      attrs.transform = `rotate(${rightSide ? deg : deg + 180} ${lx} ${ly})`;
+    }
+    const t = el("text", attrs, g);
+    t.textContent = nice(v);
+    const hitN = el("circle", { cx: x, cy: y, r: 13, fill: "transparent" }, g);
+    hitN.addEventListener("pointerenter", () => {
+      for (const { ln, p } of edges)
+        ln.setAttribute("opacity", (p.a === v || p.b === v) ? 1 : 0.12);
+    });
+    hitN.addEventListener("pointerleave", () => {
+      for (const { ln, p } of edges)
+        ln.setAttribute("opacity", p.adjacent ? 0.85 : 0.7);
+    });
+  }
+}
+(function () {
+  const root = document.getElementById("graphs");
+  const titles = { pc: "PC-style search", adaptive: "Adaptive LLM search", random: "Random search" };
+  for (const key of ["pc", "adaptive", "random"])
+    if (DATA.searches[key]) renderNetwork(root, DATA.searches[key], titles[key]);
+})();
+
+/* ---------- search efficiency grouped bars ---------- */
+(function () {
+  const metrics = [
+    ["n_queries", "Queries spent"],
+    ["n_pairs_tested", "Distinct pairs covered"],
+    ["n_independent", "Independencies found"],
+    ["n_pruned", "Candidate edges pruned"],
+  ];
+  const POLICIES = [["pc", "PC"], ["adaptive", "Adaptive"], ["random", "Random"]]
+    .filter(([k]) => DATA.searches[k]);
+  const root = document.getElementById("effchart");
+  const W = 980, H = 210, mL = 8, mR = 8, mT = 8, mB = 44;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img",
+    "aria-label": "Search efficiency by policy" }, root);
+  const groupW = (W - mL - mR) / metrics.length;
+  const maxV = Math.max(...metrics.flatMap(([k]) => POLICIES.map(([p]) => DATA.searches[p][k])));
+  const y = v => mT + (H - mT - mB) * (1 - v / (maxV * 1.15));
+  const shades = { pc: "var(--bar)", adaptive: "var(--accent)", random: "var(--bar-dim)" };
+  el("line", { x1: mL, y1: y(0), x2: W - mR, y2: y(0), stroke: "var(--baseline)" }, svg);
+  metrics.forEach(([k, label], mi) => {
+    const gx = mL + mi * groupW;
+    POLICIES.forEach(([p, pl], pi) => {
+      const v = DATA.searches[p][k];
+      const bw = 24, gap = 10;
+      const total = POLICIES.length * bw + (POLICIES.length - 1) * gap;
+      const x = gx + groupW / 2 - total / 2 + pi * (bw + gap);
+      const barTop = y(v);
+      const bar = el("path", { class: "bar",
+        d: `M ${x} ${y(0)} L ${x} ${barTop + 4} Q ${x} ${barTop} ${x + 4} ${barTop} L ${x + bw - 4} ${barTop} Q ${x + bw} ${barTop} ${x + bw} ${barTop + 4} L ${x + bw} ${y(0)} Z`,
+        fill: shades[p] }, svg);
+      const valT = el("text", { x: x + bw / 2, y: barTop - 6, "text-anchor": "middle",
+        "font-size": 12, "font-weight": 600, fill: "var(--ink)" }, svg);
+      valT.textContent = v;
+      const hit = el("rect", { x: x - 5, y: mT, width: bw + 10, height: H - mT - mB,
+        fill: "transparent", tabindex: "0" }, svg);
+      const info = [["tval", String(v)], ["tsub", `${pl} · ${label.toLowerCase()}`]];
+      hit.addEventListener("pointermove", e => { showTT(e, info); bar.setAttribute("opacity", .8); });
+      hit.addEventListener("pointerleave", () => { hideTT(); bar.setAttribute("opacity", 1); });
+    });
+    const lt = el("text", { x: gx + groupW / 2, y: H - mB + 20, "text-anchor": "middle",
+      "font-size": 12.5, fill: "var(--ink-2)" }, svg);
+    lt.textContent = label;
+  });
+  // legend
+  const lg = document.createElement("div");
+  lg.className = "legend";
+  POLICIES.forEach(([p, pl]) => {
+    const k = document.createElement("span"); k.className = "key";
+    const sw = document.createElement("span");
+    sw.style.cssText = `display:inline-block;width:11px;height:11px;border-radius:3px;background:${shades[p].startsWith("var") ? `var(${shades[p].slice(4, -1)})` : shades[p]}`;
+    sw.style.background = ({ pc: "var(--bar)", adaptive: "var(--accent)", random: "var(--bar-dim)" })[p];
+    k.appendChild(sw); k.appendChild(document.createTextNode(pl));
+    lg.appendChild(k);
+  });
+  root.appendChild(lg);
+})();
+
+/* ---------- recall bars + quality table + verdicts ---------- */
+(function () {
+  if (!DATA.eval) return;
+  const CONDS = { A: "A · EDA → LLM", B: "B · PC graph → LLM", C: "C · PC results ranked", D: "D · adaptive graph → LLM" };
+  const rows = DATA.eval.map(e => ({
+    cond: e.condition, label: CONDS[e.condition] || e.condition,
+    recall: e.gold_match ? e.gold_match.recall : null,
+    matched: e.gold_match ? e.gold_match.matched : null,
+    nGold: e.gold_match ? e.gold_match.n_gold : null,
+    q: e.quality,
+  })).sort((a, b) => a.cond.localeCompare(b.cond));
+
+  const root = document.getElementById("recallchart");
+  const W = 980, H = 66 + rows.length * 46, mL = 210, mR = 90, mT = 26, mB = 8;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img",
+    "aria-label": "Gold-hypothesis recall by condition" }, root);
+  const maxR = Math.max(...rows.map(r => r.recall || 0), 0.4);
+  const x = v => mL + (W - mL - mR) * (v / (Math.ceil(maxR * 10) / 10));
+  const ticks = [];
+  for (let t = 0; t <= Math.ceil(maxR * 10); t++) ticks.push(t / 10);
+  for (const t of ticks) {
+    el("line", { x1: x(t), y1: mT, x2: x(t), y2: H - mB, stroke: t === 0 ? "var(--baseline)" : "var(--grid)" }, svg);
+    const tx = el("text", { x: x(t), y: mT - 8, "text-anchor": "middle", "font-size": 11,
+      fill: "var(--muted)", style: "font-variant-numeric:tabular-nums" }, svg);
+    tx.textContent = (t * 100).toFixed(0) + "%";
+  }
+  rows.forEach((r, i) => {
+    const yy = mT + 14 + i * 46;
+    const lbl = el("text", { x: mL - 12, y: yy + 9, "text-anchor": "end", "font-size": 13, fill: "var(--ink)" }, svg);
+    lbl.textContent = r.label;
+    if (r.recall == null) return;
+    const bw = 18, xe = x(r.recall);
+    el("path", { class: "bar",
+      d: `M ${x(0)} ${yy} L ${xe - 4} ${yy} Q ${xe} ${yy} ${xe} ${yy + 4} L ${xe} ${yy + bw - 4} Q ${xe} ${yy + bw} ${xe - 4} ${yy + bw} L ${x(0)} ${yy + bw} Z`,
+      fill: "var(--bar)" }, svg);
+    const vt = el("text", { x: xe + 8, y: yy + bw / 2 + 4, "font-size": 12.5, "font-weight": 600, fill: "var(--ink)" }, svg);
+    vt.textContent = `${(r.recall * 100).toFixed(0)}% (${r.matched}/${r.nGold})`;
+    const hit = el("rect", { x: 0, y: yy - 10, width: W, height: bw + 20, fill: "transparent", tabindex: "0" }, svg);
+    const info = [["tval", `${(r.recall * 100).toFixed(1)}% recall`],
+      ["tsub", `${r.label} · ${r.matched} of ${r.nGold} gold hypotheses matched`]];
+    hit.addEventListener("pointermove", e => showTT(e, info));
+    hit.addEventListener("pointerleave", hideTT);
+  });
+
+  /* quality table */
+  const qt = document.getElementById("qualitytable");
+  const dims = ["validity", "novelty", "informativeness", "specificity"];
+  const thead = el("thead", {}, qt); const hr = el("tr", {}, thead);
+  for (const h of ["Condition", "Recall", ...dims.map(d => d[0].toUpperCase() + d.slice(1)), "Overall", "Redundancy"]) {
+    const th = el("th", { class: h === "Condition" ? "" : "num" }, hr); th.textContent = h;
+  }
+  const tb = el("tbody", {}, qt);
+  for (const r of rows) {
+    const tr = el("tr", {}, tb);
+    el("td", {}, tr).textContent = r.label;
+    el("td", { class: "num" }, tr).textContent = r.recall == null ? "—" : (r.recall * 100).toFixed(0) + "%";
+    for (const d of dims) el("td", { class: "num" }, tr).textContent = r.q.mean[d].toFixed(2);
+    el("td", { class: "num" }, tr).textContent = r.q.overall.toFixed(2);
+    el("td", { class: "num" }, tr).textContent = (r.q.redundancy * 100).toFixed(0) + "%";
+  }
+
+  /* verdict callouts */
+  const by = Object.fromEntries(rows.map(r => [r.cond, r]));
+  const v = document.getElementById("verdicts");
+  function callout(title, text) {
+    const c = document.createElement("div"); c.className = "callout";
+    const s = document.createElement("strong"); s.textContent = title;
+    c.appendChild(s); c.appendChild(document.createTextNode(" " + text));
+    v.appendChild(c);
+  }
+  if (by.A && by.B && by.A.recall != null && by.B.recall != null) {
+    const gap = (by.B.recall - by.A.recall) * 100;
+    callout("Q1 · representation:",
+      gap > 2 ? `graph→LLM (B) beats EDA→LLM (A) by ${gap.toFixed(0)} points of recall — the information graph helps.`
+      : gap < -2 ? `EDA→LLM (A) beats graph→LLM (B) by ${(-gap).toFixed(0)} points — the graph did not help here.`
+      : `B and A are within ${Math.abs(gap).toFixed(0)} points — no clear representation effect at this budget.`);
+  }
+  if (by.D && by.B && by.D.recall != null) {
+    const gap = (by.D.recall - by.B.recall) * 100;
+    callout("Q2 · search:",
+      gap > 2 ? `the adaptive policy's graph (D) yields ${gap.toFixed(0)} more recall points than PC's (B) at the same query budget.`
+      : gap < -2 ? `PC's graph (B) outperforms adaptive's (D) by ${(-gap).toFixed(0)} points at this budget.`
+      : gap === 0
+        ? "D and B tie exactly at this budget — run more budgets for the recall-vs-queries curve."
+        : `D and B are within ${Math.abs(gap).toFixed(0)} points at this budget — run more budgets for the recall-vs-queries curve.`);
+  }
+})();
+
+/* ---------- gold matrix ---------- */
+(function () {
+  if (!DATA.eval) return;
+  const conds = DATA.eval.filter(e => e.gold_match).map(e => e.condition).sort();
+  const per = Object.fromEntries(DATA.eval.filter(e => e.gold_match)
+    .map(e => [e.condition, new Map(e.gold_match.per_gold.map(g => [g.gold_idx, g.matched_by]))]));
+  const tbl = document.getElementById("goldmatrix");
+  const thead = el("thead", {}, tbl); const hr = el("tr", {}, thead);
+  el("th", {}, hr).textContent = "#";
+  el("th", {}, hr).textContent = "Gold hypothesis";
+  for (const c of conds) { const th = el("th", { style: "text-align:center" }, hr); th.textContent = c; }
+  const tb = el("tbody", {}, tbl);
+  DATA.dataset.gold.forEach((g, i) => {
+    const tr = el("tr", {}, tb);
+    el("td", { style: "color:var(--muted)" }, tr).textContent = i + 1;
+    el("td", { class: "stmt" }, tr).textContent = g;
+    for (const c of conds) {
+      const hitBy = per[c].get(i);
+      const td = el("td", { style: "text-align:center" }, tr);
+      const dot = document.createElement("span");
+      dot.className = "dot " + (hitBy ? "hit" : "miss");
+      if (hitBy) dot.title = `matched by ${hitBy}`;
+      td.appendChild(dot);
+    }
+  });
+})();
+
+/* ---------- top associations ---------- */
+(function () {
+  const s = DATA.searches.pc || Object.values(DATA.searches)[0];
+  const top = s.pairs.filter(p => p.adjacent).sort((a, b) => Math.abs(b.r) - Math.abs(a.r)).slice(0, 12);
+  const tbl = document.getElementById("topassoc");
+  const thead = el("thead", {}, tbl); const hr = el("tr", {}, thead);
+  for (const h of ["Pair", "Conditioned on", "r", "p", "n"]) {
+    const th = el("th", { class: ["r", "p", "n"].includes(h) ? "num" : "" }, hr);
+    th.textContent = h;
+  }
+  const tb = el("tbody", {}, tbl);
+  for (const p of top) {
+    const tr = el("tr", {}, tb);
+    el("td", {}, tr).textContent = `${nice(p.a)} — ${nice(p.b)}`;
+    el("td", { style: "color:var(--ink-2)" }, tr).textContent = p.cond.length ? p.cond.map(nice).join(", ") : "—";
+    el("td", { class: "num" }, tr).textContent = (p.r >= 0 ? "+" : "") + p.r.toFixed(2);
+    el("td", { class: "num" }, tr).textContent = fmtP(p.p);
+    el("td", { class: "num" }, tr).textContent = p.n;
+  }
+})();
+
+/* ---------- footnote ---------- */
+document.getElementById("footnote").textContent = "Method notes: partial-correlation CI tests (Fisher-z, \u03b1 = 0.05); categorical variables are dummy-coded in conditioning sets and never endpoints. Generation and judging (where present): gpt-5-mini; recall matching is judge-based and approximate. Single run per policy \u2014 treat differences within a few points as noise until repeated across seeds and budgets.";
+</script>
+
+</body></html>

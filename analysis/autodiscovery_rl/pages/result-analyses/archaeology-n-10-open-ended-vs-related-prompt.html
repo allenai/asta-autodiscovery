@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Archaeology n=10 — open-ended vs related prompt</title>
+<style>
+:root {
+  --bg:#f6f7f3; --panel:#fdfdfb; --ink:#242824; --mut:#6d746b; --rule:#dde1d6;
+  --open:#46688f; --open-bg:#eef2f7; --rel:#5c7a3e; --rel-bg:#f0f4e9;
+  --yes:#3e6b45; --yes-bg:#e6efe4; --no-b:#b0b6ab;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg:#171a17; --panel:#1e221e; --ink:#e2e6df; --mut:#98a093; --rule:#2e332c;
+  --open:#92b3d6; --open-bg:#222931; --rel:#a5c47e; --rel-bg:#242b1d;
+  --yes:#a9cba7; --yes-bg:#243325; --no-b:#4a5147;
+} }
+:root[data-theme="dark"] {
+  --bg:#171a17; --panel:#1e221e; --ink:#e2e6df; --mut:#98a093; --rule:#2e332c;
+  --open:#92b3d6; --open-bg:#222931; --rel:#a5c47e; --rel-bg:#242b1d;
+  --yes:#a9cba7; --yes-bg:#243325; --no-b:#4a5147;
+}
+:root[data-theme="light"] {
+  --bg:#f6f7f3; --panel:#fdfdfb; --ink:#242824; --mut:#6d746b; --rule:#dde1d6;
+  --open:#46688f; --open-bg:#eef2f7; --rel:#5c7a3e; --rel-bg:#f0f4e9;
+  --yes:#3e6b45; --yes-bg:#e6efe4; --no-b:#b0b6ab;
+}
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); margin:0;
+  font-family: Charter, Georgia, 'Times New Roman', serif; line-height:1.55; }
+.wrap { max-width:1180px; margin:0 auto; padding:3rem 1.5rem 5rem; }
+.eyebrow, .idlab, .lvl, .chip, .ns, .colhead, .tile b, .tile i, code, pre {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--mut); }
+h1 { font-size:1.9rem; line-height:1.2; margin:.4rem 0 .6rem; text-wrap:balance; font-weight:600; }
+h2 { font-size:1.25rem; margin:0 0 .2rem; font-weight:600; }
+.lede { color:var(--mut); max-width:62ch; margin:0; }
+.tiles { display:flex; gap:1px; background:var(--rule); border:1px solid var(--rule); margin:1.8rem 0 2.6rem; flex-wrap:wrap; }
+.tile { background:var(--panel); padding:.8rem 1.1rem; flex:1 1 150px; }
+.tile i { font-style:normal; font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); display:block; }
+.tile b { font-size:1.35rem; font-weight:600; font-variant-numeric:tabular-nums; }
+.tile small { color:var(--mut); }
+section { margin-bottom:3rem; }
+.secnote { color:var(--mut); font-size:.92rem; max-width:70ch; margin:.2rem 0 1.2rem; }
+.grid { display:grid; grid-template-columns:86px 1fr 1fr; gap:1px; background:var(--rule);
+  border:1px solid var(--rule); }
+.colhead { position:sticky; top:0; z-index:2; background:var(--panel); padding:.6rem .9rem;
+  font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700; }
+.colhead.o { color:var(--open); box-shadow: inset 0 -2px 0 var(--open); }
+.colhead.r { color:var(--rel);  box-shadow: inset 0 -2px 0 var(--rel); }
+.colhead.n { background:var(--panel); }
+.row { display:contents; }
+.nid { background:var(--panel); padding:.85rem .7rem; display:flex; flex-direction:column; gap:.15rem; }
+.idlab { font-weight:700; font-size:.9rem; }
+.lvl { font-size:.66rem; color:var(--mut); letter-spacing:.06em; }
+.cell { background:var(--panel); padding:.85rem 1rem 1rem; }
+.cell.c-open    { box-shadow: inset 3px 0 0 var(--open-bg); }
+.cell.c-related { box-shadow: inset 3px 0 0 var(--rel-bg); }
+.cell p { margin:.45rem 0 0; font-size:.92rem; max-width:60ch; }
+.meta { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; }
+.chip { font-size:.66rem; letter-spacing:.05em; padding:.13rem .5rem; border-radius:99px; }
+.chip.s-yes { background:var(--yes-bg); color:var(--yes); font-weight:700; }
+.chip.s-no  { border:1px solid var(--no-b); color:var(--mut); }
+.ns { font-size:.68rem; color:var(--mut); }
+.pgrid { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); border:1px solid var(--rule); }
+.pcell { background:var(--panel); padding:1rem 1.1rem 1.2rem; }
+.pcell h3 { margin:0 0 .4rem; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; }
+.pcell.o h3 { color:var(--open); } .pcell.r h3 { color:var(--rel); }
+.pcell pre { margin:0; white-space:pre-wrap; font-size:.82rem; line-height:1.55;
+  background:none; border:none; padding:0; }
+.pwhere { grid-column:1 / -1; background:var(--panel); padding:.55rem 1.1rem; color:var(--mut); font-size:.8rem; }
+.pwhere code { font-size:.78rem; }
+footer { color:var(--mut); font-size:.8rem; border-top:1px solid var(--rule); padding-top:1rem; }
+footer code { font-size:.75rem; word-break:break-all; }
+@media (max-width: 820px) {
+  .grid { grid-template-columns:1fr; }
+  .colhead { position:static; }
+  .colhead.n { display:none; }
+  .nid { flex-direction:row; align-items:baseline; gap:.6rem; padding:.5rem .9rem; }
+  .pgrid { grid-template-columns:1fr; }
+}
+</style>
+<div class="wrap">
+<header>
+  <div class="eyebrow">AutoDiscovery · archaeology (DiscoveryBench) · gpt-5-mini · commit fbafd54</div>
+  <h1>Open-ended vs related hypothesis prompt, node by node</h1>
+  <p class="lede">Two n=10 baseline runs on 2026-08-18, identical in every argument except
+  <code>--hypothesis_mode</code>. Both produced the same tree shape (three level-2 roots,
+  six level-3 children, one level-4 node), so rows align one-to-one.</p>
+</header>
+
+<div class="tiles">
+  <div class="tile"><i>Open-ended surprise rate</i><b>8/10</b> <small>(80%)</small></div>
+  <div class="tile"><i>Related surprise rate</i><b>7/10</b> <small>(70%)</small></div>
+  <div class="tile"><i>Reviewer success</i><b>10/10</b> <small>both runs</small></div>
+  <div class="tile"><i>Wall clock</i><b>~45 min</b> <small>each, 0 GPUs</small></div>
+</div>
+
+<section>
+  <h2>The prompts</h2>
+  <p class="secnote">The mode changes exactly two strings. Everything else — the shared theorizer
+  system message, planner/programmer/analyst/reviewer prompts, models, MCTS settings — is identical.</p>
+  <div class="pgrid">
+    <div class="pwhere">1 · Relatedness instruction inserted into the theorizer system message
+      (<code>agents.py:56</code>, <code>HYPOTHESIS_RELATEDNESS_INSTRUCTION</code>)</div>
+    <div class="pcell o"><h3>open_ended</h3><pre>Remember, you are interested in open-ended research, so your proposals may be exploratory in nature and may have only an indirect connection to the previous explorations provided.</pre></div>
+    <div class="pcell r"><h3>related</h3><pre>Remember, you are building a coherent line of inquiry, so each new hypothesis should stay closely related to the previous explorations provided — refining, extending, or probing the same phenomena, variables, and mechanisms rather than switching to an unrelated topic. Do not repeat the hypotheses that have already been explored.</pre></div>
+    <div class="pwhere">2 · On-demand generation prompt used when a node needs fresh hypotheses mid-search
+      (<code>mcts.py:24</code>, <code>HYPOTHESIS_RELATEDNESS_ONDEMAND</code>; <code>{parent!r}</code> /
+      <code>{tried}</code> are filled per node)</div>
+    <div class="pcell o"><h3>open_ended</h3><pre>Generate new hypotheses given these previously attempted experiments: {tried}</pre></div>
+    <div class="pcell r"><h3>related</h3><pre>Generate new hypotheses that stay closely related to the current line of inquiry (parent hypothesis: {parent!r}). Each new hypothesis should probe the same phenomenon, variables, or mechanism explored so far — for example by refining it, extending it to an adjacent context, or testing a plausible causal driver, moderator, or boundary condition of the observed effect — rather than switching to an unrelated topic. Do not repeat any previously attempted experiment. Previously attempted experiments: {tried}</pre></div>
+  </div>
+</section>
+
+<section>
+  <h2>Hypotheses, unabridged</h2>
+  <p class="secnote">Verbatim from each node's <code>mcts_node_*.json</code>. Node 1_0 (dataset
+  load) is omitted — it carries no hypothesis. Norm. surprisal is the belief-shift score;
+  the surprising verdict is the belief agent's boolean.</p>
+  <div class="grid">
+    <div class="colhead n">node</div>
+    <div class="colhead o">Open-ended · fixtest10-scratch</div>
+    <div class="colhead r">Related · related-n10</div>
+    <div class="row"><div class="nid"><span class="idlab">2_0</span><span class="lvl">level 2</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 1_0</span><span class="ns">norm. surprisal +0.65</span></div><p>After converting comma-decimal string columns to numeric, the interpolated pollen mean (MEAN) from pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv is positively correlated with the interpolated pollen time series (pollen_inter) in time_series_data.csv over overlapping calibrated-year periods (calBP), such that higher pollen openness (MEAN) corresponds to higher pollen_inter values (Pearson correlation &gt; 0.5).</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 1_0</span><span class="ns">norm. surprisal -0.71</span></div><p>Time periods (years) when pollen-derived vegetation openness (SMOOTH_MEAN_100y from pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv) is above its long-term median are associated with a higher mean interpolated monument count (MonumentCount_inter in time_series_data.csv) than periods when SMOOTH_MEAN_100y is below its median; the difference in means is positive and statistically significant at α = 0.05.</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">2_1</span><span class="lvl">level 2</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 1_0</span><span class="ns">norm. surprisal -0.40</span></div><p>After converting comma-decimal string columns to numeric, higher interpolated monument counts (MonumentCount_inter from time_series_data.csv) are associated with lower interpolated pollen openness mean (MEAN from pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv) across overlapping calBP years, such that the Pearson correlation coefficient is ≤ -0.4.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 1_0</span><span class="ns">norm. surprisal -0.37</span></div><p>Increases in pollen-derived vegetation openness (measured by SMOOTH_MEAN_100y) precede and predict increases in interpolated monument-building activity (MonumentCount_inter): specifically, the maximum cross-correlation between SMOOTH_MEAN_100y and MonumentCount_inter occurs at a positive lag (pollen leading monuments) within 0–200 years, and at least one lag L in {0,25,50,75,100,150,200} years produces a positive, statistically significant coefficient when MonumentCount_inter_t is regressed on SMOOTH_MEAN_100y_{t-L} controlling for linear time trend (α = 0.05, with Newey–West or block-bootstrap inference).</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">2_2</span><span class="lvl">level 2</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 1_0</span><span class="ns">norm. surprisal -0.50</span></div><p>After linearly detrending both series, increases in MonumentSize_inter (time_series_data.csv) precede increases in HouseSize_inter (time_series_data.csv): the cross-correlation (Pearson) between MonumentSize_inter at time t and HouseSize_inter at time t+lag attains its maximum at a positive lag between 50 and 150 years, and the peak correlation at that lag is ≥ 0.25.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 1_0</span><span class="ns">norm. surprisal -0.54</span></div><p>The positive association between vegetation openness (SMOOTH_MEAN_100y from pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv) and interpolated monument activity (MonumentCount_inter from time_series_data.csv) is stronger in periods with higher pottery elaboration (PotteryDecoration_inter in time_series_data.csv): i.e., there is a positive interaction such that the slope of MonumentCount_inter on SMOOTH_MEAN_100y increases with PotteryDecoration_inter (testable via interaction term in regression with robust inference).</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">3_0</span><span class="lvl">level 3</span></div><div class="cell c-open"><div class="meta"><span class="chip s-no">not surprising</span><span class="ns">parent 2_0</span><span class="ns">norm. surprisal +0.29</span></div><p>Across the prehistoric periods recorded in capital.csv, the period-level ZMonument (monument-count Z-score) is positively associated with the mean MonumentCount_inter from time_series_data.csv computed over a 201-year window centered on the period&#x27;s calendar age (calBP derived as BCE + 1950); specifically, the Pearson correlation between ZMonument and the window-averaged MonumentCount_inter across the 39 periods exceeds 0.5.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-no">not surprising</span><span class="ns">parent 2_1</span><span class="ns">norm. surprisal +0.16</span></div><p>Periods with greater vegetation openness are associated with larger monument size: the period-level mean SMOOTH_MEAN_100y (averaged over ±50 years around the period date mapped to calBP = 1950 + BCE) is positively associated with the standardized monument-size score ZMW in capital.csv — specifically, the Pearson correlation between period mean SMOOTH_MEAN_100y and numeric ZMW is &gt; 0, and in OLS regression ZMW = α + β * mean_SM100_±50y + γ * BCE + ε the coefficient β &gt; 0 and is statistically significant at α = 0.05 by a permutation (or bootstrap) test appropriate for small N (N ≈ 39).</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">3_1</span><span class="lvl">level 3</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_1</span><span class="ns">norm. surprisal -0.71</span></div><p>After converting comma-decimal string columns to numeric and restricting to overlapping calBP years (inner join of pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv and time_series_data.csv), interpolated monument size (MonumentSize_inter) is more negatively linearly associated with pollen openness mean (MEAN) than interpolated monument count (MonumentCount_inter); formally, Pearson r(MonumentSize_inter, MEAN) ≤ Pearson r(MonumentCount_inter, MEAN) - 0.05.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-no">not surprising</span><span class="ns">parent 2_0</span><span class="ns">norm. surprisal -0.07</span></div><p>Periods where the 100-year change in SMOOTH_MEAN_100y (SMOOTH_MEAN_100y at t+100 minus at t) exceeds its long-term median are followed within the next 100 years by a higher mean MonumentCount_inter than periods where the 100-year change is at-or-below the median; the mean difference (rise vs no-rise) is positive and statistically significant at α = 0.05 after accounting for temporal dependence.</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">3_2</span><span class="lvl">level 3</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_1</span><span class="ns">norm. surprisal -0.49</span></div><p>After converting comma-decimal string columns to numeric and restricting to overlapping calBP years (inner join of pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv and time_series_data.csv), year-to-year increases in interpolated monument counts predict subsequent year decreases in interpolated pollen openness mean: specifically, the Pearson correlation between delta MonumentCount_inter at year t and delta MEAN at year t+1 (computed on consecutive calBP pairs where both years exist) is ≤ -0.20.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_0</span><span class="ns">norm. surprisal -0.65</span></div><p>Years when the 50-year smoothed pollen-derived vegetation openness (SMOOTH_MEAN_50y) is above its long-term median are associated with a higher mean MonumentCount_inter than years when SMOOTH_MEAN_50y is at-or-below its median; the mean difference is positive and statistically significant at α = 0.05. Furthermore, the association (effect size and statistical significance) using SMOOTH_MEAN_50y is stronger than the association obtained using SMOOTH_MEAN_100y when evaluated on the same merged sample.</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">3_3</span><span class="lvl">level 3</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_2</span><span class="ns">norm. surprisal -0.36</span></div><p>After linearly detrending and aligning on calibrated years (calBP) at annual resolution, increases in pollen openness (SMOOTH_MEAN_200y from pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv) lead increases in monument frequency (MonumentCount_inter from time_series_data.csv): specifically, the Pearson cross-correlation between SMOOTH_MEAN_200y at time t and MonumentCount_inter at time t+lag attains its maximum at a positive lag in the interval 100–400 years, and the peak correlation at that lag is ≥ 0.30.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_2</span><span class="ns">norm. surprisal -0.54</span></div><p>Periods with higher average PotteryDecoration_inter amplify the positive association between long-term vegetation openness (SMOOTH_MEAN_100y) and MonumentCount_inter, i.e., the interaction between SMOOTH_MEAN_100y and PotteryDecoration_inter is positive (beta3 &gt; 0) in a linear model predicting MonumentCount_inter when accounting for linear time trend and temporal dependence.</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">3_4</span><span class="lvl">level 3</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_0</span><span class="ns">norm. surprisal -0.39</span></div><p>Periods with higher monument Z-scores (capital.csv: ZMonument) are associated with higher local pollen-openness (pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv: MEAN) when pollen MEAN is averaged over a symmetric 201-year window (±100 years) centered on the period&#x27;s calendar age (calBP = BCE + 1950); specifically, the Pearson correlation across periods between ZMonument and the window-averaged pollen MEAN exceeds 0.5.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-no">not surprising</span><span class="ns">parent 2_1</span><span class="ns">norm. surprisal +0.19</span></div><p>Short-term increases in pollen-derived openness (SMOOTH_MEAN_100y) predict increases in interpolated monument-building activity more strongly when the long-term baseline openness is low: specifically, for at least one lag L in {0,25,50,75,100,150,200} years, the interaction coefficient (SMOOTH_MEAN_100y_{t+L} × LowBaseline200_{t+L}) is positive and statistically significant in the regression MonumentCount_inter_t = α + β1·SM100_{t+L} + β2·LowBaseline200_{t+L} + β3·(SM100_{t+L}·LowBaseline200_{t+L}) + β4·calBP_t + ε_t (α = 0.05; inference robust to temporal dependence by Newey–West and block-bootstrap).</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">3_5</span><span class="lvl">level 3</span></div><div class="cell c-open"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_2</span><span class="ns">norm. surprisal -0.71</span></div><p>After aligning on calibrated years (calBP) and removing linear trends, the inter-annual variability of MonumentSize_inter (time_series_data.csv) is greater during periods of high pollen openness (SMOOTH_MEAN_200y from pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv above its long-term median) than during periods of low pollen openness: specifically, the variance of the detrended MonumentSize_inter residuals in the high-openness subset is at least 1.5× the variance in the low-openness subset, and this difference is statistically significant (Levene&#x27;s test p &lt; 0.05).</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 2_2</span><span class="ns">norm. surprisal -0.41</span></div><p>Periods with higher PotteryDecoration_inter amplify monument responses to short-term increases in vegetation openness: specifically, the positive association between the short-term rate of change in SMOOTH_MEAN_100y (SM100_rate, e.g., first-difference per median dt) and MonumentCount_inter is stronger when PotteryDecoration_inter is high — i.e., the coefficient on (SM100_rate_c * PotDec_c) &gt; 0 in a regression of MonumentCount_inter controlling for level and linear time trend, with inference robust to temporal dependence (Newey–West HAC and temporal block-bootstrap).</p></div></div>
+<div class="row"><div class="nid"><span class="idlab">4_0</span><span class="lvl">level 4</span></div><div class="cell c-open"><div class="meta"><span class="chip s-no">not surprising</span><span class="ns">parent 3_3</span><span class="ns">norm. surprisal +0.00</span></div><p>After converting capital.csv BCE to calBP (calBP = BCE + 1950), coercing Zkeverz to numeric and interpolating the capital-level Zkeverz to an annual calBP grid, then linearly detrending both the capital Zkeverz and the PotteryDecoration_inter series (from time_series_data.csv) on the same annual calBP grid, the capital-level pottery-decoration z-score (Zkeverz) at time t leads the local PotteryDecoration_inter at time t+lag: the Pearson correlation between detrended Zkeverz(t) and detrended PotteryDecoration_inter(t+lag) attains its maximum at a positive lag L_peak in the interval 0–200 years and the peak correlation r_peak at that lag is ≥ 0.35.</p></div><div class="cell c-related"><div class="meta"><span class="chip s-yes">surprising</span><span class="ns">parent 3_3</span><span class="ns">norm. surprisal -0.55</span></div><p>Periods of recent increase in vegetation openness amplify the association between long-term vegetation openness and monument activity: specifically, when the 100-year percent-change in pollen (pollen_grate_100) is positive, the slope of MonumentCount_inter on SMOOTH_MEAN_100y is larger (interaction coefficient &gt; 0) in a linear model controlling for a linear time trend (calBP).</p></div></div>
+  </div>
+</section>
+
+<footer>
+  Runs: <code>baseline-archaeology-metadata-0-n500-01M0BM6RAEKN3GR65T9HKT258D-20260818-234530</code> (open-ended)
+  · <code>baseline-archaeology-related-n10-01M0BQ2D6RS1XH60GR4P8BZWEB-20260819-003522</code> (related).
+  Dataset <code>discoverybench/real/test/archaeology/metadata_0.json</code>. Local copies under <code>results/</code>;
+  synced to <code>s3://ai2-asta-workspaces/autods/runs/</code>.
+</footer>
+</div>
+
+</body></html>

@@ -1,0 +1,334 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Code-Execution Failure Analysis — AutoDiscovery RL</title>
+<style>
+  :root{
+    --bg:#eef1f4; --surface:#ffffff; --surface-2:#f6f8fa;
+    --ink:#181c22; --ink-soft:#49525c; --ink-faint:#7d8790;
+    --line:#e0e5ea; --line-strong:#cfd6dd;
+    --accent:#b45309; --accent-ink:#8a3f06; --accent-soft:#fbeede;
+    --fix:#0f766e; --fix-soft:#e4f1ef;
+    --shadow:0 1px 2px rgba(20,28,38,.05),0 8px 24px rgba(20,28,38,.06);
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#121519; --surface:#1a1e24; --surface-2:#20262d;
+      --ink:#e7eaed; --ink-soft:#a6aeb7; --ink-faint:#6a747d;
+      --line:#282e35; --line-strong:#343b43;
+      --accent:#f0a24e; --accent-ink:#f4b877; --accent-soft:#2c2114;
+      --fix:#4fc7b3; --fix-soft:#152420;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.32);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f4; --surface:#ffffff; --surface-2:#f6f8fa;
+    --ink:#181c22; --ink-soft:#49525c; --ink-faint:#7d8790;
+    --line:#e0e5ea; --line-strong:#cfd6dd;
+    --accent:#b45309; --accent-ink:#8a3f06; --accent-soft:#fbeede;
+    --fix:#0f766e; --fix-soft:#e4f1ef;
+    --shadow:0 1px 2px rgba(20,28,38,.05),0 8px 24px rgba(20,28,38,.06);
+  }
+  :root[data-theme="dark"]{
+    --bg:#121519; --surface:#1a1e24; --surface-2:#20262d;
+    --ink:#e7eaed; --ink-soft:#a6aeb7; --ink-faint:#6a747d;
+    --line:#282e35; --line-strong:#343b43;
+    --accent:#f0a24e; --accent-ink:#f4b877; --accent-soft:#2c2114;
+    --fix:#4fc7b3; --fix-soft:#152420;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.32);
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased;margin:0;
+    font-size:16px;letter-spacing:-.003em}
+  .wrap{max-width:960px;margin:0 auto;padding:clamp(20px,5vw,64px) clamp(16px,4vw,40px)}
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+
+  /* header */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent-ink);font-weight:600;margin:0 0 14px}
+  h1{font-size:clamp(28px,4.6vw,44px);line-height:1.04;font-weight:660;letter-spacing:-.022em;
+    margin:0 0 18px;text-wrap:balance;max-width:20ch}
+  .lede{font-size:clamp(16px,2vw,18.5px);color:var(--ink-soft);margin:0 0 26px;max-width:66ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 10px;font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+  .meta span{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 11px;white-space:nowrap}
+
+  /* metric strip */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:34px 0 8px}
+  .metric{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .metric .n{font-size:30px;font-weight:680;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .metric .n.amber{color:var(--accent-ink)}
+  .metric .k{font-size:12.5px;color:var(--ink-faint);margin-top:8px;line-height:1.35}
+
+  /* section heads */
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:600;margin:52px 0 8px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .section-sub{color:var(--ink-soft);font-size:15px;margin:0 0 22px;max-width:66ch}
+
+  /* bar chart */
+  .chart{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow);overflow-x:auto}
+  .bar-row{display:grid;grid-template-columns:180px 1fr 58px;align-items:center;gap:14px;padding:5px 0;min-width:440px}
+  .bar-row .lbl{font-family:var(--mono);font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar-track{height:16px;background:var(--surface-2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 78%,transparent),var(--accent));border-radius:5px 0 0 5px}
+  .bar-row .val{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);text-align:right;font-variant-numeric:tabular-nums}
+  .chart .foot{font-size:12px;color:var(--ink-faint);margin-top:14px;padding-top:12px;border-top:1px solid var(--line);line-height:1.45}
+
+  /* bucket cards */
+  .buckets{display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);position:relative}
+  .card-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .rank{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);
+    border-radius:8px;padding:3px 9px;flex:none;line-height:1.2}
+  .card h3{font-size:18.5px;font-weight:630;letter-spacing:-.015em;margin:0;line-height:1.25}
+  .cause{color:var(--ink-soft);font-size:14.5px;margin:8px 0 15px;max-width:68ch}
+  .cause b{color:var(--ink);font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+  .chip{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:7px;padding:5px 9px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:8px;max-width:100%}
+  .chip .txt{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip .ct{color:var(--accent-ink);font-weight:600;flex:none}
+  .fix{display:flex;gap:10px;align-items:flex-start;background:var(--fix-soft);border:1px solid color-mix(in srgb,var(--fix) 22%,transparent);
+    border-radius:11px;padding:12px 14px;font-size:14px;color:var(--ink)}
+  .fix .tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;
+    color:var(--fix);flex:none;padding-top:1px}
+  .fix p{margin:0;color:var(--ink-soft)}
+  .fix b{color:var(--ink);font-weight:600}
+
+  /* data table */
+  .dtable{width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px}
+  .dtable th,.dtable td{text-align:right;padding:9px 12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .dtable th{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;border-bottom:1px solid var(--line-strong)}
+  .dtable td:first-child,.dtable th:first-child{text-align:left;font-family:var(--mono);color:var(--ink)}
+  .dtable .hot{color:var(--accent-ink);font-weight:600}
+  .dtable tr.key td{background:var(--accent-soft)}
+  .tbl-wrap{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px 18px 4px;box-shadow:var(--shadow);overflow-x:auto}
+  .callout{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:14px;padding:16px 20px;margin:22px 0;font-size:15px}
+  .callout b{color:var(--accent-ink)}
+  .refs{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--ink-soft);overflow-x:auto}
+  .refs .h{color:var(--ink);font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:11px;margin-bottom:8px}
+  .refs div{white-space:nowrap;padding:2px 0}
+  .note{font-size:13px;color:var(--ink-faint);margin-top:40px;padding-top:18px;border-top:1px solid var(--line);line-height:1.5;max-width:74ch}
+  .note code{font-family:var(--mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+
+  @media(max-width:560px){
+    .bar-row{grid-template-columns:130px 1fr 46px}
+    .card{padding:18px 17px}
+  }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">AutoDiscovery RL · reward-server diagnostics</p>
+  <h1>Why experiments spiral into failed-code retry loops</h1>
+  <p class="lede">Each training step waits on 64 parallel experiments; the slowest — the <em>straggler</em> — sets the wall-clock. Stragglers are almost always experiments stuck in long programmer&nbsp;→&nbsp;execute&nbsp;→&nbsp;analyst rounds, each round tripped by a self-inflicted code failure. This is the measured distribution of what actually fails, mined from the raw reward-server logs.</p>
+  <div class="meta">
+    <span>fmt1 · verdict</span>
+    <span>gpt-5-mini vs gpt-5.6-luna (execution)</span>
+    <span>2026-07-31 → 08-04</span>
+    <span>~4 code execs / experiment</span>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="n amber">43.5%</div><div class="k">code-exec failure rate — gpt-5-mini execution</div></div>
+    <div class="metric"><div class="n amber">31.1%</div><div class="k">code-exec failure rate — gpt-5.6-luna execution</div></div>
+    <div class="metric"><div class="n">6</div><div class="k">recurring root-cause buckets drive nearly all retries</div></div>
+    <div class="metric"><div class="n">~1.9k</div><div class="k">malformed-code errors alone (syntax / indentation / truncation)</div></div>
+    <div class="metric"><div class="n amber">~30%</div><div class="k">experiments auto-zeroed by the reviewer gate (mini) — the reward lever, analyzed below</div></div>
+  </div>
+
+  <h2>Exception distribution</h2>
+  <p class="section-sub">Raw occurrence counts across both runs' logs — a relative-frequency signal, not a deduplicated per-experiment count. Generic <span style="font-family:var(--mono);font-size:.9em">Warning</span> and bare <span style="font-family:var(--mono);font-size:.9em">Error</span> lines are excluded.</p>
+  <div class="chart">
+    <div class="bar-row"><div class="lbl">AttributeError</div><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="val">4428</div></div>
+    <div class="bar-row"><div class="lbl">ValueError</div><div class="bar-track"><div class="bar-fill" style="width:80%"></div></div><div class="val">3545</div></div>
+    <div class="bar-row"><div class="lbl">KeyError</div><div class="bar-track"><div class="bar-fill" style="width:66.6%"></div></div><div class="val">2948</div></div>
+    <div class="bar-row"><div class="lbl">TypeError</div><div class="bar-track"><div class="bar-fill" style="width:58.9%"></div></div><div class="val">2609</div></div>
+    <div class="bar-row"><div class="lbl">SyntaxError</div><div class="bar-track"><div class="bar-fill" style="width:35.2%"></div></div><div class="val">1558</div></div>
+    <div class="bar-row"><div class="lbl">NameError</div><div class="bar-track"><div class="bar-fill" style="width:26.2%"></div></div><div class="val">1160</div></div>
+    <div class="bar-row"><div class="lbl">SystemError</div><div class="bar-track"><div class="bar-fill" style="width:21.5%"></div></div><div class="val">951</div></div>
+    <div class="bar-row"><div class="lbl">IndexError</div><div class="bar-track"><div class="bar-fill" style="width:13.5%"></div></div><div class="val">596</div></div>
+    <div class="bar-row"><div class="lbl">PatsyError</div><div class="bar-track"><div class="bar-fill" style="width:6.1%"></div></div><div class="val">270</div></div>
+    <div class="bar-row"><div class="lbl">IndentationError</div><div class="bar-track"><div class="bar-fill" style="width:5.9%"></div></div><div class="val">262</div></div>
+    <div class="bar-row"><div class="lbl">LinAlgError</div><div class="bar-track"><div class="bar-fill" style="width:4.1%"></div></div><div class="val">180</div></div>
+    <div class="bar-row"><div class="lbl">DTypePromotionError</div><div class="bar-track"><div class="bar-fill" style="width:3.4%"></div></div><div class="val">149</div></div>
+    <div class="bar-row"><div class="lbl">TimeoutError</div><div class="bar-track"><div class="bar-fill" style="width:2.3%"></div></div><div class="val">102</div></div>
+    <div class="bar-row"><div class="lbl">MissingDataError</div><div class="bar-track"><div class="bar-fill" style="width:.8%"></div></div><div class="val">37</div></div>
+    <div class="foot">The exception <em>class</em> is only half the story — the same class spans several distinct causes. The buckets below regroup these by the underlying failure mode and cite the concrete messages driving each.</div>
+  </div>
+
+  <h2>Root causes, ranked by leverage</h2>
+  <p class="section-sub">Six patterns account for nearly all the churn. Each failure fires analyst → reviser → re-programmer → re-execute; imprecise feedback means fixing error A often just surfaces error B, so a single experiment accretes rounds.</p>
+
+  <div class="buckets">
+
+    <div class="card">
+      <div class="card-head"><span class="rank">01</span><h3>Stale library-API knowledge vs. the sandbox's newer versions</h3></div>
+      <p class="cause">The model learned <b>older</b> pandas / matplotlib / statsmodels signatures; the sandbox runs newer ones. Correct-<em>looking</em> code fails on renamed kwargs and removed methods, and the analyst rarely knows the version-specific fix — so it thrashes. The single most fixable bucket.</p>
+      <div class="chips">
+        <span class="chip"><span class="txt">boxplot() got an unexpected keyword 'labels'</span><span class="ct">536×</span></span>
+        <span class="chip"><span class="txt">'GLMResults'/'LogitResults' has no attribute 'get_robustcov_results'</span><span class="ct">~440×</span></span>
+        <span class="chip"><span class="txt">Multi-dimensional indexing no longer supported</span><span class="ct">89×</span></span>
+      </div>
+      <div class="fix"><span class="tag">Fix</span><p><b>Pin or announce library versions</b> in the programmer's system prompt (or pin the sandbox to the versions the model knows). Kills this bucket outright.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">02</span><h3>pandas ↔ numpy type confusion</h3></div>
+      <p class="cause">The model loses track of whether a variable is a <b>DataFrame/Series</b> or a bare <b>ndarray</b> and calls the wrong API — <span style="font-family:var(--mono);font-size:.9em">.loc</span>/<span style="font-family:var(--mono);font-size:.9em">.index</span> on an array, or feeds object-dtype frames into numeric ops.</p>
+      <div class="chips">
+        <span class="chip"><span class="txt">'numpy.ndarray' object has no attribute 'index' / 'loc' / 'get'</span><span class="ct">~1150×</span></span>
+        <span class="chip"><span class="txt">Pandas data cast to numpy dtype of object</span><span class="ct">545×</span></span>
+        <span class="chip"><span class="txt">int() argument must be … not 'Series'; only N-dim arrays → scalars</span><span class="ct">~600×</span></span>
+      </div>
+      <div class="fix"><span class="tag">Fix</span><p><b>Smaller, incremental code blocks</b> with intermediate type/shape asserts, so a mistaken type surfaces in one line instead of corrupting a 22&nbsp;KB block.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">03</span><h3>Guessing the data schema instead of inspecting it</h3></div>
+      <p class="cause">Analysis code written <b>before</b> checking what's in the file — referencing columns and category levels that don't exist. Recurs across <em>every</em> experiment on a dataset, so the cost compounds.</p>
+      <div class="chips">
+        <span class="chip"><span class="txt">KeyError: 'CountryGroup' / 'mean' / 't'</span><span class="ct">~2950×</span></span>
+        <span class="chip"><span class="txt">PatsyError: specified level 'Homo' not found</span><span class="ct">55×</span></span>
+      </div>
+      <div class="fix"><span class="tag">Fix</span><p>A <b>schema preflight</b> the planner enforces — print <span style="font-family:var(--mono);font-size:.9em">df.columns</span>, dtypes, and <span style="font-family:var(--mono);font-size:.9em">value_counts()</span> before any analysis. Also removes much of bucket 02.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">04</span><h3>Statistical-modeling misuse</h3></div>
+      <p class="cause">statsmodels formulas and result objects used incorrectly: formulas referencing missing variables/levels, singular design matrices from <b>collinear</b> predictors, and NaNs fed into regressions.</p>
+      <div class="chips">
+        <span class="chip"><span class="txt">PatsyError: model is missing required outcome variables</span><span class="ct">270×</span></span>
+        <span class="chip"><span class="txt">LinAlgError (singular matrix / collinearity)</span><span class="ct">180×</span></span>
+        <span class="chip"><span class="txt">MissingDataError (NaNs into regression)</span><span class="ct">37×</span></span>
+      </div>
+      <div class="fix"><span class="tag">Fix</span><p>A <b>statsmodels crib</b> in the prompt (dropna before fit, VIF/collinearity check, correct result-object accessors) — partially overlaps the version-pin fix.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">05</span><h3>Missing imports &amp; assumed-persistent state</h3></div>
+      <p class="cause">References to things never imported, or variables a <b>prior (failed) block</b> never created — the code assumes state carries across execution turns when it may not.</p>
+      <div class="chips">
+        <span class="chip"><span class="txt">NameError: 'sm' / 'stats' / 'variance_inflation_factor' not defined</span><span class="ct">~1160×</span></span>
+        <span class="chip"><span class="txt">'sm' not defined, did you mean 'smf'?</span><span class="ct">24×</span></span>
+      </div>
+      <div class="fix"><span class="tag">Fix</span><p>Require <b>explicit imports every block</b> and no cross-block state assumptions — each executed block self-contained.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">06</span><h3>Malformed / truncated code emission</h3></div>
+      <p class="cause">The LLM emits syntactically broken or <b>truncated</b> code — strongly correlated with big monolithic blocks (p90 ≈ 22&nbsp;KB). One bad line invalidates the whole block and forces a full rewrite.</p>
+      <div class="chips">
+        <span class="chip"><span class="txt">SyntaxError</span><span class="ct">1558×</span></span>
+        <span class="chip"><span class="txt">IndentationError</span><span class="ct">262×</span></span>
+        <span class="chip"><span class="txt">_IncompleteInputError (truncated block)</span><span class="ct">66×</span></span>
+      </div>
+      <div class="fix"><span class="tag">Fix</span><p><b>Smaller blocks</b> again — shrinks the surface for truncation and makes any single failure cheap to repair.</p></div>
+    </div>
+
+  </div>
+
+  <h2>Straggler blowups — from the rollout records</h2>
+  <p class="section-sub">The six buckets above are code-<em>execution</em> failures mined from stdout. To find what makes a single experiment run <em>long</em> — the straggler that gates the whole step — I pulled the per-rollout record dumps (<code>rollout_records_&lt;fmt&gt;.jsonl</code>: reward, surprise diagnostics, and the full trace per hypothesis) from every run. The tail collapses to one cause.</p>
+
+  <div class="callout">
+    Reward is <b>gated</b> by a reviewer/executor check (<code>slime_reward.py:298</code>). Every experiment runs programmer→executor→analyst→reviewer; if the reviewer rejects it — with only <b>≤1 revision</b> allowed (line 102) — it returns <b>reward 0</b> as <code>"experiment failed executor/reviewer checks"</code> and never reaches belief elicitation. <b>Stragglers are these failed experiments</b>: they burn the full revise-then-reject cycle plus verbose rejected output before returning nothing.
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="dtable">
+      <thead><tr><th>run</th><th>experiments</th><th>check-fail rate</th><th>reward (all)</th><th>reward | passed</th><th>trace: pass → fail</th></tr></thead>
+      <tbody>
+        <tr><td>mini · 8×8</td><td>551</td><td>28%</td><td>0.225</td><td>0.313</td><td>28.3k → 27.2k</td></tr>
+        <tr class="key"><td>luna · 8×8</td><td>1579</td><td class="hot">60%</td><td>0.078</td><td>0.199</td><td>19.6k → <span class="hot">27.3k</span></td></tr>
+        <tr><td>gpt-5.6 · 8×8</td><td>2282</td><td>59%</td><td>0.071</td><td>0.178</td><td>24.3k → 28.6k</td></tr>
+        <tr class="key"><td>luna · 4×4</td><td>935</td><td class="hot">60%</td><td>0.076</td><td>0.193</td><td>19.6k → <span class="hot">27.2k</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="buckets" style="margin-top:16px">
+    <div class="card">
+      <div class="card-head"><span class="rank">why</span><h3>One rate drives both the slow steps and the flat reward</h3></div>
+      <p class="cause"><b>Stragglers ≈ failures.</b> For luna, <em>failed</em> traces (27.2k chars) run markedly longer than <em>passing</em> ones (19.6k) — passes finish fast, failures drag through the revise cycle and balloon (some to the 100k trace cap). The longest traces are ~all reward-0 (46/46 in luna 4×4). <b>The flat reward is the same event:</b> a 60% auto-zero rate collapses the batch mean and manufactures the zero-std groups.</p>
+      <p class="cause"><b>Execution-side confound, now proven from the records</b> (no offline re-score needed): luna and gpt-5.6 fail the gate at ~60%, mini at 28%. Since the reviewer <em>is</em> the execution model, this may be luna/gpt-5.6 acting as <em>stricter self-reviewers</em> rather than doing worse science — note even the stronger gpt-5.6 sits at 59%, so it is not a "weak model" effect.</p>
+      <div class="fix"><span class="tag">Lever</span><p><b>Decouple or calibrate the reviewer</b> (a fixed reviewer model across runs), and/or <b>allow &gt;1 revision</b> (<code>slime_reward.py:102</code>). Both attack step-time and reward signal at once — the failed-experiment tail is where the wasted wall-clock and the dead gradient both live.</p></div>
+      <div class="refs">
+        <div class="h">rollout-record references — luna 4×4 fmt1 · dataset 01KYYAPTYMB4CKC7WFVETC6ES2 · rollout_records_fmt1_w_verdict.jsonl</div>
+        <div>index=234 · len=100000 (cap) · reward=0.0 · "experiment failed executor/reviewer checks" — trace flooded by a ~10k-entry dict dump</div>
+        <div>index=111 · len=100000 (cap) · reward=0.0 · "experiment failed executor/reviewer checks"</div>
+        <div>index=294 · len=100000 (cap) · reward=0.0 · verbose rejected analysis</div>
+        <div style="color:var(--ink-faint);margin-top:6px;white-space:normal">records pulled from all runs: mini 01KYVQV9Y5… · luna8×8 01KYWXX27G… · gpt-5.6 01KYX4JGJA… · luna4×4 01KYYAPTYM…</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Inside the reviewer gate — the 30% that returns nothing</h2>
+  <p class="section-sub">The gate rejects ~30% of <b>mini</b>'s experiments (≈60% for luna / gpt-5.6). To find <em>why</em>, I pulled all <b>189 rejected records</b> from a mini A/B (2026-08-04) and read the verdicts against the reviewer's own instructions. Almost none are code crashes — they are the reviewer applying a maximally strict rule.</p>
+
+  <div class="callout">
+    <b>Root cause is the reviewer's prompt.</b> The <code>experiment_reviewer</code> is told: <em>"If you find issues or inconsistencies in <b>any part</b> of the experiment pipeline, return success = false."</em> — an all-or-nothing gate, with only <b>≤1 revision</b> allowed (<code>slime_reward.py:102</code>). A perfectionist LLM reviewer can always find one more thing to want, so success is capped near ~70% by construction.
+  </div>
+
+  <div class="buckets" style="margin-top:16px">
+
+    <div class="card">
+      <div class="card-head"><span class="rank">M1</span><h3>Perfectionism — "please re-run / add X"</h3></div>
+      <p class="cause">The dominant mode: the verdict ends by <b>requesting more</b> — another robustness check, a saved output file, one more diagnostic — that the ≤1-revision budget can never deliver. <b>Incompleteness is treated as failure.</b></p>
+      <div class="chips"><span class="chip"><span class="txt">verdict asks for a re-run / missing artifact</span><span class="ct">~90%</span></span><span class="chip"><span class="txt">wants more diagnostics / robustness</span><span class="ct">~97%</span></span></div>
+      <p class="cause" style="border-left:2px solid var(--line-strong);padding-left:13px;font-style:italic;color:var(--ink-faint);margin-bottom:0">"…the experiment cannot be considered fully successful [until] these remaining analyses are completed and the artifacts resolved." <span style="font-style:normal;font-family:var(--mono);font-size:.85em">— fish</span></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">M2</span><h3>Reward entangled with hypothesis truth</h3></div>
+      <p class="cause">Experiments failed because the hypothesis was <b>refuted / non-significant</b>. But this is a Bayesian-<em>surprise</em> reward — a rigorously-run experiment that refutes its hypothesis is exactly what should score high. Gating reward on success, and success on "hypothesis supported," <b>fights the reward objective.</b> The single most reward-relevant mode.</p>
+      <div class="chips"><span class="chip"><span class="txt">fails because result was refuted / not significant</span><span class="ct">~31%</span></span></div>
+      <p class="cause" style="border-left:2px solid var(--line-strong);padding-left:13px;font-style:italic;color:var(--ink-faint);margin-bottom:0">"…the interaction fails to be cluster-significant … the experiment's main hypothesis is not conclusively supported." <span style="font-style:normal;font-family:var(--mono);font-size:.85em">— teachingratings</span></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">M3</span><h3>Hypothesis ↔ data mismatch</h3></div>
+      <p class="cause">The policy proposes hypotheses needing data the dataset doesn't contain — a country mapping, a label subset — so the experiment can't fully test them and the reviewer rejects rather than accepting the <em>testable subset</em>. Partly upstream (constrain generation to real columns), partly reviewer strictness.</p>
+      <div class="chips"><span class="chip"><span class="txt">references columns / mappings not in the dataset</span><span class="ct">~75%</span></span></div>
+      <p class="cause" style="border-left:2px solid var(--line-strong);padding-left:13px;font-style:italic;color:var(--ink-faint);margin-bottom:0">"Because the missing mapping prevents the Namibia vs Japan comparison … therefore success = false." <span style="font-style:normal;font-family:var(--mono);font-size:.85em">— boxes</span></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="rank">M4</span><h3>Worked-but-failed on a found issue</h3></div>
+      <p class="cause">The primary result was obtained and significant, but a minor or <em>already-fixed</em> issue elsewhere in the pipeline trips the "any issue → false" rule. A pure false-negative. Subsumed by M1's strictness.</p>
+      <div class="chips"><span class="chip"><span class="txt">primary result obtained, still marked false</span><span class="ct">~29%</span></span></div>
+      <p class="cause" style="border-left:2px solid var(--line-strong);padding-left:13px;font-style:italic;color:var(--ink-faint);margin-bottom:0">"…a statistically significant negative association [was obtained]. However, per the developer instruction … if any issues … you must return success = false." <span style="font-style:normal;font-family:var(--mono);font-size:.85em">— immigration_offshoring</span></p>
+    </div>
+
+  </div>
+  <p class="section-sub" style="margin-top:14px;font-size:13px">Prevalences overlap (a verdict can hit several) — read as theme frequencies, not a partition. n = 189 reviewer-gate rejections, mini · fmt1 · 4×4.</p>
+
+  <h2>Effect on step time — a reward lever, not a speed lever (for mini)</h2>
+  <p class="section-sub">Does the gate slow steps? Only if rejected experiments run <em>longer</em> — i.e. if they are the stragglers. For the <b>mini</b> executor we're standardizing on, they are not.</p>
+
+  <div class="tbl-wrap">
+    <table class="dtable">
+      <thead><tr><th>executor</th><th>fail rate</th><th>trace: pass → fail</th><th>fail ÷ pass</th><th>are rejects the stragglers?</th></tr></thead>
+      <tbody>
+        <tr class="key"><td>mini</td><td>30%</td><td>29.0k → 29.5k</td><td>1.02×</td><td>no — 23% of top-10% longest (&lt; 30% base)</td></tr>
+        <tr><td>luna</td><td class="hot">60%</td><td>19.6k → 27.2k</td><td class="hot">1.39×</td><td>yes — failures dominate the tail</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="buckets" style="margin-top:16px">
+    <div class="card">
+      <div class="card-head"><span class="rank">so</span><h3>For mini, fixing the gate recovers reward, not wall-clock</h3></div>
+      <p class="cause">Mini's rejected experiments take the <b>same</b> time as its passing ones (<b>1.02×</b>), and are <em>under</em>-represented among the longest traces — so the ~31% of compute spent on eventually-rejected experiments is <b>proportional, not a straggler concentration</b>. Softening the gate would recover the <b>reward</b> those experiments should have earned (especially M2's refuted-but-valid ~31%), but would <b>not</b> speed up steps — and allowing &gt;1 revision would slightly <em>increase</em> step time. Luna is the mirror image: its failures run 1.39× longer, so there the gate is simultaneously a reward and a step-time drag ("Stragglers ≈ failures" above).</p>
+      <div class="fix"><span class="tag">Takeaway</span><p><b>Reviewer-gate fix = a reward lever</b> for mini — recovers the 30% auto-zero and, via M2, un-entangles reward from hypothesis truth. <b>Step time is a separate lever</b> (the code-failure retry rounds, buckets 01–06). Don't expect the gate fix to speed up mini steps.</p></div>
+    </div>
+  </div>
+
+  <p class="note">
+    <b>Two data sources, two granularities:</b> the six buckets are raw exception occurrences in reward-server stdout (relative distribution, not per-experiment counts); the straggler table is exact per-rollout records (<code>rollout_records_&lt;fmt&gt;.jsonl</code>) pulled from each run's Beaker result dataset. Code-exec failures (buckets) are <em>one</em> way an experiment fails the reviewer gate; the gate itself (and its ≤1-revision budget) is the straggler mechanism. Fixing the reviewer/revision policy and the top code-failure buckets both shrink the failed-experiment tail — which is simultaneously the slow-step tail and the zero-reward tail.
+  </p>
+
+</div>
+
+</body></html>

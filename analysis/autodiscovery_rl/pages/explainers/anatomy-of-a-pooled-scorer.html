@@ -1,0 +1,271 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Anatomy of a pooled scorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#eef1f5;--panel:#fff;--ink:#1a2230;--muted:#5a6579;--hair:#d3dae4;--hair2:#e7ebf1;
+    --blue:#2f6fb0;--blue-soft:#e3edf7;--blue-ink:#1c4e82;
+    --teal:#1f8f8f;--teal-soft:#dcefef;--teal-ink:#126060;
+    --amber:#bf7a1c;--amber-soft:#f6ecd9;--amber-ink:#875410;
+    --neg:#c0492f;--neg-soft:#f7e4de;--pos:#2f8f5b;--pos-soft:#dcefe4;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--maxw:1000px;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0e1219;--panel:#161c26;--ink:#e6ebf2;--muted:#93a0b4;--hair:#2a3342;--hair2:#20272f;
+    --blue:#5fa0da;--blue-soft:#16283c;--blue-ink:#9cc6ec;--teal:#54c2c2;--teal-soft:#123030;--teal-ink:#8fdcdc;
+    --amber:#e0a24a;--amber-soft:#2c2413;--amber-ink:#f0c483;--neg:#e0785f;--neg-soft:#2e1a15;--pos:#5cc389;--pos-soft:#14271c;
+  }}
+  :root[data-theme="light"]{--bg:#eef1f5;--panel:#fff;--ink:#1a2230;--muted:#5a6579;--hair:#d3dae4;--hair2:#e7ebf1;--blue:#2f6fb0;--blue-soft:#e3edf7;--blue-ink:#1c4e82;--teal:#1f8f8f;--teal-soft:#dcefef;--teal-ink:#126060;--amber:#bf7a1c;--amber-soft:#f6ecd9;--amber-ink:#875410;--neg:#c0492f;--neg-soft:#f7e4de;--pos:#2f8f5b;--pos-soft:#dcefe4}
+  :root[data-theme="dark"]{--bg:#0e1219;--panel:#161c26;--ink:#e6ebf2;--muted:#93a0b4;--hair:#2a3342;--hair2:#20272f;--blue:#5fa0da;--blue-soft:#16283c;--blue-ink:#9cc6ec;--teal:#54c2c2;--teal-soft:#123030;--teal-ink:#8fdcdc;--amber:#e0a24a;--amber-soft:#2c2413;--amber-ink:#f0c483;--neg:#e0785f;--neg-soft:#2e1a15;--pos:#5cc389;--pos-soft:#14271c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(18px,4vw,48px)}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 9px}
+  h1{font-size:clamp(24px,3.6vw,36px);margin:0 0 10px;letter-spacing:-.02em;text-wrap:balance;font-weight:680}
+  .lede{color:var(--muted);max-width:70ch;margin:0;font-size:15px}
+  h2{font-family:var(--mono);font-size:12px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:38px 0 14px;display:flex;gap:11px;align-items:center}
+  h2 .n{color:var(--ink);font-weight:700}
+  h2 .rule{flex:1;height:1px;background:var(--hair)}
+  code{font-family:var(--mono);font-size:.9em}
+
+  /* fan-out */
+  .fan{background:var(--panel);border:1px solid var(--hair);border-radius:13px;padding:16px 18px}
+  .fanrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .fbox{border:1px solid var(--hair);border-radius:9px;padding:9px 12px;font-size:12.5px;background:var(--bg)}
+  .fbox .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .fbox.blue{border-left:3px solid var(--blue)} .fbox.teal{border-left:3px solid var(--teal)}
+  .grp{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+  .dot{width:15px;height:15px;border-radius:4px;background:var(--teal-soft);border:1px solid var(--teal);font-family:var(--mono);font-size:8px;display:flex;align-items:center;justify-content:center;color:var(--teal-ink)}
+  .ar{color:var(--muted);font-size:17px;flex:none}
+  @media(max-width:640px){.ar{transform:rotate(90deg)}}
+  .cap{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px}
+  .cap b{color:var(--ink)}
+
+  /* scorer pipeline spine */
+  .spine{position:relative;border:1px solid var(--teal);border-radius:15px;padding:6px 0;background:linear-gradient(180deg,var(--teal-soft),transparent 22%)}
+  .spine .hdr{display:flex;align-items:center;gap:10px;padding:13px 18px 4px}
+  .spine .hdr .tag{font-family:var(--mono);font-size:10.5px;font-weight:700;background:var(--teal);color:#fff;padding:3px 9px;border-radius:999px;letter-spacing:.03em}
+  .spine .hdr h3{margin:0;font-size:15.5px;font-weight:640}
+  .spine .hdr .lock{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--teal-ink);background:var(--teal-soft);padding:3px 9px;border-radius:6px}
+  .stage{margin:0 16px;padding:11px 0;border-top:1px dashed var(--hair);display:flex;gap:13px;align-items:flex-start}
+  .stage:first-of-type{border-top:0}
+  .snum{flex:none;width:24px;height:24px;border-radius:7px;background:var(--teal);color:#fff;font-family:var(--mono);font-size:12px;font-weight:640;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .snum.once{background:var(--muted)} .snum.gate{background:var(--amber)} .snum.rew{background:var(--pos)}
+  .sbody{flex:1;min-width:0}
+  .sbody .t{font-size:14px;font-weight:600}
+  .sbody .t .who{font-family:var(--mono);font-size:11px;color:var(--teal-ink);font-weight:500;margin-left:6px}
+  .sbody .d{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .once-lab{font-family:var(--mono);font-size:9px;background:var(--hair2);color:var(--muted);padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:1px}
+
+  /* agent loop */
+  .loop{margin-top:9px;border:1px solid var(--hair);border-radius:10px;background:var(--bg);padding:11px 12px}
+  .loop .lh{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
+  .chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .ag{border:1px solid var(--hair);border-radius:7px;padding:6px 9px;font-size:11.5px;background:var(--panel);white-space:nowrap}
+  .ag b{font-weight:600} .ag .r{font-family:var(--mono);font-size:9px;color:var(--muted);display:block}
+  .ag.exec{border-color:var(--amber);background:var(--amber-soft)}
+  .ag.exec b{color:var(--amber-ink)}
+  .la{color:var(--muted);font-size:13px}
+  .revback{font-family:var(--mono);font-size:10.5px;color:var(--amber-ink);margin-top:7px;display:flex;align-items:center;gap:6px}
+
+  /* branches */
+  .branch{display:grid;grid-template-columns:1fr;gap:10px;margin:10px 16px 4px}
+  @media(min-width:640px){.branch{grid-template-columns:1fr 1fr}}
+  .bcard{border-radius:10px;padding:11px 13px;border:1px solid var(--hair)}
+  .bcard.fail{background:var(--neg-soft);border-color:var(--neg)}
+  .bcard.ok{background:var(--pos-soft);border-color:var(--pos)}
+  .bcard .bt{font-family:var(--mono);font-size:11px;font-weight:640;margin-bottom:4px}
+  .bcard.fail .bt{color:var(--neg)} .bcard.ok .bt{color:var(--pos)}
+  .bcard .bd{font-size:12px;color:var(--muted);line-height:1.4}
+
+  .rewbox{margin:4px 16px 14px;background:var(--pos-soft);border:1px solid var(--pos);border-radius:10px;padding:12px 15px}
+  .rewbox .f{font-family:var(--mono);font-size:13px;line-height:1.7}
+  .rewbox .f b{color:var(--pos)}
+
+  /* compile back */
+  .compile{background:var(--panel);border:1px solid var(--hair);border-radius:13px;padding:15px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:3px solid var(--blue)}
+  .compile .step{font-size:12.5px}
+  .compile .step .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .compile .step .v{font-weight:600;margin-top:2px}
+  .compile code{background:var(--bg);border:1px solid var(--hair);padding:2px 6px;border-radius:5px}
+  /* failure modes */
+  .fmgrid{display:grid;grid-template-columns:1fr;gap:11px}
+  @media(min-width:640px){.fmgrid{grid-template-columns:1fr 1fr}}
+  .fm{background:var(--panel);border:1px solid var(--hair);border-radius:11px;padding:13px 15px;border-left:3px solid var(--neg)}
+  .fm.ok{border-left-color:var(--pos)} .fm.note{border-left-color:var(--muted)}
+  .fmh{display:flex;align-items:baseline;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+  .fmh .t{font-size:14px;font-weight:640}
+  .fmh .fix{font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--pos-soft);color:var(--pos);letter-spacing:.03em}
+  .fmh .fix.open{background:var(--neg-soft);color:var(--neg)} .fmh .fix.neu{background:var(--hair2);color:var(--muted)}
+  .fm .d{font-size:12.5px;color:var(--muted);line-height:1.45}
+  .fm .d code{background:var(--bg);border:1px solid var(--hair);padding:1px 5px;border-radius:4px;font-size:11px}
+  .pkgs{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .pk{font-family:var(--mono);font-size:10.5px;background:var(--bg);border:1px solid var(--hair);border-radius:5px;padding:2px 7px;color:var(--muted)}
+  .pk b{color:var(--ink)} .pk.big{background:var(--neg-soft);border-color:var(--neg);color:var(--neg)} .pk.big b{color:var(--neg)}
+  .pk.skip{opacity:.6;text-decoration:line-through}
+  /* time bar */
+  .timebox{background:var(--panel);border:1px solid var(--hair);border-radius:13px;padding:16px 18px}
+  .tstat{font-size:15px;margin-bottom:12px}.tstat b{font-size:19px;color:var(--amber-ink)}
+  .tbar{display:flex;height:34px;border-radius:8px;overflow:hidden;border:1px solid var(--hair)}
+  .tseg{height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;white-space:nowrap;overflow:hidden}
+  .tseg.reward{background:var(--teal)} .tseg.train{background:var(--blue);min-width:6px}
+  .tlab{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:9px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .tlab i{font-style:normal}.tlab .sq{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .tnote{font-size:12.5px;color:var(--muted);margin-top:11px;line-height:1.45}
+  .foot{margin-top:34px;padding-top:15px;border-top:1px solid var(--hair);font-family:var(--mono);font-size:12px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">autodiscovery reward server · scorer internals</p>
+  <h1>Anatomy of a pooled scorer</h1>
+  <p class="lede">One training step fires 64 experiments into the reward server. Each is handled by a single <b>pooled scorer</b> — a stateful, warmed, one-at-a-time worker. Here's what happens inside one, from hypothesis to reward.</p>
+
+  <!-- FAN-OUT -->
+  <h2><span class="n">1</span> the step fans out <span class="rule"></span></h2>
+  <div class="fan">
+    <div class="fanrow">
+      <div class="fbox blue"><div class="k">slime · step</div>8 prompts × 8 samples<br><b>= 64 hypotheses</b></div>
+      <span class="ar">→</span>
+      <div class="fbox blue"><div class="k">POST /reward × 64</div>{ hypothesis,<br>dataset_id }</div>
+      <span class="ar">→</span>
+      <div class="fbox teal"><div class="k">router</div>by dataset_id →<br>per-dataset pool</div>
+      <span class="ar">→</span>
+      <div>
+        <div style="font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-bottom:4px">dataset pool — one scorer per sample</div>
+        <div class="grp">
+          <div class="dot">S</div><div class="dot">S</div><div class="dot">S</div><div class="dot">S</div><div class="dot">S</div><div class="dot">S</div><div class="dot">S</div><div class="dot">S</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">A prompt's 8 samples share its dataset, so each gets its own scorer — the <b>pool size = the group size (8)</b>. Across ~6–8 datasets, all 64 run in parallel. One scored hypothesis ↓</div>
+  </div>
+
+  <!-- SCORER PIPELINE -->
+  <h2><span class="n">2</span> inside one scorer — one hypothesis <span class="rule"></span></h2>
+  <div class="spine">
+    <div class="hdr"><span class="tag">SCORER</span><h3>SurpriseRewardScorer.score()</h3><span class="lock">🔒 serialized — 1 hypothesis at a time</span></div>
+
+    <div class="stage">
+      <div class="snum once">0</div>
+      <div class="sbody"><div class="t">Warm up on the dataset <span class="once-lab">once per scorer</span></div>
+        <div class="d">Runs a data-loading experiment, computes summary stats, caches them as <code>_root_context</code> — prepended to every scoring chat. Dataset CSVs are symlinked into the scorer's own <code>work_dir</code>.</div></div>
+    </div>
+
+    <div class="stage">
+      <div class="snum">1</div>
+      <div class="sbody"><div class="t">Plan the experiment<span class="who">experiment_planner</span></div>
+        <div class="d">Turns the hypothesis into <code>{objective, steps, deliverables}</code>. One LLM call.</div></div>
+    </div>
+
+    <div class="stage">
+      <div class="snum">2</div>
+      <div class="sbody"><div class="t">Run the experiment — multi-agent group chat<span class="who">up to 50 rounds</span></div>
+        <div class="d">The bulk of the time &amp; API calls. Agents cycle until the run passes review:</div>
+        <div class="loop">
+          <div class="lh"><span>autogen GroupChat</span><span>code ↔ execute ↔ review</span></div>
+          <div class="chain">
+            <div class="ag"><b>programmer</b><span class="r">writes code</span></div>
+            <span class="la">→</span>
+            <div class="ag exec"><b>code_executor</b><span class="r">runs in sandbox venv</span></div>
+            <span class="la">→</span>
+            <div class="ag"><b>analyst</b><span class="r">interprets</span></div>
+            <span class="la">→</span>
+            <div class="ag"><b>reviewer</b><span class="r">judges success</span></div>
+          </div>
+          <div class="revback">↺ on failure → <b style="margin:0 3px">experiment_reviser</b> fixes → back to executor</div>
+        </div></div>
+    </div>
+
+    <div class="stage">
+      <div class="snum gate">?</div>
+      <div class="sbody"><div class="t">Reviewer verdict — did the experiment succeed?</div></div>
+    </div>
+    <div class="branch">
+      <div class="bcard fail"><div class="bt">✗ NO — failed checks (~25%)</div><div class="bd">Return <code>reward = 0</code> immediately. No belief step. Logged as <code>[reward-error]</code>.</div></div>
+      <div class="bcard ok"><div class="bt">✓ YES — continue to belief</div><div class="bd">Build an evidence message from the run's output, analysis &amp; review.</div></div>
+    </div>
+
+    <div class="stage">
+      <div class="snum">3</div>
+      <div class="sbody"><div class="t">Elicit belief: prior → posterior<span class="who">belief model · boolean_cat</span></div>
+        <div class="d"><b>Prior</b> (before evidence) and <b>posterior</b> (after evidence), each = <b>5 samples</b> over 5 categories (likely false … likely true). Yields <code>μ_prior</code>, <code>μ_post</code>, belief_change, kl.</div></div>
+    </div>
+
+    <div class="stage">
+      <div class="snum rew">✓</div>
+      <div class="sbody"><div class="t">Compute the surprise reward</div></div>
+    </div>
+    <div class="rewbox"><div class="f">
+      reward = <b>|normalized_surprisal|</b> = |μ<sub>post</sub> − μ<sub>prior</sub>| / theoretical_max<br>
+      <span style="color:var(--muted)">→ returned as JSON, scorer goes back to its pool</span>
+    </div></div>
+  </div>
+
+  <!-- FAILURE MODES -->
+  <h2><span class="n">✗</span> failure modes — the ~25–33% that return reward 0 <span class="rule"></span></h2>
+  <div class="fmgrid">
+    <div class="fm ok">
+      <div class="fmh"><span class="t">Missing sandbox packages</span><span class="fix">fixed</span></div>
+      <div class="d">Generated code <code>import</code>s a library not in the sandbox venv. Now pre-installed into the base venv (counts = log occurrences, first test round):</div>
+      <div class="pkgs">
+        <span class="pk big"><b>Bio</b> · 2262</span>
+        <span class="pk"><b>tqdm</b> 110</span><span class="pk"><b>openpyxl</b> 80</span><span class="pk"><b>setuptools</b> 60</span>
+        <span class="pk"><b>tabulate</b> 50</span><span class="pk"><b>dendropy</b> 30</span><span class="pk"><b>libpysal</b> 20</span>
+        <span class="pk"><b>bs4</b> 14</span><span class="pk"><b>pyreadstat</b> 12</span><span class="pk"><b>nltk</b> 12</span>
+        <span class="pk"><b>lxml</b>·<b>ete3</b> 8</span><span class="pk"><b>xlrd</b>·<b>xlsxwriter</b>·<b>html5lib</b> 2</span>
+        <span class="pk skip"><b>rpy2</b> 16 (needs R)</span>
+      </div>
+    </div>
+    <div class="fm">
+      <div class="fmh"><span class="t">Output / script truncation</span><span class="fix open">open</span></div>
+      <div class="d">The agent conversation balloons past <b>1M tokens</b>, history is trimmed to ~61k, and scripts get cut mid-line → incomplete/invalid code → reviewer rejects. The single biggest driver in the first round.</div>
+    </div>
+    <div class="fm">
+      <div class="fmh"><span class="t">Generated-code bugs</span></div>
+      <div class="d">Buggy analysis the reviser can't fix: <code>TypeError</code> (e.g. <code>GEE.from_formula() got multiple values for 'groups'</code>), <code>ValueError</code>, <code>KeyError</code> / "not in index", <code>AttributeError</code>, <code>SyntaxError</code>.</div>
+    </div>
+    <div class="fm">
+      <div class="fmh"><span class="t">Statistical non-convergence</span></div>
+      <div class="d">The model won't fit: <code>Singular matrix</code>, "did not converge", <code>PerfectSeparation</code>.</div>
+    </div>
+    <div class="fm">
+      <div class="fmh"><span class="t">Missing data / infeasible test</span></div>
+      <div class="d">Dataset lacks a required column or mapping (no Shipping pathway; no culture→country map) → forced substitution or abort.</div>
+    </div>
+    <div class="fm note">
+      <div class="fmh"><span class="t">Hypothesis not supported</span><span class="fix neu">not a bug</span></div>
+      <div class="d">The experiment ran fine but the reviewer rejects on the merits — p≥0.05, effect too small, wrong direction. A legitimate low-surprise outcome that still scores 0.</div>
+    </div>
+  </div>
+
+  <!-- COMPILE BACK -->
+  <h2><span class="n">3</span> rewards compile back to advantages <span class="rule"></span></h2>
+  <div class="compile">
+    <div class="step"><div class="k">per group (8 samples)</div><div class="v">8 rewards</div></div>
+    <span class="ar">→</span>
+    <div class="step"><div class="k">GRPO normalize</div><div class="v"><code>advᵢ = (rᵢ − mean) / std</code></div></div>
+    <span class="ar">→</span>
+    <div class="step"><div class="k">8 groups × 8</div><div class="v">64 advantages</div></div>
+    <span class="ar">→</span>
+    <div class="step"><div class="k">slime · Megatron</div><div class="v">policy-gradient step</div></div>
+  </div>
+
+  <!-- TIME PER STEP -->
+  <h2><span class="n">⏱</span> time per step — reward-bound <span class="rule"></span></h2>
+  <div class="timebox">
+    <div class="tstat">avg step ≈ <b>40 min</b> &nbsp;<span style="font-family:var(--mono);font-size:12px;color:var(--muted)">(median 44, range 24–48; first test round, 16 steps)</span></div>
+    <div class="tbar">
+      <div class="tseg reward" style="width:98%">rollout + 64 experiments · ~39 min</div>
+      <div class="tseg train" style="width:2%" title="Megatron backward + weight sync ~0.7 min"></div>
+    </div>
+    <div class="tlab">
+      <span><i class="sq" style="background:var(--teal)"></i>reward scoring — <b>98%</b>, GPUs idle</span>
+      <span><i class="sq" style="background:var(--blue)"></i>Megatron backward + weight sync — ~2% (~40 s)</span>
+    </div>
+    <div class="tnote">The 8 GPUs sit idle for ~98% of every step while the reward server runs the 64 experiments — the run is <b>entirely reward-bound</b>. Generation (SGLang) is a small slice at the front of the reward phase; the actual gradient step is under a minute.</div>
+  </div>
+
+  <p class="foot">one scorer = own work_dir + symlinked data + agent set + sandbox venv + warmed dataset context · serialized (1 hypothesis at a time) · concurrency = group size · ~64 running per step<br><br>failure-mode counts &amp; step timing sourced from the 3 fmt1/2/3 ablation jobs (gpt-5-mini, ~30% experiment-failure rate, 16 steps).</p>
+</div>
+
+</body></html>

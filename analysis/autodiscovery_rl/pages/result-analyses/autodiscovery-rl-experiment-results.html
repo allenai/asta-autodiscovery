@@ -1,0 +1,178 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>AutoDiscovery RL — Experiment Results</title>
+<style>
+  :root {
+    --bg: #F6F8F7;
+    --surface: #FFFFFF;
+    --ink: #1B211F;
+    --muted: #5C6A66;
+    --line: #DDE4E1;
+    --accent: #0E7268;
+    --accent-soft: #E0F0ED;
+    --ok: #166534; --ok-bg: #E3F1E5;
+    --warn: #92400E; --warn-bg: #F7EBD9;
+    --bad: #991B1B; --bad-bg: #F8E4E4;
+    --info: #3F5566; --info-bg: #E6EDF2;
+    --code-bg: #EEF2F0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131817; --surface: #1B2120; --ink: #E4EAE7; --muted: #93A29D;
+      --line: #2C3533; --accent: #3FB8A9; --accent-soft: #17302D;
+      --ok: #6FCF8E; --ok-bg: #17301F;
+      --warn: #E0A85C; --warn-bg: #33270F;
+      --bad: #E38C8C; --bad-bg: #371A1A;
+      --info: #9DB4C4; --info-bg: #1D272E;
+      --code-bg: #232B29;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817; --surface: #1B2120; --ink: #E4EAE7; --muted: #93A29D;
+    --line: #2C3533; --accent: #3FB8A9; --accent-soft: #17302D;
+    --ok: #6FCF8E; --ok-bg: #17301F;
+    --warn: #E0A85C; --warn-bg: #33270F;
+    --bad: #E38C8C; --bad-bg: #371A1A;
+    --info: #9DB4C4; --info-bg: #1D272E;
+    --code-bg: #232B29;
+  }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Avenir Next", "Seravek", "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55; margin: 0; padding: 2.5rem 1.25rem 5rem;
+  }
+  main { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 0.3rem; text-wrap: balance; }
+  .subtitle { color: var(--muted); margin: 0 0 2.2rem; font-size: 0.95rem; }
+  h2 { font-size: 1.18rem; font-weight: 600; margin: 0; text-wrap: balance; }
+  h3 { font-size: 0.98rem; font-weight: 600; margin: 1.4rem 0 0.4rem; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.5rem 1.75rem 1.6rem; margin: 0 0 1.5rem; }
+  .sec-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 0.85rem; margin-bottom: 1rem; }
+  .exp-no { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--accent); font-weight: 600; font-size: 0.95rem; }
+  .chip { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.18rem 0.6rem; border-radius: 99px; white-space: nowrap; }
+  .chip.ok   { color: var(--ok);   background: var(--ok-bg); }
+  .chip.warn { color: var(--warn); background: var(--warn-bg); }
+  .chip.bad  { color: var(--bad);  background: var(--bad-bg); }
+  .chip.info { color: var(--info); background: var(--info-bg); }
+  p { margin: 0.6rem 0; max-width: 70ch; }
+  ul { margin: 0.5rem 0 0.8rem; padding-left: 1.3rem; max-width: 72ch; }
+  li { margin: 0.3rem 0; }
+  .tablewrap { overflow-x: auto; margin: 0.8rem 0; }
+  table { border-collapse: collapse; font-size: 0.86rem; min-width: 100%; }
+  th, td { text-align: left; padding: 0.45rem 0.85rem 0.45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  td.num, th.num { font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.84em; background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 0.65rem 0.9rem; border-radius: 0 6px 6px 0; font-size: 0.9rem; margin: 0.9rem 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 0.8rem; }
+  .verdict-table td:first-child { font-weight: 600; }
+  footer { color: var(--muted); font-size: 0.8rem; margin-top: 2.5rem; max-width: 70ch; }
+</style>
+<main>
+<div style="max-width:1180px;margin:0 auto 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px"><a href="../dashboards/autodiscovery-rl-runs-index-10-steps.html" style="color:#2563eb;text-decoration:none">&#8592; AutoDiscovery RL &#183; runs index</a></div>
+<h1>AutoDiscovery RL — experiment results</h1>
+<p class="subtitle">Collected 2026-08-21 from Beaker (<code>ai2/autodiscovery</code>), W&amp;B (<code>sijial-ai2/autodiscovery-rl</code>), S3 run mirrors, and local <code>analysis/</code>. All RL runs: GRPO, Qwen3.5-9B, <code>fmt3_w_verdict</code>, one archaeology prompt, 10 epochs, LR 5e-6, KL 0.01, gpt-5-mini executor/belief.</p>
+
+<section>
+  <div class="sec-head"><h2>At a glance</h2></div>
+  <div class="tablewrap"><table class="verdict-table">
+    <tr><th>Experiment</th><th>Verdict</th><th>Headline</th></tr>
+    <tr><td>1 · Reward variance probe</td><td><span class="chip bad">exec-failure dominated</span></td><td>90% of repeats fail execution; reward is nearly a Bernoulli on "did the run succeed"</td></tr>
+    <tr><td>2 · RL sanity, 4 reward types</td><td><span class="chip ok">plumbing works</span> <span class="chip warn">codex untested</span></td><td>0/1/coin behave exactly as theory predicts; codex blocked twice by infra</td></tr>
+    <tr><td>3 · Prior experiments in prompt</td><td><span class="chip info">no effect detected</span></td><td>related ≈ open-ended (~70% surprise, ~0% failures); true triplet runs canceled</td></tr>
+    <tr><td>4 · Binary surprise reward ↑?</td><td><span class="chip bad">no</span></td><td>threshold too sparse → all-zero groups → zero GRPO advantage</td></tr>
+    <tr><td>5 · Response-length penalty</td><td><span class="chip ok">works at g16</span></td><td>0% truncation vs 88–94% without penalty; g4 had no pathology to fix</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="exp-no">1</span><h2>Reward variance on one hypothesis, 10× repeats, two hypotheses</h2><span class="chip bad">exec-failure dominated</span></div>
+  <p class="meta">Jobs <code>reward-variance-probe-archaeology-v2</code> / <code>-2-v2</code> (Aug 20, both succeeded). Same fixed hypothesis POSTed 10× to a <code>slime_reward</code> server (archaeology, gpt-5-mini, 3 belief samples, concurrency 10). First attempts died on a stale <code>--dataset_metadata_type</code> CLI flag.</p>
+  <div class="tablewrap"><table>
+    <tr><th></th><th class="num">Hyp 1 (HatchetSword/Monument)</th><th class="num">Hyp 2 (Amber/Dagger)</th></tr>
+    <tr><td>Rewards (10 repeats)</td><td class="num">ten 0.0</td><td class="num">nine 0.0, one 0.687</td></tr>
+    <tr><td>Mean / SD / variance</td><td class="num">0.0 / 0.0 / 0.0</td><td class="num">0.069 / 0.217 / 0.047</td></tr>
+    <tr><td>Exec failures</td><td class="num">9/10 (90%)</td><td class="num">9/10 (90%)</td></tr>
+    <tr><td>Surprising</td><td class="num">0% (1 success, belief unmoved)</td><td class="num">1/1 success surprising (Δ=0.39, KL 1.38)</td></tr>
+    <tr><td>Token usage</td><td class="num" colspan="2">not recorded — jobs ran at <code>fbafd54</code>, before the metrics-logging commit <code>655e6ff</code></td></tr>
+  </table></div>
+  <p><strong>Reading:</strong> reward variance is not belief-elicitation noise — it is a coin flip on execution success. With 1/10 successes per hypothesis, within-success variance is unmeasurable. Failure modes: syntax errors from stray policy tokens (<code>\,</code>, <code>&lt;/code&gt;</code>, trailing <code>&lt;|im_end|&gt;</code> in the hypothesis itself), matplotlib recursion in <code>tight_layout()</code>, statsmodels HAC <code>maxlags</code> KeyError, and NaN-producing merges. Several runs completed the analysis but were marked failed by a final plotting crash.</p>
+  <div class="note">Earlier repeated-scoring study (Aug 15, 100 hypotheses × 3 rescores, <code>analysis/beaker_scoring_runs</code>): scorer success ~90%, reward ICC(1,1) 0.43 (grounded) / 0.50 (NL), pairwise r 0.35–0.58, exact-match 21–38%. Even conditioned on success, single-shot rewards are noisy.</div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="exp-no">2</span><h2>Does RL respond to reward? One task, 10 epochs, 4 reward types</h2><span class="chip ok">plumbing works</span><span class="chip warn">codex untested</span></div>
+  <p class="meta">Jobs <code>autods-sanity1-fmt3-rw{zero,one,coin,codex}-g4</code> (Aug 19) + <code>rwcodex-g4-v2</code> (Aug 20). All completed 10/10 steps. Values: mean of first 2 → last 2 steps.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Run</th><th class="num">Raw reward</th><th class="num">Resp len</th><th class="num">train/kl_loss</th><th class="num">Grad norm</th><th>W&amp;B</th></tr>
+    <tr><td>always 0</td><td class="num">0.000 → 0.000</td><td class="num">8293 → 8017</td><td class="num">0 → 0</td><td class="num">0 → 0</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/yzm73atv">yzm73atv</a></td></tr>
+    <tr><td>always 1</td><td class="num">1.000 → 1.000</td><td class="num">9880 → 7427</td><td class="num">0 → 0</td><td class="num">0 → 0</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/suqbwac3">suqbwac3</a></td></tr>
+    <tr><td>coin flip</td><td class="num">0.750 → 0.625</td><td class="num">8391 → 7492</td><td class="num">0.001 → 0.116</td><td class="num">1.83 → 1.54</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/cnpji4y4">cnpji4y4</a></td></tr>
+    <tr><td>codex v1</td><td class="num">0.000 → 0.000</td><td class="num">9880 → 9023</td><td class="num">0 → 0</td><td class="num">0 → 0</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/a1jffygr">a1jffygr</a></td></tr>
+    <tr><td>codex v2</td><td class="num">0.000 → 0.000</td><td class="num">8293 → 8561</td><td class="num">0 → 0</td><td class="num">0 → 0</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/stzvjt0b">stzvjt0b</a></td></tr>
+  </table></div>
+  <ul>
+    <li><strong>Always-0 and always-1 are provably inert:</strong> constant rewards → zero group std → zero GRPO advantage → grad norm exactly 0, KL 0, policy frozen. The frozen runs even reproduce identical seeded generations across experiments — the no-update path is truly a no-op.</li>
+    <li><strong>Coin flip is the only run where gradients flow:</strong> KL climbs monotonically to 0.116, entropy falls 0.70 → 0.61, responses shorten. Pure noise-drift, exactly what random reward should do. <em>This confirms the reward → advantage → update path works end-to-end.</em></li>
+    <li><strong>Codex rewards were never actually exercised.</strong> v1: every sample failed with codex CLI <code>401 Unauthorized</code> (OPENAI_API_KEY doesn't authenticate its Responses-API calls). v2: <code>codex login --with-api-key</code> fixed auth, but <code>/usr/local/bin/codex-code-mode-host</code> was missing (the standalone musl tarball doesn't ship it), so every experiment returned "Inconclusive" → reward 0. Both collapsed to the always-0 case. A v3 needs the code-mode host installed.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="exp-no">3</span><h2>Do prior experiments in the prompt improve exec failures / surprises?</h2><span class="chip info">no effect detected</span><span class="chip bad">triplet runs canceled</span></div>
+  <p>Two distinct mechanisms were in play:</p>
+  <p><strong>A — <code>--hypothesis_mode=related</code></strong> (baseline engine): ancestor hypothesis/output/analysis/review enter the prompt via <code>get_path_context</code> (k=3) in both modes; <code>related</code> adds the stay-close instruction.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Run</th><th>Mode</th><th class="num">Exec failures</th><th class="num">Surprising (of scored)</th></tr>
+    <tr><td><code>related-n10</code></td><td>related</td><td class="num">0/11 (0%)</td><td class="num">7/10 (70%)</td></tr>
+    <tr><td><code>fixtest10-scratch</code></td><td>open-ended, same commit</td><td class="num">0/11 (0%)</td><td class="num">8/10 (80%)</td></tr>
+    <tr><td><code>related-n500</code> (still running)</td><td>related</td><td class="num">≤8/223 (≤3.6%)</td><td class="num">151/215 (70.2%)</td></tr>
+    <tr><td>old n500 baseline (archaeology)</td><td>open-ended, pre-fix commit</td><td class="num">86.8%</td><td class="num">18/26 (69.2%)</td></tr>
+  </table></div>
+  <p><strong>Reading:</strong> within the fixed commit, related vs open-ended shows <em>no detectable difference</em> — ~70% surprise and ~0% exec failures either way. The dramatic failure-rate drop vs the old 13.2%-success baseline is attributable to the <code>MessageTokenLimiter</code> fix (<code>fbafd54</code>, which stopped 4k-token message amputation), not to prior-experiment context.</p>
+  <p><strong>B — literal <code>&lt;hypothesis, reward, analysis&gt;</code> triplets</strong> (slime <code>FEEDBACK_CONTEXT=1</code>, commit <code>196edefb</code>: analysis LLM-compressed to ≤3 learnings, injected into the next step's prompt). All four <code>binrw[-trunc01]-fb-g4/g16</code> runs were canceled at ~step 8 with degenerate rollouts (reward 0, truncation 75–100%), so <em>the triplet mechanism has produced no usable numbers yet</em>.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="exp-no">4</span><h2>Does reward increase with binary surprise rewards? One task, 10 epochs</h2><span class="chip bad">no</span></div>
+  <p class="meta">Jobs <code>binrw-g4/g16</code> (Aug 19; reward 1 iff |belief shift| ≥ 0.2). Comparison: continuous-reward <code>g4/g16-v3</code>.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Run</th><th class="num">Raw reward step0 → step9 (max)</th><th class="num">Resp len</th><th>W&amp;B</th></tr>
+    <tr><td>binrw-g4</td><td class="num">0.00 → 0.25 (0.25, only step 9)</td><td class="num">9958 → 7963</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/xzr7sx89">xzr7sx89</a></td></tr>
+    <tr><td>binrw-g16</td><td class="num">0.06 → 0.00 (0.125)</td><td class="num">8070 → 16122</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/dwihdkkr">dwihdkkr</a></td></tr>
+    <tr><td>continuous g4-v3</td><td class="num">0.17 → 0.05 (0.21)</td><td class="num">8960 → 11050</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/oxiupoyv">oxiupoyv</a></td></tr>
+    <tr><td>continuous g16-v3</td><td class="num">0.21 → 0.00 (0.21)</td><td class="num">8982 → 16384 (cap)</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/w1pp0dlf">w1pp0dlf</a></td></tr>
+  </table></div>
+  <p><strong>Reading:</strong> the ≥0.2 threshold is crossed so rarely on archaeology that groups are nearly all-zero — GRPO's <code>zero_std</code> guard fires and advantages vanish, so there is essentially no learning signal. Reward does not trend up (the final-step 0.25 in binrw-g4 is a single 1/4 group, i.e. noise). Continuous baselines start higher (0.17–0.21) and <em>decline</em>. Binary rewards starved the signal rather than fixing the trend.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="exp-no">5</span><h2>Does a response penalty mitigate length growth? Binary reward + penalty</h2><span class="chip ok">works at g16</span></div>
+  <p class="meta">Jobs <code>binrw-trunc01-g4/g16</code> (Aug 19; adds <code>FAILURE_REWARD=-0.1</code> for truncated/failed rollouts).</p>
+  <div class="tablewrap"><table>
+    <tr><th>Run</th><th class="num">Resp len step0 → step9</th><th class="num">Truncated frac (max)</th><th>W&amp;B</th></tr>
+    <tr><td>binrw-g16 (no penalty)</td><td class="num">8070 → 16122</td><td class="num">0 → 0.875 (0.94)</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/dwihdkkr">dwihdkkr</a></td></tr>
+    <tr><td>binrw-trunc01-g16</td><td class="num">8468 → 9773</td><td class="num">0 throughout</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/oxm4hom5">oxm4hom5</a></td></tr>
+    <tr><td>binrw-g4 (no penalty)</td><td class="num">9958 → 7963</td><td class="num">0 throughout</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/xzr7sx89">xzr7sx89</a></td></tr>
+    <tr><td>binrw-trunc01-g4</td><td class="num">8040 → 7900</td><td class="num">0 throughout</td><td><a href="https://wandb.ai/sijial-ai2/autodiscovery-rl/runs/c38bnfo2">c38bnfo2</a></td></tr>
+  </table></div>
+  <p><strong>Reading:</strong> at g16 the penalty clearly prevented the blow-up — flat ~8.5k → 9.8k tokens with 0% truncation, vs ~2× growth and 88–94% truncation without it (continuous g16-v3 hit the 16,384 cap with 100% truncation). At g4 neither run ever truncated, so there was no pathology to correct. Caveat: with rewards near-uniformly zero, the penalty may work partly by removing the only nonzero-advantage updates rather than actively teaching brevity — but empirically it held length flat.</p>
+</section>
+
+<section>
+  <div class="sec-head"><h2>Cross-cutting observations &amp; follow-ups</h2></div>
+  <ul>
+    <li><strong>Unreconciled discrepancy:</strong> the slime reward path fails 90% of executions on policy-written hypotheses, while baseline-engine runs at the same commit fail ~0% on engine-generated ones. Differences to investigate: <code>max_rounds=10</code> + single-revision selector in the reward server, hypothesis quality/token hygiene from the policy (trailing <code>&lt;|im_end|&gt;</code>), and column grounding.</li>
+    <li><strong>Token usage is only recorded going forward:</strong> everything above ran at <code>fbafd54</code>; the metrics commit <code>655e6ff</code> (per-experiment <code>[metrics]</code> line + <code>run_metrics.json</code>, verified by smoke test: 2 experiments, 35 calls, 1.30M tokens) now captures it for both paths.</li>
+    <li><strong>Codex v3:</strong> install the <code>codex-code-mode-host</code> binary (npm layout, not the musl tarball) before rerunning — codex reward remains completely untested.</li>
+    <li><strong>Rerun the fb (triplet) runs with the truncation penalty</strong> — the penalty demonstrably prevents the g16 truncation death-spiral that killed them.</li>
+    <li><strong>Binary threshold is too sparse</strong> on archaeology (~0–12% of samples cross 0.2). Options: lower the threshold, use continuous |normalized surprisal|, or pick a higher-surprise task (per <code>n500_failure_rates</code>: affairs 73.6% success / 121 surprising, crofoot, fish).</li>
+    <li><strong>Pull <code>related-n500</code> final numbers</strong> when it finishes (was still running Aug 21) for the definitive related-vs-open-ended comparison.</li>
+  </ul>
+</section>
+
+<footer>Sources: Beaker experiments in <code>ai2/autodiscovery</code> (job IDs abbreviated above), W&amp;B project <code>sijial-ai2/autodiscovery-rl</code>, S3 mirrors under <code>s3://ai2-asta-workspaces/autods/runs/</code>, and local <code>analysis/</code>. Raw downloads: session scratchpad <code>probe_results/</code>, <code>rl_sanity_results/</code>, <code>binrw_results/</code>, <code>prior_exp_results/</code>.</footer>
+</main>
+
+</body></html>

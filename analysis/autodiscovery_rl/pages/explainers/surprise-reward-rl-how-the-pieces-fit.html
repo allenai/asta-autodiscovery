@@ -1,0 +1,324 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Surprise-Reward RL — how the pieces fit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#eef1f5; --panel:#ffffff; --ink:#1a2230; --muted:#5a6579; --hair:#d3dae4;
+    --blue:#2f6fb0; --blue-soft:#e3edf7; --blue-ink:#1c4e82;
+    --amber:#c07a1e; --amber-soft:#f6ecda; --amber-ink:#8a560f;
+    --good:#2f8f5b; --bad:#c0492f;
+    --mono:ui-monospace,"SF Mono",Menlo,"Cascadia Mono",Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --r:12px; --maxw:1080px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e1219; --panel:#161c26; --ink:#e6ebf2; --muted:#93a0b4; --hair:#2a3342;
+      --blue:#5fa0da; --blue-soft:#16283c; --blue-ink:#9cc6ec;
+      --amber:#e0a24a; --amber-soft:#2e2413; --amber-ink:#f0c483;
+      --good:#5cc389; --bad:#e0785f;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f5; --panel:#ffffff; --ink:#1a2230; --muted:#5a6579; --hair:#d3dae4;
+    --blue:#2f6fb0; --blue-soft:#e3edf7; --blue-ink:#1c4e82;
+    --amber:#c07a1e; --amber-soft:#f6ecda; --amber-ink:#8a560f;
+    --good:#2f8f5b; --bad:#c0492f;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1219; --panel:#161c26; --ink:#e6ebf2; --muted:#93a0b4; --hair:#2a3342;
+    --blue:#5fa0da; --blue-soft:#16283c; --blue-ink:#9cc6ec;
+    --amber:#e0a24a; --amber-soft:#2e2413; --amber-ink:#f0c483;
+    --good:#5cc389; --bad:#e0785f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(20px,4vw,56px)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 10px}
+  h1{font-size:clamp(28px,4.4vw,44px);line-height:1.08;margin:0 0 14px;letter-spacing:-.02em;text-wrap:balance;font-weight:680}
+  h1 .hl{color:var(--amber-ink)}
+  .lede{font-size:clamp(16px,2vw,19px);color:var(--muted);max-width:64ch;margin:0}
+  h2{font-size:clamp(19px,2.4vw,23px);letter-spacing:-.01em;margin:0 0 4px;font-weight:640}
+  section{margin-top:clamp(34px,6vw,64px)}
+  .sec-label{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0 0 18px}
+  .sub{color:var(--muted);max-width:66ch;margin:2px 0 22px}
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:var(--r)}
+
+  /* legend */
+  .legend{display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;margin:22px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:3px;flex:none}
+  .dot.b{background:var(--blue)} .dot.a{background:var(--amber)}
+
+  /* two-lane flow */
+  .flow{display:grid;grid-template-columns:1fr;gap:0;overflow:hidden;border-radius:var(--r);border:1px solid var(--hair)}
+  .lane{padding:20px clamp(14px,2.4vw,26px)}
+  .lane.t{background:linear-gradient(180deg,var(--blue-soft),transparent 70%)}
+  .lane.r{background:linear-gradient(180deg,var(--amber-soft),transparent 70%);border-top:1px dashed var(--hair)}
+  .lane-h{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
+  .lane-h .tag{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:999px;font-weight:600;letter-spacing:.03em}
+  .lane.t .tag{background:var(--blue);color:#fff} .lane.r .tag{background:var(--amber);color:#fff}
+  .lane-h h3{font-size:16px;margin:0;font-weight:640}
+  .lane-h .env{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-left:auto}
+  .steps{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin-top:14px}
+  .step{flex:1 1 150px;background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:11px 13px;min-width:0}
+  .step .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .step .v{font-size:14px;font-weight:560;margin-top:3px}
+  .step .d{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .arrow{align-self:center;color:var(--muted);font-size:18px;flex:none;padding:0 2px}
+  @media(max-width:640px){.arrow{transform:rotate(90deg)}}
+
+  /* http boundary chip */
+  .http{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px;
+    background:var(--panel);border-top:1px dashed var(--hair);border-bottom:1px dashed var(--hair)}
+  .http code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--hair);
+    padding:5px 10px;border-radius:7px;color:var(--ink);white-space:nowrap}
+  .http .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .httpwrap{overflow-x:auto}
+
+  /* concurrency */
+  .grid2{display:grid;grid-template-columns:1fr;gap:18px}
+  @media(min-width:820px){.grid2{grid-template-columns:1.15fr .85fr}}
+  .pool{padding:18px 20px}
+  .poolgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:14px 0 6px}
+  .cell{aspect-ratio:1;border-radius:5px;background:var(--amber-soft);border:1px solid var(--hair);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--amber-ink)}
+  .cell.on{background:var(--amber);color:#fff;border-color:var(--amber)}
+  .cell.q{background:transparent;color:var(--muted);border-style:dashed}
+  .poolnote{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .callout{padding:18px 20px}
+  .callout h4{margin:0 0 10px;font-size:14px;font-family:var(--mono);letter-spacing:.02em;color:var(--muted);font-weight:600}
+  .math{font-family:var(--mono);font-size:13px;line-height:1.9}
+  .math b{color:var(--amber-ink)}
+  .math .s{color:var(--muted)}
+
+  /* reason cards */
+  .reasons{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:760px){.reasons{grid-template-columns:repeat(3,1fr)}}
+  .reason{padding:18px 18px 20px}
+  .reason .n{font-family:var(--mono);font-size:12px;color:var(--amber-ink);font-weight:600}
+  .reason h4{margin:8px 0 7px;font-size:15.5px;font-weight:620}
+  .reason p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5}
+  .reason code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px;border-radius:5px;border:1px solid var(--hair)}
+
+  /* routing */
+  .route{padding:18px 20px}
+  .routerow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;padding:9px 0;border-bottom:1px solid var(--hair)}
+  .routerow:last-child{border-bottom:0}
+  .routerow .id{background:var(--blue-soft);color:var(--blue-ink);padding:3px 9px;border-radius:6px;border:1px solid var(--hair);font-weight:600}
+  .routerow .to{color:var(--muted)}
+  .routerow .ds{background:var(--amber-soft);color:var(--amber-ink);padding:3px 9px;border-radius:6px;border:1px solid var(--hair)}
+
+  /* belief buckets */
+  .belief{padding:20px clamp(14px,2.4vw,26px)}
+  .scale{position:relative;margin:30px 0 8px}
+  .buckets{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+  .bk{padding:12px 6px 10px;border-radius:8px;text-align:center;border:1px solid var(--hair)}
+  .bk .bl{font-size:12.5px;font-weight:600}
+  .bk .rg{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+  .bk.b0{background:color-mix(in srgb,var(--bad) 16%,var(--panel))}
+  .bk.b1{background:color-mix(in srgb,var(--bad) 8%,var(--panel))}
+  .bk.b2{background:var(--panel)}
+  .bk.b3{background:color-mix(in srgb,var(--good) 8%,var(--panel))}
+  .bk.b4{background:color-mix(in srgb,var(--good) 16%,var(--panel))}
+  .markers{position:relative;height:44px;margin-top:10px}
+  .mk{position:absolute;top:0;transform:translateX(-50%);text-align:center;font-family:var(--mono);font-size:11px;white-space:nowrap}
+  .mk .pin{width:2px;height:14px;margin:0 auto 3px;border-radius:2px}
+  .mk.prior .pin{background:var(--muted)} .mk.prior{color:var(--muted)}
+  .mk.post .pin{background:var(--amber);height:20px} .mk.post{color:var(--amber-ink);font-weight:600}
+  .shiftbar{position:absolute;top:6px;height:4px;background:linear-gradient(90deg,var(--muted),var(--amber));border-radius:3px;opacity:.5}
+  .beliefnote{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .bn{flex:1 1 200px;background:var(--bg);border:1px solid var(--hair);border-radius:9px;padding:12px 14px}
+  .bn .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .bn .v{font-size:14px;font-weight:560;margin-top:4px}
+  .bn .v b{color:var(--amber-ink)}
+  .bn .d{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+  .formula{margin-top:18px;border-top:1px solid var(--hair);padding-top:16px;display:flex;flex-direction:column;gap:9px}
+  .frow{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+  .fk{flex:none;width:120px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .fv{flex:1 1 300px;font-family:var(--mono);font-size:13px;line-height:1.6;color:var(--ink)}
+  .fv b{color:var(--amber-ink)}
+  .frow.alt .fv{color:var(--muted)} .frow.alt .fv b{color:var(--blue-ink)}
+  .foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--hair);color:var(--muted);font-size:12.5px;font-family:var(--mono)}
+  .foot b{color:var(--ink);font-weight:600}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">RL training · Bayesian-surprise reward</p>
+  <h1>One policy on GPUs. One <span class="hl">reward server</span> off to the side.<br>Here's the round trip.</h1>
+  <p class="lede">The model being trained proposes a scientific hypothesis. To score it, something has to actually <em>run an experiment</em> and measure how much the result changes what we believe. That scoring is too heavy — and too incompatible — to live inside the trainer, so it runs as a separate HTTP service the trainer calls once per generated sample.</p>
+
+  <div class="legend">
+    <span><i class="dot b"></i>Trainer — slime · Megatron · SGLang · 8×GPU · Python 3.13</span>
+    <span><i class="dot a"></i>Reward server — autodiscovery · CPU · Python 3.10</span>
+  </div>
+
+  <!-- ===================== THE ROUND TRIP ===================== -->
+  <section>
+    <p class="sec-label">01 — the loop, one training step</p>
+    <h2>What happens between "generate" and "gradient"</h2>
+    <p class="sub">Every step, the policy emits a batch of hypotheses. Each one leaves the GPU box, gets scored by the sidecar, and comes back as a number the RL update can use.</p>
+
+    <div class="flow">
+      <div class="lane t">
+        <div class="lane-h"><span class="tag">TRAINER</span><h3>slime generates &amp; learns</h3><span class="env">Qwen3.5-9B · GRPO</span></div>
+        <div class="steps">
+          <div class="step"><div class="k">Rollout</div><div class="v">Generate hypotheses</div><div class="d">SGLang serves the policy. 8 prompts × 8 samples = <b>64 hypotheses</b> this step.</div></div>
+          <div class="arrow">→</div>
+          <div class="step"><div class="k">Per sample</div><div class="v">Need a reward</div><div class="d">GRPO needs one scalar per hypothesis to form a within-group advantage.</div></div>
+        </div>
+      </div>
+
+      <div class="httpwrap"><div class="http">
+        <span class="lbl">HTTP ↓ request</span>
+        <code>POST /reward  { hypothesis, dataset_id, request_id }</code>
+      </div></div>
+
+      <div class="lane r">
+        <div class="lane-h"><span class="tag">REWARD SERVER</span><h3>autodiscovery runs the experiment</h3><span class="env">gpt-5-mini · sandbox</span></div>
+        <div class="steps">
+          <div class="step"><div class="k">Execute</div><div class="v">Write &amp; run analysis code</div><div class="d">An LLM writes Python; it runs in an isolated <b>sandbox venv</b> against the dataset.</div></div>
+          <div class="arrow">→</div>
+          <div class="step"><div class="k">Elicit</div><div class="v">Prior vs posterior belief</div><div class="d">Before &amp; after seeing the result: how likely is the hypothesis true?</div></div>
+          <div class="arrow">→</div>
+          <div class="step"><div class="k">Score</div><div class="v">Surprise = belief shift</div><div class="d">|posterior − prior|, normalized. Big shift = surprising = high reward.</div></div>
+        </div>
+      </div>
+
+      <div class="httpwrap"><div class="http">
+        <span class="lbl">HTTP ↑ response</span>
+        <code>{ reward: 0.73, normalized_surprisal: -0.73, posterior_mean: 0.20 }</code>
+      </div></div>
+
+      <div class="lane t">
+        <div class="lane-h"><span class="tag">TRAINER</span><h3>back in slime: turn rewards into a gradient</h3><span class="env">Megatron</span></div>
+        <div class="steps">
+          <div class="step"><div class="k">Group-normalize</div><div class="v">reward − group mean</div><div class="d">The 8 samples of a prompt form a group; advantage is each reward minus the group's mean.</div></div>
+          <div class="arrow">→</div>
+          <div class="step"><div class="k">Update</div><div class="v">Policy gradient step</div><div class="d">Push probability toward hypotheses that scored above their group. Repeat next step.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== BELIEF & VERDICT ===================== -->
+  <section>
+    <p class="sec-label">02 — inside "Score": belief, surprise, verdict</p>
+    <h2>The reward is how far one hypothesis moves a belief</h2>
+    <p class="sub">The belief is a single number in [0, 1]: how likely the hypothesis is true, read off a five-category distribution. It's elicited twice — a <b>prior</b> (before running the experiment) and a <b>posterior</b> (after seeing the result). The gap between them is the surprise.</p>
+
+    <div class="card belief">
+      <div class="scale">
+        <div class="buckets">
+          <div class="bk b0"><div class="bl">likely false</div><div class="rg">0.0 – 0.2</div></div>
+          <div class="bk b1"><div class="bl">maybe false</div><div class="rg">0.2 – 0.4</div></div>
+          <div class="bk b2"><div class="bl">uncertain</div><div class="rg">0.4 – 0.6</div></div>
+          <div class="bk b3"><div class="bl">maybe true</div><div class="rg">0.6 – 0.8</div></div>
+          <div class="bk b4"><div class="bl">likely true</div><div class="rg">0.8 – 1.0</div></div>
+        </div>
+        <div class="markers">
+          <div class="shiftbar" style="left:20%;width:46.7%"></div>
+          <div class="mk post" style="left:20%"><div class="pin"></div>posterior<br>0.20</div>
+          <div class="mk prior" style="left:66.7%"><div class="pin"></div>prior<br>0.67</div>
+        </div>
+      </div>
+
+      <div class="beliefnote">
+        <div class="bn"><div class="k">Raw shift</div><div class="v">|Δbelief| = |0.20 − 0.67| = <b>0.47</b></div><div class="d">Absolute — a swing toward false counts the same as one toward true.</div></div>
+        <div class="bn"><div class="k">Reward = |normalized surprisal|</div><div class="v"><b>0.47 / 0.642 = 0.73</b></div><div class="d">Divide by <code>theoretical_max</code> — the largest shift an idealized update could make given 5 belief samples + a Beta(½,½) prior — then take abs. Puts the reward on a ~[0,1] scale.</div></div>
+        <div class="bn"><div class="k">Verdict (direction)</div><div class="v">posterior 0.20 → <b>maybe false</b></div><div class="d">Which bucket the posterior lands in. Added to history in the <code>_w_verdict</code> formats so the policy sees the outcome, not just the magnitude.</div></div>
+      </div>
+
+      <div class="formula">
+        <div class="frow"><span class="fk">final reward</span><span class="fv">reward = |normalized_surprisal| = |μ<sub>post</sub> − μ<sub>prior</sub>| / theoretical_max</span></div>
+        <div class="frow"><span class="fk">≈ [0, 1]</span><span class="fv">theoretical_max ≈ <b>0.642</b> (n=5, evidence_weight=2, Beta(½,½)). reward &gt; 1 only when the elicited shift beats that idealized maximum — rare.</span></div>
+        <div class="frow"><span class="fk">examples</span><span class="fv">|0.20−0.67|→<b>0.73</b> &nbsp;·&nbsp; |0.94−0.71|→<b>0.36</b> &nbsp;·&nbsp; |0.52−0.50|→<b>0.03</b></span></div>
+        <div class="frow alt"><span class="fk">comparison arm</span><span class="fv">A parallel set of jobs instead uses <b>belief_change / width</b> = |Δbelief| / 0.2 (÷ a fixed threshold, not the theoretical max) — the same three examples become 2.35 · 1.15 · 0.10, so it routinely exceeds 1.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CONCURRENCY ===================== -->
+  <section>
+    <p class="sec-label">03 — concurrency</p>
+    <h2>One server, 48 slots — not 48 servers</h2>
+    <p class="sub"><code>--concurrency 48</code> is <b>one</b> reward-server process running up to 48 experiments at once — an internal worker pool, not 48 separate servers. A step produces batch 8 × samples 8 = <b>64 hypotheses</b>, so 64 requests arrive; 48 run in parallel and the other 16 wait in a queue until a slot frees. What "spins up" per experiment is an isolated <b>sandbox venv</b> (to run the generated code), never another server.</p>
+
+    <div class="grid2">
+      <div class="card pool">
+        <div class="poolnote"><span>1 reward server · pool of <b style="color:var(--amber-ink)">48 slots</b> · 64 requests/step</span><span>■ running(48) &nbsp; □ queued(16)</span></div>
+        <div class="poolgrid" id="pool"></div>
+        <div class="poolnote"><span>each cell = one in-flight experiment (its own sandbox venv); at most 48 at a time</span></div>
+      </div>
+      <div class="card callout">
+        <h4>the arithmetic</h4>
+        <div class="math">
+          64 <span class="s">hypotheses / step</span><br>
+          × ~3&nbsp;min <span class="s">per experiment</span><br>
+          <span class="s">──────────────</span><br>
+          serial: <b>~3&nbsp;hours</b> / step<br>
+          48-wide: <b>~4&nbsp;min</b> / step<br><br>
+          <span class="s">The GPUs would sit idle for that whole window — so the reward server, not the trainer, owns this parallelism.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SERVING A TASK ===================== -->
+  <section>
+    <p class="sec-label">04 — serving a task on a server</p>
+    <h2>How the server knows which dataset to run against</h2>
+    <p class="sub">"A task" here is a dataset — <code style="font-family:var(--mono);font-size:13px">affairs</code>, <code style="font-family:var(--mono);font-size:13px">nls_raw</code>, and so on. At startup the server loads a registry mapping each dataset id to its data + metadata. Every reward request carries a <b>dataset_id</b>, and a router sends it to the right dataset's experiment runner. That's what "serving a task on a server" means: the task is registered once, then addressed by name on each call.</p>
+    <div class="card route">
+      <div class="routerow"><span class="id">dataset_id: affairs</span><span class="to">→ router →</span><span class="ds">affairs data + metadata → run experiment</span></div>
+      <div class="routerow"><span class="id">dataset_id: nls_raw</span><span class="to">→ router →</span><span class="ds">nls_raw data + metadata → run experiment</span></div>
+      <div class="routerow"><span class="id">dataset_id: boxes</span><span class="to">→ router →</span><span class="ds">boxes data + metadata → run experiment</span></div>
+      <div class="routerow"><span class="id" style="opacity:.6">request_id: 7-a3f1…</span><span class="to">→ dedupe →</span><span class="ds" style="opacity:.85">seen before? return cached — never re-run a paid, multi-min experiment</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== WHY A SIDECAR ===================== -->
+  <section>
+    <p class="sec-label">05 — why a separate server at all</p>
+    <h2>Why the reward doesn't just live inside the trainer</h2>
+    <p class="sub">The natural question: why not import the scoring code into slime and call it directly? Three reasons it has to be its own process, reached over HTTP.</p>
+    <div class="reasons">
+      <div class="card reason">
+        <div class="n">01 · isolation</div>
+        <h4>Incompatible Pythons</h4>
+        <p>slime needs Python <b>3.13</b>; autodiscovery needs <b>3.10</b>. They cannot share one interpreter. An HTTP boundary lets each keep its own env and dependency tree.</p>
+      </div>
+      <div class="card reason">
+        <div class="n">02 · contract</div>
+        <h4>No shared imports</h4>
+        <p>slime never imports autodiscovery — it only speaks a tiny JSON contract: <code>POST /reward</code> in, <code>{reward}</code> out. Either side can change internally as long as the contract holds.</p>
+      </div>
+      <div class="card reason">
+        <div class="n">03 · workload</div>
+        <h4>Different resource shape</h4>
+        <p>Training is GPU-bound and synchronous; scoring is CPU/API-bound and massively parallel (48 experiments, each shelling out to models + a sandbox). Kept apart, neither starves the other.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">
+    <b>The one-liner:</b> the policy proposes hypotheses on the GPUs; a sidecar HTTP server runs a real experiment per hypothesis and returns Bayesian surprise as the reward; concurrency lives in that server because experiments are slow and many; the split exists because trainer and scorer can't share a Python — or a resource profile.
+  </p>
+
+</div>
+
+<script>
+  // 48 running + 16 queued = the 64 hypotheses of one step
+  var pool=document.getElementById('pool'), N=64, RUN=48;
+  for(var i=0;i<N;i++){
+    var c=document.createElement('div');
+    if(i<RUN){c.className='cell on';c.textContent=(i+1);}
+    else{c.className='cell q';c.textContent='q';}
+    pool.appendChild(c);
+  }
+</script>
+
+</body></html>

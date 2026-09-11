@@ -1,0 +1,96 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Grounded vs high-level hypotheses — belief & reward (corrected)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#f5f6f4;--panel:#ffffff;--ink:#161a17;--muted:#5d6b62;--line:#e2e6e1;--chip:#eef1ec;
+ --nl:#a8712f;--gr:#2f8f5b;--pos:#2f8f5b;--neg:#b23b3b;--accent:#3a6ea5;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:"Inter",system-ui,-apple-system,sans-serif;}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1411;--panel:#161d18;--ink:#e8efe9;--muted:#8ea095;--line:#232c26;--chip:#1b241e;--nl:#d6a15b;--gr:#4fbe83;--pos:#4fbe83;--neg:#e5776f;--accent:#7ea4cf;}}
+:root[data-theme=dark]{--bg:#0f1411;--panel:#161d18;--ink:#e8efe9;--muted:#8ea095;--line:#232c26;--chip:#1b241e;--nl:#d6a15b;--gr:#4fbe83;--pos:#4fbe83;--neg:#e5776f;--accent:#7ea4cf;}
+:root[data-theme=light]{--bg:#f5f6f4;--panel:#fff;--ink:#161a17;--muted:#5d6b62;--line:#e2e6e1;--chip:#eef1ec;--nl:#a8712f;--gr:#2f8f5b;--pos:#2f8f5b;--neg:#b23b3b;--accent:#3a6ea5;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:40px 22px 80px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:clamp(23px,4vw,32px);line-height:1.13;margin:10px 0 12px;letter-spacing:-.02em;text-wrap:balance;font-weight:650}
+.lede{font-size:16.5px;color:var(--muted);max-width:66ch}.lede b{color:var(--ink);font-weight:600}
+h2{font-size:13px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:38px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+p{max-width:68ch}
+.correction{background:var(--chip);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:14px 18px;margin:24px 0 6px;font-size:14.5px}
+.correction b{color:var(--ink)}
+.headline{display:flex;flex-wrap:wrap;gap:14px;margin:22px 0 4px}
+.stat{flex:1 1 210px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.stat .big{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:-.01em}
+.stat .cap{font-size:12.5px;color:var(--muted);margin-top:3px}
+.scroll{overflow-x:auto;margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:540px}
+th,td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-family:var(--mono)}
+th:first-child,td:first-child{text-align:left;font-family:var(--sans)}
+thead th{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1.5px solid var(--line)}
+tbody tr:hover{background:var(--chip)}
+.tier-nl{color:var(--nl);font-weight:600}.tier-gr{color:var(--gr);font-weight:600}
+.grp{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.zero{color:var(--muted)}
+ul.take{list-style:none;padding:0;margin:8px 0 0}
+ul.take li{position:relative;padding:9px 0 9px 26px;border-bottom:1px solid var(--line);font-size:15px;max-width:72ch}
+ul.take li:before{content:"\2192";position:absolute;left:0;color:var(--accent);font-weight:700}
+ul.take li b{font-weight:600}
+.companion{margin-top:16px;background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:13px 16px;font-size:14px;color:var(--muted)}
+a{color:var(--accent);text-decoration:none;font-weight:600}a:hover{text-decoration:underline}
+.caveat{background:var(--chip);border-left:3px solid var(--muted);border-radius:0 8px 8px 0;padding:12px 16px;margin-top:14px;font-size:13.5px;color:var(--muted);max-width:70ch}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.7}
+</style>
+<div class="wrap">
+ <div class="eyebrow">AutoDiscovery RL · hypothesis analysis · corrected classifier · 2026-08-13</div>
+ <h1>Grounding hypotheses is roughly reward-neutral</h1>
+ <p class="lede">Re-run with a <b>corrected classifier</b> that calls a hypothesis "grounded" only when it writes variables in <b>schema/identifier form</b> (backticks, <code>snake_case</code>, quoted category values, coded levels) rather than merely mentioning a word that happens to be a column. The earlier "+0.06&#8211;0.08, unanimous" reward advantage for grounded hypotheses <b>was largely an artifact</b> of the old over-inclusive matcher. Corrected, the reward gap is <b>~0 in the baseline</b> and a small <b>+0.02</b> in colsfix (mostly fmt3).</p>
+
+ <div class="correction"><b>What changed.</b> The old matcher tagged a hypothesis "grounded" if it contained <em>any</em> word matching a column name &#8212; but many columns are plain English (<code>gender</code>, <code>age</code>, <code>income</code>, <code>bmi</code>), so prose hypotheses got miscounted as grounded. That inflated the grounded group to 72% and manufactured a reward gap. The corrected classifier requires an actual schema token; the split is now a balanced ~50/50 and the gap collapses.</p>
+
+ <div class="headline">
+  <div class="stat"><div class="big neg">&#8722;0.001</div><div class="cap">baseline reward gap (grounded &#8722; NL), macro over 20 runs &#8212; grounded higher in just <b>9/20</b></div></div>
+  <div class="stat"><div class="big pos">+0.024</div><div class="cap">colsfix reward gap (macro over format) &#8212; small, and concentrated in fmt3 (+0.057; fmt1 &#8776; 0)</div></div>
+  <div class="stat"><div class="big zero">50 / 50</div><div class="cap">balanced NL vs grounded split under the corrected classifier (was 28/72)</div></div>
+ </div>
+
+ <h2>High-level NL vs grounded &#8212; both groups</h2>
+ <div class="scroll"><table>
+  <thead><tr><th>group</th><th>tier</th><th>n</th><th>reward</th><th>|shift|</th><th>prior</th><th>succ&nbsp;%</th></tr></thead>
+  <tbody>
+   <tr><td rowspan="2" class="grp">colsfix<br>5e-6 / 0.01<br>9 runs</td><td class="tier-nl">high-level NL</td><td>2,940</td><td>0.229</td><td>0.150</td><td>0.625</td><td>86</td></tr>
+   <tr><td class="tier-gr">grounded</td><td>2,930</td><td class="pos">0.256</td><td>0.165</td><td>0.622</td><td>88</td></tr>
+   <tr><td rowspan="2" class="grp">baseline<br>5e-7 / 0.001<br>20 runs</td><td class="tier-nl">high-level NL</td><td>16,854</td><td>0.254</td><td>0.155</td><td>0.628</td><td>55</td></tr>
+   <tr><td class="tier-gr">grounded</td><td>19,568</td><td>0.255</td><td>0.157</td><td>0.620</td><td>55</td></tr>
+  </tbody>
+ </table></div>
+
+ <h2>Controlled reward gap (grounded &#8722; NL), per-run macro-average</h2>
+ <div class="scroll"><table>
+  <thead><tr><th>slice</th><th>colsfix</th><th>baseline</th></tr></thead>
+  <tbody>
+   <tr><td>overall gap</td><td class="pos">+0.024</td><td class="neg">&#8722;0.001</td></tr>
+   <tr><td>runs / datasets grounded&gt;NL</td><td class="grp">15/20 datasets</td><td class="grp">9/20 runs (coin flip)</td></tr>
+   <tr><td>fmt1</td><td class="zero">+0.002</td><td class="zero">+0.002</td></tr>
+   <tr><td>fmt2</td><td class="pos">+0.012</td><td class="neg">&#8722;0.002</td></tr>
+   <tr><td>fmt3</td><td class="pos">+0.057</td><td class="neg">&#8722;0.003</td></tr>
+   <tr><td>|belief shift| gap</td><td>+0.015</td><td>+0.004</td></tr>
+  </tbody>
+ </table></div>
+
+ <h2>Takeaways</h2>
+ <ul class="take">
+  <li><b>The strong grounded&#8594;reward effect was a classifier artifact.</b> A proper schema-token classifier erases it in the baseline (&#8722;0.001, 9/20) and shrinks it to +0.02 in colsfix.</li>
+  <li><b>Grounding is essentially reward-neutral</b> &#8212; consistent with the earlier finding that column-guessing is orthogonal to reward. Priors and belief shifts are nearly identical across tiers (prior ~0.62 both; shift within 0.01&#8211;0.015).</li>
+  <li><b>The only residual signal is fmt3 in colsfix</b> (+0.057). It does not replicate in the baseline fmt3 (&#8722;0.003), so treat it as suggestive, not established.</li>
+  <li><b>Methods lesson:</b> "mentions a column" is not "grounded" when column names are common English words. Require the model to write the variable in schema/identifier form.</li>
+ </ul>
+
+ <p class="companion">&#8594; Companion visual: <a href="../reward-and-belief/belief-shift-prior-vs-posterior-by-hypothesis-tier.html">prior &#8594; posterior belief distributions, NL vs grounded &#8594;</a> &#8212; rebuilt with the same corrected classifier (with LaTeX-rendered sample hypotheses).</p>
+
+ <div class="caveat"><b>Classifier confidence (hybrid audit).</b> The regex does the full pass; on a 120-rollout random audit, gpt-5-mini (few-shot on the same definition) is <b>75% concordant</b> overall &#8212; 87% on grounded, 63% on NL. Disagreements are almost all borderline conceptual references (regex NL &#8594; gpt grounded), plus a couple of real regex misses (all-caps / multi-value parentheticals like <code>(INCOME)</code>, <code>(Pan, Pongo, Papio)</code>). The NL/grounded boundary is genuinely fuzzy (~25% debatable), but the reward gap is ~0 under either labeling, so the conclusion is robust to it.</div>
+
+ <div class="caveat"><b>Caveat.</b> Still correlational and observational (not a matched-pair intervention). But the direction is now clear: under a defensible definition of "grounded", there is no reliable reward advantage. The paired de-grounding experiment (hyp100) would be the causal test &#8212; its naturalized hypotheses mostly failed execution, which is itself evidence that grounding matters for <em>runnability</em>, if not for scored reward.</div>
+
+ <footer>tier = grounded if the hypothesis contains a backtick, snake_case/identifier token, quoted category value, coded level (y=2 / x=Japan), or (Pongo)-style value; else high-level NL. Leaked &lt;|im_end|&gt; tokens stripped before matching (they contain an underscore and previously matched everything). reward = |normalized surprisal|; shift = |prior &#8722; posterior|. Colsfix from 9 local dumps; baseline from a 20-run workflow (23 fetched, 20 with both tiers &#8805;20). Samples: colsfix n=5,870 &#183; baseline n=36,422 rollouts.</footer>
+</div>
+
+</body></html>

@@ -1,0 +1,682 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>AutoDiscovery experiment failure modes</title>
+<style>
+:root {
+  --bg:#F6F5F2; --surface:#FFFFFF; --ink:#23252B; --ink-2:#5C5F6A; --line:#E2E0DA;
+  --accent:#4A5A8A; --err:#B3382E; --warn:#9A6210; --info:#4A5A8A;
+  --code-bg:#F0EFEA;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#1A1C21; --surface:#23262D; --ink:#E8E8E4; --ink-2:#9DA1AC; --line:#34383F;
+  --accent:#93A3D6; --err:#E08379; --warn:#D9A554; --info:#93A3D6; --code-bg:#1E2126;
+} }
+:root[data-theme="dark"] {
+  --bg:#1A1C21; --surface:#23262D; --ink:#E8E8E4; --ink-2:#9DA1AC; --line:#34383F;
+  --accent:#93A3D6; --err:#E08379; --warn:#D9A554; --info:#93A3D6; --code-bg:#1E2126;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;}
+.layout{display:grid;grid-template-columns:290px 1fr;max-width:1120px;margin:0 auto;min-height:100vh;}
+aside{border-right:1px solid var(--line);padding:1.6rem 1rem 2rem;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;}
+h1{font-size:1.05rem;margin:.2rem .4rem 1rem;letter-spacing:-.01em;text-wrap:balance;}
+.src{font-size:.75rem;color:var(--ink-2);margin:0 .4rem 1rem;}
+.nav{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;background:none;border:1px solid transparent;
+  border-radius:7px;padding:.42rem .55rem;font:inherit;font-size:.85rem;color:var(--ink);cursor:pointer;}
+.nav:hover{background:var(--surface);}
+.nav.on{background:var(--surface);border-color:var(--line);font-weight:600;}
+.nav:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.nav .n{margin-left:auto;font-family:var(--mono);font-size:.7rem;color:var(--ink-2);white-space:nowrap;}
+.sev{width:8px;height:8px;border-radius:50%;flex:none;}
+.sev.err{background:var(--err);}.sev.warn{background:var(--warn);}.sev.info{background:var(--info);}
+main{padding:1.6rem 2rem 3rem;min-width:0;}
+#q{width:100%;max-width:420px;font:inherit;font-size:.88rem;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line);border-radius:7px;padding:.45rem .7rem;margin-bottom:1.2rem;}
+#q:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+h2{font-size:1.15rem;margin:.2rem 0 .4rem;}
+h2 .cnt{font-family:var(--mono);font-size:.75rem;color:var(--ink-2);font-weight:400;margin-left:.5rem;}
+.blurb{color:var(--ink-2);font-size:.9rem;max-width:65ch;margin:0 0 1.2rem;}
+.ex{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-bottom:1rem;overflow:hidden;}
+.ex header{display:flex;gap:.5rem;flex-wrap:wrap;padding:.5rem .8rem;border-bottom:1px solid var(--line);}
+.chip{font-family:var(--mono);font-size:.7rem;color:var(--ink-2);border:1px solid var(--line);border-radius:99px;padding:.08rem .5rem;}
+.chip.task{color:var(--accent);border-color:var(--accent);}
+.ex pre{margin:0;padding:.8rem .9rem;background:var(--code-bg);font-family:var(--mono);font-size:.76rem;line-height:1.5;
+  overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:340px;overflow-y:auto;}
+.none{color:var(--ink-2);}
+mark{background:var(--warn);color:var(--bg);border-radius:2px;}
+@media (max-width:760px){.layout{grid-template-columns:1fr}aside{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);}}
+
+.trace{padding:.4rem .6rem;display:flex;flex-direction:column;gap:2px;}
+.st{display:grid;grid-template-columns:2rem 12.5rem 5rem 1fr;gap:.6rem;font-size:.76rem;padding:.22rem .4rem;border-radius:5px;align-items:baseline;}
+.st .si{font-family:var(--mono);color:var(--ink-2);}
+.st .sa{font-family:var(--mono);}
+.st .sc{font-family:var(--mono);color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums;}
+.st .sb{min-width:0;overflow-wrap:break-word;}
+.st.dead{background:var(--code-bg);}.st.dead .sb{color:var(--err);font-weight:600;}
+.st.ran .sb{color:var(--good, var(--accent));}
+.st.prog .sb{color:var(--ink-2);}
+@media(max-width:700px){.st{grid-template-columns:1.6rem 1fr;grid-auto-rows:auto;}}
+</style>
+<div class="layout">
+<aside>
+  <h1>Experiment failure modes</h1>
+  <p class="src">from live logs of 2 collection jobs (archaeology, soccer) + the fmt3 sanity runs · Aug 18</p>
+  <button class="nav" data-k="spiral"><span class="sev err"></span>4096-token death spiral (root cause)<span class="n">51% of execs</span></button><button class="nav on" data-k="truncated"><span class="sev err"></span>Truncated code generations<span class="n">~1,016 mentions</span></button><button class="nav" data-k="filenotfound"><span class="sev err"></span>Wrong file paths<span class="n">~811 mentions</span></button><button class="nav" data-k="missingcol"><span class="sev err"></span>Missing / mis-named columns<span class="n">~342 mentions</span></button><button class="nav" data-k="syntaxerror"><span class="sev err"></span>SyntaxError in generated code<span class="n">~337 tracebacks</span></button><button class="nav" data-k="keyerror"><span class="sev err"></span>KeyError at runtime<span class="n">~281 tracebacks</span></button><button class="nav" data-k="nameerror"><span class="sev err"></span>NameError at runtime<span class="n">~108 tracebacks</span></button><button class="nav" data-k="othererror"><span class="sev err"></span>Other exceptions (Type/Value/…)<span class="n">~56 tracebacks</span></button><button class="nav" data-k="timeout"><span class="sev warn"></span>Hard code timeouts<span class="n">21 events seen</span></button><button class="nav" data-k="emptyresult"><span class="sev warn"></span>Empty results (0 events / 0 candidates)<span class="n">~74 mentions</span></button><button class="nav" data-k="rejected"><span class="sev warn"></span>Reviewer rejection (final verdict)<span class="n">most unscored nodes</span></button><button class="nav" data-k="overthorough"><span class="sev info"></span>Over-thorough analysis plans (time sink)<span class="n">systemic</span></button>
+</aside>
+<main>
+  <input id="q" type="search" placeholder="Search across all examples…" aria-label="Search examples">
+  <section id="sec-truncated"><h2>Truncated code generations <span class="cnt">~1,016 mentions</span></h2><p class="blurb">gpt-5-mini writes very long analysis scripts that hit the generation limit and get cut off mid-code. The run fails, the reviewer flags it, and a full revision round begins — another LLM call plus another execution attempt. The single biggest driver of slow experiments.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:39 UTC</span></header><pre>- The script appears truncated near the end (the loop processing W ends with an unfinished log call).
+
+…full verdict excerpt:
+No code execution was detected in this message — the programmer posted a script but no run output was produced. According to the execution-policy, I must therefore mark the experiment as unsuccessful.
+
+Notes and actionable feedback before you re-run:
+- This is not a debug run (no &quot;# [debug]&quot; marker was found), so mark success false and request a proper run.
+- Obvious issues in the posted script that will cause runtime errors if executed:
+  - Undefined name: the line `p.set_printoptions(suppress=True, precision=6)` uses `p` (undefined). Likely you meant `np.set_printoptions(...)`.
+  - The script appears truncated near the end (the loop processing W ends with an unfinished log call). That will produce a SyntaxError / incomplete execution. Please provide the complete script.
+  - File paths: the code uses ../time_series_data.csv and ../pollen_openness_score_....csv. Confirm these files exist relative to the working directory before running.
+  - Potential heavy work: BOOT_R is set to 1000 (reduced from 2000). Ensure you have enough runtime/memory for the intended bootstrap; otherwise lower R for a smoke test.
+- Recommendations to get a successful run:
+  1. Fix the undefined `p` (change to `np`) and complete the truncated section (ensure the loop finishes and the script writes logs at end).
+  2. Add robust error handling around file reads and writes and print the exact exceptions to </pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:40 UTC</span></header><pre>- The posted script is still truncated near the end: it ends in the middle of building the ADF loop (the last visible line is &quot;for var in [f&#x27;Synchrony_W{W}&#x27;, &#x27;&quot;).
+
+…full verdict excerpt:
+No code was executed in this message — the programmer posted a revised script but did not run it here. Per instructions, the experiment is considered unsuccessful (success = false).
+
+Why this run is not successful / next actions:
+- No runtime output, stdout, stderr, or generated files were provided for inspection. I cannot verify results or produced CSVs.
+- The posted script is still truncated near the end: it ends in the middle of building the ADF loop (the last visible line is &quot;for var in [f&#x27;Synchrony_W{W}&#x27;, &#x27;&quot;). That will cause a SyntaxError if executed. Complete the remainder of the script before running.
+
+Specific issues and recommendations to fix before re-running:
+1) Complete the script
+   - Finish the ADF diagnostics loop, the subsequent correlation/regression/bootstrap steps, and any final logging and file saves. Ensure the script ends cleanly and writes run_log_final.txt and run_config.json as planned.
+
+2) Run-time checks to add / verify
+   - Confirm the input file paths (../time_series_data.csv and ../pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv) are correct relative to the working directory.
+   - Add try/except blocks around heavy computations (e.g., loops over windows) to capture exceptions and write them to the log rather than letting the script crash silently.
+   - Ensure the included_windows.csv is written once per W or that the accumulation logic i</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:41 UTC</span></header><pre>2) Ensure the full script is complete — earlier posted full script was truncated partway through ADF diagnostics.
+
+…full verdict excerpt:
+This run was a DEBUG smoke test (the script included the marker &quot;# [debug]&quot;). Per protocol I must treat debug runs as non-final: success = false. Summary of what the smoke test did and found:
+
+- The two input files were found and loaded successfully.
+  - ../time_series_data.csv loaded: shape (3601, 37).
+    - Key columns present (sample): CE, calBP, kde_all_mean, g_all_mean, pollen_inter_100, and all twelve *_inter columns (HatchetSword_inter, Dagger_inter, HouseSize_inter, CopperGold_inter, Amber_inter, MonumentCount_inter, Depot_inter, Sickle_inter, AxesCelts_inter, MonumentSize_inter, PotteryForm_inter, PotteryDecoration_inter).
+    - Those *_inter columns appear already numeric (float64) in the smoke output.
+  - ../pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv loaded: shape (4084, 13).
+    - Several pollen-related columns (Belau_PC1, Woserin_PC1, Belau_PC1_inter, Woserin_PC1_inter, MEAN, SMOOTH_MEAN_50y/100y/...) are string-typed and use comma decimal separators (e.g., &#x27;5,65433790538302&#x27;).
+
+- Immediate parsing issue confirmed and actionable:
+  - The pollen file contains comma-decimal strings and must be coerced (replace &#x27;,&#x27; → &#x27;.&#x27; and pd.to_numeric(errors=&#x27;coerce&#x27;)) before any statistics routines. Your main script already includes logic for this; the smoke test shows that coercion is necessary and appropriate.
+
+- Time-series data readiness:
+  - pollen_inter_100 i</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:43 UTC</span></header><pre>2) Ensure the full script is complete (earlier posted full script was truncated during the ADF/Newey-West section).
+
+…full verdict excerpt:
+This run was a DEBUG smoke test (the script included the marker &quot;# [debug]&quot;). Per the experiment rules, I must treat debug runs as non-final: success = false.
+
+What the debug run did and key findings:
+- Both input files were found and successfully loaded:
+  - ../time_series_data.csv: shape (3601, 37). Contains CE, calBP, pollen_inter_100, g_all_mean, kde_all_mean, and the 12 *_inter columns (HatchetSword_inter, Dagger_inter, HouseSize_inter, CopperGold_inter, Amber_inter, MonumentCount_inter, Depot_inter, Sickle_inter, AxesCelts_inter, MonumentSize_inter, PotteryForm_inter, PotteryDecoration_inter). These _inter columns are already numeric (float64).
+  - ../pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv: shape (4084, 13). Several pollen-related columns (Belau_PC1, Woserin_PC1, Belau_PC1_inter, Woserin_PC1_inter, MEAN, SMOOTH_MEAN_50y/100y/...) are string-typed and use comma decimal separators (e.g., &#x27;5,65433790538302&#x27;), so they require coercion (replace &#x27;,&#x27;→&#x27;.&#x27; and pd.to_numeric(errors=&#x27;coerce&#x27;)).
+- The smoke test printed sample first-row values confirming the above.
+
+Recommended next steps before a full (non-debug) evaluation run:
+1) Remove the debug marker and run the full analysis script (the larger non-debug script you prepared). Debug runs must not be used for final results.
+2) Ensure the full script is complete (earlier posted full script was truncated during t</pre></article></section><section id="sec-filenotfound" hidden><h2>Wrong file paths <span class="cnt">~811 mentions</span></h2><p class="blurb">The execution agent guesses dataset paths (e.g. <code>../data.csv</code>, invented filenames) instead of checking the work dir, burning a round just to discover the real layout.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:53 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-dc1612e0e8e1&gt;&quot;, line 23, in &lt;module&gt;
+    ts = pd.read_csv(TS_FILE)
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 1904, in _make_engine
+    self.handles = get_handle(
+                   ~~~~~~~~~~^
+        f,
+        ^^
+    ...&lt;6 lines&gt;...
+        storage_options=self.options.get(&quot;storage_options&quot;, None),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/common.py&quot;, line 926, in get_handle
+    handle = open(
+        handle,
+    ...&lt;3 lines&gt;...
+        newline=&quot;&quot;,
+    )
+FileNotFoundError: [Errno 2] No such file or directory: &#x27;time_series_data.csv&#x27;</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:53 UTC</span></header><pre>FileNotFoundError                         Traceback (most recent call last)
+Cell In[1], line 23
+     21 print(&#x27;Attempting to load files...&#x27;)
+     22 try:
+---&gt; 23     ts = pd.read_csv(TS_FILE)
+     24     pollen = pd.read_csv(POLLEN_FILE)
+     25     print(&#x27;Loaded files successfully:&#x27;)
+
+File /tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py:873, in read_csv(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, skip_blank_lines, parse_dates, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, low_memory, memory_map, float_precision, storage_options, dtype_backend)
+    861 kwds_defaults = _refine_defaults_read(
+    862     dialect,
+    863     delimiter,
+   (...)    869     dtype_backend=dtype_backend,
+    870 )
+    871 kwds.update(kwds_defaults)
+--&gt; 873 return _read(filepath_or_buffer, kwds)
+
+File /tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py:300, in _read(filepath_or_buffer, kwds)
+    297 _validate_names(kwds.get(&quot;names&quot;, None))
+    299 # Create the parser.
+--&gt; 300 parser = TextFileReader(filepath_or_buffer, **kwds)
+    302 if chunksize or iterator:
+    303     return parser
+
+File /tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py:1645, in TextFileReader.__init__(self, f, engine, **kwds)
+   1642     self.options[&quot;has_index_names&quot;] = kwds[&quot;has_index_names&quot;]
+   1644 self.handles: IOHandles | None = None
+-&gt; 1645 self._engine = self._make_engine(f, self.engine)
+
+File /tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py:1904, in TextFileReader._make_engine(self, f, engine)
+   1902     if &quot;b&quot; not in mode:
+   1903         mode += &quot;b&quot;
+-&gt; 1904 self.handles = get_handle(
+   1905     f,
+   1906     mode,
+   1907     encoding=self.options.get(&quot;encoding&quot;, None),
+   1908     compression=self.options.get(&quot;compression&quot;, </pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:53 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-dc1612e0e8e1&gt;&quot;, line 23, in &lt;module&gt;
+    ts = pd.read_csv(TS_FILE)
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/parsers/readers.py&quot;, line 1904, in _make_engine
+    self.handles = get_handle(
+                   ~~~~~~~~~~^
+        f,
+        ^^
+    ...&lt;6 lines&gt;...
+        storage_options=self.options.get(&quot;storage_options&quot;, None),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File &quot;/tmp/process_sandbox_pwmcuhqm/lib/python3.14/site-packages/pandas/io/common.py&quot;, line 926, in get_handle
+    handle = open(
+        handle,
+    ...&lt;3 lines&gt;...
+        newline=&quot;&quot;,
+    )
+FileNotFoundError: [Errno 2] No such file or directory: &#x27;time_series_data.csv&#x27;</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:13 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_b24ey63q/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-23ae2f110767&gt;&quot;, line 45, in &lt;module&gt;
+    raise FileNotFoundError(f)
+FileNotFoundError: time_series_data.csv</pre></article></section><section id="sec-missingcol" hidden><h2>Missing / mis-named columns <span class="cnt">~342 mentions</span></h2><p class="blurb">Hallucinated or misremembered column names. The colsfix prompts ground the <em>hypothesis</em> in real columns, but the execution agent re-derives columns itself and still gets them wrong.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:07 UTC</span></header><pre>sum()}\&quot;)\n    else:\n        log(f\&quot;Time series column {col} not found in time_series_data.</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:09 UTC</span></header><pre>tolist()[:10]\n        poll[col] = coerced\n        parsing_diagnostics[&#x27;pollen_openness&#x27;][col] = {\n            &#x27;non_null_before&#x27;: int(before), &#x27;non_null_after&#x27;: int(after), &#x27;some_problematic_examples&#x27;: sample_bad\n        }\n        log(f\&quot;Coerced pollen col {col}: before {before} non-null, after {after}\&quot;)\n    else:\n        log(f\&quot;Pollen file missing column {col} (ok if expected)\&quot;)\n\n# Coerce the 12 _inter series and pollen_inter_100 and covariates\ninter_cols = [\n    &#x27;HatchetSword_inter&#x27;, &#x27;Dagger_inter&#x27;, &#x27;HouseSize_inter&#x27;, &#x27;CopperGold_inter&#x27;,\n    &#x27;Amber_inter&#x27;, &#x27;MonumentCount_inter&#x27;, &#x27;Depot_inter&#x27;, &#x27;Sickle_inter&#x27;,\n    &#x27;AxesCelts_inter&#x27;, &#x27;MonumentSize_inter&#x27;, &#x27;PotteryForm_inter&#x27;, &#x27;PotteryDecoration_inter&#x27;\n]\nextra_cols = [&#x27;pollen_inter_100&#x27;, &#x27;g_all_mean&#x27;, &#x27;kde_all_mean&#x27;]\nfor col in inter_cols + extra_cols:\n    if col in ts.</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:11 UTC</span></header><pre>tolist()[:10]\n        poll[col] = coerced\n        parsing_diagnostics[&#x27;pollen_openness&#x27;][col] = {\n            &#x27;non_null_before&#x27;: int(before), &#x27;non_null_after&#x27;: int(after), &#x27;some_problematic_examples&#x27;: sample_bad\n        }\n        log(f\&quot;Coerced pollen col {col}: before {before} non-null, after {after}\&quot;)\n    else:\n        log(f\&quot;Pollen file missing column {col} (ok if expected)\&quot;)\n\n# Coerce the 12 _inter series and pollen_inter_100 and covariates\ninter_cols = [\n    &#x27;HatchetSword_inter&#x27;, &#x27;Dagger_inter&#x27;, &#x27;HouseSize_inter&#x27;, &#x27;CopperGold_inter&#x27;,\n    &#x27;Amber_inter&#x27;, &#x27;MonumentCount_inter&#x27;, &#x27;Depot_inter&#x27;, &#x27;Sickle_inter&#x27;,\n    &#x27;AxesCelts_inter&#x27;, &#x27;MonumentSize_inter&#x27;, &#x27;PotteryForm_inter&#x27;, &#x27;PotteryDecoration_inter&#x27;\n]\nextra_cols = [&#x27;pollen_inter_100&#x27;, &#x27;g_all_mean&#x27;, &#x27;kde_all_mean&#x27;]\nfor col in inter_cols + extra_cols:\n    if col in ts.</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:14 UTC</span></header><pre>\n   - If any step (parsing, merging, regression) aborts due to missing columns, print a clear diagnostic and save parsing lists for manual correction before re-running.</pre></article></section><section id="sec-syntaxerror" hidden><h2>SyntaxError in generated code <span class="cnt">~337 tracebacks</span></h2><p class="blurb">Frequently downstream of truncation — half-written statements — plus ordinary LLM syntax slips in 300-line scripts.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 11:41 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_puu2h6dh/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3446, in run_cell_async
+    code_ast = compiler.ast_parse(cell, filename=cell_name)
+  File &quot;/tmp/process_sandbox_puu2h6dh/lib/python3.14/site-packages/IPython/core/compilerop.py&quot;, line 90, in ast_parse
+    return compile(source, filename, symbol, self.flags | PyCF_ONLY_AST, 1)
+  File &quot;&lt;ipython-input-1-98995fd34788&gt;&quot;, line 48
+    &#x27;Required input files are missing. The script cannot proceed with the analysis until these files are
+    ^
+SyntaxError: unterminated string literal (detected at line 48)</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 11:41 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_puu2h6dh/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3446, in run_cell_async
+    code_ast = compiler.ast_parse(cell, filename=cell_name)
+  File &quot;/tmp/process_sandbox_puu2h6dh/lib/python3.14/site-packages/IPython/core/compilerop.py&quot;, line 90, in ast_parse
+    return compile(source, filename, symbol, self.flags | PyCF_ONLY_AST, 1)
+  File &quot;&lt;ipython-input-1-98995fd34788&gt;&quot;, line 48
+    &#x27;Required input files are missing. The script cannot proceed with the analysis until these files are
+    ^
+SyntaxError: unterminated string literal (detected at line 48)</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 11:43 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_novtfwgh/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3446, in run_cell_async
+    code_ast = compiler.ast_parse(cell, filename=cell_name)
+  File &quot;/tmp/process_sandbox_novtfwgh/lib/python3.14/site-packages/IPython/core/compilerop.py&quot;, line 90, in ast_parse
+    return compile(source, filename, symbol, self.flags | PyCF_ONLY_AST, 1)
+  File &quot;&lt;ipython-input-1-a61207cd1c37&gt;&quot;, line 6
+    print(&#x27;Ready to run when time_series_data.csv is available. Re-run the analysis script to produce outputs in analysis_outputs/&#x27;)}
+                                                                                                                                    ^
+SyntaxError: unmatched &#x27;}&#x27;</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 11:43 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_novtfwgh/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3446, in run_cell_async
+    code_ast = compiler.ast_parse(cell, filename=cell_name)
+  File &quot;/tmp/process_sandbox_novtfwgh/lib/python3.14/site-packages/IPython/core/compilerop.py&quot;, line 90, in ast_parse
+    return compile(source, filename, symbol, self.flags | PyCF_ONLY_AST, 1)
+  File &quot;&lt;ipython-input-1-a61207cd1c37&gt;&quot;, line 6
+    print(&#x27;Ready to run when time_series_data.csv is available. Re-run the analysis script to produce outputs in analysis_outputs/&#x27;)}
+                                                                                                                                    ^
+SyntaxError: unmatched &#x27;}&#x27;</pre></article></section><section id="sec-keyerror" hidden><h2>KeyError at runtime <span class="cnt">~281 tracebacks</span></h2><p class="blurb">Wrong dict/DataFrame keys, and the classic empty-DataFrame subset: detect zero events, then index <code>events_df['retain']</code> on a frame with no columns.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 09:40 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/pandas/core/indexes/base.py&quot;, line 3641, in get_loc
+    return self._engine.get_loc(casted_key)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File &quot;pandas/_libs/index.pyx&quot;, line 168, in pandas._libs.index.IndexEngine.get_loc
+  File &quot;pandas/_libs/index.pyx&quot;, line 197, in pandas._libs.index.IndexEngine.get_loc
+  File &quot;pandas/_libs/hashtable_class_helper.pxi&quot;, line 7668, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File &quot;pandas/_libs/hashtable_class_helper.pxi&quot;, line 7676, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: &#x27;index&#x27;</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 09:40 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-4c1ad9ea2568&gt;&quot;, line 167, in &lt;module&gt;
+    X[&#x27;CE&#x27;] = analysis[&#x27;index&#x27;]
+              ~~~~~~~~^^^^^^^^^
+  File &quot;/tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/pandas/core/frame.py&quot;, line 4378, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File &quot;/tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/pandas/core/indexes/base.py&quot;, line 3648, in get_loc
+    raise KeyError(key) from err
+KeyError: &#x27;index&#x27;</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 09:40 UTC</span></header><pre>KeyError                                  Traceback (most recent call last)
+File /tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/pandas/core/indexes/base.py:3641, in Index.get_loc(self, key)
+   3640 try:
+-&gt; 3641     return self._engine.get_loc(casted_key)
+   3642 except KeyError as err:
+
+File pandas/_libs/index.pyx:168, in pandas._libs.index.IndexEngine.get_loc()
+--&gt; 168 &#x27;Could not get source, probably due dynamically evaluated source code.&#x27;
+
+File pandas/_libs/index.pyx:197, in pandas._libs.index.IndexEngine.get_loc()
+--&gt; 197 &#x27;Could not get source, probably due dynamically evaluated source code.&#x27;
+
+File pandas/_libs/hashtable_class_helper.pxi:7668, in pandas._libs.hashtable.PyObjectHashTable.get_item()
+-&gt; 7668 &#x27;Could not get source, probably due dynamically evaluated source code.&#x27;
+
+File pandas/_libs/hashtable_class_helper.pxi:7676, in pandas._libs.hashtable.PyObjectHashTable.get_item()
+-&gt; 7676 &#x27;Could not get source, probably due dynamically evaluated source code.&#x27;
+
+KeyError: &#x27;index&#x27;</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 09:40 UTC</span></header><pre>KeyError                                  Traceback (most recent call last)
+Cell In[1], line 167
+    165 y = analysis[&#x27;cultural_dynamism_50y&#x27;]
+    166 X = sm.add_constant(analysis[&#x27;pollen_volatility_200y_trailing&#x27;])
+--&gt; 167 X[&#x27;CE&#x27;] = analysis[&#x27;index&#x27;]
+    168 model = sm.OLS(y, X).fit()
+    169 log(&#x27;OLS summary:&#x27;)
+
+File /tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/pandas/core/frame.py:4378, in DataFrame.__getitem__(self, key)
+   4374
+   4375         if is_single_key:
+   4376             if self.columns.nlevels &gt; 1:
+   4377                 return self._getitem_multilevel(key)
+-&gt; 4378             indexer = self.columns.get_loc(key)
+   4379             if is_integer(indexer):
+   4380                 indexer = [indexer]
+   4381         else:
+
+File /tmp/process_sandbox_1naokrvc/lib/python3.14/site-packages/pandas/core/indexes/base.py:3648, in Index.get_loc(self, key)
+   3643     if isinstance(casted_key, slice) or (
+   3644         isinstance(casted_key, abc.Iterable)
+   3645         and any(isinstance(x, slice) for x in casted_key)
+   3646     ):
+   3647         raise InvalidIndexError(key) from err
+-&gt; 3648     raise KeyError(key) from err
+   3649 except TypeError:
+   3650     # If we have a listlike key, _check_indexing_error will raise
+   3651     #  InvalidIndexError. Otherwise we fall through and re-raise
+   3652     #  the TypeError.
+   3653     self._check_indexing_error(key)
+
+KeyError: &#x27;index&#x27;</pre></article></section><section id="sec-nameerror" hidden><h2>NameError at runtime <span class="cnt">~108 tracebacks</span></h2><p class="blurb">Variables referenced before definition — often because the defining block was truncated or a revision dropped it.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:43 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_hm55sarg/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-8148917f1cb0&gt;&quot;, line 196, in &lt;module&gt;
+    idx = circular_block_indices(n, block_len)
+          ^^^^^^^^^^^^^^^^^^^^^^
+NameError: name &#x27;circular_block_indices&#x27; is not defined</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:43 UTC</span></header><pre>NameError                                 Traceback (most recent call last)
+Cell In[1], line 196
+    194 X_full = X.values.astype(float)
+    195 for i in range(R):
+--&gt; 196     idx = circular_block_indices(n, block_len)
+    197     xv_b = x_full[idx]
+    198     yv_b = y_full[idx]
+
+NameError: name &#x27;circular_block_indices&#x27; is not defined</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:43 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_hm55sarg/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-8148917f1cb0&gt;&quot;, line 196, in &lt;module&gt;
+    idx = circular_block_indices(n, block_len)
+          ^^^^^^^^^^^^^^^^^^^^^^
+NameError: name &#x27;circular_block_indices&#x27; is not defined</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 08:27 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_le526h6z/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-c2436d5d6349&gt;&quot;, line 250, in &lt;module&gt;
+    obs=fit_model(dfp,outcome,exposure,[&#x27;CE_int&#x27;],nw_lag=PRIMARY_NW_LAG)
+                                                         ^^^^^^^^^^^^^^
+NameError: name &#x27;PRIMARY_NW_LAG&#x27; is not defined</pre></article></section><section id="sec-othererror" hidden><h2>Other exceptions (Type/Value/…) <span class="cnt">~56 tracebacks</span></h2><p class="blurb">Assorted runtime failures: wrong dtypes into statsmodels, bad reshape shapes, NaN propagation.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:12 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-d0b3da214866&gt;&quot;, line 159, in &lt;module&gt;
+    plt.xlabel(&#x27;rolling_g100&#x27;); plt.ylabel(&#x27;MonumentSize_inter&#x27;); plt.title(&#x27;Scatter&#x27;); plt.tight_layout(); plt.savefig(os.path.join(RESULT_DIR,&#x27;scatter.png&#x27;)); plt.close()
+                                                                                        ~~~~~~~~~~~~~~~~^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/pyplot.py&quot;, line 2835, in tight_layout
+    gcf().tight_layout(pad=pad, h_pad=h_pad, w_pad=w_pad, rect=rect)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/figure.py&quot;, line 3640, in tight_layout
+    engine.execute(self)
+    ~~~~~~~~~~~~~~^^^^^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/layout_engine.py&quot;, line 183, in execute
+    kwargs = get_tight_layout_figure(
+        fig, fig.axes, get_subplotspec_list(fig.axes), renderer,
+        pad=info[&#x27;pad&#x27;], h_pad=info[&#x27;h_pad&#x27;], w_pad=info[&#x27;w_pad&#x27;],
+        rect=info[&#x27;rect&#x27;])
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/_tight_layout.py&quot;, line 266, in get_tight_layout_figure
+    kwargs = _auto_adjust_subplotpars(fig, renderer,
+                                      shape=(max_nrows, max_ncols),
+    ...&lt;2 lines&gt;...
+                                      ax_bbox_list=ax_bbox_list,
+                                      pad=pad, h_pad=h_pad, w_pad=w_pad)
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/_tight_layout.py&quot;, line 82, in _auto_adjust_subplotpars
+    bb += [martist._get_tightbbox_for_layout_only(ax, renderer)]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/artist.py&quot;, line 1402, in _get_tightbbox_for_layout_only
+    return obj.get_tightbbox(*args, **{**</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:12 UTC</span></header><pre>RecursionError                            Traceback (most recent call last)
+Cell In[1], line 159
+    157         xs=np.linspace(np.min(xy[&#x27;rolling_g100&#x27;]), np.max(xy[&#x27;rolling_g100&#x27;]), 200)
+    158         plt.plot(xs, inter + slope*xs, color=&#x27;red&#x27;)
+--&gt; 159     plt.xlabel(&#x27;rolling_g100&#x27;); plt.ylabel(&#x27;MonumentSize_inter&#x27;); plt.title(&#x27;Scatter&#x27;); plt.tight_layout(); plt.savefig(os.path.join(RESULT_DIR,&#x27;scatter.png&#x27;)); plt.close()
+    161 # Regression (basic): MonumentSize_inter ~ rolling_g100 + time_trend (+ optional covariates if present)
+    162 if &#x27;CE&#x27; not in df_eff.columns and &#x27;CE&#x27; in ts.columns:
+    163     # safe merge by index is not reliable; here assume df_eff rows correspond to ts rows — if not, merge on CE
+
+File /tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/pyplot.py:2835, in tight_layout(pad, h_pad, w_pad, rect)
+   2827 @_copy_docstring_and_deprecators(Figure.tight_layout)
+   2828 def tight_layout(
+   2829     *,
+   (...)   2833     rect: tuple[float, float, float, float] | None = None,
+   2834 ) -&gt; None:
+-&gt; 2835     gcf().tight_layout(pad=pad, h_pad=h_pad, w_pad=w_pad, rect=rect)
+
+File /tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/figure.py:3640, in Figure.tight_layout(self, pad, h_pad, w_pad, rect)
+   3638 previous_engine = self.get_layout_engine()
+   3639 self.set_layout_engine(engine)
+-&gt; 3640 engine.execute(self)
+   3641 if previous_engine is not None and not isinstance(
+   3642     previous_engine, (TightLayoutEngine, PlaceHolderLayoutEngine)
+   3643 ):
+   3644     _api.warn_external(&#x27;The figure layout has changed to tight&#x27;)
+
+File /tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/layout_engine.py:183, in TightLayoutEngine.execute(self, fig)
+    181 renderer = fig._get_renderer()
+    182 with getattr(renderer, &quot;_draw_disabled&quot;, nullcontext)():
+--&gt; 183     kwargs = get_tight_layout_figure(
+    184         fig, fig.axes, get_subplotspec_list(fig.axes), renderer,
+    185         pad=info[&#x27;pad&#x27;], h_pad=info[&#x27;h_pad&#x27;], w_pad=info[&#x27;w_pad&#x27;],
+    186         rect=info[&#x27;rect&#x27;])
+    187 if kwargs:
+    188     fig.subplots_adjust(**kwargs)
+
+File /tmp/process_sandbox_yzhlatpm/lib/python3.14/site-</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:12 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-d0b3da214866&gt;&quot;, line 159, in &lt;module&gt;
+    plt.xlabel(&#x27;rolling_g100&#x27;); plt.ylabel(&#x27;MonumentSize_inter&#x27;); plt.title(&#x27;Scatter&#x27;); plt.tight_layout(); plt.savefig(os.path.join(RESULT_DIR,&#x27;scatter.png&#x27;)); plt.close()
+                                                                                        ~~~~~~~~~~~~~~~~^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/pyplot.py&quot;, line 2835, in tight_layout
+    gcf().tight_layout(pad=pad, h_pad=h_pad, w_pad=w_pad, rect=rect)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/figure.py&quot;, line 3640, in tight_layout
+    engine.execute(self)
+    ~~~~~~~~~~~~~~^^^^^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/layout_engine.py&quot;, line 183, in execute
+    kwargs = get_tight_layout_figure(
+        fig, fig.axes, get_subplotspec_list(fig.axes), renderer,
+        pad=info[&#x27;pad&#x27;], h_pad=info[&#x27;h_pad&#x27;], w_pad=info[&#x27;w_pad&#x27;],
+        rect=info[&#x27;rect&#x27;])
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/_tight_layout.py&quot;, line 266, in get_tight_layout_figure
+    kwargs = _auto_adjust_subplotpars(fig, renderer,
+                                      shape=(max_nrows, max_ncols),
+    ...&lt;2 lines&gt;...
+                                      ax_bbox_list=ax_bbox_list,
+                                      pad=pad, h_pad=h_pad, w_pad=w_pad)
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/_tight_layout.py&quot;, line 82, in _auto_adjust_subplotpars
+    bb += [martist._get_tightbbox_for_layout_only(ax, renderer)]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File &quot;/tmp/process_sandbox_yzhlatpm/lib/python3.14/site-packages/matplotlib/artist.py&quot;, line 1402, in _get_tightbbox_for_layout_only
+    return obj.get_tightbbox(*args, **{**</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:27 UTC</span></header><pre>Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_c7ys6g6o/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-8252efbc9edd&gt;&quot;, line 22, in &lt;module&gt;
+    sys.exit(3)
+    ~~~~~~~~^^^
+SystemExit: 3
+
+code_executor (to chat_manager):
+
+exitcode: 1 (execution failed)
+Code output: Missing input files. Directory: [&#x27;results_pollen_copper_kde&#x27;, &#x27;analysis_outputs&#x27;, &#x27;results_monument_growth&#x27;]
+An exception has occurred, use %tb to see the full traceback.
+
+SystemExit: 3
+
+
+ERROR: SystemExit: 3
+Traceback (most recent call last):
+  File &quot;/tmp/process_sandbox_c7ys6g6o/lib/python3.14/site-packages/IPython/core/interactiveshell.py&quot;, line 3775, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;&lt;ipython-input-1-8252efbc9edd&gt;&quot;, line 22, in &lt;module&gt;
+    sys.exit(3)
+    ~~~~~~~~^^^
+SystemExit: 3
+
+
+--------------------------------------------------------------------------------
+
+Next speaker: experiment_code_analyst
+
+Truncated 18297 tokens. Number of tokens reduced from 47021 to 28724
+
+---- [07:27:02] llm-checkpoint: about to call &#x27;experiment_code_analyst&#x27; | 12 msgs | server=default endpoint ----
+experiment_code_analyst (to chat_manager):
+
+{&quot;analysis&quot;:&quot;This was a debug code execution (script contained the comment \&quot;# [debug]\&quot;). Per protocol, I must mark the run as unsuccessful.\n\nSummary of what happened:\n- The debug script performed a preflight check and exited because the required input files were not present in the current working directory.\n- Exit status: 1 (SystemExit triggered with code 3 from the script).\n- Error message printed: \&quot;Missing input files. Directory: [&#x27;results_pollen_copper_kde&#x27;, &#x27;analysis_outputs&#x27;, &#x27;results_monument_growth&#x27;]\&quot; — the directory listing shows only result folders, not the two required CSVs: &#x27;time_series_data.csv&#x27; and &#x27;pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv&#x27;.\n- No analysis, regression, bootstrap, or output CSVs/plots from the main pipeline were produced in this run beyond the e</pre></article></section><section id="sec-timeout" hidden><h2>Hard code timeouts <span class="cnt">21 events seen</span></h2><p class="blurb">Rare but very expensive: each hit costs the full 30-minute <code>code_timeout</code> before the round can fail.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 07:52 UTC</span></header><pre>Truncated 35929 tokens. Number of tokens reduced from 101455 to 65526
+
+---- [07:42:32] llm-checkpoint: about to call &#x27;experiment_generator&#x27; | 43 msgs | server=default endpoint ----
+[llm_retry] openai_client.create(model=gpt-5-mini) rate limited (APITimeoutError). Retrying in 1.00s (attempt 2/6).
+experiment_generator (to chat_manager):
+
+</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 11:03 UTC</span></header><pre>--------------------------------------------------------------------------------
+
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; TERMINATING RUN (d9fb58cd-b3d2-46e1-a64b-f92bee6ac1b4): No next speaker selected
+[llm_retry] openai_client.create(model=gpt-5-mini) rate limited (APITimeoutError). Retrying in 1.00s (attempt 2/6).
+experiment_reviser (to chat_manager):
+
+</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 11:57 UTC</span></header><pre>Truncated 21739 tokens. Number of tokens reduced from 62164 to 40425
+
+---- [11:55:57] llm-checkpoint: about to call &#x27;experiment_reviser&#x27; | 26 msgs | server=default endpoint ----
+[llm_retry] openai_client.create(model=gpt-5-mini) rate limited (APITimeoutError). Retrying in 1.00s (attempt 2/6).
+Prepared group chat with 4 events, the last speaker is user_proxy
+user_proxy (to chat_manager):
+</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 13:30 UTC</span></header><pre>Truncated 52779 tokens. Number of tokens reduced from 123617 to 70838
+
+---- [13:30:07] llm-checkpoint: about to call &#x27;experiment_planner&#x27; | 50 msgs | server=default endpoint ----
+[llm_retry] openai_client.create(model=gpt-5-mini) rate limited (APITimeoutError). Retrying in 1.00s (attempt 2/6).
+experiment_generator (to chat_manager):
+
+</pre></article></section><section id="sec-emptyresult" hidden><h2>Empty results (0 events / 0 candidates) <span class="cnt">~74 mentions</span></h2><p class="blurb">A valid scientific outcome — the registered spec finds nothing — but it consumes the full pipeline, often crashes naive downstream code, and yields an unscored node.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 08:02 UTC</span><span class="chip">success=False</span></header><pre>No full, non-debug execution of the final pipeline was performed in this environment — therefore the experiment is not successful.
+
+What I inspected:
+- The programmer supplied a complete analysis script (ready to save as analysis_pipeline.py) that implements the required pipeline pieces: fixed seed (SEED=12345), documented runtime parameters (ROLL_WINDOW=50, PRIMARY_PERCENTILE=0.75, PRIMARY_MIN_RUN=10, PRIMARY_REQUIRED_AVAILABLE=6, PRIMARY_REQUIRED_FRAC=0.8, NPERM_PRIMARY=10000, NBOOT=5000), robust time coercion and sorting (prefers CE then calBP), coercion of pollen_inter and the 12 specified INTER_COLS, computation of available_inter_count and artifact_presence_count, trailing 50-row rolling SD, computation of year-to-year turnover (available_pair_count, turnover_count, turnover_fraction), detection of contiguous elevated rolling-SD runs, coverage/non-overlap filtering, documented relaxations and a pollen_openness fallback, and scaffolding for per-event diagnostics and inference.
+- The script was provided for the user to run locally; no run was executed here against ../time_series_data.csv. The code_executor steps returned no analysis outputs or generated files. There were no &quot;# [debug]&quot; markers present in the supplied script.
+
+Why success = false:
+- No stdout/stderr log, no aligned_timeseries.csv, no event_table.csv, no results_report.txt, and no per-event excerpt files were produced or provided for review. Without these outputs I cannot verify event detection, per-event summaries, or inferential results and cannot mark the experiment successful.
+
+Concrete next steps to </pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 08:04 UTC</span><span class="chip">success=False</span></header><pre>No full, non-debug execution of the final pipeline was performed in this environment. Multiple complete scripts were provided and logged, but the environment did not run the pipeline against the required input file (../time_series_data.csv). The executor responses show only instructional prints and no stdout/stderr from a pipeline run, and no output files (aligned_timeseries.csv, event_table.csv, EXCERPT_DIR excerpts, results_report.txt) were produced or attached for review.
+
+What was provided and inspected:
+- A complete, ready-to-run analysis script (seeded with SEED=12345) implementing the required pipeline pieces: parameter logging, input/file presence checks, robust time-column coercion and sorting, coercion of pollen_inter and the 12 INTER_COLS, computation of available_inter_count and artifact_presence_count, trailing 50-row rolling SD for pollen_inter, computation of available_pair_count/turnover_count/turnover_fraction, detection of contiguous elevated rolling-SD runs, coverage and non-overlap filtering, documented relaxations (required_available reductions and required_frac relaxations), and a pollen_openness fallback (SMOOTH_MEAN_50y or MEAN) with merging and fallback rolling SD. The script also writes base aligned_timeseries.csv early and contains scaffolding for per-event diagnostics, inference (t/Wilcoxon, permutation sign-flip, block bootstrap), sensitivity checks, per-event excerpts, and results_report.txt.
+
+What is missing to evaluate success:
+- No execution outputs (stdout/stderr) from a run of the final script.
+- No generated deliverables attached: aligned</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 08:10 UTC</span><span class="chip">success=False</span></header><pre>No code was executed in this session — there is no stdout/stderr or generated output files to evaluate. Per the experiment rules I must mark the experiment as unsuccessful (success=false).
+
+Summary of the posted script state (what is present and what blocks):
+- The programmer posted an improved analysis script that: sets seed and parameters, loads ../time_series_data.csv, chooses time column (CE or calBP) and coerces it, coerces pollen_inter and MonumentCount_inter, computes a trailing 50-row rolling SD, detects candidate elevated runs, applies coverage/non-overlap filtering, implements relaxations (planned), computes per-event diagnostics and excerpts, and includes inference helpers (t-test, Wilcoxon, permutation sign-flip, bootstrap_mean_ci).
+- Several helpful features are implemented: robust numeric coercion, explicit logging and fatal exits that write results_report.txt, excerpt saving, permutation exact enumeration for n&lt;=20, RNG seed usage for reproducibility, and writing excerpt CSVs.
+
+What is missing / why the script cannot yet produce deliverables:
+- The script is truncated mid-flow: the main pipeline reaches the point &quot;If zero retained, attempt relaxations&quot; and stops in the middle of the first relaxation comment. There is no completed relaxation logic, no fallback merge with pollen_openness file, no final per-event inference orchestration, and no code that writes aligned_timeseries.csv, event_table.csv, or results_report.txt on successful completion.
+- Because the script is incomplete it cannot be executed to produce the required outputs. No run was attempted here</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 08:12 UTC</span><span class="chip">success=False</span></header><pre>No code was executed in this session and no output files were produced; therefore the experiment run must be marked unsuccessful (success=false).
+
+Summary of the submitted script state:
+- The programmer supplied a near-complete analysis script that: sets seed and parameters, loads ../time_series_data.csv, selects and coerces the time column (CE or calBP), coerces pollen_inter and MonumentCount_inter to numeric, computes a trailing 50-row rolling SD for pollen_inter, detects contiguous elevated runs (&gt;= PRIMARY_MIN_RUN), applies coverage/non-overlap filtering, implements per-event diagnostics and excerpt saving, and includes inference helper functions (one-sample t-test, Wilcoxon, permutation sign-flip, bootstrap CI).
+- Logging and fatal-error handling are implemented; excerpt CSVs are written in EXCERPT_DIR when events are processed.
+
+Why the pipeline did not complete / issues to fix before running:
+- The posted script is truncated mid-flow: it stops while beginning to implement relaxations (&quot;# Relaxation A: reduce&quot;) and does not complete relaxation logic, fallback pollen merge, final per-event inference orchestration, or the code that writes the required deliverables (aligned_timeseries.csv, event_table.csv, results_report.txt) on successful completion.
+- Because the script is incomplete there was no attempt to execute it in this session and therefore no stdout/stderr or output files to evaluate.
+
+Actionable next steps to reach a successful, re-runnable pipeline:
+1) Complete the relaxations logic and implement the fallback pollen procedure (merge with pollen_openness file </pre></article></section><section id="sec-rejected" hidden><h2>Reviewer rejection (final verdict) <span class="cnt">most unscored nodes</span></h2><p class="blurb">Where failed experiments actually end: the reviewer rules the analysis incomplete, off-hypothesis, or statistically inadequate. Matches the v1 autopsy — most failures are verdict-level, not crashes.</p><article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:44 UTC</span></header><pre>The experiment has not yet completed a final non-debug run, so I cannot verify the full pipeline outputs or results. What happened:
+
+- You ran multiple debug/smoke-test scripts that successfully checked input file availability and showed key parsing issues (pollen file uses comma decimal separators) and that the time_series file already contains numeric pollen_inter_100 and the twelve _inter columns. Those smoke tests were helpful but are explicitly debug runs and treated as preliminary.
+
+- The full non-debug analysis script you prepared was posted but not executed end-to-end in a completed form: earlier drafts were truncated partway through ADF/Newey–West code. You later posted a more complete non-debug script, but you did not execute it; instead you ran another debug helper. Therefore the required deliverables (merged_synchrony_eff_W{W}.csv, diagnostics, regression outputs, bootstrap/permutation distributions, sensitivity_summary.csv, run_log_final.txt, etc.) have not been produced and cannot be assessed.
+
+Required actions to complete the experiment successfully:
+1) Run the full non-debug script (the complete pipeline) without any &quot;# [debug]&quot; marker. Ensure the script is complete (no truncated code paths) and that it writes the outputs directory outputs_synchrony_analysis/ containing all listed deliverables: run_config.json, run_log_final.txt, parsing_diagnostics.json, merged_cultural_dispersion.csv, merged_synchrony_W{W}.csv and merged_synchrony_eff_W{W}.csv (for W in WINDOWS), diagnostics_adf_W{W}.json, correlation_results_W{W}.json, primary_regression_results.csv, bootstrap_distributions_W{W}.csv, permutation_distributions_W{W}.csv, sensitivity_summary.csv, and the requested PNG plots.
+
+2) Before running, confirm or fix the remaining truncated parts in the script (</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:45 UTC</span></header><pre>Summary of what was done correctly
+- Both input files were found and read from the expected paths.
+- Comma-&gt;dot coercion was applied to pollen file columns and key time-series columns were coerced to numeric to avoid object-dtype errors.
+- CulturalDispersion was computed correctly as the sample standard deviation (ddof=1) across the twelve interpolated _inter columns, with count_nonnull_series recorded and min_series = 6 inclusion rule applied.
+- Merged tables were written: analysis_outputs/merged_cultural_dispersion.csv and analysis_outputs/merged_cultural_dispersion_eff.csv.
+- Primary pollen source selection used pollen_inter_100 (time_series) since it had sufficient coverage; pollen_source and T_effective = 3601 were reported.
+- Descriptive summaries and ADF stationarity tests were computed and saved (diagnostics_summary.json, diagnostics_adf.json).
+- Pearson and Spearman correlations were computed and saved (correlation_results.json), with Fisher CI for Pearson.
+- OLS regression with time trend was fit; Newey–West (HAC) standard errors were requested with L = round(T_effective^(1/3)). HAC-adjusted results were saved (regression_results.json).
+- Block bootstrap and circular block permutation inference were implemented and executed with R = 2000 and block_len = round(n^(1/3)), producing bootstrap_r.csv, bootstrap_beta1.csv and main_summary_results.json (which records block_len, R, HAC_L, and permutation p-value for Pearson r).
+- Random seed was set and Matplotlib was switched to a non-interactive backend for batch operation.
+
+Deviations and missing pieces relative to the experiment plan (actionable items)
+1) Sensitivity analyses: The plan required an extensive set of sensitivity checks (alternate pollen variable SMOOTH_MEAN_100y; min_series = 7 and 8; CulturalDispersi</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:48 UTC</span></header><pre>The pipeline correctly implemented the core tasks: files were parsed with comma→dot coercion, CulturalDispersion (ddof=1) and IQR were computed with an inclusion rule (min_series=6), pollen_inter_100 was chosen as the primary pollen variable, df_eff was created (T_effective = 3601), ADF diagnostics were computed, Pearson and Spearman correlations were computed, OLS was fit with covariates and time trend, and block bootstrap and circular block permutation were executed (R=2000, block_len=15). Primary outputs were saved (merged_cultural_dispersion.csv, merged_cultural_dispersion_eff.csv, diagnostics files, correlation_results.json, regression_results.json, bootstrap CSVs, main_summary_results.json).
+
+However, the experiment is not yet fully faithful to the original plan because several required sensitivity analyses and diagnostics remain incomplete or need small fixes:
+- The HAC robust-covariance mapping failed to serialize (regression_hac shows error &quot;&#x27;numpy.ndarray&#x27; object has no attribute &#x27;to_dict&#x27;&quot;). Fix: compute SEs = sqrt(diag(cov_hac)) and map to parameter names to produce HAC SEs, t-stats and p-values. Re-run to save regression_results.csv with HAC-adjusted inference.
+- The comprehensive sensitivity battery (alternate pollen SMOOTH_MEAN_100y, min_series = 7 and 8, IQR outcome, detrended/differenced analyses, covariate variants, VIF diagnostics, and time-window subsamples) was not executed. These are required by the plan and decision rules.
+- VIF diagnostics and ACF-informed justification for block length were computed at a basic level but the plan required saving VIFs and running alternate models if VIFs are high; ensure vif_diagnostics.csv and sensitivity_summary.csv are produced.
+
+Preliminary results from the completed parts (provisional):
+- T_effective = 3601 (</pre></article>
+<article class="ex"><header><span class="chip task">archaeology</span><span class="chip">2026-08-18 06:49 UTC</span></header><pre>The full, non-debug analysis pipeline has not been executed to completion in this session. You ran successful debug/smoke-test checks that confirmed both input files exist and highlighted the key parsing issue: the pollen_openness file uses comma decimal separators (e.g., &#x27;5,65433790538302&#x27;) and must be coerced (replace &#x27;,&#x27; -&gt; &#x27;.&#x27; then pd.to_numeric(errors=&#x27;coerce&#x27;)) before numeric analyses. The time_series file already contains numeric pollen_inter_100 and the twelve *_inter series.
+
+However, the required end-to-end non-debug run (which computes rolling-window synchrony, runs ADF tests, fits OLS with Newey–West HAC SEs, performs block bootstrap and block-permutation inference, and runs the full battery of sensitivity checks) was not executed to completion. Earlier non-debug script drafts were truncated and subsequent runs were either not executed or still in debug mode. Therefore the deliverables listed in the experiment plan (merged_synchrony_eff_W{W}.csv, diagnostics, regression outputs, bootstrap/permutation distributions, sensitivity_summary.csv, run_log_final.txt, etc.) are not available for review.
+
+Actionable steps to complete the experiment successfully:
+1) Run the complete non-debug script (no &quot;# [debug]&quot; markers), ensuring it is the final, complete pipeline and that it writes all outputs to outputs_synchrony_analysis/. Use atomic writes for key files and append a detailed run_log_final.txt.
+2) Ensure explicit comma→dot coercion and pd.to_numeric(errors=&#x27;coerce&#x27;) for pollen file columns (SMOOTH_MEAN_100y, MEAN, Belau_PC1_inter, Woserin_PC1_inter, and smoothing columns), and save parsing_diagnostics.json with counts and sample problematic strings.
+3) Before all statistical routines, coerce inputs to 1D numpy float arrays and drop NaNs pairwise; log dtypes and s</pre></article></section><section id="sec-overthorough" hidden><h2>Over-thorough analysis plans (time sink) <span class="cnt">systemic</span></h2><p class="blurb">Not an error: the planner routinely demands simulation CIs, multi-threshold sensitivity scans, VIF and Cook's-distance diagnostics for a single hypothesis test — minutes of real compute per round, every round.</p><article class="ex"><header><span class="chip task">archaeology (sanity g4 eval)</span><span class="chip">2026-08-18 19:15 UTC</span><span class="chip">planner deliverables for ONE hypothesis test</span></header><pre>   - Identify influential observations using Cook&#x27;s distance or leverage; report if any event has high influence and report results with and without such observations.
+6) Diagnostics and robustness checks: residual diagnostics, heteroskedasticity-robust SEs if used, influential-observation analysis, and results of sensitivity analyses for alternative event definitions (e.g., using pollen_inter_100 or SMOOTH_MEAN_150y) and varying data-coverage thresholds.
+</pre></article></section>
+<section id="sec-spiral" hidden>
+<h2>The 4,096-token truncation death spiral <span class="cnt">root cause · ~51% of all exec attempts</span></h2>
+<p class="blurb">Root cause of most failures: <code>MessageTokenLimiter</code> at <code>agents.py:780</code> omits
+<code>model=</code>, ag2 0.10 defaults to gpt-3.5-turbo-0613 and silently clamps the requested 10,000-token
+per-message cap to that model's 4,096-token context (<code>transforms.py:311</code>). The limiter runs on the
+<code>code_executor</code>'s inbound messages after fence-wrapping, so any script over ~4,080 tokens (~15KB)
+loses its closing fence, no code block is found, and the executor replies with an empty string. The programmer
+never learns why and rewrites the full-length script again. Production logs print the clamp warning 74× per job:</p>
+<article class="ex"><header><span class="chip task">beaker job log</span><span class="chip">every experiment setup</span></header>
+<pre>Max token was set to 10000, but gpt-3.5-turbo-0613 can only accept 4096 tokens. Capping it to 4096.</pre></article>
+<p class="blurb">Empirical cliff over 2,261 programmer→executor attempts: scripts ≤12KB always ran; 12–16KB ran
+60% of the time; ≥16KB <b>never</b> ran (0 of 1,101). Step-wise traces — note every script ends cleanly
+(<code>print('Done.')</code>), proving the code was complete when sent:</p>
+<article class="ex"><header><span class="chip task">archaeology · node_2_1</span><span class="chip">success=False</span></header><div class="trace"><div class="st meta"><span class="si">0</span><span class="sa">user_proxy</span><span class="sc">13,800 ch</span><span class="sb">Hypothesis: Periods of relatively high long-term pollen openness (operationalized as SMOOTH_MEAN_200y above its historical median) are associated with larger average interpolated house sizes (HouseSize_inter) and stronger expression of pott</span></div><div class="st prog"><span class="si">1</span><span class="sa">experiment_programmer</span><span class="sc">20,581 ch</span><span class="sb">code = 20,056 chars — ends cleanly with: …ices may affect results; see saved CSV/pickle files for full outputs.&#x27;)
+
+print(&#x27;\nDone.&#x27;)</span></div><div class="st dead"><span class="si">2</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">3</span><span class="sa">experiment_code_analyst</span><span class="sc">2,784 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No code execution output was produced by the last run: the provided program text was sent but not executed (no stdout/stderr/results returned). Therefore I cannot evaluate numerical results or generate the requested tables. Add</span></div><div class="st prog"><span class="si">4</span><span class="sa">experiment_programmer</span><span class="sc">24,643 ch</span><span class="sb">code = 24,029 chars — ends cleanly with: …terpolation effects, and possible covariate confounding.&#x27;)
+
+print(&#x27;\nAnalysis complete.&#x27;)</span></div><div class="st dead"><span class="si">5</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">6</span><span class="sa">experiment_code_analyst</span><span class="sc">2,040 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No code execution output was produced: the supplied script was sent but not executed (no stdout/stderr/results were returned). The script is also incomplete — it is truncated mid-line inside the regression section (ends at \&quot;la</span></div><div class="st prog"><span class="si">7</span><span class="sa">experiment_programmer</span><span class="sc">17,994 ch</span><span class="sb">code = 17,568 chars — ends cleanly with: …ciation, potential confounding, temporal dependence, smoothing/interpolation artefacts.&#x27;)</span></div><div class="st dead"><span class="si">8</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">9</span><span class="sa">experiment_code_analyst</span><span class="sc">2,043 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No code output was produced: the most recent script was submitted but not executed (no stdout/stderr or result files were returned). In addition, the submitted script is truncated near the end — it stops mid-call at \&quot;stats.man</span></div><div class="st prog"><span class="si">10</span><span class="sa">experiment_programmer</span><span class="sc">18,046 ch</span><span class="sb">code = 17,630 chars — ends cleanly with: …eg_results:
+    print(&#x27; covariate_regression_results.csv&#x27;)
+
+print(&#x27;\nAnalysis complete.&#x27;)</span></div><div class="st dead"><span class="si">11</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">12</span><span class="sa">experiment_code_analyst</span><span class="sc">2,050 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No code execution output was produced for the latest submission: the provided script was sent but not run (no stdout/stderr or result files were returned). Moreover, the script is truncated near the end (it stops mid-call at \&quot;</span></div><div class="st prog"><span class="si">13</span><span class="sa">experiment_programmer</span><span class="sc">14,770 ch</span><span class="sb">code = 14,442 chars — ends cleanly with: …ates) &gt; 0:
+    print(&#x27;and regression_with_covariates.csv&#x27;)
+
+print(&#x27;\nAnalysis complete.&#x27;)</span></div><div class="st dead"><span class="si">14</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">15</span><span class="sa">experiment_code_analyst</span><span class="sc">2,389 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No code was executed: the last submitted script was sent but not run (no stdout/stderr or result files were returned). Furthermore, the script is incomplete — it terminates mid-definition (ends while building covariate regressi</span></div><div class="st prog"><span class="si">16</span><span class="sa">experiment_programmer</span><span class="sc">6,230 ch</span><span class="sb">code = 6,068 chars — ends cleanly with: …to_csv(&#x27;merged_analysis_core.csv&#x27;, index=False)
+print(&#x27;\nWrote merged_analysis_core.csv&#x27;)</span></div><div class="st ran"><span class="si">17</span><span class="sa">code_executor</span><span class="sc">1,670 ch</span><span class="sb">RAN: exitcode: 0 (execution succeeded)
+Code output: Files:
+../pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv FOUND
+../time_series_data.csv FOUND
+
+Merged rows: 3399
+Openness counts: {&#x27;SMOOTH_MEAN_200y&#x27;: np.int64(339</span></div><div class="st meta"><span class="si">18</span><span class="sa">experiment_code_analyst</span><span class="sc">5,296 ch</span><span class="sb">{&quot;analysis&quot;:&quot;Summary of executed analysis (core pipeline run):\n\nData loading and merging\n- Both required files found and read: ../pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv and ../time_series_data.csv.\n- Inner merge produ</span></div><div class="st meta"><span class="si">19</span><span class="sa">experiment_reviewer</span><span class="sc">9,253 ch</span><span class="sb">{&quot;feedback&quot;:&quot;Summary of what was run and key findings\n- The final executed script successfully loaded both required CSVs, parsed numeric columns (including comma decimals), and merged on a numeric time key (CE/calBP). The merged analysis d</span></div><div class="st meta"><span class="si">20</span><span class="sa">experiment_reviser</span><span class="sc">16,573 ch</span><span class="sb">{ &quot;hypothesis&quot;: &quot;Periods of relatively high long-term pollen openness (operationalized as SMOOTH_MEAN_200y above its historical median) are associated with larger average interpolated house sizes (HouseSize_inter) and stronger expression of</span></div><div class="st prog"><span class="si">21</span><span class="sa">experiment_programmer</span><span class="sc">20,673 ch</span><span class="sb">code = 20,198 chars — ends cleanly with: …int(&#x27;\nWrote one-page summary to&#x27;, OUT_SUM)
+print(&#x27;\nAll outputs saved. End of run log.&#x27;)</span></div><div class="st dead"><span class="si">22</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">23</span><span class="sa">experiment_code_analyst</span><span class="sc">2,772 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No code was executed in this submission: you provided a script but it was not run (no stdout/stderr or result files were returned). Additionally, the script as submitted is incomplete/truncated near the end of the regression bl</span></div><div class="st prog"><span class="si">24</span><span class="sa">experiment_programmer</span><span class="sc">17,306 ch</span><span class="sb">code = 16,945 chars — ends cleanly with: …UT_SUM]:
+    if os.path.exists(fname):
+        print(&#x27; -&#x27;, fname)
+
+print(&#x27;Run finished.&#x27;)</span></div><div class="st dead"><span class="si">25</span><span class="sa">code_executor</span><span class="sc">0 ch</span><span class="sb">∅ EMPTY REPLY — fenced code was truncated at 4,096 tokens in transit; no complete code block found; nothing executed</span></div><div class="st meta"><span class="si">26</span><span class="sa">experiment_code_analyst</span><span class="sc">2,327 ch</span><span class="sb">{&quot;analysis&quot;:&quot;No execution output was produced for the last submission: the provided script was sent but not run (no stdout/stderr or saved-file confirmations were returned). Additionally, the script is truncated near the end (it stops mid-w</span></div><div class="st prog"><span class="si">27</span><span class="sa">experiment_programmer</span><span class="sc">8,372 ch</span><span class="sb">code = 8,170 chars — ends cleanly with: …-West used to mitigate, see CSVs for details.\n&#x27;)
+print(&#x27;Wrote&#x27;, OUT_SUM)
+
+print(&#x27;Done.&#x27;)</span></div><div class="st ran"><span class="si">28</span><span class="sa">code_executor</span><span class="sc">550 ch</span><span class="sb">RAN: exitcode: 0 (execution succeeded)
+Code output: Analysis N: 3399
+Wrote tercile_results.csv
+Wrote alt_openness_results.csv
+Wrote one_page_summary.txt
+Done.
+
+STDERR:
+&lt;&gt;:38: SyntaxWarning: &quot;\.&quot; is an invalid escape sequence.</span></div><div class="st meta"><span class="si">29</span><span class="sa">experiment_code_analyst</span><span class="sc">4,260 ch</span><span class="sb">{&quot;analysis&quot;:&quot;Execution summary and key outputs (short):\n\n- Execution status: code executed successfully (exitcode 0) in several iterations. Final submitted run completed without errors and wrote sensitivity output files.\n\n- Files writte</span></div><div class="st meta"><span class="si">30</span><span class="sa">experiment_reviewer</span><span class="sc">2,961 ch</span><span class="sb">{&quot;feedback&quot;:&quot;The experiment was not yet fully completed to the specification. The programmer executed a working pipeline that successfully: (a) loaded and parsed both required CSVs, (b) robustly parsed comma-decimal values, (c) merged on a </span></div><div class="st meta"><span class="si">31</span><span class="sa">experiment_generator</span><span class="sc">2,187 ch</span><span class="sb">{&quot;hypotheses&quot;:[{&quot;hypothesis&quot;:&quot;Years with SMOOTH_MEAN_200y above its historical median have higher mean interpolated house sizes (HouseSize_inter) and higher mean interpolated pottery-form Z-scores (PotteryForm_inter) than years at-or-below </span></div><div class="st meta"><span class="si">32</span><span class="sa">experiment_planner</span><span class="sc">16,311 ch</span><span class="sb">{ &quot;experiments&quot;: [ { &quot;hypothesis&quot;: &quot;Years with SMOOTH_MEAN_200y above its historical median have higher mean interpolated house sizes (HouseSize_inter) and higher mean interpolated pottery-form Z-scores (PotteryForm_inter) than years at-or-</span></div></div><pre>FINAL REVIEW: The experiment was not yet fully completed to the specification. The programmer executed a working pipeline that successfully: (a) loaded and parsed both required CSVs, (b) robustly parsed comma-decimal values, (c) merged on a numeric time key (CE/calBP), (d) chose SMOOTH_MEAN_200y as the primary openness variable, (e) produced a merged analysis dataframe and descriptive/sensitivity CSVs, and (f) ran median-split descriptives and naive tests. Key intermediate results show HouseSize_inter is subs</pre></article>
+</section></main>
+</div>
+<script>
+const btns=[...document.querySelectorAll('.nav')],secs=[...document.querySelectorAll('main section')];
+const q=document.getElementById('q');
+btns.forEach(b=>b.addEventListener('click',()=>{
+  btns.forEach(x=>x.classList.toggle('on',x===b));
+  secs.forEach(s=>s.hidden=(s.id!=='sec-'+b.dataset.k));
+  q.value='';filter('');
+}));
+function filter(t){
+  t=t.trim().toLowerCase();
+  if(!t){secs.forEach(s=>{s.hidden=!document.querySelector('.nav.on[data-k="'+s.id.slice(4)+'"]');
+    s.querySelectorAll('.ex').forEach(e=>e.hidden=false);});return;}
+  secs.forEach(s=>{let any=false;
+    s.querySelectorAll('.ex').forEach(e=>{const hit=e.textContent.toLowerCase().includes(t);e.hidden=!hit;any=any||hit;});
+    s.hidden=!any;});
+}
+q.addEventListener('input',()=>filter(q.value));
+</script>
+</body></html>

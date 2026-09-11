@@ -1,0 +1,253 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Keyword reward sanity runs</title>
+<style>
+  :root {
+    --bg: #F6F8F7; --surface: #FFFFFF; --ink: #1B211F; --muted: #5C6A66;
+    --line: #DDE4E1; --accent: #0E7268; --accent-soft: #E0F0ED; --code-bg: #EEF2F0;
+    --grid: #E7ECEA;
+    --series-1: #2a78d6; --series-2: #eb6834;
+    --st-good: #0ca30c; --st-warning: #fab219; --st-critical: #d03b3b;
+    --st-good-bg: #E3F1E5; --st-warning-bg: #F7EBD9; --st-critical-bg: #F8E4E4;
+    --st-ink-good: #166534; --st-ink-warning: #92400E; --st-ink-critical: #991B1B;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131817; --surface: #1B2120; --ink: #E4EAE7; --muted: #93A29D;
+      --line: #2C3533; --accent: #3FB8A9; --accent-soft: #17302D; --code-bg: #232B29;
+      --grid: #2A3331;
+      --series-1: #3987e5; --series-2: #d95926;
+      --st-good-bg: #17301F; --st-warning-bg: #33270F; --st-critical-bg: #371A1A;
+      --st-ink-good: #6FCF8E; --st-ink-warning: #E0A85C; --st-ink-critical: #E38C8C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817; --surface: #1B2120; --ink: #E4EAE7; --muted: #93A29D;
+    --line: #2C3533; --accent: #3FB8A9; --accent-soft: #17302D; --code-bg: #232B29;
+    --grid: #2A3331;
+    --series-1: #3987e5; --series-2: #d95926;
+    --st-good-bg: #17301F; --st-warning-bg: #33270F; --st-critical-bg: #371A1A;
+    --st-ink-good: #6FCF8E; --st-ink-warning: #E0A85C; --st-ink-critical: #E38C8C;
+  }
+  body {
+    background: var(--bg); color: var(--ink); margin: 0; padding: 2.5rem 1.25rem 4rem;
+    font-family: "Avenir Next", Seravek, "Segoe UI", system-ui, sans-serif; line-height: 1.55;
+  }
+  main { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+  h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 0.3rem; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 0.93rem; margin: 0; max-width: 72ch; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.4rem 1.6rem 1.5rem; }
+  h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.15rem; }
+  .cap { color: var(--muted); font-size: 0.86rem; margin: 0 0 1rem; max-width: 74ch; }
+  p { margin: 0.6rem 0; max-width: 74ch; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.84em; background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 0.85rem; width: 100%; }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; }
+  .pill { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 99px; white-space: nowrap; }
+  .pill.good { color: var(--st-ink-good); background: var(--st-good-bg); }
+  .pill.warn { color: var(--st-ink-warning); background: var(--st-warning-bg); }
+  .pill.bad  { color: var(--st-ink-critical); background: var(--st-critical-bg); }
+  .legend { display: flex; gap: 1.1rem; flex-wrap: wrap; margin: 0 0 0.5rem; font-size: 0.84rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .chartwrap { position: relative; overflow-x: auto; }
+  svg { display: block; max-width: 100%; height: auto; }
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.45rem 0.6rem; font-size: 0.78rem; box-shadow: 0 2px 10px rgba(0,0,0,.13);
+    white-space: nowrap; z-index: 5; color: var(--ink);
+  }
+  .tip b { font-weight: 600; }
+  .note { border-left: 3px solid var(--st-critical); background: var(--st-critical-bg); color: var(--ink);
+          padding: 0.7rem 0.9rem; border-radius: 0 6px 6px 0; font-size: 0.89rem; margin: 1rem 0 0; max-width: 74ch; }
+  .note.calm { border-left-color: var(--accent); background: var(--accent-soft); }
+  details { margin-top: 0.9rem; font-size: 0.85rem; }
+  summary { cursor: pointer; color: var(--muted); }
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+<main>
+<div style="max-width:1180px;margin:0 auto 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px"><a href="../dashboards/autodiscovery-rl-runs-index-10-steps.html" style="color:#2563eb;text-decoration:none">&#8592; AutoDiscovery RL &#183; runs index</a></div>
+  <div>
+    <h1>Keyword reward sanity runs</h1>
+    <p class="sub">Five GRPO runs on one archaeology prompt, 10 epochs, Qwen3.5-9B. Reward is 1.0 iff the extracted hypothesis matches a regex, 0.0 otherwise — deterministic in the policy's own text, no API models involved. Plotted value is <code>rollout/raw_reward</code>, which for a binary reward equals the fraction of the group that matched.</p>
+  </div>
+
+  <section>
+    <h2>Run status</h2>
+    <p class="cap">Only one run finished cleanly, and its clean exit was itself spurious. Every restart began a fresh run at step 0 — there is no checkpoint resume, so each preemption costs the whole run.</p>
+    <div class="tablewrap"><table>
+      <tr><th>Run</th><th>Pattern</th><th class="num">Group</th><th class="num">Steps</th><th>Outcome</th><th>Usable?</th></tr>
+      <tr><td>kw-g16</td><td>pottery form</td><td class="num">16</td><td class="num">5/10</td><td>cancelled at 8h wall clock</td><td><span class="pill warn">underpowered</span></td></tr>
+      <tr><td>kw-g256</td><td>pottery form</td><td class="num">256</td><td class="num">3/10</td><td>preempted; later "exit 0" was a dropped ray driver, not success</td><td><span class="pill good">trustworthy</span></td></tr>
+      <tr><td>kw-pc-g16</td><td>+ copper</td><td class="num">16</td><td class="num">1/10</td><td>preempted, then NCCL watchdog abort</td><td><span class="pill bad">no data</span></td></tr>
+      <tr><td>kw-pc-g256</td><td>+ copper</td><td class="num">256</td><td class="num">9/10</td><td>ran 16h, cancelled at step 8</td><td><span class="pill bad">reward hacked</span></td></tr>
+      <tr><td>kw-pcn-g256</td><td>+ negative</td><td class="num">256</td><td class="num">0/10</td><td>container died during step-0 rollout</td><td><span class="pill bad">no data</span></td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>The genuine signal — single keyword</h2>
+    <p class="cap">Matches are verified real: short hypotheses (max ~690 chars), zero truncation in either run. <code>pottery form</code> corresponds to a real dataset column (<code>PotteryForm_inter</code>), so this measures variable steering at a ~1–2% base rate.</p>
+    <div class="legend" id="legend-a"></div>
+    <div class="chartwrap"><div id="chart-a"></div><div class="tip" id="tip-a"></div></div>
+    <p>At <strong>g256</strong> the reward rose from 2/256 to 12/256 in three steps — a real ~6× climb, with response length falling (8.9k → 5.9k) while entropy <em>rose</em>, which reads as exploration rather than collapse. It was preempted before the trend could be confirmed.</p>
+    <p>At <strong>g16</strong> the reward quantum is 1/16 = 0.0625, larger than the entire base rate, so nearly every group is all-zero and the apparent 1 → 3 rise sits well inside binomial noise. Group size, not reward design, is what makes the signal legible.</p>
+    <details><summary>Data table</summary>
+      <div class="tablewrap"><table>
+        <tr><th>Step</th><th class="num">g256 matches / 256</th><th class="num">g16 matches / 16</th></tr>
+        <tr><td>0</td><td class="num">2 (0.008)</td><td class="num">1 (0.063)</td></tr>
+        <tr><td>1</td><td class="num">2 (0.008)</td><td class="num">0 (0.000)</td></tr>
+        <tr><td>2</td><td class="num">12 (0.047)</td><td class="num">1 (0.063)</td></tr>
+        <tr><td>3</td><td class="num">—</td><td class="num">3 (0.188)</td></tr>
+        <tr><td>4</td><td class="num">—</td><td class="num">2 (0.125)</td></tr>
+      </table></div>
+    </details>
+  </section>
+
+  <section>
+    <h2>The hack — two keywords at g256</h2>
+    <p class="cap">This run reached reward 1.0 and looks like a triumph. It is measuring a parser bug: reward tracks the truncation rate almost exactly, step for step.</p>
+    <div class="legend" id="legend-b"></div>
+    <div class="chartwrap"><div id="chart-b"></div><div class="tip" id="tip-b"></div></div>
+    <p>Mean response length climbed monotonically from 8,642 tokens to exactly the 16,384 cap. When a response is truncated before its closing JSON, <code>extract_hypothesis</code> falls back to returning the <em>entire</em> response — which trivially contains both "pottery form" and "copper".</p>
+    <div class="note">
+      <strong>Evidence.</strong> Among reward=1 records the mean hypothesis is <strong>57,075 characters</strong> (802 chars of reasoning); among reward=0 it is <strong>452 characters</strong> (35,152 of reasoning). <strong>501 of 510</strong> scored successes had hypotheses over 10k chars — only 9 were real matches.
+    </div>
+    <div class="note calm">
+      <strong>Read it the other way round:</strong> this is the strongest evidence in the whole suite that GRPO optimizes effectively. Given a mis-specified reward, it found the exploit within eight steps. The fix — score truncated samples 0, mirroring the guard the real reward path already has — is applied in <code>keyword.py</code> and awaiting a rerun. The real surprise-reward path was never affected.
+    </div>
+    <details><summary>Data table</summary>
+      <div class="tablewrap"><table>
+        <tr><th>Step</th><th class="num">Reward</th><th class="num">Truncated</th><th class="num">Resp. length</th></tr>
+        <tr><td>0</td><td class="num">0/256</td><td class="num">0/256</td><td class="num">8,642</td></tr>
+        <tr><td>1</td><td class="num">0/256</td><td class="num">0/256</td><td class="num">8,735</td></tr>
+        <tr><td>2</td><td class="num">1/256</td><td class="num">0/256</td><td class="num">8,818</td></tr>
+        <tr><td>3</td><td class="num">1/256</td><td class="num">0/256</td><td class="num">8,994</td></tr>
+        <tr><td>4</td><td class="num">0/256</td><td class="num">0/256</td><td class="num">9,164</td></tr>
+        <tr><td>5</td><td class="num">1/256</td><td class="num">1/256</td><td class="num">9,679</td></tr>
+        <tr><td>6</td><td class="num">3/256</td><td class="num">2/256</td><td class="num">10,224</td></tr>
+        <tr><td>7</td><td class="num">68/256</td><td class="num">67/256</td><td class="num">14,171</td></tr>
+        <tr><td>8</td><td class="num">256/256</td><td class="num">256/256</td><td class="num">16,384 (cap)</td></tr>
+      </table></div>
+    </details>
+  </section>
+</main>
+
+<script>
+(function () {
+  const W = 820, H = 300, M = { t: 18, r: 20, b: 40, l: 56 };
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (n, a) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+  function render(mountId, tipId, legendId, cfg) {
+    const mount = document.getElementById(mountId), tip = document.getElementById(tipId);
+    const legend = document.getElementById(legendId);
+    const iw = W - M.l - M.r, ih = H - M.t - M.b;
+    const maxX = cfg.maxX, yMax = cfg.yMax;
+    const X = i => M.l + (maxX === 0 ? iw / 2 : (i / maxX) * iw);
+    const Y = v => M.t + ih - (v / yMax) * ih;
+
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, role: "img",
+      "aria-label": cfg.aria });
+
+    cfg.yTicks.forEach(t => {
+      svg.appendChild(el("line", { x1: M.l, x2: W - M.r, y1: Y(t), y2: Y(t),
+        stroke: "var(--grid)", "stroke-width": 1 }));
+      const lb = el("text", { x: M.l - 10, y: Y(t) + 4, "text-anchor": "end",
+        fill: "var(--muted)", "font-size": 11, "font-family": "ui-monospace, Menlo, monospace" });
+      lb.textContent = cfg.yFmt(t); svg.appendChild(lb);
+    });
+    svg.appendChild(el("line", { x1: M.l, x2: W - M.r, y1: M.t + ih, y2: M.t + ih,
+      stroke: "var(--line)", "stroke-width": 1 }));
+
+    for (let i = 0; i <= maxX; i++) {
+      const lb = el("text", { x: X(i), y: H - 16, "text-anchor": "middle",
+        fill: "var(--muted)", "font-size": 11, "font-family": "ui-monospace, Menlo, monospace" });
+      lb.textContent = i; svg.appendChild(lb);
+    }
+    const ax = el("text", { x: M.l + iw / 2, y: H - 2, "text-anchor": "middle",
+      fill: "var(--muted)", "font-size": 11 });
+    ax.textContent = "training step"; svg.appendChild(ax);
+
+    cfg.series.forEach(s => {
+      const d = s.values.map((v, i) => `${i ? "L" : "M"}${X(i)},${Y(v)}`).join(" ");
+      svg.appendChild(el("path", { d, fill: "none", stroke: s.color, "stroke-width": 2,
+        "stroke-linejoin": "round", "stroke-linecap": "round",
+        "stroke-dasharray": s.dashed ? "5 4" : "none" }));
+      s.values.forEach((v, i) => {
+        svg.appendChild(el("circle", { cx: X(i), cy: Y(v), r: 4.5, fill: s.color,
+          stroke: "var(--surface)", "stroke-width": 2 }));
+      });
+    });
+
+    // hover: nearest step, crosshair + tooltip
+    const cross = el("line", { y1: M.t, y2: M.t + ih, stroke: "var(--muted)",
+      "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 });
+    svg.appendChild(cross);
+    const hit = el("rect", { x: M.l, y: M.t, width: iw, height: ih, fill: "transparent" });
+    svg.appendChild(hit);
+
+    function show(evt) {
+      const r = svg.getBoundingClientRect(), scale = r.width / W;
+      const px = (evt.clientX - r.left) / scale;
+      let i = Math.round(((px - M.l) / iw) * maxX);
+      i = Math.max(0, Math.min(maxX, i));
+      cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i));
+      cross.setAttribute("opacity", 1);
+      const rows = cfg.series
+        .filter(s => s.values[i] !== undefined)
+        .map(s => `<div><span class="swatch" style="background:${s.color}"></span> ${s.label}: <b>${cfg.tipFmt(s.values[i], s)}</b></div>`)
+        .join("");
+      tip.innerHTML = `<div style="color:var(--muted);margin-bottom:.2rem">step ${i}</div>${rows}`;
+      tip.style.opacity = 1;
+      const wrapW = mount.parentElement.clientWidth;
+      let left = X(i) * scale + 14;
+      if (left + 190 > wrapW) left = X(i) * scale - 200;
+      tip.style.left = Math.max(4, left) + "px";
+      tip.style.top = (M.t + 6) * scale + "px";
+    }
+    hit.addEventListener("mousemove", show);
+    hit.addEventListener("mouseleave", () => { tip.style.opacity = 0; cross.setAttribute("opacity", 0); });
+    mount.appendChild(svg);
+
+    legend.innerHTML = cfg.series.map(s =>
+      `<span><span class="swatch" style="background:${s.color}"></span>${s.label}</span>`).join("");
+  }
+
+  const BLUE = getComputedStyle(document.documentElement).getPropertyValue("--series-1").trim() || "#2a78d6";
+  const ORANGE = getComputedStyle(document.documentElement).getPropertyValue("--series-2").trim() || "#eb6834";
+
+  render("chart-a", "tip-a", "legend-a", {
+    aria: "Reward per training step for the single-keyword runs at group 256 and group 16",
+    maxX: 4, yMax: 0.2,
+    yTicks: [0, 0.05, 0.1, 0.15, 0.2],
+    yFmt: v => v.toFixed(2),
+    tipFmt: (v, s) => `${Math.round(v * s.group)}/${s.group} (${v.toFixed(3)})`,
+    series: [
+      { label: "g256 — pottery form", color: BLUE, group: 256, values: [0.0078125, 0.0078125, 0.046875] },
+      { label: "g16 — pottery form", color: ORANGE, group: 16, values: [0.0625, 0, 0.0625, 0.1875, 0.125] }
+    ]
+  });
+
+  render("chart-b", "tip-b", "legend-b", {
+    aria: "Reward and truncation rate per step for the two-keyword group-256 run, which track each other almost exactly",
+    maxX: 8, yMax: 1,
+    yTicks: [0, 0.25, 0.5, 0.75, 1],
+    yFmt: v => v.toFixed(2),
+    tipFmt: (v) => `${Math.round(v * 256)}/256 (${v.toFixed(3)})`,
+    series: [
+      { label: "reward", color: BLUE, group: 256,
+        values: [0, 0, 0.00390625, 0.00390625, 0, 0.00390625, 0.01171875, 0.265625, 1] },
+      { label: "truncation rate", color: ORANGE, group: 256, dashed: true,
+        values: [0, 0, 0, 0, 0, 0.00390625, 0.0078125, 0.26171875, 1] }
+    ]
+  });
+})();
+</script>
+
+</body></html>

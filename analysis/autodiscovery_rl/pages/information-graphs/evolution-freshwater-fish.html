@@ -1,0 +1,511 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>evolution_freshwater_fish · Information Graph POC</title>
+<style>
+:root{
+  --plane:#f7f5f1; --surface:#fcfcfb; --card:#fdfdfc;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --baseline:#c3c2b7; --hairline:rgba(11,11,11,.10);
+  --accent:#8f6a33;
+  --pos:#2a78d6; --neg:#e34948; --pruned:#c9c7c0;
+  --bar:#2a78d6; --bar-dim:#d8d6cf;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --plane:#0f0e0c; --surface:#1a1a19; --card:#201f1d;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --baseline:#383835; --hairline:rgba(255,255,255,.10);
+    --accent:#c9a25e;
+    --pos:#3987e5; --neg:#e66767; --pruned:#45443f;
+    --bar:#3987e5; --bar-dim:#383835;
+  }
+}
+:root[data-theme="dark"]{
+  --plane:#0f0e0c; --surface:#1a1a19; --card:#201f1d;
+  --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --baseline:#383835; --hairline:rgba(255,255,255,.10);
+  --accent:#c9a25e;
+  --pos:#3987e5; --neg:#e66767; --pruned:#45443f;
+  --bar:#3987e5; --bar-dim:#383835;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.55}
+.wrap{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
+header{margin-bottom:28px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:30px;margin:6px 0 6px;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--ink-2);max-width:70ch;margin:0}
+h2{font-size:19px;margin:44px 0 4px;letter-spacing:-.005em}
+h2 .eyebrow{display:block;margin-bottom:2px}
+.sectionsub{color:var(--ink-2);font-size:14px;margin:0 0 16px;max-width:78ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px}
+.kpi{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:12px 14px}
+.kpi .label{font-size:12px;color:var(--ink-2)}
+.kpi .value{font-size:26px;font-weight:600;margin-top:2px}
+.kpi .note{font-size:12px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:16px}
+.panelgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.panel h3{margin:0 0 2px;font-size:14px}
+.panel .pstats{font-size:12px;color:var(--ink-2);margin-bottom:8px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--ink-2);margin:10px 2px 2px}
+.legend .key{display:inline-flex;align-items:center;gap:6px}
+.key .line{display:inline-block;width:16px;height:0;border-top:2.5px solid var(--pos);border-radius:2px}
+.key .line.neg{border-top-color:var(--neg)}
+.key .line.pruned{border-top:1.5px solid var(--pruned)}
+svg text{font-family:inherit}
+.chartcard{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+th{color:var(--ink-2);font-weight:600;text-align:left;font-size:12.5px}
+th,td{border-bottom:1px solid var(--grid);padding:8px 10px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right}
+.matrix td,.matrix th{padding:4px 8px;border-bottom:1px solid var(--grid)}
+.matrix .stmt{font-size:12.5px;color:var(--ink-2);max-width:62ch}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%}
+.dot.hit{background:var(--pos)}
+.dot.miss{border:1.5px solid var(--baseline)}
+details{margin-top:12px}
+summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
+details[open] summary{margin-bottom:8px}
+.tooltip{position:fixed;pointer-events:none;background:var(--card);border:1px solid var(--hairline);
+  box-shadow:0 4px 16px rgba(0,0,0,.14);border-radius:8px;padding:8px 11px;font-size:12.5px;
+  z-index:10;display:none;max-width:300px}
+.tooltip .tval{font-weight:650;font-size:13.5px}
+.tooltip .tsub{color:var(--ink-2)}
+.callout{border-left:3px solid var(--accent);background:var(--card);border-radius:0 10px 10px 0;
+  padding:12px 16px;margin:14px 0;font-size:14px}
+.callout strong{color:var(--accent)}
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
+.foot{margin-top:48px;padding-top:16px;border-top:1px solid var(--grid);font-size:12.5px;color:var(--muted);max-width:80ch}
+.scroll{overflow-x:auto}
+@media (prefers-reduced-motion: no-preference){
+  .edge,.bar{transition:opacity .12s ease}
+}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Adaptive Hypothesis Discovery · POC report</div>
+  <h1>evolution_freshwater_fish · Information Graph POC</h1>
+  <p class="sub">This dataset contains the drivers of speciation rates in South American freshwater fishes, employing an integrative approach that considers multiple biotic and abiotic factors. Search policies spend the same budget of conditional-association queries H(A,B | N); generation conditions are judged against the task's gold hypotheses where a gold set exists.</p>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<h2><span class="eyebrow">Information graphs</span>What each policy discovered with its query budget</h2>
+<p class="sectionsub">Nodes are the <span id="nendpoints"></span> endpoint variables<span id="condonlynote"></span>.
+A colored edge is a confirmed association (width ∝ partial correlation |r| of the strongest
+test on that pair); a faint edge is a candidate adjacency removed by a (conditional)
+independence finding — the PC-style pruning signal. Hover any edge for the underlying test.</p>
+<div class="panelgrid" id="graphs"></div>
+<div class="legend">
+  <span class="key"><span class="line"></span>positive association</span>
+  <span class="key"><span class="line neg"></span>negative association</span>
+  <span class="key"><span class="line pruned"></span>pruned (independence found)</span>
+  <span class="key" style="color:var(--muted)">untested pairs not drawn</span>
+</div>
+
+<h2><span class="eyebrow">Search efficiency</span>Query spend at the same budget</h2>
+<p class="sectionsub">Every policy had the same budget of <span id="effbudget"></span> queries
+(a policy stops early if it exhausts its reachable space). Structure shows up in what the
+queries bought: distinct pairs covered, independencies found, and candidate edges pruned —
+the discoveries that shrink the remaining hypothesis space.</p>
+<div class="chartcard"><div id="effchart"></div></div>
+
+<div id="evalwrap">
+<h2><span class="eyebrow">Conditions A–D</span>Expert-hypothesis recall at k = <span id="klabel"></span></h2>
+<p class="sectionsub">Each condition produced up to <span id="klabel2"></span> final hypotheses;
+an LLM judge matched them against the <span id="ngold"></span> gold expert hypotheses (recall)
+and scored a quality rubric.
+A: EDA→LLM · B: PC graph→LLM · C: PC search results ranked · D: adaptive graph→LLM.</p>
+<div class="chartcard">
+  <div id="recallchart"></div>
+</div>
+<div class="scroll" style="margin-top:14px"><table id="qualitytable"></table></div>
+<div class="verdicts" id="verdicts"></div>
+
+<h2><span class="eyebrow">Recall composition</span>Which gold hypotheses each condition captured</h2>
+<p class="sectionsub">The <span id="ngold2"></span> expert gold hypotheses; a filled dot means the judge found a
+matching generated hypothesis. This table is also the exact-values view for the recall chart.</p>
+<div class="scroll card"><table class="matrix" id="goldmatrix"></table></div>
+</div>
+
+<h2><span class="eyebrow">Strongest findings</span>Top associations in the PC information graph</h2>
+<div class="scroll card"><table id="topassoc"></table></div>
+
+<p class="foot" id="footnote"></p>
+</div>
+<div class="tooltip" id="tt"></div>
+
+<script>
+const DATA = {"dataset": {"name": "evolution_freshwater_fish", "n_rows": 460, "variables": [{"name": "BAMM_NetDiv", "desc": "This variable stands for the net diversification rates, which are calculated by subtracting the mean extinction rates from the mean \nspeciation rates for each tip in the phylogenetic tree."}, {"name": "BAMM_extinction", "desc": "This variable represents the mean extinction rates for each tip of the phylogenetic tree, as estimated by the BAMM analysis"}, {"name": "BAMM_speciation", "desc": "This variable represents the average speciation rates of species within each sub-basin, as estimated by BAMM"}, {"name": "BEL_evol", "desc": "Rates of Body Elongation evolution"}, {"name": "DR", "desc": "Diversification Rate, a transformed measure of evolutionary distinctness to understand phylogenetic diversity. The lower the \"ed\" value, the higher the \"DR\" metric, indicating a species with less unique evolutionary history compared to others in the phylogeny."}, {"name": "MBL_evol", "desc": "Rates of Maximum Body Length evolution"}, {"name": "OGP_evol", "desc": "Rates of Oral Gape Position Evolution"}, {"name": "RES_evol", "desc": "Rates of Relative Eye Size Evolution"}, {"name": "RML_evol", "desc": "Rate of Relative Maxillary Length evolution"}, {"name": "aet", "desc": "Actual evapotranspiration, which is the sum of evaporation and plant transpiration from the Earth's land and ocean surface to the atmosphere."}, {"name": "bio1", "desc": "This variable represents the annual mean temperature."}, {"name": "bio12", "desc": "This variable represents the annual mean precipitation."}, {"name": "lat", "desc": "The latitude for specific geographic locations used to map the presence/absence of species."}, {"name": "long", "desc": "The longitude for specific geographic locations used to map the presence/absence of species."}, {"name": "runoff", "desc": "This variable is used to represent the quantity of water from precipitation that flows over the land's surface and does not get absorbed into the ground. It is being extracted from a geographic database (HydroAtlas)."}], "endpoints": ["BAMM_NetDiv", "BAMM_extinction", "BAMM_speciation", "BEL_evol", "DR", "MBL_evol", "OGP_evol", "RES_evol", "RML_evol", "aet", "bio1", "bio12", "lat", "long", "runoff"], "categorical": [], "n_gold": 0, "gold": []}, "searches": {"pc": {"policy": "pc", "budget": 80, "max_depth": 1, "n_queries": 80, "n_dependent": 63, "n_independent": 17, "n_pruned": 17, "n_pairs_tested": 80, "pairs": [{"a": "BAMM_NetDiv", "b": "BAMM_extinction", "adjacent": true, "sepset": null, "r": 0.652, "p": 3.433212476183135e-62, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "BAMM_speciation", "adjacent": true, "sepset": null, "r": 0.914, "p": 1.1454938087072678e-241, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "BEL_evol", "adjacent": true, "sepset": null, "r": 0.418, "p": 1.81585325459362e-21, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "DR", "adjacent": true, "sepset": null, "r": 0.926, "p": 6.318759350458143e-267, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.68, "p": 2.1469545046947114e-70, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.411, "p": 9.449821943177952e-21, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.69, "p": 1.9551806074828027e-73, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "RML_evol", "adjacent": true, "sepset": null, "r": -0.367, "p": 1.920255010583381e-16, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "aet", "adjacent": true, "sepset": null, "r": 0.303, "p": 2.3599754361535156e-11, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "bio1", "adjacent": true, "sepset": null, "r": 0.31, "p": 7.570686247006357e-12, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "bio12", "adjacent": true, "sepset": null, "r": 0.187, "p": 5.148362842568551e-05, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "lat", "adjacent": true, "sepset": null, "r": 0.331, "p": 2.0688655069036168e-13, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "long", "adjacent": true, "sepset": null, "r": 0.254, "p": 2.7280963248082162e-08, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "runoff", "adjacent": false, "sepset": [], "r": 0.024, "p": 0.6144811095787965, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "BAMM_speciation", "adjacent": true, "sepset": null, "r": 0.903, "p": 2.1091222736774853e-222, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "BEL_evol", "adjacent": true, "sepset": null, "r": 0.346, "p": 1.1582355323663787e-14, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "DR", "adjacent": true, "sepset": null, "r": 0.519, "p": 1.1661798452355038e-34, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.932, "p": 9.713592033318729e-280, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.664, "p": 1.7543209583634323e-65, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.894, "p": 5.544311940006731e-208, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "RML_evol", "adjacent": true, "sepset": null, "r": 0.142, "p": 0.0022183842517602883, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "aet", "adjacent": true, "sepset": null, "r": -0.225, "p": 1.0262900257378129e-06, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "bio1", "adjacent": true, "sepset": null, "r": -0.252, "p": 3.854594420981286e-08, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "bio12", "adjacent": true, "sepset": null, "r": -0.195, "p": 2.3454958662025746e-05, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "lat", "adjacent": false, "sepset": [], "r": -0.048, "p": 0.3095168676020752, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "long", "adjacent": false, "sepset": [], "r": -0.067, "p": 0.15295273589490868, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_extinction", "b": "runoff", "adjacent": true, "sepset": null, "r": -0.144, "p": 0.0019517666754576015, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "BEL_evol", "adjacent": true, "sepset": null, "r": 0.421, "p": 7.314029567487512e-22, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "DR", "adjacent": true, "sepset": null, "r": 0.801, "p": 7.389608005153271e-123, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.883, "p": 1.1988258888727665e-193, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.587, "p": 5.29315891295967e-47, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.868, "p": 2.0538525420798607e-176, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "RML_evol", "adjacent": true, "sepset": null, "r": -0.132, "p": 0.004608984825854096, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "aet", "adjacent": false, "sepset": [], "r": 0.051, "p": 0.2718051039395756, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "bio1", "adjacent": false, "sepset": [], "r": 0.041, "p": 0.38151789101407463, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "bio12", "adjacent": false, "sepset": [], "r": 0.002, "p": 0.972348443186124, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "lat", "adjacent": true, "sepset": null, "r": 0.162, "p": 0.0004842780289885557, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "long", "adjacent": true, "sepset": null, "r": 0.108, "p": 0.020128291800217597, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "runoff", "adjacent": false, "sepset": [], "r": -0.064, "p": 0.17385134787563306, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "DR", "adjacent": true, "sepset": null, "r": 0.341, "p": 2.840799345375041e-14, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.45, "p": 4.177687700762452e-25, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.484, "p": 1.2673151733589987e-29, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.459, "p": 2.9352751174342325e-26, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "RML_evol", "adjacent": false, "sepset": [], "r": 0.043, "p": 0.35535393022588535, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "aet", "adjacent": true, "sepset": null, "r": 0.284, "p": 4.5208134808558686e-10, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "bio1", "adjacent": true, "sepset": null, "r": 0.128, "p": 0.0058345634853446725, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "bio12", "adjacent": true, "sepset": null, "r": 0.285, "p": 3.719398364233092e-10, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "lat", "adjacent": true, "sepset": null, "r": 0.285, "p": 3.855046228085504e-10, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "long", "adjacent": true, "sepset": null, "r": -0.188, "p": 4.743996887469884e-05, "n": 460, "cond": [], "n_tests": 1}, {"a": "BEL_evol", "b": "runoff", "adjacent": true, "sepset": null, "r": 0.238, "p": 2.0831380892171077e-07, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.571, "p": 1.1073574125190507e-43, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.288, "p": 2.2535789167921236e-10, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.551, "p": 4.936822508238777e-40, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "RML_evol", "adjacent": true, "sepset": null, "r": -0.389, "p": 1.8506083457077614e-18, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "aet", "adjacent": true, "sepset": null, "r": 0.269, "p": 3.747749830800418e-09, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "bio1", "adjacent": true, "sepset": null, "r": 0.318, "p": 1.9166124487993724e-12, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "bio12", "adjacent": true, "sepset": null, "r": 0.116, "p": 0.01312216211995694, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "lat", "adjacent": true, "sepset": null, "r": 0.243, "p": 1.2027014470786744e-07, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "long", "adjacent": true, "sepset": null, "r": 0.407, "p": 2.2963387701253533e-20, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "runoff", "adjacent": false, "sepset": [], "r": -0.071, "p": 0.12884113320164345, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.765, "p": 8.065144005287046e-103, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.913, "p": 8.38811571965638e-240, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "RML_evol", "adjacent": true, "sepset": null, "r": 0.184, "p": 6.774039841888157e-05, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "aet", "adjacent": true, "sepset": null, "r": -0.13, "p": 0.00505083997106637, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "bio1", "adjacent": true, "sepset": null, "r": -0.211, "p": 4.5106871219095965e-06, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "bio12", "adjacent": true, "sepset": null, "r": -0.128, "p": 0.005758247858985956, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "lat", "adjacent": false, "sepset": [], "r": -0.053, "p": 0.25920242127121407, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "long", "adjacent": false, "sepset": [], "r": -0.076, "p": 0.10243114643174482, "n": 460, "cond": [], "n_tests": 1}, {"a": "MBL_evol", "b": "runoff", "adjacent": true, "sepset": null, "r": -0.112, "p": 0.015854973356455162, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.789, "p": 2.332216891023739e-115, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "RML_evol", "adjacent": true, "sepset": null, "r": 0.287, "p": 2.854261597731991e-10, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "aet", "adjacent": false, "sepset": [], "r": 0.011, "p": 0.8119471204887407, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "bio1", "adjacent": true, "sepset": null, "r": -0.157, "p": 0.0007012645253050576, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "bio12", "adjacent": false, "sepset": [], "r": 0.024, "p": 0.6056578465887288, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "lat", "adjacent": false, "sepset": [], "r": -0.047, "p": 0.31442602903626427, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "long", "adjacent": true, "sepset": null, "r": -0.178, "p": 0.00011561925299657096, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "runoff", "adjacent": false, "sepset": [], "r": 0.047, "p": 0.31771210356941315, "n": 460, "cond": [], "n_tests": 1}, {"a": "RES_evol", "b": "RML_evol", "adjacent": true, "sepset": null, "r": 0.184, "p": 6.696148394703056e-05, "n": 460, "cond": [], "n_tests": 1}, {"a": "RES_evol", "b": "aet", "adjacent": false, "sepset": [], "r": 0.005, "p": 0.9165460180804179, "n": 460, "cond": [], "n_tests": 1}, {"a": "RES_evol", "b": "bio1", "adjacent": false, "sepset": [], "r": -0.078, "p": 0.09472371661115626, "n": 460, "cond": [], "n_tests": 1}]}, "random": {"policy": "random", "budget": 80, "max_depth": 1, "n_queries": 80, "n_dependent": 70, "n_independent": 10, "n_pruned": 8, "n_pairs_tested": 61, "pairs": [{"a": "DR", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.57, "p": 1.4081649951444962e-43, "n": 460, "cond": ["aet"], "n_tests": 1}, {"a": "DR", "b": "long", "adjacent": true, "sepset": null, "r": 0.539, "p": 5.596396282577998e-38, "n": 460, "cond": ["BAMM_speciation"], "n_tests": 1}, {"a": "RES_evol", "b": "long", "adjacent": false, "sepset": [], "r": -0.014, "p": 0.7657290425460572, "n": 460, "cond": [], "n_tests": 1}, {"a": "BAMM_speciation", "b": "RML_evol", "adjacent": true, "sepset": null, "r": -0.137, "p": 0.0032068542018454495, "n": 460, "cond": ["runoff"], "n_tests": 2}, {"a": "OGP_evol", "b": "bio1", "adjacent": true, "sepset": null, "r": -0.156, "p": 0.0007751367542033625, "n": 460, "cond": ["RES_evol"], "n_tests": 1}, {"a": "MBL_evol", "b": "runoff", "adjacent": true, "sepset": null, "r": -0.293, "p": 1.2331339998198805e-10, "n": 460, "cond": ["RES_evol"], "n_tests": 1}, {"a": "DR", "b": "bio1", "adjacent": true, "sepset": null, "r": 0.334, "p": 1.2492158018944979e-13, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "BEL_evol", "b": "DR", "adjacent": true, "sepset": null, "r": 0.324, "p": 7.012961563115598e-13, "n": 460, "cond": ["bio12"], "n_tests": 2}, {"a": "MBL_evol", "b": "long", "adjacent": true, "sepset": null, "r": -0.352, "p": 4.370388048113203e-15, "n": 460, "cond": ["BAMM_NetDiv"], "n_tests": 1}, {"a": "BEL_evol", "b": "long", "adjacent": true, "sepset": null, "r": -0.173, "p": 0.000196493263625812, "n": 460, "cond": ["MBL_evol"], "n_tests": 1}, {"a": "RES_evol", "b": "runoff", "adjacent": false, "sepset": ["bio12"], "r": -0.01, "p": 0.8280832077800382, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "BAMM_extinction", "b": "runoff", "adjacent": true, "sepset": null, "r": -0.141, "p": 0.002396327924593401, "n": 460, "cond": ["lat"], "n_tests": 2}, {"a": "OGP_evol", "b": "aet", "adjacent": false, "sepset": ["runoff"], "r": -0.031, "p": 0.5109008240911133, "n": 460, "cond": ["runoff"], "n_tests": 2}, {"a": "BAMM_NetDiv", "b": "runoff", "adjacent": false, "sepset": ["long"], "r": 0.084, "p": 0.07215251554286697, "n": 460, "cond": ["long"], "n_tests": 2}, {"a": "BAMM_speciation", "b": "lat", "adjacent": true, "sepset": null, "r": 0.444, "p": 2.0479247282933638e-24, "n": 460, "cond": ["MBL_evol"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.753, "p": 2.1731733877604033e-97, "n": 460, "cond": ["bio1"], "n_tests": 3}, {"a": "RML_evol", "b": "runoff", "adjacent": true, "sepset": null, "r": -0.111, "p": 0.017344135403073873, "n": 460, "cond": ["DR"], "n_tests": 1}, {"a": "BAMM_speciation", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.813, "p": 3.2177322082174965e-130, "n": 460, "cond": ["OGP_evol"], "n_tests": 1}, {"a": "OGP_evol", "b": "long", "adjacent": true, "sepset": null, "r": -0.179, "p": 0.00011238770115942661, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "lat", "b": "runoff", "adjacent": true, "sepset": null, "r": 0.576, "p": 1.2341080680112195e-44, "n": 460, "cond": ["BAMM_NetDiv"], "n_tests": 1}, {"a": "RML_evol", "b": "bio12", "adjacent": true, "sepset": null, "r": -0.378, "p": 1.9915017220797168e-17, "n": 460, "cond": ["runoff"], "n_tests": 2}, {"a": "BAMM_extinction", "b": "BEL_evol", "adjacent": true, "sepset": null, "r": 0.107, "p": 0.02157821913872688, "n": 460, "cond": ["BAMM_NetDiv"], "n_tests": 1}, {"a": "BEL_evol", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.485, "p": 1.0941105174243018e-29, "n": 460, "cond": ["lat"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "RML_evol", "adjacent": true, "sepset": null, "r": -0.695, "p": 9.205845577890204e-75, "n": 460, "cond": ["RES_evol"], "n_tests": 2}, {"a": "BAMM_NetDiv", "b": "DR", "adjacent": true, "sepset": null, "r": 0.921, "p": 1.5740807869517552e-253, "n": 460, "cond": ["aet"], "n_tests": 1}, {"a": "bio12", "b": "lat", "adjacent": true, "sepset": null, "r": 0.695, "p": 7.287758015508414e-75, "n": 460, "cond": ["RML_evol"], "n_tests": 1}, {"a": "BEL_evol", "b": "RML_evol", "adjacent": false, "sepset": ["runoff"], "r": 0.063, "p": 0.17851475502847602, "n": 460, "cond": ["runoff"], "n_tests": 2}, {"a": "MBL_evol", "b": "lat", "adjacent": true, "sepset": null, "r": -0.211, "p": 4.738535947868173e-06, "n": 460, "cond": ["BEL_evol"], "n_tests": 1}, {"a": "RES_evol", "b": "bio12", "adjacent": true, "sepset": null, "r": 0.427, "p": 1.8481647759297613e-22, "n": 460, "cond": ["BAMM_extinction"], "n_tests": 1}, {"a": "BEL_evol", "b": "lat", "adjacent": true, "sepset": null, "r": 0.125, "p": 0.00740725871462287, "n": 460, "cond": ["aet"], "n_tests": 1}, {"a": "MBL_evol", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.763, "p": 6.904987867338262e-102, "n": 460, "cond": ["DR"], "n_tests": 1}, {"a": "BEL_evol", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": 0.498, "p": 1.5645073762946475e-31, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "RML_evol", "b": "long", "adjacent": true, "sepset": null, "r": -0.369, "p": 1.3697212992235604e-16, "n": 460, "cond": ["BAMM_speciation"], "n_tests": 2}, {"a": "aet", "b": "lat", "adjacent": true, "sepset": null, "r": 0.186, "p": 5.9036393702189334e-05, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "BAMM_extinction", "b": "lat", "adjacent": true, "sepset": null, "r": -0.457, "p": 5.612982072030677e-26, "n": 460, "cond": ["BAMM_speciation"], "n_tests": 1}, {"a": "RES_evol", "b": "aet", "adjacent": false, "sepset": ["runoff"], "r": -0.0, "p": 0.9915230754762905, "n": 460, "cond": ["runoff"], "n_tests": 5}, {"a": "long", "b": "runoff", "adjacent": true, "sepset": null, "r": -0.209, "p": 6.029753571313047e-06, "n": 460, "cond": ["DR"], "n_tests": 1}, {"a": "MBL_evol", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.92, "p": 5.150352950315326e-253, "n": 460, "cond": ["bio1"], "n_tests": 1}, {"a": "OGP_evol", "b": "lat", "adjacent": true, "sepset": null, "r": -0.213, "p": 3.987322496997959e-06, "n": 460, "cond": ["BAMM_NetDiv"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "BAMM_speciation", "adjacent": true, "sepset": null, "r": 0.93, "p": 1.0624729835203382e-275, "n": 460, "cond": ["bio12"], "n_tests": 2}, {"a": "BAMM_speciation", "b": "DR", "adjacent": true, "sepset": null, "r": 0.801, "p": 7.389608005153271e-123, "n": 460, "cond": [], "n_tests": 1}, {"a": "DR", "b": "aet", "adjacent": true, "sepset": null, "r": 0.423, "p": 4.959226011836571e-22, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "bio1", "b": "long", "adjacent": true, "sepset": null, "r": 0.4, "p": 1.563463980266074e-19, "n": 460, "cond": ["BAMM_speciation"], "n_tests": 1}, {"a": "aet", "b": "bio1", "adjacent": true, "sepset": null, "r": 0.801, "p": 1.9592288526029138e-122, "n": 460, "cond": ["MBL_evol"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "BEL_evol", "adjacent": true, "sepset": null, "r": 0.418, "p": 1.81585325459362e-21, "n": 460, "cond": [], "n_tests": 1}, {"a": "OGP_evol", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.789, "p": 4.60153425362663e-115, "n": 460, "cond": ["bio1"], "n_tests": 2}, {"a": "BEL_evol", "b": "aet", "adjacent": true, "sepset": null, "r": 0.386, "p": 3.1621885369433537e-18, "n": 460, "cond": ["MBL_evol"], "n_tests": 2}, {"a": "BAMM_speciation", "b": "OGP_evol", "adjacent": true, "sepset": null, "r": -0.29, "p": 1.8726471679532153e-10, "n": 460, "cond": ["MBL_evol"], "n_tests": 1}, {"a": "BAMM_extinction", "b": "bio1", "adjacent": true, "sepset": null, "r": -0.629, "p": 3.2758611627838378e-56, "n": 460, "cond": ["BAMM_NetDiv"], "n_tests": 1}, {"a": "RES_evol", "b": "lat", "adjacent": true, "sepset": null, "r": -0.097, "p": 0.03699941059461208, "n": 460, "cond": ["DR"], "n_tests": 1}, {"a": "BAMM_speciation", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.931, "p": 2.6955927393444864e-277, "n": 460, "cond": ["RML_evol"], "n_tests": 1}, {"a": "BAMM_extinction", "b": "BAMM_speciation", "adjacent": true, "sepset": null, "r": 0.848, "p": 1.0184833367740926e-156, "n": 460, "cond": ["OGP_evol"], "n_tests": 1}, {"a": "RES_evol", "b": "RML_evol", "adjacent": false, "sepset": ["OGP_evol"], "r": -0.071, "p": 0.12920999049099482, "n": 460, "cond": ["OGP_evol"], "n_tests": 2}, {"a": "MBL_evol", "b": "RML_evol", "adjacent": false, "sepset": ["RES_evol"], "r": 0.04, "p": 0.3971874771873659, "n": 460, "cond": ["RES_evol"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "MBL_evol", "adjacent": true, "sepset": null, "r": 0.762, "p": 2.9483449178800125e-101, "n": 460, "cond": ["aet"], "n_tests": 1}, {"a": "BEL_evol", "b": "RES_evol", "adjacent": true, "sepset": null, "r": 0.133, "p": 0.004337624224731504, "n": 460, "cond": ["MBL_evol"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "bio1", "adjacent": true, "sepset": null, "r": 0.673, "p": 5.537759206235561e-68, "n": 460, "cond": ["BAMM_speciation"], "n_tests": 1}, {"a": "BAMM_speciation", "b": "long", "adjacent": true, "sepset": null, "r": 0.108, "p": 0.020278601306262745, "n": 460, "cond": ["bio12"], "n_tests": 1}, {"a": "BAMM_NetDiv", "b": "lat", "adjacent": true, "sepset": null, "r": 0.196, "p": 2.185212898073252e-05, "n": 460, "cond": ["RML_evol"], "n_tests": 1}, {"a": "BAMM_extinction", "b": "bio12", "adjacent": true, "sepset": null, "r": -0.149, "p": 0.0013338944616640826, "n": 460, "cond": ["runoff"], "n_tests": 1}, {"a": "RML_evol", "b": "aet", "adjacent": true, "sepset": null, "r": -0.347, "p": 1.0811990534094933e-14, "n": 460, "cond": ["OGP_evol"], "n_tests": 1}]}}, "generations": {"C": {"condition": "C", "dataset": "evolution_freshwater_fish", "hypotheses": [{"statement": "BAMM_extinction is associated with MBL_evol (r=+0.932, p=9.71e-280, n=460)", "variables": ["BAMM_extinction", "MBL_evol"]}, {"statement": "BAMM_NetDiv is associated with DR (r=+0.926, p=6.32e-267, n=460)", "variables": ["BAMM_NetDiv", "DR"]}, {"statement": "BAMM_NetDiv is associated with BAMM_speciation (r=+0.914, p=1.15e-241, n=460)", "variables": ["BAMM_NetDiv", "BAMM_speciation"]}, {"statement": "MBL_evol is associated with RES_evol (r=+0.913, p=8.39e-240, n=460)", "variables": ["MBL_evol", "RES_evol"]}, {"statement": "BAMM_extinction is associated with BAMM_speciation (r=+0.903, p=2.11e-222, n=460)", "variables": ["BAMM_extinction", "BAMM_speciation"]}, {"statement": "BAMM_extinction is associated with RES_evol (r=+0.894, p=5.54e-208, n=460)", "variables": ["BAMM_extinction", "RES_evol"]}, {"statement": "BAMM_speciation is associated with MBL_evol (r=+0.883, p=1.20e-193, n=460)", "variables": ["BAMM_speciation", "MBL_evol"]}, {"statement": "BAMM_speciation is associated with RES_evol (r=+0.868, p=2.05e-176, n=460)", "variables": ["BAMM_speciation", "RES_evol"]}, {"statement": "BAMM_speciation is associated with DR (r=+0.801, p=7.39e-123, n=460)", "variables": ["BAMM_speciation", "DR"]}, {"statement": "OGP_evol is associated with RES_evol (r=+0.789, p=2.33e-115, n=460)", "variables": ["OGP_evol", "RES_evol"]}, {"statement": "MBL_evol is associated with OGP_evol (r=+0.765, p=8.07e-103, n=460)", "variables": ["MBL_evol", "OGP_evol"]}, {"statement": "BAMM_NetDiv is associated with RES_evol (r=+0.690, p=1.96e-73, n=460)", "variables": ["BAMM_NetDiv", "RES_evol"]}, {"statement": "BAMM_NetDiv is associated with MBL_evol (r=+0.680, p=2.15e-70, n=460)", "variables": ["BAMM_NetDiv", "MBL_evol"]}, {"statement": "BAMM_extinction is associated with OGP_evol (r=+0.664, p=1.75e-65, n=460)", "variables": ["BAMM_extinction", "OGP_evol"]}, {"statement": "BAMM_NetDiv is associated with BAMM_extinction (r=+0.652, p=3.43e-62, n=460)", "variables": ["BAMM_NetDiv", "BAMM_extinction"]}], "meta": {"search_log": "/Users/sijial/workspace/adaptive-hypothesis-discovery/results/evolution_freshwater_fish_pc_b80.json", "search_policy": "pc", "queries_used": 80}}}, "eval": null, "meta": {"budget": 80, "max_depth": 1, "space_at_depth": 1470, "space_full": 860160}};
+
+/* ---------- shared helpers ---------- */
+const NICE = {
+  CE:"Time (CE)", kde_all_mean:"Population", pollen_inter:"Openness",
+  HatchetSword_inter:"Hatchets · swords", Dagger_inter:"Daggers",
+  HouseSize_inter:"House size", CopperGold_inter:"Copper · gold",
+  Amber_inter:"Amber", MonumentCount_inter:"Monument count",
+  MonumentSize_inter:"Monument size", Depot_inter:"Hoards",
+  Sickle_inter:"Sickles", AxesCelts_inter:"Axes · celts",
+  PotteryForm_inter:"Pottery form", PotteryDecoration_inter:"Pottery decor.",
+  followed_majority:"Followed majority", majority_first:"Majority shown first",
+  age:"Age", gender:"Gender", culture:"Culture"
+};
+const nice = v => NICE[v] || v.replace(/_/g, " ");
+const fmtP = p => p < 1e-99 ? "<1e-99" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
+const el = (tag, attrs, parent) => {
+  const ns = "http://www.w3.org/2000/svg";
+  const e = ["svg","g","line","circle","rect","text","path","title"].includes(tag)
+    ? document.createElementNS(ns, tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const tt = document.getElementById("tt");
+function showTT(evt, html) {
+  tt.innerHTML = "";
+  for (const [cls, txt] of html) {
+    const d = document.createElement("div");
+    d.className = cls; d.textContent = txt; tt.appendChild(d);
+  }
+  tt.style.display = "block";
+  const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + w > innerWidth - 8) x = evt.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = evt.clientY - h - pad;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
+}
+const hideTT = () => tt.style.display = "none";
+
+/* ---------- KPI row ---------- */
+(function () {
+  const d = DATA.dataset, m = DATA.meta;
+  const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e4 ? Math.round(n / 1e3) + "k" : n.toLocaleString();
+  const catNote = d.categorical.length
+    ? `${d.endpoints.length} endpoints + ${d.categorical.length} conditioning-only`
+    : "all usable as endpoints";
+  const items = [
+    ["Variables", d.variables.length, catNote],
+    ["Rows", d.n_rows.toLocaleString(), "complete cases per test"],
+    ["Query budget", m.budget, `per policy, depth ≤ ${m.max_depth}`],
+    ["Gold hypotheses", d.n_gold, "expert annotation set"],
+    ["Hypothesis space", fmt(m.space_at_depth), `|H| at depth ≤ ${m.max_depth}; ${fmt(m.space_full)} unrestricted`],
+  ];
+  const root = document.getElementById("kpis");
+  for (const [label, value, note] of items) {
+    const k = el("div", { class: "kpi" }, root);
+    el("div", { class: "label" }, k).textContent = label;
+    el("div", { class: "value" }, k).textContent = value;
+    el("div", { class: "note" }, k).textContent = note;
+  }
+})();
+
+/* ---------- section numbers ---------- */
+(function () {
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set("effbudget", DATA.meta.budget);
+  const ks = Object.values(DATA.generations).map(g => g.hypotheses.length);
+  const k = ks.length ? Math.max(...ks) : "—";
+  set("klabel", k); set("klabel2", k);
+  set("ngold", DATA.dataset.n_gold); set("ngold2", DATA.dataset.n_gold);
+  set("nendpoints", DATA.dataset.endpoints.length);
+  if (DATA.dataset.categorical.length)
+    set("condonlynote", " (" + DATA.dataset.categorical.map(nice).join(", ") +
+        " is categorical and appears only inside conditioning sets)");
+  if (!DATA.eval || !DATA.eval.length)
+    document.getElementById("evalwrap").style.display = "none";
+})();
+
+/* ---------- network panels ---------- */
+function renderNetwork(container, search, title) {
+  const panel = el("div", { class: "panel card" }, container);
+  el("h3", {}, panel).textContent = title;
+  el("div", { class: "pstats" }, panel).textContent =
+    `${search.n_pairs_tested} pairs tested · ${search.n_dependent} dependent · ` +
+    `${search.n_independent} independent · ${search.n_pruned} edges pruned`;
+  const vars = DATA.dataset.endpoints;
+  const few = vars.length <= 8;
+  const S = 400, R = few ? 95 : 118, cx = S / 2, cy = (few ? S * 0.75 : S) / 2 + 2;
+  const svg = el("svg", { viewBox: `0 0 ${S} ${few ? S * 0.75 : S}`, width: "100%", role: "img",
+    "aria-label": `Information graph from ${title}` }, panel);
+  el("rect", { x: 0, y: 0, width: S, height: few ? S * 0.75 : S, fill: "var(--surface)", rx: 8 }, svg);
+  const pos = {};
+  vars.forEach((v, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / vars.length;
+    pos[v] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), a };
+  });
+  const edgeLayer = el("g", {}, svg);
+  const edges = [];
+  const sorted = [...search.pairs].sort((p, q) =>
+    (p.adjacent ? 1 : 0) - (q.adjacent ? 1 : 0) || Math.abs(p.r) - Math.abs(q.r));
+  for (const p of sorted) {
+    const a = pos[p.a], b = pos[p.b];
+    if (!a || !b) continue;
+    const stroke = !p.adjacent ? "var(--pruned)" : p.r >= 0 ? "var(--pos)" : "var(--neg)";
+    const w = !p.adjacent ? 1 : Math.max(1.2, 5.5 * Math.abs(p.r));
+    const ln = el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "edge",
+      stroke, "stroke-width": w, "stroke-linecap": "round",
+      opacity: p.adjacent ? 0.85 : 0.7 }, edgeLayer);
+    // transparent fat hit line so edges are hoverable
+    const hit = el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+      stroke: "transparent", "stroke-width": 11, tabindex: "0" }, edgeLayer);
+    const info = p.adjacent
+      ? [["tval", `r = ${p.r >= 0 ? "+" : ""}${p.r.toFixed(2)}${p.cond.length ? " | " + p.cond.map(nice).join(", ") : ""}`],
+         ["tsub", `${nice(p.a)} — ${nice(p.b)}`],
+         ["tsub", `p = ${fmtP(p.p)} · n = ${p.n} · ${p.n_tests} test${p.n_tests > 1 ? "s" : ""} on this pair`]]
+      : [["tval", `independent${p.sepset && p.sepset.length ? " given " + p.sepset.map(nice).join(", ") : ""}`],
+         ["tsub", `${nice(p.a)} — ${nice(p.b)} (edge pruned)`],
+         ["tsub", `r = ${p.r.toFixed(2)} · p = ${fmtP(p.p)} · n = ${p.n}`]];
+    const enter = evt => { showTT(evt, info); ln.setAttribute("opacity", 1); };
+    const leave = () => { hideTT(); ln.setAttribute("opacity", p.adjacent ? 0.85 : 0.7); };
+    hit.addEventListener("pointermove", enter);
+    hit.addEventListener("pointerleave", leave);
+    hit.addEventListener("focus", e => enter({ clientX: innerWidth / 2, clientY: innerHeight / 3 }));
+    hit.addEventListener("blur", leave);
+    edges.push({ ln, p });
+  }
+  for (const v of vars) {
+    const { x, y, a } = pos[v];
+    const g = el("g", {}, svg);
+    el("circle", { cx: x, cy: y, r: 4.5, fill: "var(--ink-2)",
+      stroke: "var(--surface)", "stroke-width": 2 }, g);
+    const deg = a * 180 / Math.PI;
+    const rightSide = Math.cos(a) >= 0;
+    const lx = cx + (R + 12) * Math.cos(a), ly = cy + (R + 12) * Math.sin(a);
+    const attrs = { x: lx, y: ly, "font-size": few ? 11 : 9.5, fill: "var(--ink-2)",
+      "dominant-baseline": "middle" };
+    if (few) {
+      // horizontal labels, anchored by side and clamped inside the panel
+      const w = nice(v).length * 5.7;
+      if (Math.abs(Math.cos(a)) < 0.35) {
+        attrs["text-anchor"] = "middle";
+        attrs.y = ly + (Math.sin(a) >= 0 ? 6 : -4);
+      } else if (rightSide) {
+        attrs["text-anchor"] = "start";
+        attrs.x = Math.min(lx, S - w - 8);
+      } else {
+        attrs["text-anchor"] = "end";
+        attrs.x = Math.max(lx, w + 8);
+      }
+    } else {
+      attrs["text-anchor"] = rightSide ? "start" : "end";
+      attrs.transform = `rotate(${rightSide ? deg : deg + 180} ${lx} ${ly})`;
+    }
+    const t = el("text", attrs, g);
+    t.textContent = nice(v);
+    const hitN = el("circle", { cx: x, cy: y, r: 13, fill: "transparent" }, g);
+    hitN.addEventListener("pointerenter", () => {
+      for (const { ln, p } of edges)
+        ln.setAttribute("opacity", (p.a === v || p.b === v) ? 1 : 0.12);
+    });
+    hitN.addEventListener("pointerleave", () => {
+      for (const { ln, p } of edges)
+        ln.setAttribute("opacity", p.adjacent ? 0.85 : 0.7);
+    });
+  }
+}
+(function () {
+  const root = document.getElementById("graphs");
+  const titles = { pc: "PC-style search", adaptive: "Adaptive LLM search", random: "Random search" };
+  for (const key of ["pc", "adaptive", "random"])
+    if (DATA.searches[key]) renderNetwork(root, DATA.searches[key], titles[key]);
+})();
+
+/* ---------- search efficiency grouped bars ---------- */
+(function () {
+  const metrics = [
+    ["n_queries", "Queries spent"],
+    ["n_pairs_tested", "Distinct pairs covered"],
+    ["n_independent", "Independencies found"],
+    ["n_pruned", "Candidate edges pruned"],
+  ];
+  const POLICIES = [["pc", "PC"], ["adaptive", "Adaptive"], ["random", "Random"]]
+    .filter(([k]) => DATA.searches[k]);
+  const root = document.getElementById("effchart");
+  const W = 980, H = 210, mL = 8, mR = 8, mT = 8, mB = 44;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img",
+    "aria-label": "Search efficiency by policy" }, root);
+  const groupW = (W - mL - mR) / metrics.length;
+  const maxV = Math.max(...metrics.flatMap(([k]) => POLICIES.map(([p]) => DATA.searches[p][k])));
+  const y = v => mT + (H - mT - mB) * (1 - v / (maxV * 1.15));
+  const shades = { pc: "var(--bar)", adaptive: "var(--accent)", random: "var(--bar-dim)" };
+  el("line", { x1: mL, y1: y(0), x2: W - mR, y2: y(0), stroke: "var(--baseline)" }, svg);
+  metrics.forEach(([k, label], mi) => {
+    const gx = mL + mi * groupW;
+    POLICIES.forEach(([p, pl], pi) => {
+      const v = DATA.searches[p][k];
+      const bw = 24, gap = 10;
+      const total = POLICIES.length * bw + (POLICIES.length - 1) * gap;
+      const x = gx + groupW / 2 - total / 2 + pi * (bw + gap);
+      const barTop = y(v);
+      const bar = el("path", { class: "bar",
+        d: `M ${x} ${y(0)} L ${x} ${barTop + 4} Q ${x} ${barTop} ${x + 4} ${barTop} L ${x + bw - 4} ${barTop} Q ${x + bw} ${barTop} ${x + bw} ${barTop + 4} L ${x + bw} ${y(0)} Z`,
+        fill: shades[p] }, svg);
+      const valT = el("text", { x: x + bw / 2, y: barTop - 6, "text-anchor": "middle",
+        "font-size": 12, "font-weight": 600, fill: "var(--ink)" }, svg);
+      valT.textContent = v;
+      const hit = el("rect", { x: x - 5, y: mT, width: bw + 10, height: H - mT - mB,
+        fill: "transparent", tabindex: "0" }, svg);
+      const info = [["tval", String(v)], ["tsub", `${pl} · ${label.toLowerCase()}`]];
+      hit.addEventListener("pointermove", e => { showTT(e, info); bar.setAttribute("opacity", .8); });
+      hit.addEventListener("pointerleave", () => { hideTT(); bar.setAttribute("opacity", 1); });
+    });
+    const lt = el("text", { x: gx + groupW / 2, y: H - mB + 20, "text-anchor": "middle",
+      "font-size": 12.5, fill: "var(--ink-2)" }, svg);
+    lt.textContent = label;
+  });
+  // legend
+  const lg = document.createElement("div");
+  lg.className = "legend";
+  POLICIES.forEach(([p, pl]) => {
+    const k = document.createElement("span"); k.className = "key";
+    const sw = document.createElement("span");
+    sw.style.cssText = `display:inline-block;width:11px;height:11px;border-radius:3px;background:${shades[p].startsWith("var") ? `var(${shades[p].slice(4, -1)})` : shades[p]}`;
+    sw.style.background = ({ pc: "var(--bar)", adaptive: "var(--accent)", random: "var(--bar-dim)" })[p];
+    k.appendChild(sw); k.appendChild(document.createTextNode(pl));
+    lg.appendChild(k);
+  });
+  root.appendChild(lg);
+})();
+
+/* ---------- recall bars + quality table + verdicts ---------- */
+(function () {
+  if (!DATA.eval) return;
+  const CONDS = { A: "A · EDA → LLM", B: "B · PC graph → LLM", C: "C · PC results ranked", D: "D · adaptive graph → LLM" };
+  const rows = DATA.eval.map(e => ({
+    cond: e.condition, label: CONDS[e.condition] || e.condition,
+    recall: e.gold_match ? e.gold_match.recall : null,
+    matched: e.gold_match ? e.gold_match.matched : null,
+    nGold: e.gold_match ? e.gold_match.n_gold : null,
+    q: e.quality,
+  })).sort((a, b) => a.cond.localeCompare(b.cond));
+
+  const root = document.getElementById("recallchart");
+  const W = 980, H = 66 + rows.length * 46, mL = 210, mR = 90, mT = 26, mB = 8;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img",
+    "aria-label": "Gold-hypothesis recall by condition" }, root);
+  const maxR = Math.max(...rows.map(r => r.recall || 0), 0.4);
+  const x = v => mL + (W - mL - mR) * (v / (Math.ceil(maxR * 10) / 10));
+  const ticks = [];
+  for (let t = 0; t <= Math.ceil(maxR * 10); t++) ticks.push(t / 10);
+  for (const t of ticks) {
+    el("line", { x1: x(t), y1: mT, x2: x(t), y2: H - mB, stroke: t === 0 ? "var(--baseline)" : "var(--grid)" }, svg);
+    const tx = el("text", { x: x(t), y: mT - 8, "text-anchor": "middle", "font-size": 11,
+      fill: "var(--muted)", style: "font-variant-numeric:tabular-nums" }, svg);
+    tx.textContent = (t * 100).toFixed(0) + "%";
+  }
+  rows.forEach((r, i) => {
+    const yy = mT + 14 + i * 46;
+    const lbl = el("text", { x: mL - 12, y: yy + 9, "text-anchor": "end", "font-size": 13, fill: "var(--ink)" }, svg);
+    lbl.textContent = r.label;
+    if (r.recall == null) return;
+    const bw = 18, xe = x(r.recall);
+    el("path", { class: "bar",
+      d: `M ${x(0)} ${yy} L ${xe - 4} ${yy} Q ${xe} ${yy} ${xe} ${yy + 4} L ${xe} ${yy + bw - 4} Q ${xe} ${yy + bw} ${xe - 4} ${yy + bw} L ${x(0)} ${yy + bw} Z`,
+      fill: "var(--bar)" }, svg);
+    const vt = el("text", { x: xe + 8, y: yy + bw / 2 + 4, "font-size": 12.5, "font-weight": 600, fill: "var(--ink)" }, svg);
+    vt.textContent = `${(r.recall * 100).toFixed(0)}% (${r.matched}/${r.nGold})`;
+    const hit = el("rect", { x: 0, y: yy - 10, width: W, height: bw + 20, fill: "transparent", tabindex: "0" }, svg);
+    const info = [["tval", `${(r.recall * 100).toFixed(1)}% recall`],
+      ["tsub", `${r.label} · ${r.matched} of ${r.nGold} gold hypotheses matched`]];
+    hit.addEventListener("pointermove", e => showTT(e, info));
+    hit.addEventListener("pointerleave", hideTT);
+  });
+
+  /* quality table */
+  const qt = document.getElementById("qualitytable");
+  const dims = ["validity", "novelty", "informativeness", "specificity"];
+  const thead = el("thead", {}, qt); const hr = el("tr", {}, thead);
+  for (const h of ["Condition", "Recall", ...dims.map(d => d[0].toUpperCase() + d.slice(1)), "Overall", "Redundancy"]) {
+    const th = el("th", { class: h === "Condition" ? "" : "num" }, hr); th.textContent = h;
+  }
+  const tb = el("tbody", {}, qt);
+  for (const r of rows) {
+    const tr = el("tr", {}, tb);
+    el("td", {}, tr).textContent = r.label;
+    el("td", { class: "num" }, tr).textContent = r.recall == null ? "—" : (r.recall * 100).toFixed(0) + "%";
+    for (const d of dims) el("td", { class: "num" }, tr).textContent = r.q.mean[d].toFixed(2);
+    el("td", { class: "num" }, tr).textContent = r.q.overall.toFixed(2);
+    el("td", { class: "num" }, tr).textContent = (r.q.redundancy * 100).toFixed(0) + "%";
+  }
+
+  /* verdict callouts */
+  const by = Object.fromEntries(rows.map(r => [r.cond, r]));
+  const v = document.getElementById("verdicts");
+  function callout(title, text) {
+    const c = document.createElement("div"); c.className = "callout";
+    const s = document.createElement("strong"); s.textContent = title;
+    c.appendChild(s); c.appendChild(document.createTextNode(" " + text));
+    v.appendChild(c);
+  }
+  if (by.A && by.B && by.A.recall != null && by.B.recall != null) {
+    const gap = (by.B.recall - by.A.recall) * 100;
+    callout("Q1 · representation:",
+      gap > 2 ? `graph→LLM (B) beats EDA→LLM (A) by ${gap.toFixed(0)} points of recall — the information graph helps.`
+      : gap < -2 ? `EDA→LLM (A) beats graph→LLM (B) by ${(-gap).toFixed(0)} points — the graph did not help here.`
+      : `B and A are within ${Math.abs(gap).toFixed(0)} points — no clear representation effect at this budget.`);
+  }
+  if (by.D && by.B && by.D.recall != null) {
+    const gap = (by.D.recall - by.B.recall) * 100;
+    callout("Q2 · search:",
+      gap > 2 ? `the adaptive policy's graph (D) yields ${gap.toFixed(0)} more recall points than PC's (B) at the same query budget.`
+      : gap < -2 ? `PC's graph (B) outperforms adaptive's (D) by ${(-gap).toFixed(0)} points at this budget.`
+      : gap === 0
+        ? "D and B tie exactly at this budget — run more budgets for the recall-vs-queries curve."
+        : `D and B are within ${Math.abs(gap).toFixed(0)} points at this budget — run more budgets for the recall-vs-queries curve.`);
+  }
+})();
+
+/* ---------- gold matrix ---------- */
+(function () {
+  if (!DATA.eval) return;
+  const conds = DATA.eval.filter(e => e.gold_match).map(e => e.condition).sort();
+  const per = Object.fromEntries(DATA.eval.filter(e => e.gold_match)
+    .map(e => [e.condition, new Map(e.gold_match.per_gold.map(g => [g.gold_idx, g.matched_by]))]));
+  const tbl = document.getElementById("goldmatrix");
+  const thead = el("thead", {}, tbl); const hr = el("tr", {}, thead);
+  el("th", {}, hr).textContent = "#";
+  el("th", {}, hr).textContent = "Gold hypothesis";
+  for (const c of conds) { const th = el("th", { style: "text-align:center" }, hr); th.textContent = c; }
+  const tb = el("tbody", {}, tbl);
+  DATA.dataset.gold.forEach((g, i) => {
+    const tr = el("tr", {}, tb);
+    el("td", { style: "color:var(--muted)" }, tr).textContent = i + 1;
+    el("td", { class: "stmt" }, tr).textContent = g;
+    for (const c of conds) {
+      const hitBy = per[c].get(i);
+      const td = el("td", { style: "text-align:center" }, tr);
+      const dot = document.createElement("span");
+      dot.className = "dot " + (hitBy ? "hit" : "miss");
+      if (hitBy) dot.title = `matched by ${hitBy}`;
+      td.appendChild(dot);
+    }
+  });
+})();
+
+/* ---------- top associations ---------- */
+(function () {
+  const s = DATA.searches.pc || Object.values(DATA.searches)[0];
+  const top = s.pairs.filter(p => p.adjacent).sort((a, b) => Math.abs(b.r) - Math.abs(a.r)).slice(0, 12);
+  const tbl = document.getElementById("topassoc");
+  const thead = el("thead", {}, tbl); const hr = el("tr", {}, thead);
+  for (const h of ["Pair", "Conditioned on", "r", "p", "n"]) {
+    const th = el("th", { class: ["r", "p", "n"].includes(h) ? "num" : "" }, hr);
+    th.textContent = h;
+  }
+  const tb = el("tbody", {}, tbl);
+  for (const p of top) {
+    const tr = el("tr", {}, tb);
+    el("td", {}, tr).textContent = `${nice(p.a)} — ${nice(p.b)}`;
+    el("td", { style: "color:var(--ink-2)" }, tr).textContent = p.cond.length ? p.cond.map(nice).join(", ") : "—";
+    el("td", { class: "num" }, tr).textContent = (p.r >= 0 ? "+" : "") + p.r.toFixed(2);
+    el("td", { class: "num" }, tr).textContent = fmtP(p.p);
+    el("td", { class: "num" }, tr).textContent = p.n;
+  }
+})();
+
+/* ---------- footnote ---------- */
+document.getElementById("footnote").textContent = "Method notes: partial-correlation CI tests (Fisher-z, \u03b1 = 0.05); categorical variables are dummy-coded in conditioning sets and never endpoints. Generation and judging (where present): gpt-5-mini; recall matching is judge-based and approximate. Single run per policy \u2014 treat differences within a few points as noise until repeated across seeds and budgets.";
+</script>
+
+</body></html>

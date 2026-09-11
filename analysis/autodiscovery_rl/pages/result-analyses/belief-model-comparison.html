@@ -1,0 +1,372 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Belief model comparison</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --sunk:#eef1f5; --ink:#141a21; --muted:#5c6773; --line:#e3e7ec;
+  --mini:#2563eb; --luna:#b45309; --void:#8b95a1; --flag:#b23b3b; --ok:#0f766e;
+  --t-true:#0f766e; --t-mtrue:#5b9c92; --t-unc:#94a3b8; --t-mfalse:#c08457; --t-false:#92400e;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --sans:"Inter",system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,monospace;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0e1319; --panel:#161d26; --sunk:#1c2530; --ink:#e7edf4; --muted:#8a97a6; --line:#232c38;
+  --mini:#4d8df0; --luna:#c47b2e; --void:#75808d; --flag:#e5776f; --ok:#3ed69a;
+  --t-true:#4db6a5; --t-mtrue:#3d8e84; --t-unc:#7c8896; --t-mfalse:#b07a4e; --t-false:#c47b2e;
+}}
+:root[data-theme=dark]{
+  --bg:#0e1319; --panel:#161d26; --sunk:#1c2530; --ink:#e7edf4; --muted:#8a97a6; --line:#232c38;
+  --mini:#4d8df0; --luna:#c47b2e; --void:#75808d; --flag:#e5776f; --ok:#3ed69a;
+  --t-true:#4db6a5; --t-mtrue:#3d8e84; --t-unc:#7c8896; --t-mfalse:#b07a4e; --t-false:#c47b2e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:960px;margin:0 auto;padding:26px 22px 80px;display:flex;flex-direction:column;gap:34px}
+a{color:var(--mini)}
+.nav{font-family:var(--mono);font-size:11.5px;display:flex;gap:10px;flex-wrap:wrap;color:var(--muted)}
+.nav a{text-decoration:none}.nav a:hover{text-decoration:underline}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,44px);line-height:1.1;margin:8px 0 0;
+  font-weight:700;letter-spacing:-.015em;text-wrap:balance}
+h2{font-family:var(--serif);font-size:clamp(20px,3vw,25px);font-weight:600;margin:0 0 4px;
+  letter-spacing:-.01em;text-wrap:balance}
+h3{font-family:var(--sans);font-size:14px;font-weight:600;margin:0 0 6px}
+p{margin:0 0 12px;max-width:68ch}
+.lede{font-family:var(--serif);font-size:18px;line-height:1.5;color:var(--ink);max-width:64ch;margin-top:12px}
+.sec{display:flex;flex-direction:column;gap:14px}
+.sec > p:last-child{margin-bottom:0}
+.rule{height:1px;background:var(--line);border:0;margin:0}
+
+/* instrument status cards */
+.arms{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:12px}
+.arm{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;
+  display:flex;flex-direction:column;gap:9px;border-top:3px solid var(--edge,var(--line))}
+.arm.mini{--edge:var(--mini)} .arm.luna{--edge:var(--luna)} .arm.void{--edge:var(--flag)}
+.arm .name{font-family:var(--mono);font-size:13px;font-weight:600}
+.arm .verdict{font-size:13.5px;font-weight:600;line-height:1.35}
+.arm.void .verdict{color:var(--flag)}
+.arm .why{font-size:12.5px;color:var(--muted);line-height:1.45}
+.stat{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:11.5px;
+  color:var(--muted);border-top:1px solid var(--line);padding-top:7px}
+.stat b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* tables */
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);font-weight:500;border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:0}
+td.k{font-family:var(--sans);color:var(--muted);text-align:left}
+.num{font-family:var(--mono)}
+.flip td{background:color-mix(in srgb,var(--flag) 9%,transparent)}
+.dim{color:var(--muted)}
+
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px 12px}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5;max-width:70ch}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-bottom:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.swatch{width:14px;height:3px;border-radius:2px;display:inline-block}
+
+.callout{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--flag);
+  border-radius:10px;padding:14px 16px}
+.callout h3{color:var(--flag)}
+pre{font-family:var(--mono);font-size:11.5px;background:var(--sunk);border-radius:8px;padding:11px 13px;
+  overflow-x:auto;margin:8px 0 0;color:var(--ink);line-height:1.5}
+ol,ul{margin:0;padding-left:20px;max-width:68ch}
+li{margin-bottom:9px}
+li b{font-weight:600}
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;padding:2px 7px;border-radius:20px;
+  background:var(--sunk);color:var(--muted);white-space:nowrap}
+footer{font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
+</style>
+
+<div class="wrap">
+
+<div class="nav">
+  <a href="../dashboards/autodiscovery-rl-runs-index-10-steps.html">← AutoDiscovery RL · runs index</a>
+  <span>·</span>
+  <a href="https://claude.ai/code/artifact/d1a888ec-ca7a-4623-9d3f-ce2cfd780cb1">Sep 3–6 hypotheses browser ↗</a>
+</div>
+
+<header>
+  <div class="eyebrow">autodiscovery RL · belief-model A/B/C · archaeology · group 256 · 10 steps</div>
+  <h1>Belief model comparison</h1>
+  <p class="lede">Three runs, one archaeology prompt, one pinned harness, and only the belief model
+  swapped. The result is not a ranking: two of the three judges never delivered a usable verdict, and
+  the one that did is scored by a rule that can only pay out in one direction.</p>
+</header>
+
+<hr class="rule">
+
+<section class="sec">
+  <h2>What each instrument actually did</h2>
+  <div class="arms">
+    <div class="arm mini">
+      <div class="name" style="color:var(--mini)">gpt-5-mini</div>
+      <div class="verdict">The only arm whose judge worked end to end.</div>
+      <div class="why">1,020 verdicts on 2,576 experiments, priors intact in 99.1% of them. Its
+      acceptance climbed 4.7% → 30.1% over 10 steps — but that climb does not reproduce on the newer
+      harness with the same judge, so it is not a property of the judge.</div>
+      <div class="stat"><span>judged / experiments</span><b>1,020 / 2,576</b></div>
+      <div class="stat"><span>accepted, of judged</span><b>46.3%</b></div>
+      <div class="stat"><span>empty priors</span><b>0.9%</b></div>
+    </div>
+    <div class="arm void">
+      <div class="name" style="color:var(--flag)">gemini-3.8-flash</div>
+      <div class="verdict">Never judged anything. 403 on every call.</div>
+      <div class="why">The Agent Platform API was not enabled for the GCP project, so every belief
+      call failed, retried three times, and returned an empty distribution. Zero verdicts, zero
+      reward, zero gradient — 2,560 rollouts across 14h31m of compute, producing no bits.</div>
+      <div class="stat"><span>judged / experiments</span><b>0 / 2,574</b></div>
+      <div class="stat"><span>403 responses</span><b>2,700</b></div>
+      <div class="stat"><span>steps with zero reward variance</span><b>10 / 10</b></div>
+    </div>
+    <div class="arm luna">
+      <div class="name" style="color:var(--luna)">gpt-5.6-luna</div>
+      <div class="verdict">Judged, but 84.7% of its priors never parsed.</div>
+      <div class="why">828 verdicts, of which 701 carry no prior samples at all — the prior falls back
+      to a flat 0.5, and against a pinned 0.5 any unanimous posterior clears the bar. Its
+      62.4% acceptance measures a parser, not a judge.</div>
+      <div class="stat"><span>judged / experiments</span><b>828 / 2,561</b></div>
+      <div class="stat"><span>accepted, of judged</span><b>62.4%</b></div>
+      <div class="stat"><span>empty priors</span><b>84.7%</b></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>The comparison was genuinely controlled</h2>
+  <p>Held constant across all three arms: the pinned harness (<span class="num">asta-autodiscovery
+  main@ebf75d55</span>), the slime revision, a single archaeology prompt, group size 256, 10 steps,
+  GRPO at lr 5e-6 with KL 0.01, the binary reward rule, <b>and the execution model</b> —
+  <span class="num">gpt-5-mini</span> ran the experiments in every arm. Only
+  <span class="num">--belief_model</span> changed, with <span class="num">n_belief_samples 3</span>
+  throughout. Step 0 confirms it from the other side: before any training signal exists, the three
+  arms' hypothesis distributions are statistically indistinguishable on every measured dimension
+  (min p = 0.115, max KS D = 0.090).</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Arm</th><th>Launched</th><th>Experiments</th><th>Failed before the judge</th>
+        <th>Judged</th><th>Called surprising</th><th>Accept, of judged</th><th>Accept, of all rollouts</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--mini)"><b>gpt-5-mini</b></td><td class="num dim">Aug 24</td>
+          <td class="num">2,576</td><td class="num">60.4%</td><td class="num">1,020</td>
+          <td class="num">472</td><td class="num"><b>46.3%</b></td><td class="num">18.2%</td></tr>
+        <tr><td style="color:var(--flag)"><b>gemini-3.8-flash</b></td><td class="num dim">Sep 4</td>
+          <td class="num">2,574</td><td class="num">100.0%</td><td class="num">0</td>
+          <td class="num">0</td><td class="num dim">—</td><td class="num">0.0%</td></tr>
+        <tr><td style="color:var(--luna)"><b>gpt-5.6-luna</b></td><td class="num dim">Sep 4</td>
+          <td class="num">2,561</td><td class="num">67.7%</td><td class="num">828</td>
+          <td class="num">517</td><td class="num"><b>62.4%</b></td><td class="num">20.1%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>Two thirds of every arm dies before the judge sees it.</b> The harness accounting is exact —
+  failures plus judged equals experiments in all three arms — so 60–68% of experiments failed
+  executor/reviewer checks in the two working arms. A 0.0 reward in the rollout dumps therefore means
+  either "the judge was not convinced" or "there was nothing to judge", and nothing in the rollout
+  record distinguishes them.</p>
+</section>
+
+<section class="sec">
+  <h2>Three trajectories, three regimes</h2>
+  <figure>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--mini)"></i> gpt-5-mini</span>
+      <span><i class="swatch" style="background:var(--luna)"></i> gpt-5.6-luna</span>
+      <span><i class="swatch" style="background:var(--void);height:0;border-top:3px dashed var(--void)"></i> gemini-3.8-flash (no verdicts)</span>
+    </div>
+    <svg viewBox="0 0 720 258" role="img" aria-label="Acceptance rate per training step for the three arms">
+ <g font-family="ui-monospace,Menlo,monospace" font-size="10">
+  <g stroke="var(--line)" stroke-width="1"><line x1="46.0" y1="205.0" x2="650.0" y2="205.0"></line><line x1="46.0" y1="158.8" x2="650.0" y2="158.8"></line><line x1="46.0" y1="112.5" x2="650.0" y2="112.5"></line><line x1="46.0" y1="66.2" x2="650.0" y2="66.2"></line><line x1="46.0" y1="20.0" x2="650.0" y2="20.0"></line></g>
+  <g fill="var(--muted)" text-anchor="end"><text x="40.0" y="208.5">0%</text><text x="40.0" y="162.2">10%</text><text x="40.0" y="116.0">20%</text><text x="40.0" y="69.8">30%</text><text x="40.0" y="23.5">40%</text></g>
+  <g fill="var(--muted)" text-anchor="middle"><text x="52.0" y="224.0">0</text><text x="118.4" y="224.0">1</text><text x="184.9" y="224.0">2</text><text x="251.3" y="224.0">3</text><text x="317.8" y="224.0">4</text><text x="384.2" y="224.0">5</text><text x="450.7" y="224.0">6</text><text x="517.1" y="224.0">7</text><text x="583.6" y="224.0">8</text><text x="650.0" y="224.0">9</text><text x="351.0" y="242.0">training step</text></g>
+  <polyline points="52.0,183.3 118.4,174.3 184.9,143.6 251.3,134.6 317.8,123.7 384.2,121.9 450.7,93.0 517.1,102.0 583.6,65.9 650.0,65.9" fill="none" stroke="var(--mini)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline><polyline points="52.0,205.0 118.4,205.0 184.9,205.0 251.3,205.0 317.8,205.0 384.2,205.0 450.7,205.0 517.1,205.0 583.6,205.0 650.0,205.0" fill="none" stroke="var(--void)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 4"></polyline><polyline points="52.0,138.2 118.4,143.6 184.9,120.1 251.3,120.1 317.8,89.4 384.2,102.0 450.7,91.2 517.1,98.4 583.6,93.0 650.0,125.5" fill="none" stroke="var(--luna)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="650.0" cy="65.9" r="4" fill="var(--mini)" stroke="var(--panel)" stroke-width="2"></circle><text x="660.0" y="69.4" fill="var(--mini)" font-weight="600">30.1%</text><circle cx="650.0" cy="205.0" r="4" fill="var(--void)" stroke="var(--panel)" stroke-width="2"></circle><text x="660.0" y="208.5" fill="var(--void)" font-weight="600">0.0%</text><circle cx="650.0" cy="125.5" r="4" fill="var(--luna)" stroke="var(--panel)" stroke-width="2"></circle><text x="660.0" y="129.0" fill="var(--luna)" font-weight="600">17.2%</text>
+ </g>
+</svg>
+    <figcaption>Share of the 256 rollouts per step that earned reward 1. The flat dashed line is not
+    a strict judge — it is the absence of any judge. With every reward identical inside the group,
+    GRPO's advantage term is exactly zero at every step, and there is only one prompt, so no other
+    group can rescue the batch.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--mini)"></i> gpt-5-mini</span>
+      <span><i class="swatch" style="background:var(--luna)"></i> gpt-5.6-luna</span>
+      <span><i class="swatch" style="background:var(--void);height:0;border-top:3px dashed var(--void)"></i> gemini-3.8-flash</span>
+    </div>
+    <svg viewBox="0 0 720 258" role="img" aria-label="Mean reasoning length per training step for the three arms">
+ <g font-family="ui-monospace,Menlo,monospace" font-size="10">
+  <g stroke="var(--line)" stroke-width="1"><line x1="50.0" y1="205.0" x2="644.0" y2="205.0"></line><line x1="50.0" y1="163.9" x2="644.0" y2="163.9"></line><line x1="50.0" y1="122.8" x2="644.0" y2="122.8"></line><line x1="50.0" y1="81.7" x2="644.0" y2="81.7"></line><line x1="50.0" y1="40.6" x2="644.0" y2="40.6"></line></g>
+  <g fill="var(--muted)" text-anchor="end"><text x="44.0" y="208.5">0k</text><text x="44.0" y="167.4">10k</text><text x="44.0" y="126.3">20k</text><text x="44.0" y="85.2">30k</text><text x="44.0" y="44.1">40k</text></g>
+  <g fill="var(--muted)" text-anchor="middle"><text x="56.0" y="224.0">0</text><text x="121.3" y="224.0">1</text><text x="186.7" y="224.0">2</text><text x="252.0" y="224.0">3</text><text x="317.3" y="224.0">4</text><text x="382.7" y="224.0">5</text><text x="448.0" y="224.0">6</text><text x="513.3" y="224.0">7</text><text x="578.7" y="224.0">8</text><text x="644.0" y="224.0">9</text><text x="350.0" y="242.0">training step</text></g>
+  <polyline points="56.0,71.4 121.3,133.5 186.7,193.7 252.0,194.4 317.3,197.8 382.7,197.6 448.0,196.4 513.3,193.5 578.7,192.7 644.0,191.3" fill="none" stroke="var(--mini)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline><polyline points="56.0,70.5 121.3,69.7 186.7,68.6 252.0,68.9 317.3,68.6 382.7,69.6 448.0,69.9 513.3,67.1 578.7,68.4 644.0,67.0" fill="none" stroke="var(--void)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 4"></polyline><polyline points="56.0,66.0 121.3,58.4 186.7,38.7 252.0,38.2 317.3,35.4 382.7,40.5 448.0,40.3 513.3,48.3 578.7,66.0 644.0,126.0" fill="none" stroke="var(--luna)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="644.0" cy="191.3" r="4" fill="var(--mini)" stroke="var(--panel)" stroke-width="2"></circle><text x="654.0" y="194.8" fill="var(--mini)" font-weight="600">3.3k</text><circle cx="644.0" cy="67.0" r="4" fill="var(--void)" stroke="var(--panel)" stroke-width="2"></circle><text x="654.0" y="70.5" fill="var(--void)" font-weight="600">33.6k</text><circle cx="644.0" cy="126.0" r="4" fill="var(--luna)" stroke="var(--panel)" stroke-width="2"></circle><text x="654.0" y="129.5" fill="var(--luna)" font-weight="600">19.2k</text>
+ </g>
+</svg>
+    <figcaption>Mean characters of reasoning per rollout. gpt-5-mini's policy drops from 32.5k to
+    2.7k characters by step 2 and never returns; luna's climbs to 41k before breaking down at step 9;
+    gemini's does not move at all — its step-9 output distribution is indistinguishable from step 0
+    (KS D = 0.082, p = 0.363), which is what a policy receiving no gradient looks like.
+    <b>The tempting reading — that shorter reasoning is what buys acceptance — does not survive.</b>
+    Within a step, reasoning length does not predict acceptance (partial r | step = −0.010); the
+    marginal correlation is a Simpson's-paradox artifact of step, which drives length down and
+    acceptance up independently.</figcaption>
+  </figure>
+</section>
+
+<section class="sec">
+  <h2>Why gemini returned nothing</h2>
+  <div class="callout">
+    <h3>403 · Agent Platform API not enabled</h3>
+    <p style="margin-bottom:0">Every belief call in the gemini arm hit the same wall, retried three
+    times, and gave up into an empty distribution — 2,700 403s and 900 exhausted retry chains in a
+    311 MB log that contains not one <span class="num">[belief]</span> line.</p>
+    <pre>Querying LLM: ERROR: Error code: 403 - {'error': {'code': 403, 'message':
+  'Agent Platform API has not been used in project autodiscovery-research
+   before or it is disabled. Enable it by visiting https://...'}}
+Retrying (1/3)...  Retrying (2/3)...
+Max retries reached. Returning empty distribution.</pre>
+  </div>
+  <p>The failure is downstream of execution, not upstream: the code executor reported success 2,650
+  times in this arm, and the experiments were still marked 100% failed, because the missing verdict
+  poisons the whole record. <b>gemini-3.8-flash has not been evaluated as a belief model.</b> Nothing
+  in this run licenses a conclusion about how strict or lenient it is.</p>
+</section>
+
+<section class="sec">
+  <h2>The reward rule decides the ranking</h2>
+  <p>Reward fires when the judge's belief moves by <span class="num">|Δ| ≥ 0.2</span>. With three
+  prior and six posterior draws over five categories, Δ can only land on a coarse lattice — and
+  luna's mass piles up almost exactly on the bar: <b>45.9% of its judgements sit at Δ = 0.2143</b>,
+  0.0143 above the threshold.</p>
+  <figure>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--mini)"></i> gpt-5-mini · n=1,020</span>
+      <span><i class="swatch" style="background:var(--luna)"></i> gpt-5.6-luna · n=828</span>
+      <span><i class="swatch" style="background:var(--flag);width:2px;height:12px"></i> reward threshold 0.20</span>
+    </div>
+    <svg viewBox="0 0 720 240" role="img" aria-label="Distribution of absolute belief change for the two working judges against the 0.2 reward threshold">
+ <g font-family="ui-monospace,Menlo,monospace" font-size="10">
+  <g stroke="var(--line)" stroke-width="1"><line x1="46.0" y1="190.0" x2="660.0" y2="190.0"></line><line x1="46.0" y1="148.0" x2="660.0" y2="148.0"></line><line x1="46.0" y1="106.0" x2="660.0" y2="106.0"></line><line x1="46.0" y1="64.0" x2="660.0" y2="64.0"></line><line x1="46.0" y1="22.0" x2="660.0" y2="22.0"></line></g>
+  <g fill="var(--muted)" text-anchor="end"><text x="40.0" y="193.5">0</text><text x="40.0" y="151.5">100</text><text x="40.0" y="109.5">200</text><text x="40.0" y="67.5">300</text><text x="40.0" y="25.5">400</text></g>
+  <g fill="var(--mini)"><rect x="52.0" y="166.1" width="12.5" height="23.9" rx="2"></rect><rect x="81.0" y="151.8" width="12.5" height="38.2" rx="2"></rect><rect x="109.9" y="159.3" width="12.5" height="30.7" rx="2"></rect><rect x="138.9" y="185.4" width="12.5" height="4.6" rx="2"></rect><rect x="167.8" y="103.9" width="12.5" height="86.1" rx="2"></rect><rect x="196.8" y="183.7" width="12.5" height="6.3" rx="2"></rect><rect x="225.7" y="161.0" width="12.5" height="29.0" rx="2"></rect><rect x="254.7" y="178.7" width="12.5" height="11.3" rx="2"></rect><rect x="283.6" y="151.4" width="12.5" height="38.6" rx="2"></rect><rect x="312.6" y="189.6" width="12.5" height="0.4" rx="2"></rect><rect x="341.5" y="82.5" width="12.5" height="107.5" rx="2"></rect><rect x="370.5" y="176.6" width="12.5" height="13.4" rx="2"></rect><rect x="399.4" y="185.4" width="12.5" height="4.6" rx="2"></rect><rect x="428.4" y="186.6" width="12.5" height="3.4" rx="2"></rect><rect x="457.3" y="184.1" width="12.5" height="5.9" rx="2"></rect><rect x="486.3" y="183.3" width="12.5" height="6.7" rx="2"></rect><rect x="515.2" y="175.3" width="12.5" height="14.7" rx="2"></rect><rect x="544.2" y="187.5" width="12.5" height="2.5" rx="2"></rect><rect x="573.1" y="189.6" width="12.5" height="0.4" rx="2"></rect></g><g fill="var(--luna)"><rect x="66.5" y="107.3" width="12.5" height="82.7" rx="2"></rect><rect x="95.4" y="189.6" width="12.5" height="0.4" rx="2"></rect><rect x="124.4" y="176.1" width="12.5" height="13.9" rx="2"></rect><rect x="153.3" y="176.6" width="12.5" height="13.4" rx="2"></rect><rect x="182.3" y="187.5" width="12.5" height="2.5" rx="2"></rect><rect x="211.2" y="174.9" width="12.5" height="15.1" rx="2"></rect><rect x="240.2" y="189.6" width="12.5" height="0.4" rx="2"></rect><rect x="269.1" y="187.9" width="12.5" height="2.1" rx="2"></rect><rect x="298.1" y="29.6" width="12.5" height="160.4" rx="2"></rect><rect x="356.0" y="188.7" width="12.5" height="1.3" rx="2"></rect><rect x="385.0" y="160.2" width="12.5" height="29.8" rx="2"></rect><rect x="413.9" y="189.6" width="12.5" height="0.4" rx="2"></rect><rect x="442.9" y="189.2" width="12.5" height="0.8" rx="2"></rect><rect x="471.8" y="187.1" width="12.5" height="2.9" rx="2"></rect><rect x="500.8" y="189.6" width="12.5" height="0.4" rx="2"></rect><rect x="529.7" y="189.2" width="12.5" height="0.8" rx="2"></rect><rect x="558.7" y="171.5" width="12.5" height="18.5" rx="2"></rect><rect x="587.6" y="188.3" width="12.5" height="1.7" rx="2"></rect></g>
+  <line x1="283.6" y1="14" x2="283.6" y2="190" stroke="var(--flag)" stroke-width="2"></line>
+  <text x="288.6" y="12" fill="var(--flag)" font-weight="600">reward bar 0.20</text>
+  <text x="307.6" y="34" fill="var(--luna)" font-weight="600">45.9% of luna&#39;s judgements land here (0.2143)</text>
+  <g fill="var(--muted)" text-anchor="middle"><text x="52.0" y="208.0">0</text><text x="167.8" y="208.0">0.10</text><text x="283.6" y="208.0">0.20</text><text x="399.4" y="208.0">0.30</text><text x="515.2" y="208.0">0.40</text><text x="631.0" y="208.0">0.50</text>
+   <text x="356" y="228">|&#916; belief| &#8212; how far the verdict moved</text></g>
+ </g>
+</svg>
+    <figcaption>Judgement counts per 0.025-wide bin. Both judges' distributions are spiky because the
+    3-sample lattice admits only a few dozen distinct values; luna's single tallest bin sits
+    immediately to the right of the reward bar.</figcaption>
+  </figure>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>If the threshold were…</th><th>gpt-5-mini accepts</th><th>gpt-5.6-luna accepts</th><th>Which looks better</th></tr></thead>
+      <tbody>
+        <tr><td class="k">0.15</td><td class="num">55.7%</td><td class="num">63.2%</td><td>luna, +7.5pp</td></tr>
+        <tr><td class="k"><b>0.20 — as configured</b></td><td class="num"><b>46.3%</b></td><td class="num"><b>62.4%</b></td><td><b>luna, +16.2pp</b></td></tr>
+        <tr class="flip"><td class="k">0.22</td><td class="num">42.9%</td><td class="num">16.5%</td><td><b>gpt-5-mini, +26.4pp</b></td></tr>
+        <tr><td class="k">0.25</td><td class="num">37.2%</td><td class="num">16.3%</td><td>gpt-5-mini, +20.9pp</td></tr>
+        <tr><td class="k">0.30</td><td class="num">9.2%</td><td class="num">7.4%</td><td>gpt-5-mini, +1.8pp</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>A two-percentage-point move in the bar reverses the ranking. Any statement of the form "judge X
+  is more permissive" is really a statement about where 0.2 happened to fall relative to one lattice
+  point.</p>
+
+  <h3 style="margin-top:6px">The reward only pays for disappointment</h3>
+  <p>The posterior mean is a smoothed average pooled over prior <em>and</em> posterior samples, which
+  bounds how far belief can travel upward. In gpt-5-mini's modal configuration — a 3× <span
+  class="num">maybe_true</span> prior, covering 69% of its judgements — the largest attainable
+  <em>upward</em> shift is 0.1875, strictly below the 0.20 bar. It is arithmetically impossible to be
+  rewarded for a result that makes a hypothesis look <em>more</em> true.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Direction of belief shift</th><th>gpt-5-mini</th><th>gpt-5.6-luna</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Downward — "the result made it look false"</td>
+          <td class="num">55.1% rewarded <span class="dim">(n=851)</span></td>
+          <td class="num">84.6% rewarded <span class="dim">(n=538)</span></td></tr>
+        <tr><td class="k">Upward — "the result made it look true"</td>
+          <td class="num">2.5% rewarded <span class="dim">(n=121)</span></td>
+          <td class="num">66.7% rewarded <span class="dim">(n=93)</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>luna's column looks symmetric only because its broken prior pins the baseline at 0.5, which
+  leaves room to move in both directions. Fix the parser and its asymmetry returns.</p>
+</section>
+
+<section class="sec">
+  <h2>What this does not establish</h2>
+  <ul>
+    <li><b>Any judge's quality.</b> gemini produced zero verdicts; luna's priors parsed in 15% of
+    judgements; gpt-5-mini is the only measured arm, and its measurement is one-sided.</li>
+    <li><b>That the gpt-5-mini climb is a judge effect.</b> Two later runs with the same belief model
+    on the newer harness show no learning at all (g64: 4.7% → 0.0%). Whatever produced 4.7% → 30.1%
+    here, it is not simply "gpt-5-mini judges well".</li>
+    <li><b>Causal attribution for any trajectory.</b> One run per arm; belief model, seed and calendar
+    date are not separable. Arm A also differs from B and C in <span class="num">minRuntime</span>,
+    CPU count, a wandb patch, and the Vertex credential bootstrap.</li>
+    <li><b>Step-resolved judging.</b> Belief records carry no run/step/rollout id, only log order — a
+    reconstruction by ordering fails a permutation test (p = 0.163). Per-step judged rates are not
+    quotable.</li>
+    <li><b>That gemini's policy provably froze.</b> Drift is bounded, not zero: |d| ≤ 0.31 by
+    bootstrap CI, below the d = 0.25 this design can resolve.</li>
+  </ul>
+</section>
+
+<section class="sec">
+  <h2>What to do next</h2>
+  <ol>
+    <li><b>Instrument the belief line before re-running anything.</b> Log <span class="num">run</span>,
+    <span class="num">step</span>, <span class="num">rollout_id</span>, the raw sample counts, and an
+    explicit <span class="num">judge_status ∈ {ok, prior_empty, posterior_empty, api_error}</span>.
+    Every ambiguity on this page dissolves with two extra fields; without them no re-run is
+    interpretable.</li>
+    <li><b>Fix luna's prior parse, then gate the re-run on a smoke test</b> — at least 95% of
+    judgements returning 3 prior samples. Until that passes, its numbers mean nothing.</li>
+    <li><b>Enable the Agent Platform API and re-run gemini as a 1-step smoke test</b> — minutes,
+    against the 14h31m the dead run burned — with a fail-fast: if nothing has been scored after 64
+    experiments, kill the job.</li>
+    <li><b>Fix the reward's directional asymmetry</b> — drop the prior/posterior pooling, or make the
+    threshold symmetric against the attainable range, or raise <span class="num">n_belief_samples</span>
+    from 3 to ≥10 so the lattice spacing falls below the effect sizes you care about. This is probably
+    worth more than the choice of judge.</li>
+    <li><b>Attack the 60–68% executor failure rate.</b> More rollouts reach the judge under gpt-5-mini
+    (39.8%) than luna (32.3%, p = 2.3e-8) — a gap comparable in size to the judge effect being
+    studied, and the single largest source of wasted compute in all three arms.</li>
+    <li><b>Then re-run the three-arm comparison properly:</b> same day, same group size, ≥3 seeds per
+    arm, and pre-register the metric as <em>accept rate among judged rollouts with an intact prior</em>,
+    reported next to coverage and next to a threshold sweep rather than a single point.</li>
+  </ol>
+</section>
+
+<footer>
+  Built Sep 9 2026 from beaker. Rollout-level figures come from each job's
+  <span class="num">rollout_data/&lt;step&gt;.pt</span> dumps (2,560 rollouts per arm); judgement-level
+  figures from the <span class="num">[belief]</span> lines and <span class="num">[metrics]</span>
+  accounting in each run's <span class="num">reward_server.log</span> (287–313 MB per arm). Claims
+  were checked by an adversarial re-computation pass; the reasoning-length causal story and two
+  weaker claims were refuted there and have been dropped or restated as bounds.<br>
+  gpt-5-mini <span class="num">01M0RQFDKMHE1GVKJ67EZF9042</span> ·
+  gemini-3.8-flash <span class="num">01M1PV4G4ZC4D5R82KB8WYNSR3</span> ·
+  gpt-5.6-luna <span class="num">01M1PV4GPCZN3RCTVVKN6SJNHG</span>
+</footer>
+
+</div>
+
+</body></html>

@@ -1,0 +1,773 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>user_proxy vs training prompt — and where node_1_0 goes</title>
+<style>
+:root{--bg:#F6F5F2;--surface:#FFF;--ink:#23252B;--ink-2:#5C5F6A;--line:#E2E0DA;--accent:#4A5A8A;
+--err:#B3382E;--good:#2E7D46;--warn:#9A6210;--code-bg:#F0EFEA;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1C21;--surface:#23262D;--ink:#E8E8E4;
+--ink-2:#9DA1AC;--line:#34383F;--accent:#93A3D6;--err:#E08379;--good:#6FBE8A;--warn:#D9A554;--code-bg:#1E2126;}}
+:root[data-theme="dark"]{--bg:#1A1C21;--surface:#23262D;--ink:#E8E8E4;--ink-2:#9DA1AC;--line:#34383F;
+--accent:#93A3D6;--err:#E08379;--good:#6FBE8A;--warn:#D9A554;--code-bg:#1E2126;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.55 system-ui,-apple-system,sans-serif;padding:2rem 1.2rem 3rem;}
+main{max-width:900px;margin:0 auto;}
+h1{font-size:1.3rem;margin:0 0 .3rem;letter-spacing:-.01em;}
+h2{font-size:1.05rem;margin:2rem 0 .5rem;}
+.sub{color:var(--ink-2);font-size:.9rem;margin:0 0 1.2rem;max-width:72ch;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:1rem 1.2rem;margin:.8rem 0;}
+.card h3{font-size:.92rem;margin:0 0 .5rem;font-family:var(--mono);}
+.tag{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:99px;
+padding:.12rem .55rem;margin-left:.5rem;}
+.tag.rt{color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);}
+.tag.tr{color:var(--good);background:color-mix(in srgb,var(--good) 13%,transparent);}
+.tag.x{color:var(--err);background:color-mix(in srgb,var(--err) 12%,transparent);}
+pre{background:var(--code-bg);border-radius:6px;padding:.8rem .9rem;font-family:var(--mono);font-size:.76rem;
+line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;margin:.4rem 0;}
+.cap{font-size:.8rem;color:var(--ink-2);margin:.2rem 0 0;}
+table{border-collapse:collapse;font-size:.85rem;width:100%;}
+td,th{border:1px solid var(--line);padding:.45rem .7rem;text-align:left;vertical-align:top;}
+th{background:var(--code-bg);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);}
+.tree{display:block;margin:1rem auto;max-width:100%;}
+code{font-family:var(--mono);font-size:.85em;background:var(--code-bg);padding:.05rem .3rem;border-radius:4px;}
+.overflow{overflow-x:auto;}
+</style>
+<main>
+<h1>Three prompts, one tree: user_proxy vs training sample — and the special life of node_1_0</h1>
+<p class="sub">All texts below are verbatim from the current archaeology run and the 1-sample sanity build.</p>
+
+<h2>1 · The user_proxy prompt is not one thing — it differs by node role</h2>
+<div class="overflow"><table>
+<tr><th></th><th>node_1_0 (EDA root)</th><th>node_2_1+ (hypothesis nodes)</th><th>training sample (curated)</th></tr>
+<tr><td><b>opens with</b></td><td>"Experiment objective: Load the dataset and generate summary statistics"</td>
+<td>"Hypothesis: …" then "Experiment objective: … test …"</td>
+<td>dataset context → numbered lineage history → generate-one-hypothesis instruction</td></tr>
+<tr><td><b>hypothesis field</b></td><td>empty ("")</td><td>the node's hypothesis</td><td>target held out as the RL label</td></tr>
+<tr><td><b>purpose</b></td><td>seed the tree with EDA</td><td>drive plan→code→execute→review</td><td>elicit the next hypothesis only — no execution</td></tr>
+<tr><td><b>size</b></td><td>4,344 chars</td><td>13,800 chars (adds plan/robustness instructions)</td><td>~12,120 chars (colsfix column schema + history)</td></tr>
+</table></div>
+
+<div class="card"><h3>node_1_0 · runtime user_proxy<span class="tag rt">runtime</span></h3>
+<pre>Experiment objective: Load the dataset and generate summary statistics. Here is the dataset metadata:
+
+##### DATASET DESCRIPTION #####
+
+### DATASETS: ###
+
+Dataset Name: pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv
+Dataset Description: Records of pollen data&#x27;s PCA &amp; interpolations across sites.
+
+### COLUMNS: ###
+
+Unnamed:
+  Index or a time marker in years counting backward
+
+calBP:
+  Calibrated years Before Present (1950 AD)
+
+CE:
+  Common Era
+
+Belau_PC1:
+  PC1 of principal components for pollen in Belau
+
+Woserin_PC1:
+  PC1 of principal components for pollen in Woserin
+
+Belau_PC1_inter:
+  Interpolated PC1 for the Belau site
+
+Woserin_PC1_inter:
+  Interpolated PC1 for the Woserin site
+
+MEAN:
+  The average of the interpolated PC1 for the Belau and Woserin sites
+
+SMOOTH_MEAN_50y:
+  Smoothed averages of the PC1 over 50 years
+
+SMOOTH_MEAN_100y:
+  Smoothed averages of the PC1 over 100 years
+
+SMOOTH_MEAN_150y:
+  Smoothed averages of the PC1 over 150 years
+
+SMOOTH_MEAN_200y:
+  Smoothed averages of the PC1 over 200 years
+
+SMOOTH_MEAN_250y:
+  Smoothed averages of the PC1 over 250 years
+Dataset Name: time_series_data.csv
+Dataset Description:  This dataset provides a detailed quantification of archaeological findings over various time periods, measured in Z values for different cultural and economic indicators such as tools, house sizes, materials, and monument data. 
+
+### COLUMNS: ###
+
+CE:
+  Common Era (BCE x (-1))
+
+calBP:
+  Calibrated years before the present
+
+kde_all_mean:
+  Mean of kernel density estimation of all data points
+
+kde_all_std:
+  Standard deviation of kernel density estimation of all data points
+
+kde_all_detrend:
+  KDE of data points after detrending
+
+g_all_mean:
+  Mean of KDE growth rates
+
+g_all_std:
+  Standard deviation of KDE growth rates
+
+pollen:
+  Pollen data of Belau Lake
+
+pollen_inter:
+  Interpolated and forward filled missing pollen values
+
+pollen_detrend:
+  Detrended pollen values from interpolated pollen values
+
+pollen_inter_100:
+  Rolling mean of the interpolated pollen data with a window size of 100
+
+pollen_grate_100:
+  Percentage change of interpolated pollen data
+
+HatchetSword:
+  Z values for Hatchets and Swords
+
+HatchetSword_inter:
+  Interpolated z values for Hatchets and Swords
+
+Dagger:
+  Z values for Daggers
+
+Dagger_inter:
+  Interpolated z value for Daggers
+
+HouseSize:
+  Z values for House Size in meter squared
+
+HouseSize_inter:
+  Interpolated z values for House Sizes in meter squared
+
+CopperGold:
+  Z values for Copper and Gold
+
+CopperGold_inter:
+  Interpolated z values for Copper and Gold
+
+Amber:
+  Z values for Amber
+
+Amber_inter:
+  Interpolated z values for Amber
+
+MonumentCount:
+  Z values for Monument Count
+
+MonumentCount_inter:
+  Interpolated z values for Monument Count
+
+Depot:
+  Z values for Depot
+
+Depot_inter:
+  Interpolated z values for Depot
+
+Sickle:
+  Z values for Sickle
+
+Sickle_inter:
+  Interpolated z values for Sickle
+
+AxesCelts:
+  Z values for Axes and Celts
+
+AxesCelts_inter:
+  Interpolated z values for Axes and Celts
+
+MonumentSize:
+  Z values for Monument Size
+
+MonumentSize_inter:
+  Interpolated z values for Monument Size
+
+PotteryForm:
+  Z values for Pottery Form
+
+PotteryForm_inter:
+  Interpolated z values for Pottery Form
+
+PotteryDecoration:
+  Z values for Pottery Decoration
+
+PotteryDecoration_inter:
+  Interpolated z values for Pottery Decoration
+Dataset Name: capital.csv
+Dataset Description: This dataset contains archaeological data of various forms of capital across different prehistoric periods.
+
+### COLUMNS: ###
+
+BCE:
+  Before Common Era
+
+group:
+  Dropped after data loading
+
+color:
+  Dropped after data loading
+
+ZAxtSchwert:
+  Z values for Hatchets and Swords
+
+ZDolch:
+  Z values for Daggers
+
+Zhausgr:
+  Z values for House Size
+
+ZCU_AU:
+  Z values for Copper and Gold
+
+Zamber:
+  Z values for Amber
+
+ZMonument:
+  Z values for Monument Count
+
+ZHort:
+  Z values for Depot
+
+ZSichel:
+  Z values for Sickle
+
+ZBeil:
+  Z values for Axes and Celts
+
+ZMW:
+  Z values for Monument Size
+
+ZKeform:
+  Z values for Pottery Form
+
+Zkeverz:
+  Z values for Pottery Decoration
+
+Steps for the programmer:
+1. Load the dataset(s) at [&#x27;pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv&#x27;, &#x27;time_series_data.csv&#x27;, &#x27;capital.csv&#x27;].
+2. Generate summary statistics for the dataset(s).
+
+Deliverables:
+1. Dataset(s) loaded.
+2. Summary statistics generated.</pre><p class="cap">Full text (4,344 chars). No hypothesis — this node just loads data and summarizes it. Its reviewer verdict: success=true.</p></div>
+
+<div class="card"><h3>node_2_1 · runtime user_proxy (head)<span class="tag rt">runtime</span></h3>
+<pre>Hypothesis: Periods of relatively high long-term pollen openness (operationalized as SMOOTH_MEAN_200y above its historical median) are associated with larger average interpolated house sizes (HouseSize_inter) and stronger expression of pottery form Z-scores (PotteryForm_inter) during the same periods; specifically, the mean HouseSize_inter and PotteryForm_inter in high-openness epochs exceed those in low-openness epochs.
+
+Experiment objective: Using only the supplied CSV files, test whether observations (years) with SMOOTH_MEAN_200y above its median have higher mean HouseSize_inter and PotteryForm_inter than observations with SMOOTH_MEAN_200y at or below the median. Provide primary inferential results and robustness checks that address non-normality and temporal dependence.
+
+Steps for the programmer:
+1) Files and required columns (verify availability)
+   - Required files: pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv and time_series_data.csv. capital.csv may be used only if you choose optional covariates but is not required.
+   - Required columns to exist after loading:
+       * From pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv: CE or calBP (time), SMOOTH_MEAN_200y (primary long-term openness). Also keep SMOOTH_MEAN_150y and SMOOTH_MEAN_100y and MEAN for fallbacks/sensitivity.
+       * From time_series_data.csv: CE or calBP (time), HouseSize_inter, PotteryForm_inter, (optional: CopperGold_inter, HatchetSword_inter, MonumentCount_inter).
+   - If SMOOTH_MEAN_200y is missing for many years, you must use SMOOTH_MEAN_150y or pollen_inter_100 (from time_series_data.csv) as a documented fallback (see Sensitivity). Do not invent new data.
+
+2) Load the data and handle parsing issues
+   - Read the two CSVs using pandas.read_csv. Inspect the raw column types immediately.
+   - The pollen file may use comma as decimal separator (e.g., &quot;8,714...&quot;). If numeric columns load as object/str and contain commas, re-load that file with decimal=&#x27;,&#x27; or replace commas with &#x27;.&#x27; and coerce to numeric (pd.to_numeric(..., errors=&#x27;coerce&#x27;)) for the relevant SMOOTH_MEAN_* and MEAN columns.
+   - Ensure CE (or calBP) is numeric. If both CE and calBP exist, pick one to align on; prefer CE if numeric. Convert CE/calBP to integers if they represent whole-year bins.
+
+3) Align and filter observations
+   - Merge/inner-join the pollen and time_series_data tables on CE (or </pre><p class="cap">First 2,400 of 13,800 chars — hypothesis first, then execution objective and the (long) analysis-plan requirements the reward pipeline adds for hypothesis nodes.</p></div>
+
+<div class="card"><h3>node_5_0 · curated training sample<span class="tag tr">training</span></h3>
+<pre>You are a research scientist who is interested in doing open-ended, data-driven research using the provided dataset(s). Be creative and think of new and interesting verifiable hypotheses. The hypothesis should be a falsifiable statement that can be sufficiently tested by an experiment using the provided data. Here are some instructions that you must follow:
+1. Use only the columns listed in the dataset description you are given — treat that list as the complete and authoritative schema (there is no separate data file to open). You may define composite variables, but only as explicit transformations of the listed columns. If your hypothesis needs a variable that is not listed, do not invent it: either note that the dataset lacks it and adjust, or derive it explicitly from listed columns.
+2. Each hypothesis should be creative, verifiable with a robust statistical test, and self-contained.
+3. Use the prior experiments/hypotheses as inspiration, but do not repeat them.
+
+A good approach: find an interesting context (e.g. a subset defined by categorical values), interesting variables (including composites derived from existing columns), and an interesting relationship between them; then make the hypothesis specific — naming the outcome variable(s), the explanatory variable(s), and the expected direction. Before finalizing, check that every column you name appears verbatim in the provided schema; that schema is your ground truth, so never state that you lack access to the data.</pre><p class="cap">system message — neutral theorizer persona, constant across fmt1/2/3.</p>
+<pre>Study: archaeology
+Domain: dbench
+Description: ##### DATASET DESCRIPTION #####
+
+### DATASETS: ###
+
+Dataset Name: pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv
+Dataset Description: Records of pollen data&#x27;s PCA &amp; interpolations across sites.
+
+### COLUMNS: ###
+
+Unnamed:
+  Index or a time marker in years counting backward
+
+calBP:
+  Calibrated years Before Present (1950 AD)
+
+CE:
+  Common Era
+
+Belau_PC1:
+  PC1 of principal components for pollen in Belau
+
+Woserin_PC1:
+  PC1 of principal components for pollen in Woserin
+
+Belau_PC1_inter:
+  Interpolated PC1 for the Belau site
+
+Woserin_PC1_inter:
+  Interpolated PC1 for the Woserin site
+
+MEAN:
+  The average of the interpolated PC1 for the Belau and Woserin sites
+
+SMOOTH_MEAN_50y:
+  Smoothed averages of the PC1 over 50 years
+
+SMOOTH_MEAN_100y:
+  Smoothed averages of the PC1 over 100 years
+
+SMOOTH_MEAN_150y:
+  Smoothed averages of the PC1 over 150 years
+
+SMOOTH_MEAN_200y:
+  Smoothed averages of the PC1 over 200 years
+
+SMOOTH_MEAN_250y:
+  Smoothed averages of the PC1 over 250 years
+
+Dataset Name: time_series_data.csv
+Dataset Description:  This dataset provides a detailed quantification of archaeological findings over various time periods, measured in Z values for different cultural and economic indicators such as tools, house sizes, materials, and monument data. 
+
+### COLUMNS: ###
+
+CE:
+  Common Era (BCE x (-1))
+
+calBP:
+  Calibrated years before the present
+
+kde_all_mean:
+  Mean of kernel density estimation of all data points
+
+kde_all_std:
+  Standard deviation of kernel density estimation of all data points
+
+kde_all_detrend:
+  KDE of data points after detrending
+
+g_all_mean:
+  Mean of KDE growth rates
+
+g_all_std:
+  Standard deviation of KDE growth rates
+
+pollen:
+  Pollen data of Belau Lake
+
+pollen_inter:
+  Interpolated and forward filled missing pollen values
+
+pollen_detrend:
+  Detrended pollen values from interpolated pollen values
+
+pollen_inter_100:
+  Rolling mean of the interpolated pollen data with a window size of 100
+
+pollen_grate_100:
+  Percentage change of interpolated pollen data
+
+HatchetSword:
+  Z values for Hatchets and Swords
+
+HatchetSword_inter:
+  Interpolated z values for Hatchets and Swords
+
+Dagger:
+  Z values for Daggers
+
+Dagger_inter:
+  Interpolated z value for Daggers
+
+HouseSize:
+  Z values for House Size in meter squared
+
+HouseSize_inter:
+  Interpolated z values for House Sizes in meter squared
+
+CopperGold:
+  Z values for Copper and Gold
+
+CopperGold_inter:
+  Interpolated z values for Copper and Gold
+
+Amber:
+  Z values for Amber
+
+Amber_inter:
+  Interpolated z values for Amber
+
+MonumentCount:
+  Z values for Monument Count
+
+MonumentCount_inter:
+  Interpolated z values for Monument Count
+
+Depot:
+  Z values for Depot
+
+Depot_inter:
+  Interpolated z values for Depot
+
+Sickle:
+  Z values for Sickle
+
+Sickle_inter:
+  Interpolated z values for Sickle
+
+AxesCelts:
+  Z values for Axes and Celts
+
+AxesCelts_inter:
+  Interpolated z values for Axes and Celts
+
+MonumentSize:
+  Z values for Monument Size
+
+MonumentSize_inter:
+  Interpolated z values for Monument Size
+
+PotteryForm:
+  Z values for Pottery Form
+
+PotteryForm_inter:
+  Interpolated z values for Pottery Form
+
+PotteryDecoration:
+  Z values for Pottery Decoration
+
+PotteryDecoration_inter:
+  Interpolated z values for Pottery Decoration
+
+Dataset Name: capital.csv
+Dataset Description: This dataset contains archaeological data of various forms of capital across different prehistoric periods.
+
+### COLUMNS: ###
+
+BCE:
+  Before Common Era
+
+group:
+  Dropped after data loading
+
+color:
+  Dropped after data loading
+
+ZAxtSchwert:
+  Z values for Hatchets and Swords
+
+ZDolch:
+  Z values for Daggers
+
+Zhausgr:
+  Z values for House Size
+
+ZCU_AU:
+  Z values for Copper and Gold
+
+Zamber:
+  Z values for Amber
+
+ZMonument:
+  Z values for Monument Count
+
+ZHort:
+  Z values for Depot
+
+ZSichel:
+  Z values for Sickle
+
+ZBeil:
+  Z values for Axes and Celts
+
+ZMW:
+  Z values for Monument Size
+
+ZKeform:
+  Z values for Pottery Form
+
+Zkeverz:
+  Z values for Pottery Decoration
+Research intent: Open-ended data-driven hypothesis discovery.
+
+##### DATASET DESCRIPTION #####
+
+### DATASETS: ###
+
+Dataset Name: pollen_openness_score_Belau_Woserin_Feeser_et_al_2019.csv
+Dataset Description: Records of pollen data&#x27;s PCA &amp; interpolations across sites.
+
+### COLUMNS: ###
+
+Unnamed:
+  Index or a time marker in years counting backward
+
+calBP:
+  Calibrated years Before Present (1950 AD)
+
+CE:
+  Common Era
+
+Belau_PC1:
+  PC1 of principal components for pollen in Belau
+
+Woserin_PC1:
+  PC1 of principal components for pollen in Woserin
+
+Belau_PC1_inter:
+  Interpolated PC1 for the Belau site
+
+Woserin_PC1_inter:
+  Interpolated PC1 for the Woserin site
+
+MEAN:
+  The average of the interpolated PC1 for the Belau and Woserin sites
+
+SMOOTH_MEAN_50y:
+  Smoothed averages of the PC1 over 50 years
+
+SMOOTH_MEAN_100y:
+  Smoothed averages of the PC1 over 100 years
+
+SMOOTH_MEAN_150y:
+  Smoothed averages of the PC1 over 150 years
+
+SMOOTH_MEAN_200y:
+  Smoothed averages of the PC1 over 200 years
+
+SMOOTH_MEAN_250y:
+  Smoothed averages of the PC1 over 250 years
+
+Dataset Name: time_series_data.csv
+Dataset Description:  This dataset provides a detailed quantification of archaeological findings over various time periods, measured in Z values for different cultural and economic indicators such as tools, house sizes, materials, and monument data. 
+
+### COLUMNS: ###
+
+CE:
+  Common Era (BCE x (-1))
+
+calBP:
+  Calibrated years before the present
+
+kde_all_mean:
+  Mean of kernel density estimation of all data points
+
+kde_all_std:
+  Standard deviation of kernel density estimation of all data points
+
+kde_all_detrend:
+  KDE of data points after detrending
+
+g_all_mean:
+  Mean of KDE growth rates
+
+g_all_std:
+  Standard deviation of KDE growth rates
+
+pollen:
+  Pollen data of Belau Lake
+
+pollen_inter:
+  Interpolated and forward filled missing pollen values
+
+pollen_detrend:
+  Detrended pollen values from interpolated pollen values
+
+pollen_inter_100:
+  Rolling mean of the interpolated pollen data with a window size of 100
+
+pollen_grate_100:
+  Percentage change of interpolated pollen data
+
+HatchetSword:
+  Z values for Hatchets and Swords
+
+HatchetSword_inter:
+  Interpolated z values for Hatchets and Swords
+
+Dagger:
+  Z values for Daggers
+
+Dagger_inter:
+  Interpolated z value for Daggers
+
+HouseSize:
+  Z values for House Size in meter squared
+
+HouseSize_inter:
+  Interpolated z values for House Sizes in meter squared
+
+CopperGold:
+  Z values for Copper and Gold
+
+CopperGold_inter:
+  Interpolated z values for Copper and Gold
+
+Amber:
+  Z values for Amber
+
+Amber_inter:
+  Interpolated z values for Amber
+
+MonumentCount:
+  Z values for Monument Count
+
+MonumentCount_inter:
+  Interpolated z values for Monument Count
+
+Depot:
+  Z values for Depot
+
+Depot_inter:
+  Interpolated z values for Depot
+
+Sickle:
+  Z values for Sickle
+
+Sickle_inter:
+  Interpolated z values for Sickle
+
+AxesCelts:
+  Z values for Axes and Celts
+
+AxesCelts_inter:
+  Interpolated z values for Axes and Celts
+
+MonumentSize:
+  Z values for Monument Size
+
+MonumentSize_inter:
+  Interpolated z values for Monument Size
+
+PotteryForm:
+  Z values for Pottery Form
+
+PotteryForm_inter:
+  Interpolated z values for Pottery Form
+
+PotteryDecoration:
+  Z values for Pottery Decoration
+
+PotteryDecoration_inter:
+  Interpolated z values for Pottery Decoration
+
+Dataset Name: capital.csv
+Dataset Description: This dataset contains archaeological data of various forms of capital across different prehistoric periods.
+
+### COLUMNS: ###
+
+BCE:
+  Before Common Era
+
+group:
+  Dropped after data loading
+
+color:
+  Dropped after data loading
+
+ZAxtSchwert:
+  Z values for Hatchets and Swords
+
+ZDolch:
+  Z values for Daggers
+
+Zhausgr:
+  Z values for House Size
+
+ZCU_AU:
+  Z values for Copper and Gold
+
+Zamber:
+  Z values for Amber
+
+ZMonument:
+  Z values for Monument Count
+
+ZHort:
+  Z values for Depot
+
+ZSichel:
+  Z values for Sickle
+
+ZBeil:
+  Z values for Axes and Celts
+
+ZMW:
+  Z values for Monument Size
+
+ZKeform:
+  Z values for Pottery Form
+
+Zkeverz:
+  Z values for Pottery Decoration
+
+Hypotheses already explored along this line of inquiry (root to current), in order, each with its measured surprise score and outcome verdict:
+1. Sustained positive shifts in pollen openness (operationalized as an increasing 100-year smoothed pollen openness) are followed within 200 years by a statistically significant increase in interpolated monument activity (both MonumentCount_inter and MonumentSize_inter) compared with the 200-year baseline prior to the pollen increase.
+   surprise: 0.000
+   verdict: uncertain
+2. Among events defined as sustained 100-year increases in smoothed pollen openness (positive 100-year slope and forward-100 mean &gt; prior-100 mean), the 200-year post-onset increase in MonumentSize_inter (post200 mean minus pre200 mean) is larger for events that occur when pre-event HouseSize_inter (mean over the 200-year pre window) is high versus when pre-event HouseSize_inter is low. Pre-existing household/settlement investment moderates the monument-size response to sustained pollen openness increases.
+   surprise: 0.000
+   verdict: uncertain
+3. For events defined by sustained 100-year increases in smoothed pollen openness (positive 100-year forward slope and forward-100 mean &gt; prior-100 mean), the magnitude of the forward-100 pollen slope (b_fwd) is positively associated with the 200-year post-onset change in MonumentCount_inter (diff_count = post200 mean minus pre200 mean): larger pollen-slope events elicit larger increases in monument counts, after accounting for pre-event MonumentCount_inter.
+   surprise: 0.000
+   verdict: uncertain
+
+Given the hypotheses explored above, propose exactly ONE new, falsifiable hypothesis that stays closely related to the current line of inquiry (most recent hypothesis: &#x27;For events defined by sustained 100-year increases in smoothed pollen openness (positive 100-year forward slope and forward-100 mean &gt; prior-100 mean), the magnitude of the forward-100 pollen slope (b_fwd) is positively associated with the 200-year post-onset change in MonumentCount_inter (diff_count = post200 mean minus pre200 mean): larger pollen-slope events elicit larger increases in monument counts, after accounting for pre-event MonumentCount_inter.&#x27;). It should probe the same phenomenon, variables, or mechanism explored so far — for example by refining it, extending it to an adjacent context, or testing a plausible causal driver, moderator, or boundary condition of the observed effect — rather than switching to an unrelated topic. Do not repeat any hypothesis explored above. Return only the hypothesis statement.</pre><p class="cap">user message in full: column-grounded dataset block (colsfix), then the 3-entry lineage history with (surprise, verdict), then the fmt3 related-follow-up instruction. Note: no execution instructions at all — the reward server judges the generated hypothesis by actually running it.</p></div>
+
+<h2>2 · Where node_1_0 goes in curation: everywhere and nowhere</h2>
+<svg class="tree" viewBox="0 0 720 210" role="img" aria-label="MCTS lineage and sample construction">
+<style>text{font:12px ui-monospace,monospace;fill:var(--ink);}.d{fill:var(--ink-2);}</style>
+<g fill="none" stroke="var(--ink-2)" stroke-width="1.2">
+<path d="M85 45 h60"/><path d="M205 45 h60"/><path d="M325 45 h60"/><path d="M445 45 h60"/><path d="M565 45 h60"/>
+</g>
+<rect x="20" y="28" width="65" height="34" rx="6" fill="none" stroke="var(--line)"/>
+<text x="30" y="49">0_0 root</text>
+<rect x="145" y="28" width="60" height="34" rx="6" fill="none" stroke="var(--err)"/>
+<text x="152" y="43">1_0</text><text x="152" y="57" class="d">EDA</text>
+<rect x="265" y="28" width="60" height="34" rx="6" fill="none" stroke="var(--ink-2)"/>
+<text x="272" y="43">2_x</text><text x="272" y="57" class="d">hyp 1</text>
+<rect x="385" y="28" width="60" height="34" rx="6" fill="none" stroke="var(--ink-2)"/>
+<text x="392" y="43">3_x</text><text x="392" y="57" class="d">hyp 2</text>
+<rect x="505" y="28" width="60" height="34" rx="6" fill="none" stroke="var(--ink-2)"/>
+<text x="512" y="43">4_x</text><text x="512" y="57" class="d">hyp 3</text>
+<rect x="625" y="28" width="70" height="34" rx="6" fill="none" stroke="var(--good)" stroke-width="2"/>
+<text x="632" y="43">5_0</text><text x="632" y="57" class="d">TARGET</text>
+<text x="20" y="100" class="d">sample for node_5_0:</text>
+<text x="20" y="122">history = [hyp 1, hyp 2, hyp 3]   ← node_1_0 contributes NOTHING (empty hypothesis)</text>
+<text x="20" y="144">target  = node_5_0's hypothesis   (n_history = 3, not 4)</text>
+<text x="20" y="176" class="d">node_1_0 itself: never a sample (level &lt;= 1 excluded) · never in history (no hypothesis)</text>
+<text x="20" y="196" class="d">but structurally required: load_mcts_from_json roots the tree at (1,0) — the KeyError guard</text>
+</svg>
+
+<div class="card"><h3>the two exclusion rules<span class="tag x">curation</span></h3>
+<pre># build_lineage_training_data.py — build_samples()
+if int(r["level"]) &lt;= 1 or not clean(r["hypothesis"]):
+    continue  # level-1 data-loading roots are not hypotheses
+
+# ancestors: only hypothesis-bearing nodes enter the history block
+hist_hyps = [a for a in ancestors if clean(a["hypothesis"])]</pre>
+<p class="cap">So in every fmt1/2/3 dataset (v1 dbb_lineage, v2 autods_v2_4k, v2colsfix, and the sanity sample):
+node_1_0 is neither a target nor a history line. Its EDA output influenced which hypotheses the theorizer
+proposed at collection time, but the curated prompts never mention it. Meanwhile the resume/RL machinery
+depends on it structurally — tree loading requires node (1,0) to exist, and GRPO rollouts still expand
+node_1_0 (we watched the sanity run sample ['1_0', '3_57']), meaning fresh hypotheses can branch straight
+off the EDA context with zero history.</p></div>
+</main>
+</body></html>

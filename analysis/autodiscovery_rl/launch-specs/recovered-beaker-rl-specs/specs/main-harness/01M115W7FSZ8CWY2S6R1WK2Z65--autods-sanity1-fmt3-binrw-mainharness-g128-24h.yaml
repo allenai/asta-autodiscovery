@@ -1,0 +1,65 @@
+version: v2
+description: 'A/B: GRPO fmt3_w_verdict, 1 archaeology sample, 10 epochs, group=128, BINARY reward. HARNESS = asta-autodiscovery main@ebf75d55 + planner separation + token-limit fix + gpt-5 logprobs gate ONLY (prompts/reviewer/sandbox stay main). group-size sweep arm g=128 (fills the curve between the g16 and g256 main-harness runs). slime ba17b587. 24h timeout (8h killed the earlier attempt at 3-5 steps).'
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nASTA=/root/asta-autodiscovery\nDST=$ASTA/packages/autodiscovery/src/autodiscovery\n# Harness under test: mainline AutoDiscovery, pinned.\ngit clone --branch main https://github.com/allenai/asta-autodiscovery.git \"$ASTA\"\ngit -C \"$ASTA\" checkout ebf75d55c0b15d465ec61578e9a9091ee6fd3a77\n# Overlay, in full: (a) main's agents.py/mcts.py carrying ONLY the planner separation\n# and the MessageTokenLimiter fix, (b) the reward-server shim main has no equivalent of.\ncp /overlay/agents.py /overlay/mcts.py /overlay/slime_reward.py /overlay/metrics.py \"$DST/\"\necho \"===== overlay vs main (planner + token limit) =====\"; cat /overlay/overlay.diff\necho \"===== verification =====\"\ngrep -n \"MessageTokenLimiter\" -A3 \"$DST/agents.py\"\ngrep -c \"experiment_planner\" \"$DST/agents.py\"\ngrep -n \"def _plan_hypotheses\" \"$DST/mcts.py\"\ngrep -n 'startswith(\"gpt-5\")' \"$DST/agents.py\"\ngrep -n \"model_name=config.execution_model\" \"$DST/slime_reward.py\"\ngit -C \"$ASTA\" log --oneline -1\npython3 -c \"import ast;[ast.parse(open(f'$DST/'+f).read()) for f in ['agents.py','mcts.py','slime_reward.py','metrics.py']];print('overlay parses OK')\"\n# Same slime commit as the binrw-g16 baseline: only the harness differs.\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh\n"]
+    envVars:
+      - name: ASTA_REF
+        value: main
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "128"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+    datasets:
+      - mountPath: /overlay
+        source:
+          beaker: 01M0RQEYD6EJ3YNZ36HCSBZMTR
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 24h0m0s

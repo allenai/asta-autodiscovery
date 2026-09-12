@@ -1,0 +1,63 @@
+version: v2
+description: 'sanity: GRPO fmt3_w_verdict on 1 archaeology sample, 10 epochs, group=4, BINARY reward + trunc penalty -0.1 + FEEDBACK_CONTEXT (prior rollout learnings in prompt), slime 196edefb'
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, 'set -e; git clone https://github.com/sijial430/slime.git /root/slime-repo; cd /root/slime-repo; git checkout 196edefb7d5f3d42492c255cd56cc8dd326ea5fe; bash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh']
+    envVars:
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "4"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: AUTODISCOVERY_FAILURE_REWARD
+        value: "-0.1"
+      - name: FEEDBACK_CONTEXT
+        value: "1"
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 8h0m0s

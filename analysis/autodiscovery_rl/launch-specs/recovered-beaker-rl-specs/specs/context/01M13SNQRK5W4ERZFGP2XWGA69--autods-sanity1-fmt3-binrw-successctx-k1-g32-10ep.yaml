@@ -1,0 +1,93 @@
+version: v2
+description: GRPO fmt3_w_verdict, one archaeology task, 10 epochs, group=32, binary reward; cumulative reward=1 context capped at k1. Context-cap sweep on the pinned main harness.
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, /gantry/entrypoint.sh]
+    arguments: [bash, -c, "set -ex\nASTA=/root/asta-autodiscovery\nDST=$ASTA/packages/autodiscovery/src/autodiscovery\ngit clone --branch main https://github.com/allenai/asta-autodiscovery.git \"$ASTA\"\ngit -C \"$ASTA\" checkout ebf75d55c0b15d465ec61578e9a9091ee6fd3a77\ncp /overlay/agents.py /overlay/mcts.py /overlay/slime_reward.py /overlay/metrics.py \"$DST/\"\nexport ASTA_DIR=\"$ASTA\"\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh"]
+    envVars:
+      - name: GANTRY_VERSION
+        value: 1.17.2
+      - name: GITHUB_REPO
+        value: sijial430/slime
+      - name: GIT_REF
+        value: 40a87e8a4ade4f938cbe63317590b6b2173cc3d5
+      - name: GANTRY_TASK_NAME
+        value: main
+      - name: RESULTS_DIR
+        value: /results
+      - name: CONDA_PLUGINS_AUTO_ACCEPT_TOS
+        value: "yes"
+      - name: ASTA_REF
+        value: main
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: binary
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "32"
+      - name: MAX_PROMPT_LEN
+        value: "16384"
+      - name: MAX_TOKENS_PER_GPU
+        value: "32768"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: FEEDBACK_CONTEXT
+        value: "1"
+      - name: AUTODISCOVERY_FEEDBACK_K
+        value: "1"
+      - name: AUTODISCOVERY_FEEDBACK_SUMMARY_MODEL
+        value: gpt-5-mini
+      - name: WANDB_GROUP
+        value: binrw-successctx-k1-archaeology
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: NO_PYTHON
+        value: "1"
+    datasets:
+      - mountPath: /gantry
+        source:
+          beaker: 01KVY7GT81R5YZ3ZH6RCDV8GKP
+      - mountPath: /overlay
+        source:
+          beaker: 01M0RQEYD6EJ3YNZ36HCSBZMTR
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 36h0m0s
+retry:
+  allowedTaskRetries: 1

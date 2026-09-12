@@ -1,0 +1,69 @@
+version: v2
+description: 'codex v5: npm install + sandbox=danger-full-access (bwrap cannot make namespaces in-container) + FAILURE_REWARD=-1. sanity: GRPO fmt3_w_verdict on 1 archaeology sample, 10 epochs, group=4, codex reward: Codex CLI runs the experiment, binary surprise |dprob|>=0.2, slime d241e239 (v2: codex API-key login fix)'
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout d241e239d19d3343ca9a8246d56dae778e127eb9\n# codex now installs from npm so its vendored code-mode host comes along;\n# the script asserts the host exists before training starts.\ncp /overlay/beaker_fmt_ablation_entry.sh /overlay/train_grpo.sh examples/autodiscovery_rl/\ncp /overlay/codex.py slime/rollout/rm_hub/\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh\n"]
+    envVars:
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: norm_surprisal
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "4"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: REWARD_TYPE
+        value: codex
+      - name: AUTODISCOVERY_FAILURE_REWARD
+        value: "-1"
+      - name: CODEX_VERSION
+        value: 0.149.1
+      - name: AUTODISCOVERY_CODEX_SANDBOX
+        value: danger-full-access
+    datasets:
+      - mountPath: /overlay
+        source:
+          beaker: 01M0S09HEBHADSHKR9FTJYSPBP
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 8h0m0s

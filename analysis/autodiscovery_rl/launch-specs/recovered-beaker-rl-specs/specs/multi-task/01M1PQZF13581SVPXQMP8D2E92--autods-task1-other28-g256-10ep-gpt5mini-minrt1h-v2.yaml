@@ -1,0 +1,1544 @@
+version: v2
+description: 'Other 28 benchmark tasks with minRuntime=1h: one independent GRPO fmt3_pairs_related arm per dataset, one prompt, 10 epochs, group=256, binary surprise reward, failure reward 0, and explicit gpt-5-mini belief model. Repeats the canceled autods-task1-*-g256-10ep-v2 sweep on slime ba17b587.'
+tasks:
+  - name: affairs
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, affairs]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 1h0m0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 12h0m0s
+  - name: amtl
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, amtl]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: boxes
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, boxes]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: caschools
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, caschools]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: conversation
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, conversation]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: crofoot
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, crofoot]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: evolution-freshwater-fish
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, evolution_freshwater_fish]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: fertility
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, fertility]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: fish
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, fish]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: hurricane
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, hurricane]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: immigration-offshoring-effect-on-employment
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, immigration_offshoring_effect_on_employment]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: introduction-pathways-non-native-plants
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, introduction_pathways_non-native_plants]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: meta-regression-raw
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, meta_regression_raw]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: meta-regression
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, meta_regression]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: mortgage
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, mortgage]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: nls-bmi-raw
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, nls_bmi_raw]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: nls-bmi
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, nls_bmi]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: nls-incarceration
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, nls_incarceration]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: nls-raw
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, nls_raw]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: nls-ses
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, nls_ses]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: panda-nuts
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, panda_nuts]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: reading
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, reading]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: requirements-engineering-for-ml-enabled-systems
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, requirements_engineering_for_ML_enabled_systems]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: soccer
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, soccer]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: teachingratings
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, teachingratings]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: toy
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, toy]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: worldbank-education-gdp-indicators
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, worldbank_education_gdp_indicators]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+  - name: worldbank-education-gdp
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nexport SPLIT_SUBDIR=\"task1_$1\"\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh", _, worldbank_education_gdp]
+    envVars:
+      - name: FORMAT
+        value: fmt3_pairs_related
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "256"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: BELIEF_MODEL
+        value: gpt-5-mini
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false

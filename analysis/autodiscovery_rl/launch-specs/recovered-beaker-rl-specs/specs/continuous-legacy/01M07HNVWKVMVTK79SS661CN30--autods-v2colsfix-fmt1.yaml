@@ -1,0 +1,70 @@
+version: v2
+description: GRPO fmt1_w_verdict on dbb_split_v2_colsfix (v2 data + column-grounded prompts), lr 5e-6, kl 0.01
+tasks:
+  - name: main
+    image:
+      beaker: 01GV1W09KK3VAQYT005Z90RZDB
+    command: [bash, /gantry/entrypoint.sh]
+    arguments: [bash, examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh]
+    envVars:
+      - name: GANTRY_VERSION
+        value: 1.17.2
+      - name: GITHUB_REPO
+        value: sijial430/slime
+      - name: GIT_REF
+        value: ba17b5870b878aa1535ee4681beff1d5a1ef525b
+      - name: GANTRY_TASK_NAME
+        value: main
+      - name: RESULTS_DIR
+        value: /results
+      - name: SPLIT_SUBDIR
+        value: dbb_split_v2_colsfix
+      - name: FORMAT
+        value: fmt1_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: ROLLOUT_BATCH_SIZE
+        value: "4"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "4"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: CONDA_PLUGINS_AUTO_ACCEPT_TOS
+        value: "yes"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: NO_PYTHON
+        value: "1"
+    datasets:
+      - mountPath: /gantry
+        source:
+          beaker: 01KVY7GT81R5YZ3ZH6RCDV8GKP
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 6h0m0s

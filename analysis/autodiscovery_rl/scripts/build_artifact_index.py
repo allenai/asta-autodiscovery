@@ -608,8 +608,8 @@ def render_readme():
         ),
         (
             "launch-specs/",
-            "Four-task g256 launch (YAML + outcome manifest) and the verified Weka training-log "
-            "transfer (YAML + provenance)",
+            "Recovered specs for 206 slime RL experiments, the four-task g256 launch, and the "
+            "verified Weka training-log transfer",
         ),
         (
             "scripts/",

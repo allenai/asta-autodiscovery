@@ -1,0 +1,61 @@
+version: v2
+description: 'sanity: GRPO fmt3_w_verdict on 1 archaeology sample, 10 epochs, group=16, BINARY reward, HARNESS=allenai/asta-autodiscovery main (A/B vs binrw-g16 on sijia/generator-dev); slime ba17b587'
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nASTA=/root/asta-autodiscovery\n# Harness under test: mainline AutoDiscovery (agents/prompts/mcts/beliefs/executor).\ngit clone --depth 1 --branch main \\\n  https://github.com/allenai/asta-autodiscovery.git \"$ASTA\"\n# main has no reward server, so carry ONLY the slime shim over from the branch.\ngit clone --depth 1 --branch sijia/generator-dev \\\n  https://github.com/allenai/asta-autodiscovery.git /root/asta-branch\nSRC=/root/asta-branch/packages/autodiscovery/src/autodiscovery\nDST=$ASTA/packages/autodiscovery/src/autodiscovery\ncp \"$SRC/slime_reward.py\" \"$SRC/metrics.py\" \"$DST/\"\n# main's get_agents takes model_name, not the branch's split theorizer/execution models.\nsed -i -e 's/^\\( *\\)theorizer_model=config\\.execution_model,$/\\1model_name=config.execution_model,/' \\\n       -e '/^ *execution_model=config\\.execution_model,$/d' \"$DST/slime_reward.py\"\n# Report the per-message token cap main actually applies (10k/12k, pre-fix).\nsed -i -e 's/^MAX_TOKENS_PER_MESSAGE = 16_384$/MAX_TOKENS_PER_MESSAGE = 10_000/' \\\n       -e 's/^MIN_TOKENS = 20_000$/MIN_TOKENS = 12_000/' \"$DST/metrics.py\"\npython3 -c \"import ast; ast.parse(open('$DST/slime_reward.py').read())\"\ngrep -n \"model_name=config.execution_model\" \"$DST/slime_reward.py\"\ngrep -n \"MessageTokenLimiter\" -A3 \"$DST/agents.py\"\ngit -C \"$ASTA\" log --oneline -1\n# Same slime commit as the binrw-g16 baseline: only the harness differs.\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh\n"]
+    envVars:
+      - name: ASTA_REF
+        value: main
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "16"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 8h0m0s

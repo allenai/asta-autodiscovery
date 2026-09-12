@@ -1,0 +1,61 @@
+version: v2
+description: 'sanity: GRPO fmt3_w_verdict on 1 archaeology sample, 10 epochs, group=16, control: conjunction keyword reward (1 iff hypothesis mentions pottery form AND copper), slime c391fd03'
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, 'set -e; git clone https://github.com/sijial430/slime.git /root/slime-repo; cd /root/slime-repo; git checkout c391fd034025ea946847599d61a81c7243c22474; sed -i "s/coin,codex}/coin,codex,keyword}/" examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh; bash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh']
+    envVars:
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: norm_surprisal
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "16"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: REWARD_TYPE
+        value: keyword
+      - name: AUTODISCOVERY_KEYWORD_PATTERN
+        value: (?s)(?=.*pottery\s*form)(?=.*copper)
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 8h0m0s

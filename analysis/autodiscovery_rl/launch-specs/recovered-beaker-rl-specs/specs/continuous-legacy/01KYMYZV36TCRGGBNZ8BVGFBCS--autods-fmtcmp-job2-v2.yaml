@@ -1,0 +1,55 @@
+version: v2
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, /gantry/entrypoint.sh]
+    arguments: [bash, examples/autodiscovery_rl/beaker_fmt_compare_entry.sh]
+    envVars:
+      - name: GANTRY_VERSION
+        value: 1.17.2
+      - name: GITHUB_REPO
+        value: sijial430/slime
+      - name: GIT_REF
+        value: 030bb4fa8567eed20264ba10360ca84817e069d7
+      - name: GANTRY_TASK_NAME
+        value: main
+      - name: RESULTS_DIR
+        value: /results
+      - name: CONDA_PLUGINS_AUTO_ACCEPT_TOS
+        value: "yes"
+      - name: JOB
+        value: "2"
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: GITHUB_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: NO_PYTHON
+        value: "1"
+    datasets:
+      - mountPath: /gantry
+        source:
+          beaker: 01KVY7GT81R5YZ3ZH6RCDV8GKP
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      cluster:
+        - ai2/jupiter
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 6h0m0s

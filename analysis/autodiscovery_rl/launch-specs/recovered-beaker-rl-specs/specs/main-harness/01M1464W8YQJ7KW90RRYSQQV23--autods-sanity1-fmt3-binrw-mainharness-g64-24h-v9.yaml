@@ -1,0 +1,187 @@
+version: v2
+description: 'GRPO fmt3_w_verdict: 1 archaeology sample, group 64, 10 epochs, binary reward, 24h. slime ba17b587 + wandb/ray/mem fixes.'
+tasks:
+  - name: main
+    image:
+      docker: slimerl/slime:latest
+    command: [bash, -c, "set -ex\nMA=$(awk '/MemAvailable/{print int($2/1048576)}' /proc/meminfo)\necho \"[preflight] host MemAvailable=${MA}GiB (need >=600)\"\nif [ \"$MA\" -lt 600 ]; then echo \"[preflight] node too loaded - failing fast\"; exit 1; fi\nASTA=/root/asta-autodiscovery\nDST=$ASTA/packages/autodiscovery/src/autodiscovery\n# Harness under test: mainline AutoDiscovery, pinned.\ngit clone --branch main https://github.com/allenai/asta-autodiscovery.git \"$ASTA\"\ngit -C \"$ASTA\" checkout ebf75d55c0b15d465ec61578e9a9091ee6fd3a77\n# Overlay, in full: (a) main's agents.py/mcts.py carrying ONLY the planner separation\n# and the MessageTokenLimiter fix, (b) the reward-server shim main has no equivalent of.\ncp /overlay/agents.py /overlay/mcts.py /overlay/slime_reward.py /overlay/metrics.py \"$DST/\"\necho \"===== overlay vs main (planner + token limit) =====\"; cat /overlay/overlay.diff\necho \"===== verification =====\"\ngrep -n \"MessageTokenLimiter\" -A3 \"$DST/agents.py\"\ngrep -c \"experiment_planner\" \"$DST/agents.py\"\ngrep -n \"def _plan_hypotheses\" \"$DST/mcts.py\"\ngrep -n 'startswith(\"gpt-5\")' \"$DST/agents.py\"\ngrep -n \"model_name=config.execution_model\" \"$DST/slime_reward.py\"\ngit -C \"$ASTA\" log --oneline -1\npython3 -c \"import ast;[ast.parse(open(f'$DST/'+f).read()) for f in ['agents.py','mcts.py','slime_reward.py','metrics.py']];print('overlay parses OK')\"\n# Same slime commit as the binrw-g16 baseline: only the harness differs.\ngit clone https://github.com/sijial430/slime.git /root/slime-repo\ncd /root/slime-repo\ngit checkout ba17b5870b878aa1535ee4681beff1d5a1ef525b\necho '[fix1] patching wandb.util.generate_id'\nfind /root/slime -name wandb_utils.py -exec sed -i 's/wandb\\.util\\.generate_id()/(getattr(wandb.util,\"generate_id\",None) or __import__(\"wandb.sdk.lib.runid\",fromlist=[\"generate_id\"]).generate_id)()/g' {} +\ngrep -rn 'generate_id' /root/slime --include=wandb_utils.py || true\necho '[fix2] making ray job failures propagate'\nexport AUTODS_RAY_SID=\"autods-$(date +%s)\"\nsed -i 's|ray job submit --address=\"http://127.0.0.1:8265\" \\\\|ray job submit --address=\"http://127.0.0.1:8265\" --submission-id \"$AUTODS_RAY_SID\" \\\\|' examples/autodiscovery_rl/train_grpo.sh\ngrep -q 'submission-id' examples/autodiscovery_rl/train_grpo.sh || { echo \"[guard] FAILED to patch ray submit\"; exit 1; }\nprintf '%s\\n' '' 'RC=$?' 'ST=$(ray job status --address=http://127.0.0.1:8265 \"$AUTODS_RAY_SID\" 2>&1 | tail -3)' 'echo \"[guard] ray submit rc=$RC ; final status: $ST\"' 'case \"$ST\" in *SUCCEEDED*) exit \"$RC\" ;; *) echo \"[guard] ray job did NOT reach SUCCEEDED\"; exit 1 ;; esac' >> examples/autodiscovery_rl/train_grpo.sh\nbash examples/autodiscovery_rl/beaker_fmt_ablation_entry.sh\n"]
+    envVars:
+      - name: ASTA_REF
+        value: main
+      - name: SPLIT_SUBDIR
+        value: sanity1_fmt3_bin
+      - name: FORMAT
+        value: fmt3_w_verdict
+      - name: ADVANTAGE_ESTIMATOR
+        value: grpo
+      - name: LR
+        value: "5e-6"
+      - name: KL_COEF
+        value: "0.01"
+      - name: EPOCHS
+        value: "10"
+      - name: REWARD_SIGNAL
+        value: belief_change
+      - name: ROLLOUT_BATCH_SIZE
+        value: "1"
+      - name: N_SAMPLES_PER_PROMPT
+        value: "64"
+      - name: MAX_PROMPT_LEN
+        value: "8192"
+      - name: EXECUTION_MODEL
+        value: gpt-5-mini
+      - name: WANDB_KEY
+        secret: SIJIAL_WANDB_API_KEY
+      - name: OPENAI_API_KEY
+        secret: OPENAI_API_KEY
+      - name: AWS_ACCESS_KEY_ID
+        secret: AWS_ACCESS_KEY_ID
+      - name: AWS_SECRET_ACCESS_KEY
+        secret: AWS_SECRET_ACCESS_KEY
+      - name: GITHUB_TOKEN
+        secret: SIJIAL_AI2_GH_TOKEN
+      - name: HF_TOKEN
+        secret: HF_TOKEN
+      - name: AUTODS_USE_BINARY_REWARD
+        value: "true"
+      - name: REWARD_CONCURRENCY
+        value: "32"
+    datasets:
+      - mountPath: /overlay
+        source:
+          beaker: 01M0RQEYD6EJ3YNZ36HCSBZMTR
+    result:
+      path: /results
+    resources:
+      gpuCount: 8
+      memory: 1000 GiB
+    context:
+      priority: urgent
+      minRuntime: 0s
+      autoResume: true
+    constraints:
+      hostname:
+        - jupiter-cs-aus-102.reviz.ai2.in
+        - jupiter-cs-aus-103.reviz.ai2.in
+        - jupiter-cs-aus-104.reviz.ai2.in
+        - jupiter-cs-aus-105.reviz.ai2.in
+        - jupiter-cs-aus-106.reviz.ai2.in
+        - jupiter-cs-aus-107.reviz.ai2.in
+        - jupiter-cs-aus-108.reviz.ai2.in
+        - jupiter-cs-aus-109.reviz.ai2.in
+        - jupiter-cs-aus-110.reviz.ai2.in
+        - jupiter-cs-aus-111.reviz.ai2.in
+        - jupiter-cs-aus-112.reviz.ai2.in
+        - jupiter-cs-aus-113.reviz.ai2.in
+        - jupiter-cs-aus-114.reviz.ai2.in
+        - jupiter-cs-aus-115.reviz.ai2.in
+        - jupiter-cs-aus-116.reviz.ai2.in
+        - jupiter-cs-aus-117.reviz.ai2.in
+        - jupiter-cs-aus-118.reviz.ai2.in
+        - jupiter-cs-aus-119.reviz.ai2.in
+        - jupiter-cs-aus-120.reviz.ai2.in
+        - jupiter-cs-aus-121.reviz.ai2.in
+        - jupiter-cs-aus-122.reviz.ai2.in
+        - jupiter-cs-aus-123.reviz.ai2.in
+        - jupiter-cs-aus-124.reviz.ai2.in
+        - jupiter-cs-aus-125.reviz.ai2.in
+        - jupiter-cs-aus-126.reviz.ai2.in
+        - jupiter-cs-aus-127.reviz.ai2.in
+        - jupiter-cs-aus-128.reviz.ai2.in
+        - jupiter-cs-aus-129.reviz.ai2.in
+        - jupiter-cs-aus-130.reviz.ai2.in
+        - jupiter-cs-aus-131.reviz.ai2.in
+        - jupiter-cs-aus-132.reviz.ai2.in
+        - jupiter-cs-aus-133.reviz.ai2.in
+        - jupiter-cs-aus-134.reviz.ai2.in
+        - jupiter-cs-aus-136.reviz.ai2.in
+        - jupiter-cs-aus-137.reviz.ai2.in
+        - jupiter-cs-aus-139.reviz.ai2.in
+        - jupiter-cs-aus-140.reviz.ai2.in
+        - jupiter-cs-aus-141.reviz.ai2.in
+        - jupiter-cs-aus-142.reviz.ai2.in
+        - jupiter-cs-aus-143.reviz.ai2.in
+        - jupiter-cs-aus-144.reviz.ai2.in
+        - jupiter-cs-aus-146.reviz.ai2.in
+        - jupiter-cs-aus-147.reviz.ai2.in
+        - jupiter-cs-aus-148.reviz.ai2.in
+        - jupiter-cs-aus-149.reviz.ai2.in
+        - jupiter-cs-aus-150.reviz.ai2.in
+        - jupiter-cs-aus-152.reviz.ai2.in
+        - jupiter-cs-aus-154.reviz.ai2.in
+        - jupiter-cs-aus-155.reviz.ai2.in
+        - jupiter-cs-aus-156.reviz.ai2.in
+        - jupiter-cs-aus-158.reviz.ai2.in
+        - jupiter-cs-aus-159.reviz.ai2.in
+        - jupiter-cs-aus-160.reviz.ai2.in
+        - jupiter-cs-aus-161.reviz.ai2.in
+        - jupiter-cs-aus-162.reviz.ai2.in
+        - jupiter-cs-aus-163.reviz.ai2.in
+        - jupiter-cs-aus-164.reviz.ai2.in
+        - jupiter-cs-aus-165.reviz.ai2.in
+        - jupiter-cs-aus-166.reviz.ai2.in
+        - jupiter-cs-aus-167.reviz.ai2.in
+        - jupiter-cs-aus-168.reviz.ai2.in
+        - jupiter-cs-aus-169.reviz.ai2.in
+        - jupiter-cs-aus-170.reviz.ai2.in
+        - jupiter-cs-aus-171.reviz.ai2.in
+        - jupiter-cs-aus-172.reviz.ai2.in
+        - jupiter-cs-aus-174.reviz.ai2.in
+        - jupiter-cs-aus-175.reviz.ai2.in
+        - jupiter-cs-aus-176.reviz.ai2.in
+        - jupiter-cs-aus-177.reviz.ai2.in
+        - jupiter-cs-aus-178.reviz.ai2.in
+        - jupiter-cs-aus-179.reviz.ai2.in
+        - jupiter-cs-aus-180.reviz.ai2.in
+        - jupiter-cs-aus-181.reviz.ai2.in
+        - jupiter-cs-aus-182.reviz.ai2.in
+        - jupiter-cs-aus-183.reviz.ai2.in
+        - jupiter-cs-aus-184.reviz.ai2.in
+        - jupiter-cs-aus-185.reviz.ai2.in
+        - jupiter-cs-aus-186.reviz.ai2.in
+        - jupiter-cs-aus-187.reviz.ai2.in
+        - jupiter-cs-aus-188.reviz.ai2.in
+        - jupiter-cs-aus-189.reviz.ai2.in
+        - jupiter-cs-aus-190.reviz.ai2.in
+        - jupiter-cs-aus-191.reviz.ai2.in
+        - jupiter-cs-aus-192.reviz.ai2.in
+        - jupiter-cs-aus-193.reviz.ai2.in
+        - jupiter-cs-aus-194.reviz.ai2.in
+        - jupiter-cs-aus-195.reviz.ai2.in
+        - jupiter-cs-aus-196.reviz.ai2.in
+        - jupiter-cs-aus-197.reviz.ai2.in
+        - jupiter-cs-aus-198.reviz.ai2.in
+        - jupiter-cs-aus-200.reviz.ai2.in
+        - jupiter-cs-aus-202.reviz.ai2.in
+        - jupiter-cs-aus-203.reviz.ai2.in
+        - jupiter-cs-aus-204.reviz.ai2.in
+        - jupiter-cs-aus-205.reviz.ai2.in
+        - jupiter-cs-aus-206.reviz.ai2.in
+        - jupiter-cs-aus-207.reviz.ai2.in
+        - jupiter-cs-aus-208.reviz.ai2.in
+        - jupiter-cs-aus-209.reviz.ai2.in
+        - jupiter-cs-aus-210.reviz.ai2.in
+        - jupiter-cs-aus-211.reviz.ai2.in
+        - jupiter-cs-aus-212.reviz.ai2.in
+        - jupiter-cs-aus-215.reviz.ai2.in
+        - jupiter-cs-aus-216.reviz.ai2.in
+        - jupiter-cs-aus-217.reviz.ai2.in
+        - jupiter-cs-aus-218.reviz.ai2.in
+        - jupiter-cs-aus-219.reviz.ai2.in
+        - jupiter-cs-aus-220.reviz.ai2.in
+        - jupiter-cs-aus-221.reviz.ai2.in
+        - jupiter-cs-aus-222.reviz.ai2.in
+        - jupiter-cs-aus-223.reviz.ai2.in
+        - jupiter-cs-aus-224.reviz.ai2.in
+        - jupiter-cs-aus-225.reviz.ai2.in
+        - jupiter-cs-aus-227.reviz.ai2.in
+        - jupiter-cs-aus-228.reviz.ai2.in
+        - jupiter-cs-aus-229.reviz.ai2.in
+        - jupiter-cs-aus-435.reviz.ai2.in
+        - jupiter-cs-aus-436.reviz.ai2.in
+        - jupiter-cs-aus-483.reviz.ai2.in
+        - jupiter-cs-aus-484.reviz.ai2.in
+    hostNetworking: false
+    propagateFailure: false
+    propagatePreemption: false
+    timeout: 24h0m0s

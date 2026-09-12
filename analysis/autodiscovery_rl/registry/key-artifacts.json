@@ -260,6 +260,24 @@
    "topic": "provenance-registries-and-code"
   },
   {
+   "path": "launch-specs/recovered-beaker-rl-specs/README.md",
+   "extra_paths": [
+    "launch-specs/recovered-beaker-rl-specs/index.json",
+    "scripts/export_autodiscovery_rl_beaker_specs.py"
+   ],
+   "title": "Recovered Beaker launch specs for 206 slime RL experiments",
+   "kind": "launch spec collection",
+   "date": "Sep 11",
+   "what_it_shows": "A portable archive of 206 normalized Beaker v2 YAML specs used for the indexed AutoDiscovery-RL experiments, organized into 12 experiment families. The machine-readable index records experiment IDs, names, final indexed status, Beaker URLs, paths, sizes and SHA-256 hashes. Beaker retained 205 experiment specs directly; the deleted truncation-penalty experiment was recovered through its result dataset's retained source job, with Beaker-injected environment variables removed.",
+   "related_claude_pages": [
+    "ee9f104f",
+    "65d799a0",
+    "cd5b6a58"
+   ],
+   "caution": "The specs preserve secret references by name but contain no credential values. They still depend on external images, datasets and Beaker secrets. The index statuses come from the source-workspace registry rather than a fresh status query.",
+   "topic": "provenance-registries-and-code"
+  },
+  {
    "path": "launch-specs/autods-training-logs-to-weka-2026-09-11.md",
    "extra_paths": [
     "launch-specs/autods-training-logs-to-weka-2026-09-11.yaml"

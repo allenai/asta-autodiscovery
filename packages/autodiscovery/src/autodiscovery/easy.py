@@ -28,6 +28,9 @@ import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
+from autodiscovery.args import MODEL_FLAG_HELP
+from autodiscovery.llm import ModelError
+
 
 def _sniff_columns(path: Path) -> list[dict[str, str]] | None:
     """Read CSV/TSV headers and return column entries with empty descriptions."""
@@ -76,7 +79,9 @@ def _build_metadata(
             # it only to the first file to avoid repeating it per-file.
             first = True
             for child in sorted(path.rglob("*")):
-                if child.is_file() and not any(p.startswith(".") for p in child.relative_to(path).parts):
+                if child.is_file() and not any(
+                    p.startswith(".") for p in child.relative_to(path).parts
+                ):
                     rel = str(Path(path.name) / child.relative_to(path))
                     entry: dict = {
                         "name": rel,
@@ -190,9 +195,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
     adv = parser.add_argument_group("advanced")
-    adv.add_argument("--model", type=str, default="gemini-3.1-pro-preview")
-    adv.add_argument("--belief_model", type=str, default="gemini-3-flash-preview")
-    adv.add_argument("--vision_model", type=str, default="gemini-3.1-pro-preview")
+    adv.add_argument(
+        "--model",
+        type=str,
+        default="vertex_ai/gemini-3.7-flash",
+        help=MODEL_FLAG_HELP.format(role="all agents (except the belief agent)"),
+    )
+    adv.add_argument(
+        "--belief_model",
+        type=str,
+        default="vertex_ai/gemini-3.7-flash",
+        help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
+    )
+    adv.add_argument(
+        "--vision_model",
+        type=str,
+        default="vertex_ai/gemini-3.7-flash",
+        help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
+    )
+    adv.add_argument(
+        "--embedding_model",
+        type=str,
+        default="openai/text-embedding-3-large",
+        help=MODEL_FLAG_HELP.format(role="deduplication embeddings"),
+    )
+    adv.add_argument("--embedding_dimensions", type=int)
     adv.add_argument("--temperature", type=float, default=1.0)
     adv.add_argument("--belief_temperature", type=float, default=1.0)
     adv.add_argument(
@@ -216,6 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     adv.add_argument("--run_eda", action=argparse.BooleanOptionalAction, default=False)
     adv.add_argument("--experiment_first", action=argparse.BooleanOptionalAction, default=False)
+    adv.add_argument("--dedupe", action=argparse.BooleanOptionalAction, default=False)
     adv.add_argument(
         "--backend",
         type=str,
@@ -245,6 +273,17 @@ def cli_main(argv: list[str] | None = None) -> None:
     for p in dataset_paths:
         if not p.exists():
             parser.error(f"Dataset path not found: {p}")
+
+    # Check the model flags here, before any directory is created, so a bad flag
+    # or missing provider configuration reads as a flag error like any other
+    # rather than a traceback out of the engine. run.main() checks them again;
+    # the check is pure and cheap, so the duplicate costs nothing.
+    from autodiscovery.run import resolve_model_args
+
+    try:
+        resolve_model_args(args)
+    except ModelError as e:
+        raise SystemExit(f"{parser.prog}: error: {e}") from e
 
     # Create a working directory with symlinks to datasets + metadata.json.
     # Symlinks let the sandbox (which chdir's to work_dir) find files by
@@ -283,6 +322,8 @@ def cli_main(argv: list[str] | None = None) -> None:
         model=args.model,
         belief_model=args.belief_model,
         vision_model=args.vision_model,
+        embedding_model=args.embedding_model,
+        embedding_dimensions=args.embedding_dimensions,
         temperature=args.temperature,
         belief_temperature=args.belief_temperature,
         reasoning_effort=args.reasoning_effort,
@@ -314,7 +355,7 @@ def cli_main(argv: list[str] | None = None) -> None:
         k_parents=10,
         implicit_bayes_posterior=False,
         use_binary_reward=False,
-        dedupe=False,
+        dedupe=args.dedupe,
         use_online_beliefs=False,
         warmstart_experiments=None,
         bucket_path=None,

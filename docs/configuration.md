@@ -150,12 +150,14 @@ The AD job runs the LLM-generated experiment code through a configurable executo
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (in-process, no isolation), or `modal` (remote sandbox). |
+| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (subprocess sharing the job's own environment), or `modal` (remote sandbox). |
 
 - `process` (default) — runs code in an isolated subprocess inside the job container, in a separate
   sandbox venv; per-cell package installs are discarded, and no state carries across cells. No cloud
   dependency (Modal is not required). Reads the dataset from the job's data mount.
-- `local` — runs code in-process with no isolation. Lowest overhead, least safe.
+- `local` — runs code in a subprocess that shares the job's own Python environment, with no separate
+  sandbox venv. Lowest overhead, least isolated: generated code sees, and installs into, the packages
+  the job itself runs on.
 - `modal` — runs code in a remote Modal sandbox that mounts **only** the per-job data prefix,
   read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables and
   `STORAGE_BACKEND=gcs` (the sandbox mounts the dataset from `gs://`).
@@ -172,6 +174,10 @@ data the job or sandbox cannot see:
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
 | `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
+
+All three return the figures a run produced as structured outputs, which the job then interprets
+with `--vision_model` in its own process. No backend needs model credentials inside the execution
+environment, and every backend persists its figures to `rich_outputs/` for the HTML report.
 
 ### Choosing a safe combination
 
@@ -216,12 +222,16 @@ Model access for the discovery agents.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `OPENAI_API_KEY` | Conditional | *(none)* | OpenAI API key. Required when using OpenAI models. |
-| `VERTEX_PROJECT_ID` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models. |
-| `VERTEX_LOCATION` | No | `global` | Vertex AI location/region. |
-| `VERTEX_OPENAI_BASE_URL` | No | *(derived)* | Overrides the base URL for the Vertex OpenAI-compatible endpoint. When unset it is derived from the project/location. |
-| `VERTEX_ACCESS_TOKEN` | Conditional | *(none)* | OAuth bearer token for Vertex. `GOOGLE_OAUTH_ACCESS_TOKEN` is accepted as a fallback. |
-| `GOOGLE_OAUTH_ACCESS_TOKEN` | No | *(none)* | Fallback OAuth token used for Vertex when `VERTEX_ACCESS_TOKEN` is not set. |
+| `VERTEXAI_PROJECT` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models, and checked at startup; it is not inferred from the Application Default Credentials project. Read by litellm itself — this is litellm's own variable name, not one this package defines. |
+| `VERTEXAI_LOCATION` | Conditional | *(none)* | Vertex AI location/region, required alongside `VERTEXAI_PROJECT` and checked at startup. Use `global` unless you have a reason not to: it serves the Gemini models the CLI defaults to, and litellm's own fallback, `us-central1`, does not. Also litellm's variable. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Conditional | *(none)* | Service-account key for Vertex. Vertex uses Application Default Credentials; run `gcloud auth application-default login` instead for local development. |
+| `GITHUB_COPILOT_TOKEN_DIR` | No | `~/.config/litellm/github_copilot` | Directory holding an `access-token` file with a GitHub OAuth token. Interactive runs obtain and cache this via device-code login; pre-seed it for non-interactive runs, which otherwise block on a device prompt. |
 | `ASTA_AGENTS_MODEL` | No | `openai/gpt-5-mini` | Model used by the `agents` package (LiteLLM model string). |
+
+`VERTEX_ACCESS_TOKEN`, `GOOGLE_OAUTH_ACCESS_TOKEN` and `VERTEX_OPENAI_BASE_URL`
+are no longer read. Vertex traffic goes through litellm's Vertex client, which
+authenticates with ADC and refreshes tokens itself, so a raw bearer token and a
+hand-set OpenAI-compatible base URL no longer have a place.
 
 ### LLM retry / backoff
 
@@ -252,12 +262,16 @@ Used by the completion-email maintenance job to notify users when runs finish.
 
 Configures the "dig deeper" handoff that sends an experiment's context to Asta.
 
+Both `ASTA_CONTEXT_SERVICE_URL` and `ASTA_CONTEXT_SERVICE_API_KEY` must be set to enable it. With
+either missing the feature is off: the UI hides the "Continue exploring with Asta" entry points and
+the API returns `503` from the handoff endpoint. The rest of the app is unaffected.
+
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `AUTODISCOVERY_BASE_URL` | No | `https://autodiscovery.allen.ai` | Base URL of this app, used to build the AutoDiscovery run link included in the Asta handoff. |
 | `ASTA_BASE_URL` | No | `https://asta.allen.ai` | Base URL used to build Asta chat links returned to the UI. |
 | `ASTA_CONTEXT_SERVICE_URL` | No | *(empty — feature disabled)* | URL of the context service that stores handoff artifacts and metadata. |
-| `ASTA_CONTEXT_SERVICE_API_KEY` | No | *(empty)* | API key for the context service. |
+| `ASTA_CONTEXT_SERVICE_API_KEY` | No | *(empty — feature disabled)* | API key for the context service. |
 | `ASTA_BUCKET` | No | `example-workspaces-project` | Bucket the handoff copies dataset files into for Asta to load. |
 
 ## Frontend (UI)

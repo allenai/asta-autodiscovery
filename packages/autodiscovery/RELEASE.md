@@ -6,6 +6,19 @@ generate follow-up hypotheses in a recursive exploration.
 
 > Link to our NeurIPS 2025 paper: [AutoDiscovery: Open-ended Scientific Discovery via Bayesian Surprise](https://openreview.net/pdf?id=kJqTkj2HhF)
 
+## Upgrading from 0.2.x
+
+1.0.0 changes two things that every existing command line depends on:
+
+- **Model flags now name their provider.** `--model gemini-3.1-pro-preview`
+  becomes `--model vertex_ai/gemini-3.7-flash`. A bare model name is rejected at
+  startup. See [Selecting models](#selecting-models) below.
+- **Vertex AI authenticates via Application Default Credentials only.**
+  `VERTEX_ACCESS_TOKEN`, `GOOGLE_OAUTH_ACCESS_TOKEN` and
+  `VERTEX_OPENAI_BASE_URL` are no longer read.
+
+Full notes: [CHANGELOG](https://github.com/allenai/asta-autodiscovery/blob/main/CHANGELOG.md).
+
 ## Installation
 
 Requires Python 3.13 or newer.
@@ -56,24 +69,30 @@ Run `auto-discovery --help` to see the full set of options.
 
 ## Authentication
 
-The agent talks to model providers through their OpenAI-compatible endpoints. The provider is
-chosen per-model from the model name: anything starting with `gemini` is routed through Google
-Vertex AI; everything else (e.g. `gpt-4o`) goes to OpenAI. You only need to configure the
-providers for the models you actually select via `--model`, `--belief_model`, and
-`--vision_model`.
+All model traffic goes through [litellm](https://docs.litellm.ai/), and every model flag names
+its provider explicitly as `<provider>/<model>` — for example
+`vertex_ai/gemini-3.7-flash`, `openai/o4-mini`, `github_copilot/claude-haiku-4.5`. You only
+need to configure the providers you actually name in `--model`, `--belief_model`,
+`--vision_model` and `--embedding_model`.
 
-### Gemini (Vertex AI)
+### Vertex AI
 
-Used when any of `--model`, `--belief_model`, or `--vision_model` is a `gemini-*` name. The
-defaults are Gemini models, so this is required unless you override all three.
+Used when a model flag names `vertex_ai/...`. The defaults are Vertex models, so this is required
+unless you override them all.
 
-Pick one of the following. In all cases, set the project (and optionally location) so the agent
-knows which Vertex endpoint to call:
+Pick one of the following. In all cases, set the project and location so the agent knows which
+Vertex endpoint to call — these are litellm's own variable names, read by litellm itself:
 
 ```sh
-export VERTEX_PROJECT_ID=your-gcp-project-id
-export VERTEX_LOCATION=global   # optional; defaults to "global"
+export VERTEXAI_PROJECT=your-gcp-project-id
+export VERTEXAI_LOCATION=global   # `global` serves the default models
 ```
+
+Both are required for a `vertex_ai/` model, and a run that names one without them stops at
+startup naming whichever is missing. Neither is inferred: Application Default Credentials carry
+a project of their own, which is frequently not the project you meant, and litellm's fallback
+location is `us-central1`, which does not serve the Gemini models the defaults name. Relying on
+either turns a missing setting into a confusing 404 mid-run.
 
 **Service account key file (recommended for non-interactive use):**
 
@@ -90,35 +109,46 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 gcloud auth application-default login
 ```
 
-**Static access token (short-lived, e.g. in CI):**
-If present, this will take priority over the `GOOGLE_APPLICATION_CREDENTIALS` setting.
-```sh
-export VERTEX_ACCESS_TOKEN=$(gcloud auth print-access-token)
-```
-
-To bypass project/location lookup entirely, set `VERTEX_OPENAI_BASE_URL` to a fully-formed
-Vertex OpenAI-compatible endpoint URL.
+Vertex authenticates via Application Default Credentials, so either
+`GOOGLE_APPLICATION_CREDENTIALS` or `gcloud auth application-default login` is
+required. Raw bearer tokens (`VERTEX_ACCESS_TOKEN`) are no longer accepted.
 
 ### OpenAI
 
-Used when any of `--model`, `--belief_model`, or `--vision_model` is a non-Gemini name
-(e.g. `gpt-4o`, `gpt-4o-mini`).
+Used when a model flag names `openai/...` (e.g. `openai/gpt-4o`).
 
 ```sh
 export OPENAI_API_KEY=sk-...
 ```
 
+### GitHub Copilot
+
+Used when a model flag names `github_copilot/...`. litellm reads a GitHub OAuth token from a
+file. On an interactive terminal it runs GitHub's device-code login on first use and
+caches the token itself, so no setup is needed. For non-interactive runs, pre-seed it:
+
+```sh
+export GITHUB_COPILOT_TOKEN_DIR=/path/to/dir   # must contain a file named `access-token`
+```
+
+There is no TTY detection, so a headless run without a cached token prints a device
+code and blocks for about three minutes before failing.
+
 ### Selecting models
 
-| Flag | What it controls | Provider |
+| Flag | What it controls | Default |
 | --- | --- | --- |
-| `--model` | Primary reasoning model used for hypothesis generation and analysis. | Gemini if name starts with `gemini`, else OpenAI. |
-| `--belief_model` | Model used for belief updates over experimental outcomes. | Same routing. |
-| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | Same routing. |
+| `--model` | Primary reasoning model used for hypothesis generation and analysis. | `vertex_ai/gemini-3.7-flash` |
+| `--belief_model` | Model used for belief updates over experimental outcomes. | `vertex_ai/gemini-3.7-flash` |
+| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | `vertex_ai/gemini-3.7-flash` |
+| `--embedding_model` | Model used for deduplication embeddings. | `openai/text-embedding-3-large` |
 
-Mixing providers is supported — for example, `--model gpt-4o --belief_model gemini-3-flash-preview`
-will use OpenAI for the main loop and Vertex AI for belief updates, and both `OPENAI_API_KEY` and
-the Vertex variables must be set.
+Because the provider travels with each flag, mixing providers is supported — for example,
+`--model openai/gpt-4o --belief_model vertex_ai/gemini-3.7-flash` uses OpenAI for the main
+loop and Vertex AI for belief updates, with both `OPENAI_API_KEY` and the Vertex variables set.
+
+Each flag is validated against litellm's offline model registry at startup, before the first
+model call.
 
 ## Citation
 

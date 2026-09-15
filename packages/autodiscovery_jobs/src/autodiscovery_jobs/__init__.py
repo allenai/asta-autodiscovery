@@ -69,6 +69,7 @@ from .manager import ForkResult, JobManager
 
 # Re-export functional APIs for direct use
 from .persistence import (
+    UserDataSummary,
     create_job_directory,
     delete_job_directory,
     download_job_results,
@@ -80,7 +81,9 @@ from .persistence import (
     list_user_ids,
     list_user_jobs,
     parse_gcs_path,
+    purge_user_data,
     soft_delete_job,
+    summarize_user_data,
     upload_dataset,
     upload_metadata,
 )
@@ -118,7 +121,7 @@ from .user_profile import (
     update_user_profile,
 )
 
-__version__ = "0.2.2"
+__version__ = "1.0.1"
 
 __all__ = [
     # Main class
@@ -163,6 +166,10 @@ __all__ = [
     "create_job_directory",
     "delete_job_directory",
     "soft_delete_job",
+    # Per-user erasure (maintainer-only; see scripts/purge_user_data.py)
+    "UserDataSummary",
+    "summarize_user_data",
+    "purge_user_data",
     "upload_dataset",
     "expire_datasets",
     "upload_metadata",

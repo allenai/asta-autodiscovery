@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request
 from utils.auth import get_auth_provider, requires_auth
-from utils.credits import get_user_credits
+from utils.credits import get_cached_user_credits
 
 # Import autodiscovery_jobs when available
 try:
@@ -55,7 +55,7 @@ def create() -> Blueprint:
 
         try:
             job_manager = get_job_manager()
-            user_credits = get_user_credits(userid=user_id, config=job_manager.config)
+            user_credits = get_cached_user_credits(userid=user_id, config=job_manager.config)
 
             return jsonify(
                 {

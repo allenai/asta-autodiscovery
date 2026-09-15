@@ -4,15 +4,15 @@ This module provides authenticated endpoints for users to create and manage
 their own autodiscovery experiment runs.
 """
 
+import logging
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
-from google.cloud import storage
 from urllib.parse import urlparse
-import logging
-
 
 from flask import Blueprint, current_app, jsonify, request, url_for
+from google.cloud import storage
+from utils.asta_context_client import is_configured as asta_integration_enabled
 from utils.auth import (
     PermissionType,
     optional_enrollment,
@@ -87,7 +87,6 @@ try:
         get_userid_for_job,
         read_rich_outputs,
     )
-    from autodiscovery_jobs.storage import get_store
     from autodiscovery_jobs.run_details import (
         RunDetails,
         create_run_details,
@@ -95,6 +94,7 @@ try:
         refresh_run_status,
         update_run_details,
     )
+    from autodiscovery_jobs.storage import get_store
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -628,7 +628,9 @@ def create() -> Blueprint:
                 execution_status={},
                 max_file_size=max_file_size,
                 can_view_datasets=has_ai1_datasets,
-                can_explore_with_asta=True,  # Enabled for all users (no longer permission-gated)
+                # Not permission-gated; gated only on whether this deployment
+                # has an Asta context service configured.
+                can_explore_with_asta=asta_integration_enabled(),
                 parent_run_id=(
                     run_metadata_model.parent_run_id if run_metadata_model else None
                 ),
@@ -1525,13 +1527,17 @@ def create() -> Blueprint:
         Returns the Asta chat URL and the GCS URI of the saved manifest.
         """
         import requests as _requests
-
         import utils.asta_client as asta_client
         import utils.asta_context_client as asta_context_client
         from autodiscovery_jobs import asta_gcs
 
         if not JOBS_AVAILABLE:
             return jsonify({"error": "Job management not available"}), 503
+
+        # The UI hides this feature when unconfigured, but guard here too so a
+        # direct call fails cleanly instead of reaching out to asta.allen.ai.
+        if not asta_integration_enabled():
+            return jsonify({"error": "Asta integration is not configured"}), 503
 
         caller_id = request.user.get("sub")
         if caller_id != userid:

@@ -6,7 +6,7 @@ import {
     TEST_ID_ABOUT_BUTTON,
     TEST_ID_CREDITS_CHIP,
     TEST_ID_AI2_LOGO_LINK,
-    TEST_ID_ASTA_LABS_LOGO_LINK,
+    TEST_ID_ASTA_LOGO_LINK,
     TEST_ID_EXAMPLE_SESSION_ITEM,
     TEST_ID_DISCLAIMER_BUTTON,
     TEST_ID_ATTRIBUTION_BUTTON,
@@ -68,8 +68,8 @@ test.describe('Homepage (/runs)', () => {
         await expectExternalLink(context, ai2Link, 'allenai.org');
     });
 
-    test('ASTA Labs logo link leads to allen.ai', async ({ page, context }) => {
-        const astaLink = page.locator(`[data-test-id="${TEST_ID_ASTA_LABS_LOGO_LINK}"]`);
+    test('Asta logo link leads to allen.ai', async ({ page, context }) => {
+        const astaLink = page.locator(`[data-test-id="${TEST_ID_ASTA_LOGO_LINK}"]`);
         await expect(astaLink).toBeVisible();
         await expectExternalLink(context, astaLink, 'allen.ai');
     });

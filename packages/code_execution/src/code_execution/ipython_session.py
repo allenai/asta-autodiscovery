@@ -1,10 +1,12 @@
 """IPython-backed execution helpers with optional subprocess isolation."""
 
 import base64
+import sys
 import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass
 from multiprocessing import get_context
+from time import monotonic
 from typing import Any, cast
 
 from IPython.core.formatters import DisplayFormatter
@@ -69,14 +71,60 @@ def _format_error(exc: BaseException | None) -> dict[str, str] | None:
     }
 
 
+def _flush_open_figures(formatted_object_ids: set[int]) -> None:
+    """Emit any matplotlib figures the cell left open as display data.
+
+    The inline backend only publishes a figure when the code calls
+    ``plt.show()``, which also closes it. Anything still open once the cell
+    finishes was therefore never published -- a figure the code built but
+    saved, or simply forgot to show. Publishing it here means a caller's view
+    of the figures a cell produced does not depend on the cell calling
+    ``plt.show()``.
+
+    Only touches pyplot if the cell actually imported it, so a cell that draws
+    nothing pays no import cost.
+    """
+    pyplot = sys.modules.get("matplotlib.pyplot")
+    if pyplot is None:
+        return
+    from IPython.display import display
+
+    for fig_num in pyplot.get_fignums():
+        figure = pyplot.figure(fig_num)
+        try:
+            if id(figure) not in formatted_object_ids:
+                display(figure)
+        except Exception:
+            # A figure that cannot be rendered must not fail the cell it came
+            # from or prevent later figures from being published.
+            pass
+        finally:
+            pyplot.close(figure)
+
+
 def _run_cell_with_shell(
     shell: InteractiveShell,
     code_str: str,
     allow_mime: frozenset[str],
 ) -> dict[str, Any]:
     # Execute in-process to preserve state between calls when isolation isn't needed.
-    with capture_output() as captured:
-        result = shell.run_cell(code_str)
+    formatted_object_ids: set[int] = set()
+    formatter = cast(DisplayFormatter, shell.display_formatter)
+    original_format = formatter.format
+
+    def tracking_format(obj: Any, *args: Any, **kwargs: Any):
+        formatted_object_ids.add(id(obj))
+        return original_format(obj, *args, **kwargs)
+
+    formatter.format = tracking_format
+    try:
+        with capture_output() as captured:
+            result = shell.run_cell(code_str)
+            # Inside the capture block so newly flushed figures land in
+            # captured.outputs alongside figures the cell published itself.
+            _flush_open_figures(formatted_object_ids)
+    finally:
+        formatter.format = original_format
 
     error = result.error_before_exec or result.error_in_exec
     outputs = {
@@ -176,6 +224,13 @@ def _ensure_pip_available() -> None:
         return
 
 
+def _remaining(deadline: float | None) -> float | None:
+    """Seconds left until ``deadline``, or None for no deadline."""
+    if deadline is None:
+        return None
+    return max(0.0, deadline - monotonic())
+
+
 def _run_cell_in_subprocess(
     code_str: str,
     allow_mime: frozenset[str],
@@ -228,12 +283,34 @@ class IPythonSession:
         )
         process.start()
         child_conn.close()
-        process.join(timeout=self._config.timeout_s)
 
+        # Read the result before waiting for the child to exit. The child sends
+        # its outputs as a single pickled frame, which runs to megabytes once
+        # figures are attached, while a pipe buffers only ~64KB. Joining first
+        # would leave the child blocked in send() with nobody draining the pipe,
+        # and the parent blocked in join() waiting for an exit that send() is
+        # preventing -- a deadlock that only shows up on cells big enough to
+        # overflow the buffer. recv() is what drains it, so it has to come first.
+        timeout_s = self._config.timeout_s
+        deadline = None if timeout_s is None else monotonic() + timeout_s
+        result: dict[str, Any] | None = None
+        try:
+            if parent_conn.poll(_remaining(deadline)):
+                result = parent_conn.recv()
+        except EOFError:
+            # Child exited without sending; reported below as a missing result.
+            pass
+
+        process.join(timeout=_remaining(deadline))
         if process.is_alive():
             process.terminate()
             process.join()
-            parent_conn.close()
+        parent_conn.close()
+
+        if result is not None:
+            return result
+
+        if deadline is not None and monotonic() >= deadline:
             return {
                 "stdout": "",
                 "stderr": "",
@@ -241,17 +318,10 @@ class IPythonSession:
                 "success": False,
                 "error": {
                     "type": "TimeoutError",
-                    "message": f"Execution exceeded {self._config.timeout_s} seconds",
+                    "message": f"Execution exceeded {timeout_s} seconds",
                     "traceback": "",
                 },
             }
-
-        if parent_conn.poll():
-            result = parent_conn.recv()
-            parent_conn.close()
-            return result
-
-        parent_conn.close()
 
         return {
             "stdout": "",

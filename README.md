@@ -2,6 +2,11 @@
 
 > AutoDiscovery for Asta
 
+## Changelog
+
+Release notes for the published packages, including breaking changes, are in
+[CHANGELOG.md](CHANGELOG.md).
+
 ## Standalone CLI
 
 To run AutoDiscovery against a local dataset without the full Skiff stack, see

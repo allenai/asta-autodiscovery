@@ -35,7 +35,6 @@ export interface AuthContextType {
     loginWithRedirect: () => Promise<void>;
     logout: () => void;
     getAccessToken: () => Promise<string>;
-    canExploreWithAsta: boolean;
     authError: string | null;
     /** Which provider is active, once known. */
     provider: AuthConfig['provider'] | null;
@@ -83,7 +82,6 @@ function LoadingAuthProvider({ children }: { children: ReactNode }) {
             loginWithRedirect: async () => {},
             logout: () => {},
             getAccessToken: async () => '',
-            canExploreWithAsta: false,
             authError: null,
             provider: null,
         }),
@@ -366,7 +364,6 @@ function NoneAuthProvider({ children }: { children: ReactNode }) {
             loginWithRedirect: async () => {},
             logout: () => {},
             getAccessToken: async () => '',
-            canExploreWithAsta: true,
             authError: null,
             provider: 'none',
         }),
@@ -376,9 +373,7 @@ function NoneAuthProvider({ children }: { children: ReactNode }) {
 }
 
 // Shared assembly of the context value (memoized) for the auth0/password_file paths.
-function useAuthValue(
-    parts: Omit<AuthContextType, 'hasPermission' | 'canExploreWithAsta'>
-): AuthContextType {
+function useAuthValue(parts: Omit<AuthContextType, 'hasPermission'>): AuthContextType {
     const {
         isAuthenticated,
         isLoading,
@@ -403,9 +398,6 @@ function useAuthValue(
             loginWithRedirect,
             logout,
             getAccessToken,
-            // "Explore in Asta" is enabled for all users (no longer gated on
-            // the enroll:asta_integration permission).
-            canExploreWithAsta: true,
             authError,
             provider,
         };

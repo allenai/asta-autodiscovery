@@ -1,5 +1,12 @@
 import argparse
 
+#: Shared help text so every model flag documents the same litellm convention.
+MODEL_FLAG_HELP = (
+    "Model to use for {role}, as litellm's <provider>/<model> "
+    "(e.g. vertex_ai/gemini-3.7-flash, openai/o4-mini, "
+    "github_copilot/claude-haiku-4.5). The provider prefix is required."
+)
+
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self, group=None):
@@ -12,20 +19,33 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="gemini-3.1-pro-preview",
-            help="LLM to use for all agents (except belief distribution agent).",
+            default="vertex_ai/gemini-3.7-flash",
+            help=MODEL_FLAG_HELP.format(
+                role="all agents (except belief distribution agent)",
+            ),
         )
         self.add_argument(
             "--belief_model",
             type=str,
-            default="gemini-3-flash-preview",
-            help="LLM to use for belief distribution agent.",
+            default="vertex_ai/gemini-3.7-flash",
+            help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
         )
         self.add_argument(
             "--vision_model",
             type=str,
-            default="gemini-3.1-pro-preview",
-            help="Model to use for image analysis during code execution.",
+            default="vertex_ai/gemini-3.7-flash",
+            help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
+        )
+        self.add_argument(
+            "--embedding_model",
+            type=str,
+            default="openai/text-embedding-3-large",
+            help=MODEL_FLAG_HELP.format(role="deduplication embeddings"),
+        )
+        self.add_argument(
+            "--embedding_dimensions",
+            type=int,
+            help="Optional embedding dimensions override for models that support it.",
         )
         self.add_argument(
             "--user_query",
@@ -212,7 +232,7 @@ class ArgParser(argparse.ArgumentParser):
             type=str,
             choices=["local", "process", "modal"],
             default="process",
-            help="Code execution backend: local (in-process), process (isolated subprocess, default), or modal (Modal sandbox)",
+            help="Code execution backend: local (subprocess sharing this environment), process (isolated subprocess, default), or modal (Modal sandbox)",
         )
         self.add_argument(
             "--use_modal_sandbox",

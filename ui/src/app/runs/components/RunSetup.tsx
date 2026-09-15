@@ -54,7 +54,7 @@ interface RunSetupProps {
  *
  * Features:
  * - Upload multiple datasets with descriptions
- * - Configure run parameters (experiments, models)
+ * - Configure run parameters (experiments, MCTS selection)
  * - Single page experience with all settings
  * - Submit run when ready
  */

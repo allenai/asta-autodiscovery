@@ -38,6 +38,7 @@ nav:
   - Configuration: configuration.md
   - Authentication: authentication.md
   - Autodiscovery:
+      - Standalone CLI: autodiscovery/standalone.md
       - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md

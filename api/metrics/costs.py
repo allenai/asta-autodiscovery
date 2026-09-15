@@ -8,6 +8,7 @@ from datetime import datetime
 # Source: https://cloud.google.com/vertex-ai/generative-ai/pricing
 LLM_PRICING: dict[str, dict[str, float]] = {
     # Google Gemini models
+    "gemini-3.7-flash": {"input": 0.75, "output": 3.75},
     "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00},
     "gemini-3-pro-preview": {"input": 2.00, "output": 12.00},
     "gemini-3-flash-preview": {"input": 0.50, "output": 3.00},

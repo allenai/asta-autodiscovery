@@ -4,11 +4,11 @@ import json
 import random
 
 import numpy as np
-from openai import OpenAI
 from pydantic import BaseModel, Field
 from scipy.cluster.hierarchy import linkage
 from tqdm import tqdm
 
+from autodiscovery import llm
 from autodiscovery.llm_usage import UsageTracker
 from autodiscovery.utils import query_llm
 
@@ -37,8 +37,14 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="gpt-4o",
-            help="LLM model to use for hypothesis merging decisions. Default is gpt-4o.",
+            default="vertex_ai/gemini-3.7-flash",
+            help="LLM model for hypothesis merging decisions, as litellm's <provider>/<model>.",
+        )
+        self.add_argument(
+            "--embedding_model",
+            type=str,
+            default="openai/text-embedding-3-large",
+            help="Embedding model for candidate clustering, as litellm's <provider>/<model>.",
         )
         self.add_argument(
             "--n_nodes",
@@ -137,59 +143,57 @@ def get_hypotheses(in_nodes_list):
 
 def get_embedding(
     texts,
-    model="text-embedding-3-large",
+    model,
+    dimensions=None,
     batch_size=128,
-    client=None,
     n_attempts=1,
     usage_tracker: UsageTracker | None = None,
 ):
-    """Compute embeddings for a list of texts using the OpenAI Embeddings API.
+    """Compute embeddings for a list of texts.
 
     Args:
         texts (list): A list of text strings to be embedded.
-        model (str, optional): The identifier for the embedding model to use.
+        model (str): Embedding model, as litellm's ``<provider>/<model>``.
+        dimensions: Optional output dimensions for providers that support it.
         batch_size (int, optional): The number of texts to process in one API call.
+        n_attempts: Number of attempts before giving up.
         usage_tracker: Optional usage tracker for embedding requests.
 
     Returns:
         numpy.ndarray: An array of embeddings for the input texts.
     """
-    if client is None:
-        client = OpenAI()
-    all_embeddings = []
+    kwargs = {} if dimensions is None else {"dimensions": dimensions}
+
     for attempt in range(n_attempts):
         try:
             all_embeddings = []
-            # Process the texts in batches
             for i in range(0, len(texts), batch_size):
-                batch = texts[i : i + batch_size]
-                # Request embeddings for the current batch from the API
-                response = client.embeddings.create(input=batch, model=model)
+                response = llm.embed(model, texts[i : i + batch_size], **kwargs)
                 if usage_tracker is not None:
                     usage_tracker.record_response(
                         response,
-                        source="openai",
+                        source=llm.provider_of(model),
                         component="dedupe.embeddings",
                         agent_name="dedupe",
                     )
-                for item in response.data:
-                    # Convert the embedding to a NumPy array and add it to the list
-                    all_embeddings.append(np.array(item.embedding))
-            break  # If successful, exit the loop
-        except Exception as e:
+                all_embeddings.extend(np.array(item["embedding"]) for item in response.data)
+            return np.array(all_embeddings)
+        except Exception as exc:
             if attempt < n_attempts - 1:
-                print(f"Embeddings: Attempt {attempt + 1} failed: {e}. Retrying...")
+                print(f"Embeddings: Attempt {attempt + 1} failed: {exc}. Retrying...")
             else:
-                raise RuntimeError(f"Failed to get embeddings after {n_attempts} attempts.") from e
-    return np.array(all_embeddings)
+                raise RuntimeError(
+                    f"Failed to get embeddings after {n_attempts} attempts."
+                ) from exc
 
 
 def get_llm_merge_decision(
     hyp1: str,
     hyp2: str,
+    *,
+    model: str,
     n_samples: int = 30,
     threshold: float = 0.7,
-    model: str = "gpt-4o",
     temperature: float = 1.0,
     reasoning_effort: str = "medium",
     usage_tracker: UsageTracker | None = None,
@@ -201,7 +205,7 @@ def get_llm_merge_decision(
         hyp2: Second hypothesis string.
         n_samples: Number of LLM samples to draw.
         threshold: Proportion threshold for merging decisions.
-        model: LLM model identifier.
+        model: LLM model, as litellm's ``<provider>/<model>``.
         temperature: Sampling temperature.
         reasoning_effort: Reasoning effort for the model.
         usage_tracker: Optional usage tracker for merge decision calls.
@@ -239,11 +243,14 @@ def get_llm_merge_decision(
 
 def dedupe(
     nodes_or_json_path,
+    *,
+    model,
+    embedding_model,
     n_samples=10,
     merge_threshold=0.7,
     seed=42,
     rep_mode="biggest",
-    model="gpt-4o",
+    embedding_dimensions=None,
     n_nodes=None,
     verbose=False,
     log_comparisons_fname=None,
@@ -257,7 +264,9 @@ def dedupe(
         merge_threshold: Merge threshold for LLM votes.
         seed: Random seed.
         rep_mode: Representative selection mode for merged clusters.
-        model: LLM model identifier.
+        model: LLM model, as litellm's ``<provider>/<model>``.
+        embedding_model: Embedding model, as litellm's ``<provider>/<model>``.
+        embedding_dimensions: Optional embedding dimensions override.
         n_nodes: Optional cap on nodes processed.
         verbose: Whether to print verbose details.
         log_comparisons_fname: Optional JSON path to log LLM comparisons.
@@ -287,7 +296,15 @@ def dedupe(
     n_dedup = len(dedup_hyp)
 
     # Generate embeddings for deduplicated hypotheses
-    embeds = np.array(get_embedding(dedup_hyp, n_attempts=3, usage_tracker=usage_tracker))
+    embeds = np.array(
+        get_embedding(
+            dedup_hyp,
+            model=embedding_model,
+            dimensions=embedding_dimensions,
+            n_attempts=3,
+            usage_tracker=usage_tracker,
+        )
+    )
 
     # Initialize assignment structures
     clusters = {i: [i] for i in range(n_dedup)}
@@ -413,6 +430,7 @@ if __name__ == "__main__":
         merge_threshold=args.merge_threshold,
         seed=args.seed,
         model=args.model,
+        embedding_model=args.embedding_model,
         n_nodes=args.n_nodes,
         verbose=args.verbose,
     )

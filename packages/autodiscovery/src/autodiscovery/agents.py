@@ -3,18 +3,15 @@ import concurrent.futures
 import copy
 import json
 import os
+from typing import Any
 
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
-from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
+from autogen.coding import CodeBlock, CodeExecutor, CodeResult
 
-from autodiscovery.llm_retry import (
-    apply_openai_client_backoff_retry,
-    apply_openai_client_vertex_token_refresh,
-    call_with_backoff,
-)
-from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER, UsageTracker
+from autodiscovery import llm
+from autodiscovery.llm_usage import UsageTracker, record_ag2_response_usage
 from autodiscovery.structured_outputs import (
     Experiment,
     ExperimentAnalyst,
@@ -23,9 +20,6 @@ from autodiscovery.structured_outputs import (
     ExperimentList,
     ExperimentReviewer,
 )
-from autodiscovery.utils import get_vertex_access_token, is_gemini_model, normalize_vertex_model_name
-from autodiscovery.vertex_client import OpenAICredentialsRefresher
-from autodiscovery.vertex_config import get_vertex_openai_base_url
 
 IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the following:
 
@@ -41,6 +35,76 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 4. Annotations and Legends: Describe key annotations or legends.
 5. Statistical Insights: Provide insights based on the information presented in the plot."""
 
+# Cap on how much of a code block's output is kept. Generated code regularly prints
+# an entire dataset (a raw .sql dump, a full dataframe), and the executor's output
+# becomes a chat message that is then re-serialized into every subsequent LLM
+# request — so an uncapped output is copied many times over and OOM-kills the job.
+# Observed in production: a single block emitted 676 MB of stdout and the container
+# was SIGKILLed (exit 137) on the next turn. 20k characters is roughly 5k LLM
+# tokens: enough for about 10k characters from each end (including a typical
+# traceback or many tabular rows) without letting one tool result consume a large
+# fraction of a future model request.
+MAX_CODE_OUTPUT_CHARS = 20_000
+
+
+def _truncate_output_parts(parts: list[str]) -> str:
+    """Assemble and clip code-output sections to the fixed cap, keeping both ends.
+
+    The head carries whatever the code printed first (headers, schema, counts) and
+    the tail carries the final result, so both are worth keeping; only the middle
+    is dropped. The truncation notice itself counts toward the cap. Working from
+    sections avoids first concatenating potentially enormous stdout and stderr.
+    """
+    output_length = sum(len(part) for part in parts)
+    if output_length <= MAX_CODE_OUTPUT_CHARS:
+        return "".join(parts)
+
+    dropped = output_length - MAX_CODE_OUTPUT_CHARS
+    while True:
+        notice = (
+            f"\n\n... [output truncated: {dropped} of {output_length} characters omitted; "
+            f"limit is {MAX_CODE_OUTPUT_CHARS}. Do not print whole datasets — "
+            f"aggregate, sample, or write to a file and read back only what you "
+            f"need.] ...\n\n"
+        )
+        retained = max(0, MAX_CODE_OUTPUT_CHARS - len(notice))
+        actual_dropped = output_length - retained
+        if actual_dropped == dropped:
+            break
+        dropped = actual_dropped
+
+    # The cap is intentionally fixed well above the notice length, but preserve
+    # the size invariant if a future edit lowers it: no Python ``[-0:]`` slice
+    # should accidentally retain an entire output section.
+    if retained == 0:
+        return notice[: max(0, MAX_CODE_OUTPUT_CHARS)]
+
+    head = retained // 2
+    tail = retained - head
+    prefix_parts = []
+    prefix_remaining = head
+    for part in parts:
+        prefix_parts.append(part[:prefix_remaining])
+        prefix_remaining -= min(len(part), prefix_remaining)
+        if prefix_remaining == 0:
+            break
+    prefix = "".join(prefix_parts)
+
+    suffix_parts = []
+    suffix_remaining = tail
+    for part in reversed(parts):
+        suffix_parts.append(part[-suffix_remaining:])
+        suffix_remaining -= min(len(part), suffix_remaining)
+        if suffix_remaining == 0:
+            break
+    suffix = "".join(reversed(suffix_parts))
+    return prefix + notice + suffix
+
+
+def _truncate_output(output: str) -> str:
+    """Clip an over-long code output to the fixed cap, keeping both ends."""
+    return _truncate_output_parts([output])
+
 
 def _run_async(coro):
     """Run a coroutine from a synchronous context.
@@ -55,16 +119,35 @@ def _run_async(coro):
         return asyncio.run(coro)
 
 
-class _ProcessBackendAdapter:
-    """Wraps ProcessIPythonBackend in an async interface compatible with ModalSandboxExecutor."""
+class _IPythonBackendAdapter:
+    """Wraps a ``code_execution`` IPython backend in the async sandbox interface.
 
-    def __init__(self, backend) -> None:
+    Both non-Modal backends run through this: ``process``
+    (:class:`~code_execution.ProcessIPythonBackend`, an isolated venv in a
+    subprocess) and ``local`` (:class:`~code_execution.LocalIPythonBackend`, the
+    job's own environment). Adapting them to the same interface as the Modal
+    executor is what lets every backend return figures as rich outputs, so plot
+    interpretation happens in one place -- the parent process.
+    """
+
+    def __init__(self, backend, *, use_subprocess: bool = False) -> None:
+        """Initialize the adapter.
+
+        Args:
+            backend: Synchronous ``code_execution`` backend exposing ``run_cell``.
+            use_subprocess: Run each cell in a child process. Required for the
+                in-process backend so a hard timeout can be enforced and cell
+                state does not leak into the job process.
+        """
         self._backend = backend
+        self._use_subprocess = use_subprocess
 
     async def run_code(self, code: str, timeout_seconds: float | None = None):
         from asta_sandbox import ExecutionError, ExecutionResult, RichOutput
 
-        result = self._backend.run_cell(code, timeout_s=timeout_seconds)
+        result = self._backend.run_cell(
+            code, use_subprocess=self._use_subprocess, timeout_s=timeout_seconds
+        )
         error = None
         if result.get("error"):
             err = result["error"]
@@ -88,22 +171,23 @@ class _ProcessBackendAdapter:
         )
 
 
-class ModalSandboxExecutor(CodeExecutor):
+class SandboxCodeExecutor(CodeExecutor):
     """Wraps an async sandbox executor to satisfy Autogen's synchronous CodeExecutor interface."""
 
     def __init__(
         self,
         backend,
+        *,
+        vision_model: str,
         timeout: int = 30 * 60,
-        vision_model: str = "gpt-4o",
         usage_tracker: UsageTracker | None = None,
     ):
         """Initialize the sandbox executor wrapper.
 
         Args:
-            backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
+            backend: Async sandbox executor (ModalEphemeralExecutor or _IPythonBackendAdapter)
             timeout: Timeout in seconds (for Autogen compatibility)
-            vision_model: Model to use for image analysis
+            vision_model: Vision model, as litellm's ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
         """
         self._executor = backend
@@ -111,26 +195,6 @@ class ModalSandboxExecutor(CodeExecutor):
         self.vision_model = vision_model
         self._usage_tracker = usage_tracker
         self._usage_node_id: str | None = None
-
-    def _get_vision_client(self):
-        from openai import OpenAI
-
-        is_gemini = is_gemini_model(self.vision_model)
-        if is_gemini:
-            try:
-                base_url = get_vertex_openai_base_url()
-            except ValueError as exc:
-                return None, f"Image analysis skipped: {exc}"
-        else:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                return (
-                    None,
-                    f"Image analysis skipped: OPENAI_API_KEY is not set for {self.vision_model}.",
-                )
-        if is_gemini:
-            return OpenAICredentialsRefresher(base_url=base_url), None
-        return OpenAI(api_key=api_key), None
 
     def _analyze_image(self, image_data: str) -> str:
         """Analyze a base64-encoded image using the configured vision model.
@@ -141,14 +205,13 @@ class ModalSandboxExecutor(CodeExecutor):
         Returns:
             Analysis text
         """
-        client, error_msg = self._get_vision_client()
-        if client is None:
-            return error_msg
-
         messages = [
             {
                 "role": "system",
-                "content": "You are a research scientist responsible for analyzing plots and figures from running experiments and providing detailed descriptions.",
+                "content": (
+                    "You are a research scientist responsible for analyzing plots and figures "
+                    "from running experiments and providing detailed descriptions."
+                ),
             },
             {
                 "role": "user",
@@ -161,25 +224,20 @@ class ModalSandboxExecutor(CodeExecutor):
                 ],
             },
         ]
+        # Deliberately not caught here: execute_code_blocks already wraps this
+        # call and records "Failed to analyze image: ..." per figure, which is
+        # what main did. Swallowing it here would duplicate that handling and
+        # hide the failure behind a different message.
+        response = llm.complete(self.vision_model, messages)
 
-        response = call_with_backoff(
-            lambda: client.chat.completions.create(
-                model=normalize_vertex_model_name(self.vision_model)
-                if is_gemini_model(self.vision_model)
-                else self.vision_model,
-                messages=messages,
-            ),
-            label=f"vision_analysis(model={self.vision_model})",
-        )
         if self._usage_tracker is not None:
             self._usage_tracker.record_response(
                 response,
-                source="openai",
-                component="image_analysis.modal",
+                source=llm.provider_of(self.vision_model),
+                component="image_analysis",
                 agent_name="code_executor",
                 node_id=self._usage_node_id,
             )
-
         return response.choices[0].message.content
 
     def execute_code_blocks(self, code_blocks: list[CodeBlock]) -> CodeResult:
@@ -202,13 +260,13 @@ class ModalSandboxExecutor(CodeExecutor):
             print("[CodeExecutor] Execution completed")
             print(f"[CodeExecutor] Success: {result.success}")
 
-            output = result.stdout or ""
+            output_parts = [result.stdout or ""]
 
-            print(f"[CodeExecutor] Stdout length: {len(output)} characters")
+            print(f"[CodeExecutor] Stdout length: {len(output_parts[0])} characters")
 
             if result.stderr:
                 print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
-                output += f"\nSTDERR:\n{result.stderr}"
+                output_parts.extend(("\nSTDERR:\n", result.stderr))
 
             if not result.success:
                 if result.error:
@@ -223,11 +281,11 @@ class ModalSandboxExecutor(CodeExecutor):
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"
-                print(f"[CodeExecutor] Error: {error_msg}")
-                output += f"\nERROR: {error_msg}"
+                print(f"[CodeExecutor] Error: {error_msg[:200]}")
+                output_parts.append(f"\nERROR: {error_msg}")
 
-            if not output.strip():
-                output = "[CodeExecutor] Code executed but produced no output"
+            if not any(part.strip() for part in output_parts):
+                output_parts = ["[CodeExecutor] Code executed but produced no output"]
                 print("[CodeExecutor] Warning: No output produced")
 
             # Store rich output data dicts for image analysis
@@ -252,8 +310,12 @@ class ModalSandboxExecutor(CodeExecutor):
                             )
 
                 if image_analyses:
-                    output += "\n" + "\n".join(image_analyses)
+                    output_parts.append("\n" + "\n".join(image_analyses))
 
+            output_length = sum(len(part) for part in output_parts)
+            output = _truncate_output_parts(output_parts)
+            if len(output) != output_length:
+                print(f"[CodeExecutor] Output truncated to {len(output)} characters")
             return CodeResult(exit_code=0 if result.success else 1, output=output)
 
         except Exception as e:
@@ -262,9 +324,8 @@ class ModalSandboxExecutor(CodeExecutor):
             error_details = traceback.format_exc()
             print(f"[CodeExecutor] Exception occurred: {str(e)}")
             print(f"[CodeExecutor] Traceback:\n{error_details}")
-            return CodeResult(
-                exit_code=1, output=f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
-            )
+            output = f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
+            return CodeResult(exit_code=1, output=_truncate_output(output))
 
     def get_last_rich_outputs(self):
         """Get rich outputs from the last execution."""
@@ -328,177 +389,7 @@ def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
     return bucket_name, key_prefix
 
 
-def build_image_analysis_patch(vision_model: str) -> str:
-    template = """\
-import matplotlib.pyplot as plt
-import functools
-from io import BytesIO
-import base64
-import json
-import os
-from openai import OpenAI
-
-VISION_MODEL = __VISION_MODEL__
-USAGE_MARKER = __USAGE_MARKER__
-VERTEX_OPENAI_BASE_URL_ENV = "VERTEX_OPENAI_BASE_URL"
-VERTEX_PROJECT_ENV_VAR = "VERTEX_PROJECT_ID"
-VERTEX_LOCATION_ENV_VAR = "VERTEX_LOCATION"
-
-def _is_gemini_model(model: str) -> bool:
-    return model.split("/")[-1].startswith("gemini")
-
-def _normalize_vertex_model_name(model: str) -> str:
-    if _is_gemini_model(model) and "/" not in model:
-        return f"google/{model}"
-    return model
-
-def _get_vertex_base_url():
-    # Reference: https://github.com/GoogleCloudPlatform/generative-ai/blob/main/gemini/chat-completions/intro_chat_completions_api.ipynb
-    # NOTE: Duplicated here because this patch runs in an isolated execution context.
-    explicit_base_url = os.getenv(VERTEX_OPENAI_BASE_URL_ENV)
-    if explicit_base_url:
-        return explicit_base_url
-    project_id = os.getenv(VERTEX_PROJECT_ENV_VAR)
-    location = os.getenv(VERTEX_LOCATION_ENV_VAR)
-    if not project_id or not location:
-        return None
-    api_host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
-    return f"https://{api_host}/v1/projects/{project_id}/locations/{location}/endpoints/openapi"
-
-def _get_vertex_token():
-    token = os.getenv("VERTEX_ACCESS_TOKEN") or os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
-    if token:
-        return token
-    try:
-        import google.auth
-        import google.auth.transport.requests
-    except Exception:
-        return None
-    try:
-        credentials, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        credentials.refresh(google.auth.transport.requests.Request())
-        return credentials.token
-    except Exception:
-        return None
-
-def _get_openai_client():
-    is_gemini = _is_gemini_model(VISION_MODEL)
-    if is_gemini:
-        api_key = _get_vertex_token()
-        base_url = _get_vertex_base_url()
-        if not api_key or not base_url:
-            return None
-        return OpenAI(api_key=api_key, base_url=base_url)
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    return OpenAI(api_key=api_key)
-
-image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
-
-
-def image_to_text():
-    client = _get_openai_client()
-    if client is None:
-        missing = "VERTEX_ACCESS_TOKEN/GOOGLE_OAUTH_ACCESS_TOKEN + Vertex base URL" if _is_gemini_model(VISION_MODEL) else "OPENAI_API_KEY"
-        print(f"Image analysis skipped: {{missing}} is not set for {{VISION_MODEL}}.")
-        return
-    for fig_num in plt.get_fignums():
-        fig = plt.figure(fig_num)  # Get the current figure
-        with BytesIO() as buf:
-            # Save the figure to a PNG buffer
-            fig.savefig(buf, format='png', dpi=200)
-            buf.seek(0)
-            # Encode image to base64
-            base64_image = base64.b64encode(buf.read()).decode('utf-8')
-            messages = [
-                {
-                    'role': 'system',
-                    'content': 'You are a research scientist responsible for analyzing plots and figures from running experiments and providing detailed descriptions.'
-                },
-                {
-                    'role': 'user',
-                    'content': [
-                        {'type': 'text', 'text': image_analyst_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": "data:image/png;base64," + base64_image
-                            }
-                        }
-                    ]
-                }
-            ]
-            # Get image analysis from the LLM
-            response = client.chat.completions.create(
-                model=_normalize_vertex_model_name(VISION_MODEL) if _is_gemini_model(VISION_MODEL) else VISION_MODEL,
-                messages=messages,
-                max_tokens=1000,
-            )
-            usage = getattr(response, "usage", None)
-            if usage is not None:
-                usage_payload = {
-                    "source": "openai",
-                    "component": "image_analysis.local",
-                    "agent_name": "code_executor",
-                    "model": getattr(response, "model", VISION_MODEL),
-                    "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
-                    "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
-                    "total_tokens": getattr(usage, "total_tokens", 0) or 0,
-                }
-                print(USAGE_MARKER + json.dumps(usage_payload, sort_keys=True))
-            analysis = response.choices[0].message.content
-            print(f"\\n=== Plot Analysis (fig. {{fig_num}}) ===\\n")
-            print(analysis)
-            print("\\n" + "="*50)
-
-        plt.close(fig)
-
-
-def patch_matplotlib_show():
-    # Replace plt.show with our custom function
-    plt.show = functools.partial(image_to_text)
-
-
-# Apply the patch
-patch_matplotlib_show()
-"""
-    return (
-        template.replace("__VISION_MODEL__", repr(vision_model))
-        .replace("__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT))
-        .replace("__USAGE_MARKER__", repr(LOCAL_IMAGE_USAGE_MARKER))
-    )
-
-
-class CodeBlockWrapperTransform(transforms.MessageTransform):
-    def __init__(self, vision_model: str = "gpt-4o"):
-        self.image_analysis_patch = build_image_analysis_patch(vision_model)
-
-    def apply_transform(self, messages: list[dict]) -> list[dict]:
-        # Deep copy messages to avoid modifying the original
-        transformed_messages = copy.deepcopy(messages)
-        message = transformed_messages[-1]
-
-        try:
-            code = json.loads(message["content"]).get("code", "# Failed to parse code from message")
-        except json.JSONDecodeError:
-            code = "# Failed to parse code from message"
-
-        message["content"] = f"```python\n{self.image_analysis_patch}\n\n{code}\n```"
-
-        return transformed_messages
-
-    def get_logs(
-        self, pre_transform_messages: list[dict], post_transform_messages: list[dict]
-    ) -> tuple[str, bool]:
-        return "CodeBlockWrapperTransform", True
-
-
-def code_transform_working_dir(
-    backend: str, work_dir: str, modal_working_dir: str | None
-) -> str:
+def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: str | None) -> str:
     """Return the directory the code transform should ``os.chdir`` into per cell.
 
     For the process/local backends this must be **absolute**: their subprocess
@@ -546,75 +437,100 @@ class SimpleCodeBlockTransform(transforms.MessageTransform):
         return "SimpleCodeBlockTransform", True
 
 
-def get_openai_config(
-    api_key: str | None = None,
+class LiteLLMAG2Client:
+    """AG2 ModelClient that routes every provider through litellm.
+
+    AG2 0.10 ships clients for a fixed set of providers and picks one by
+    ``api_type``. Registering this instead means AG2 inherits litellm's provider
+    list, so a new provider needs no code here -- only a ``<provider>/<model>``
+    model flag.
+    """
+
+    def __init__(self, config: dict[str, Any], **_: Any) -> None:
+        """Initialize the adapter from an AG2 model configuration."""
+        self.model = str(config["model"])
+        self.config = config
+
+    def create(self, params: dict[str, Any]) -> Any:
+        """Run one completion and return a litellm response.
+
+        Args:
+            params: AG2 request parameters.
+
+        Returns:
+            A litellm ``ModelResponse``, which is OpenAI-shaped and so satisfies
+            AG2's expectations directly.
+        """
+        kwargs = {
+            key: params[key]
+            for key in ("temperature", "reasoning_effort", "response_format", "n", "stream")
+            if params.get(key) is not None
+        }
+        if not llm.accepts_temperature(self.model):
+            kwargs.pop("temperature", None)
+        response = llm.complete(self.model, params["messages"], **kwargs)
+        # This is the single point every AG2 response flows through, so usage is
+        # recorded here rather than by patching AG2's OpenAIWrapper.
+        record_ag2_response_usage(response, agent_name=self.config.get("agent_name"))
+        return response
+
+    def message_retrieval(self, response: Any) -> list[str]:
+        """Extract assistant message content from a response."""
+        return [choice.message.content for choice in response.choices]
+
+    def cost(self, response: Any) -> float:
+        """Return the response cost litellm computed, or zero."""
+        return float(getattr(response, "_hidden_params", {}).get("response_cost") or 0.0)
+
+    @staticmethod
+    def get_usage(response: Any) -> dict[str, Any]:
+        """Return AG2-compatible token usage metadata."""
+        usage = getattr(response, "usage", None)
+        return {
+            "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
+            "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+            "cost": float(getattr(response, "_hidden_params", {}).get("response_cost") or 0.0),
+            "model": getattr(response, "model", None),
+        }
+
+
+def get_llm_config(
+    model_name: str,
     temperature: float | None = None,
     reasoning_effort: str | None = None,
     timeout: int = 600,
-    model_name: str = "o4-mini",
-):
-    """Build a model config for AG2/Autogen clients.
+) -> dict[str, Any]:
+    """Build an AG2 llm_config backed by :class:`LiteLLMAG2Client`.
 
     Args:
-        api_key: API key for the provider. Defaults to env-based resolution.
-        temperature: Sampling temperature.
-        reasoning_effort: Optional reasoning effort for o-series models.
+        model_name: Model name, as litellm's ``<provider>/<model>``.
+        temperature: Sampling temperature. Omitted for models that reject it.
+        reasoning_effort: Optional reasoning effort; litellm drops it where
+            unsupported.
         timeout: Request timeout in seconds.
-        model_name: Target model name.
 
     Returns:
-        Configuration dict for the Autogen LLM client.
+        Configuration dict for AG2.
     """
-    # Apply retry policy for AG2 OpenAI-compatible client calls.
-    apply_openai_client_backoff_retry()
-
-    # Check if this is a Gemini model
-    is_gemini = is_gemini_model(model_name)
-
-    if is_gemini:
-        # Route Gemini through Vertex's OpenAI-compatible endpoint so usage metadata
-        # (including provider-native total token counts) is preserved.
-        apply_openai_client_vertex_token_refresh()
-        base_url = get_vertex_openai_base_url()
-        config = {
-            "api_type": "openai",
-            "model": normalize_vertex_model_name(model_name),
-            "timeout": timeout,
-            "api_key": get_vertex_access_token(),
-            "base_url": base_url,
-            # Retries are handled by apply_openai_client_backoff_retry().
-            "max_retries": 0,
-            "cache_seed": None,
-        }
-        if temperature is not None:
-            config["temperature"] = temperature
-    else:
-        # Configure for OpenAI models
-        config = {
-            "api_type": "openai",
-            "model": model_name,
-            "timeout": timeout,
-            "api_key": api_key,
-            # Retries are handled by apply_openai_client_backoff_retry().
-            "max_retries": 0,
-            "cache_seed": None,  # Disabling caching also addresses this bug: https://github.com/ag2ai/ag2/issues/1103
-        }
-        if temperature is not None:
-            config["temperature"] = temperature
-
-        # Make o-series specific changes
-        if model_name.startswith("o"):
-            if reasoning_effort is not None:
-                config["reasoning_effort"] = reasoning_effort  # Defaults to medium
-        else:
-            config["logprobs"] = True
-
-    return config
+    llm.provider_of(model_name)  # fail fast on an unusable name
+    entry: dict[str, Any] = {
+        "model": model_name,
+        "model_client_cls": LiteLLMAG2Client.__name__,
+        "timeout": timeout,
+    }
+    if temperature is not None and llm.accepts_temperature(model_name):
+        entry["temperature"] = temperature
+    if reasoning_effort is not None:
+        entry["reasoning_effort"] = reasoning_effort
+    return {"config_list": [entry], "cache_seed": None}
 
 
 def get_agents(
     work_dir,
-    model_name="o4-mini",
+    *,
+    model_name,
+    vision_model,
     temperature=None,
     reasoning_effort=None,
     branching_factor=3,
@@ -624,14 +540,14 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
-    vision_model: str = "gpt-4o",
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
 
     Args:
         work_dir: Working directory for code execution.
-        model_name: Model used for AG2 conversational agents.
+        model_name: Model for AG2 conversational agents, as litellm's
+            ``<provider>/<model>``.
         temperature: Sampling temperature for non-reasoning models.
         reasoning_effort: Reasoning effort for compatible models.
         branching_factor: Number of experiment candidates to request.
@@ -641,25 +557,28 @@ def get_agents(
         backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
-        vision_model: Vision model used for plot analysis.
+        vision_model: Vision model for plot analysis, as litellm's
+            ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
 
     Returns:
         Dictionary mapping agent name to agent instance.
     """
-    is_gemini = is_gemini_model(model_name)
-    api_key = None if is_gemini else os.getenv("OPENAI_API_KEY")
-    llm_config = get_openai_config(
-        api_key=api_key,
+    llm_config = get_llm_config(
         model_name=model_name,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
     )
 
-    # Create token limit transform
+    # Create token limit transform.
+    # `model` must be set explicitly: MessageTokenLimiter defaults to "gpt-3.5-turbo-0613"
+    # and silently caps max_tokens_per_message to that model's 4096-token limit.
+    # The value only drives tokenizer choice and the cap lookup, so any large-context OpenAI model works.
     token_limit_capability = transform_messages.TransformMessages(
         transforms=[
-            transforms.MessageTokenLimiter(max_tokens_per_message=10_000, min_tokens=12_000)
+            transforms.MessageTokenLimiter(
+                max_tokens_per_message=10_000, min_tokens=12_000, model="gpt-4o"
+            )
         ]
     )
 
@@ -842,7 +761,7 @@ def install(package):
         )
         _run_async(modal_executor.add_shares(cloud_share))
 
-        executor = ModalSandboxExecutor(
+        executor = SandboxCodeExecutor(
             modal_executor,
             timeout=code_timeout,
             vision_model=vision_model,
@@ -857,19 +776,30 @@ def install(package):
         from code_execution import ProcessIPythonBackend
 
         process_backend = ProcessIPythonBackend(cwd=work_dir)
-        executor = ModalSandboxExecutor(
-            _ProcessBackendAdapter(process_backend),
+        executor = SandboxCodeExecutor(
+            _IPythonBackendAdapter(process_backend),
             timeout=code_timeout,
             vision_model=vision_model,
             usage_tracker=usage_tracker,
         )
         print(f"Using process backend with work_dir: {work_dir}")
-    else:
-        # Use local code executor (in-process, no isolation)
-        executor = LocalCommandLineCodeExecutor(
+    elif backend == "local":
+        # Local: the job's own Python environment, with no per-cell venv.
+        # It still runs each cell in a child process (use_subprocess), which is
+        # what LocalCommandLineCodeExecutor used to give us and what makes the
+        # timeout enforceable; the difference from `process` is only that the
+        # cell sees the job's installed packages rather than a curated venv.
+        from code_execution import LocalIPythonBackend
+
+        executor = SandboxCodeExecutor(
+            _IPythonBackendAdapter(LocalIPythonBackend(cwd=work_dir), use_subprocess=True),
             timeout=code_timeout,
-            work_dir=work_dir,
+            vision_model=vision_model,
+            usage_tracker=usage_tracker,
         )
+        print(f"Using local backend with work_dir: {work_dir}")
+    else:
+        raise ValueError(f"unknown code execution backend: {backend!r}")
 
     # Create an agent with code executor configuration.
     code_executor = ConversableAgent(
@@ -879,22 +809,15 @@ def install(package):
         human_input_mode="NEVER",
     )
 
-    # Apply appropriate transform based on executor type
-    if backend in ("modal", "process"):
-        # For sandbox-style backends, use simple transform without image analysis patch
-        # (the executor handles image analysis internally)
-        # Pass the working_dir so code can change to that directory.
-        sandbox_working_dir = code_transform_working_dir(backend, work_dir, modal_working_dir)
-        transform_messages_capability = transform_messages.TransformMessages(
-            transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
-        )
-        transform_messages_capability.add_to_agent(code_executor)
-    else:
-        # For local executor, use full transform with image analysis patch
-        transform_messages_capability = transform_messages.TransformMessages(
-            transforms=[CodeBlockWrapperTransform(vision_model=vision_model)]
-        )
-        transform_messages_capability.add_to_agent(code_executor)
+    # Every backend gets the same transform: the agent's code, prefixed only by a
+    # chdir into the directory the data is mounted at. Figure interpretation is not
+    # injected here -- the executor returns figures as rich outputs and analyses them
+    # in this process.
+    sandbox_working_dir = code_transform_working_dir(backend, work_dir, modal_working_dir)
+    transform_messages_capability = transform_messages.TransformMessages(
+        transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
+    )
+    transform_messages_capability.add_to_agent(code_executor)
 
     user_proxy = UserProxyAgent(
         name="user_proxy",
@@ -912,6 +835,10 @@ def install(package):
         code_executor,
         user_proxy,
     ]
+
+    for agent in agents:
+        if agent.llm_config is not False:
+            agent.register_model_client(LiteLLMAG2Client)
 
     # Apply token limit to all agents
     for agent in agents:

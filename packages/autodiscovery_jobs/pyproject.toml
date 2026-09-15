@@ -1,6 +1,6 @@
 [project]
 name = "asta-autodiscovery-jobs"
-version = "0.2.2"
+version = "1.0.1"
 description = "Python package for managing AutoDiscovery jobs and their persisted data"
 readme = "README.md"
 license = "Apache-2.0"

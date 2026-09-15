@@ -767,6 +767,7 @@ function RunViewContent({
                             runStats={run.stats}
                             surprisalWidth={run.metadata?.surprisalWidth}
                             datasetExpired={datasetExpired}
+                            canExploreWithAsta={run.canExploreWithAsta}
                         />
                     </RunContent>
                     {isDragEnabled && (
@@ -802,6 +803,7 @@ function RunViewContent({
                                 runId={run.id}
                                 surprisalWidth={run.metadata?.surprisalWidth}
                                 datasetExpired={datasetExpired}
+                                canExploreWithAsta={run.canExploreWithAsta}
                                 actions={
                                     <>
                                         <Tooltip title="Share experiment" placement="bottom">

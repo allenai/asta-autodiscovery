@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import functools
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_random_exponential
 
@@ -15,6 +14,7 @@ T = TypeVar("T")
 LLM_RETRY_MAX_RETRIES_ENV = "LLM_RETRY_MAX_RETRIES"
 LLM_RETRY_INITIAL_DELAY_ENV = "LLM_RETRY_INITIAL_DELAY_SECONDS"
 LLM_RETRY_MAX_DELAY_ENV = "LLM_RETRY_MAX_DELAY_SECONDS"
+
 
 @dataclass(frozen=True)
 class RetryConfig:
@@ -136,157 +136,6 @@ def call_with_backoff(
     return retrying(func)
 
 
-def apply_openai_client_vertex_token_refresh() -> bool:
-    """Patch AG2 OpenAI client to refresh Vertex tokens for Gemini requests.
-
-    This wrapper targets AG2's ``OpenAIClient.create`` path, which is used when
-    Gemini models are routed through Vertex's OpenAI-compatible endpoint.
-
-    Returns:
-        True when the patch is active, otherwise False.
-    """
-    try:
-        from autogen.oai.client import OpenAIClient
-    except Exception:
-        return False
-
-    if getattr(OpenAIClient.create, "_autodiscovery_vertex_refresh_wrapped", False):
-        return True
-
-    original_create = OpenAIClient.create
-
-    @functools.wraps(original_create)
-    def wrapped(self, params):
-        _refresh_vertex_openai_api_key_if_needed(self, params)
-        return original_create(self, params)
-
-    wrapped._autodiscovery_vertex_refresh_wrapped = True  # type: ignore[attr-defined]
-    OpenAIClient.create = wrapped
-    return True
-
-
-def apply_openai_client_backoff_retry() -> bool:
-    """Patch AG2 OpenAI client create calls with centralized backoff retries.
-
-    This wrapper targets AG2's ``OpenAIClient.create`` path and applies
-    ``call_with_backoff`` to provider requests, including Vertex OpenAI-compatible
-    Gemini calls and regular OpenAI-compatible calls.
-
-    Returns:
-        True when the patch is active, otherwise False.
-    """
-    try:
-        from autogen.oai.client import OpenAIClient
-    except Exception:
-        return False
-
-    if getattr(OpenAIClient.create, "_autodiscovery_backoff_wrapped", False):
-        return True
-
-    original_create = OpenAIClient.create
-
-    @functools.wraps(original_create)
-    def wrapped(self, params):
-        model = params.get("model") if isinstance(params, dict) else None
-        label = (
-            f"openai_client.create(model={model})" if isinstance(model, str) else "openai_client.create"
-        )
-
-        def _call():
-            # Refresh Vertex access token before every attempt for Gemini calls.
-            if isinstance(params, dict):
-                _refresh_vertex_openai_api_key_if_needed(self, params)
-            return original_create(self, params)
-
-        return call_with_backoff(_call, label=label)
-
-    wrapped._autodiscovery_backoff_wrapped = True  # type: ignore[attr-defined]
-    OpenAIClient.create = wrapped
-    return True
-
-
-def apply_openai_wrapper_usage_tracking() -> bool:
-    """Patch AG2 OpenAI wrapper to emit per-response usage events.
-
-    Returns:
-        True when the patch is active, otherwise False.
-    """
-    try:
-        from autogen.oai.client import OpenAIWrapper
-    except Exception:
-        return False
-
-    if getattr(OpenAIWrapper.create, "_autodiscovery_usage_wrapped", False):
-        return True
-
-    original_create = OpenAIWrapper.create
-
-    @functools.wraps(original_create)
-    def wrapped(self, *args: Any, **kwargs: Any):
-        response = original_create(self, *args, **kwargs)
-        config = _extract_openai_wrapper_config(args, kwargs)
-        _record_wrapped_openai_response_usage(response, config)
-        return response
-
-    wrapped._autodiscovery_usage_wrapped = True  # type: ignore[attr-defined]
-    OpenAIWrapper.create = wrapped
-    return True
-
-
-def _record_wrapped_openai_response_usage(response: Any, config: dict[str, Any]) -> None:
-    """Record usage from a wrapped AG2 OpenAI wrapper response."""
-    from autodiscovery.llm_usage import record_ag2_response_usage
-
-    agent_obj = config.get("agent")
-    agent_name = getattr(agent_obj, "name", None)
-    record_ag2_response_usage(response, agent_name=agent_name)
-
-
-def _extract_openai_wrapper_config(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Extract OpenAIWrapper.create config from positional/keyword args."""
-    if args and isinstance(args[0], dict):
-        merged = dict(args[0])
-        merged.update(kwargs)
-        return merged
-    return dict(kwargs)
-
-
-def _refresh_vertex_openai_api_key_if_needed(client: object, params: dict) -> bool:
-    """Refresh API key for Vertex OpenAI-compatible Gemini calls.
-
-    Args:
-        client: AG2 OpenAIClient instance (or duck-typed equivalent).
-        params: Request parameters passed to ``OpenAIClient.create``.
-
-    Returns:
-        True if a refreshed token was applied, otherwise False.
-    """
-    model = params.get("model")
-    if not isinstance(model, str):
-        return False
-
-    # Only refresh for Gemini model calls.
-    if not model.split("/")[-1].startswith("gemini"):
-        return False
-
-    oai_client = getattr(client, "_oai_client", None)
-    if oai_client is None:
-        return False
-    base_url = str(getattr(oai_client, "base_url", "") or "")
-    # Restrict refresh to Vertex OpenAI-compatible endpoints.
-    if "/endpoints/openapi" not in base_url and "aiplatform.googleapis.com" not in base_url:
-        return False
-
-    # Imported lazily to avoid module-import cycles.
-    from autodiscovery.utils import get_vertex_access_token
-
-    refreshed_token = get_vertex_access_token()
-    if not refreshed_token:
-        return False
-    setattr(oai_client, "api_key", refreshed_token)
-    return True
-
-
 def _env_int(name: str, default: int) -> int:
     # Accept invalid env values gracefully and fall back to defaults.
     raw = os.getenv(name)
@@ -360,7 +209,12 @@ def _is_openai_retryable_error(exc: Exception) -> bool:
         return True
     if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) == 429:
         return True
-    if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) in {500, 502, 503, 504}:
+    if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) in {
+        500,
+        502,
+        503,
+        504,
+    }:
         return True
     return False
 
@@ -391,4 +245,6 @@ def _is_urllib3_retryable_error(exc: Exception) -> bool:
     except Exception:
         return False
 
-    return isinstance(exc, (ProtocolError, ReadTimeoutError, ConnectTimeoutError, NewConnectionError))
+    return isinstance(
+        exc, (ProtocolError, ReadTimeoutError, ConnectTimeoutError, NewConnectionError)
+    )

@@ -28,6 +28,10 @@ program and reported its token usage back as a marker line on stdout.
   `image_analysis.modal` are gone).
 - `asta-code-execution` returns matplotlib figures a cell left open, so a figure
   is captured whether or not the code called `plt.show()`.
+- `asta-code-execution` no longer deadlocks when a cell run with
+  `use_subprocess=True` returns more data than a pipe buffers — which any cell
+  producing a figure does. `IPythonSession` now reads the child's result before
+  waiting for the child to exit.
 
 `--backend local` now runs each cell as an IPython cell in a child process using
 the CLI's own Python environment, rather than as a script through AG2's

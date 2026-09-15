@@ -153,6 +153,36 @@ def test_run_cell_subprocess_success() -> None:
     assert outputs["error"] is None
 
 
+def test_run_cell_subprocess_returns_payload_larger_than_pipe_buffer() -> None:
+    # A pipe buffers ~64KB. The parent has to drain it before waiting for the
+    # child to exit, or the child blocks in send() and neither side moves.
+    payload_bytes = 4 * 1024 * 1024
+    session = IPythonSession(use_subprocess=True, timeout_s=60.0)
+    outputs = session.run_cell(f'print("x" * {payload_bytes})')
+
+    assert outputs["success"] is True
+    assert outputs["error"] is None
+    assert len(outputs["stdout"].strip()) == payload_bytes
+
+
+def test_run_cell_subprocess_returns_figure() -> None:
+    # The real shape of an oversized payload: a figure's mime bundle carries
+    # PNG, SVG and JPEG, so one plot is already several hundred KB.
+    session = IPythonSession(use_subprocess=True, timeout_s=60.0)
+    code = """
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(12, 8))
+ax.plot(range(2000))
+plt.show()
+"""
+    outputs = session.run_cell(code)
+
+    assert outputs["success"] is True
+    assert outputs["error"] is None
+    assert len(outputs["rich_outputs"]) == 1
+    assert outputs["rich_outputs"][0]["image/png"]
+
+
 def test_timeout_requires_subprocess() -> None:
     session = IPythonSession(timeout_s=0.1)
     with pytest.raises(ValueError):

@@ -6,6 +6,7 @@ import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass
 from multiprocessing import get_context
+from time import monotonic
 from typing import Any, cast
 
 from IPython.core.formatters import DisplayFormatter
@@ -223,6 +224,13 @@ def _ensure_pip_available() -> None:
         return
 
 
+def _remaining(deadline: float | None) -> float | None:
+    """Seconds left until ``deadline``, or None for no deadline."""
+    if deadline is None:
+        return None
+    return max(0.0, deadline - monotonic())
+
+
 def _run_cell_in_subprocess(
     code_str: str,
     allow_mime: frozenset[str],
@@ -275,12 +283,34 @@ class IPythonSession:
         )
         process.start()
         child_conn.close()
-        process.join(timeout=self._config.timeout_s)
 
+        # Read the result before waiting for the child to exit. The child sends
+        # its outputs as a single pickled frame, which runs to megabytes once
+        # figures are attached, while a pipe buffers only ~64KB. Joining first
+        # would leave the child blocked in send() with nobody draining the pipe,
+        # and the parent blocked in join() waiting for an exit that send() is
+        # preventing -- a deadlock that only shows up on cells big enough to
+        # overflow the buffer. recv() is what drains it, so it has to come first.
+        timeout_s = self._config.timeout_s
+        deadline = None if timeout_s is None else monotonic() + timeout_s
+        result: dict[str, Any] | None = None
+        try:
+            if parent_conn.poll(_remaining(deadline)):
+                result = parent_conn.recv()
+        except EOFError:
+            # Child exited without sending; reported below as a missing result.
+            pass
+
+        process.join(timeout=_remaining(deadline))
         if process.is_alive():
             process.terminate()
             process.join()
-            parent_conn.close()
+        parent_conn.close()
+
+        if result is not None:
+            return result
+
+        if deadline is not None and monotonic() >= deadline:
             return {
                 "stdout": "",
                 "stderr": "",
@@ -288,17 +318,10 @@ class IPythonSession:
                 "success": False,
                 "error": {
                     "type": "TimeoutError",
-                    "message": f"Execution exceeded {self._config.timeout_s} seconds",
+                    "message": f"Execution exceeded {timeout_s} seconds",
                     "traceback": "",
                 },
             }
-
-        if parent_conn.poll():
-            result = parent_conn.recv()
-            parent_conn.close()
-            return result
-
-        parent_conn.close()
 
         return {
             "stdout": "",

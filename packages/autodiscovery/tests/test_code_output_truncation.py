@@ -9,7 +9,7 @@ import autodiscovery.agents as agents
 import pytest
 from autodiscovery.agents import (
     MAX_CODE_OUTPUT_CHARS,
-    ModalSandboxExecutor,
+    SandboxCodeExecutor,
     _truncate_output,
 )
 
@@ -74,7 +74,7 @@ class _StubBackend:
 
 
 def _executor(stdout, stderr="", **kwargs):
-    return ModalSandboxExecutor(
+    return SandboxCodeExecutor(
         _StubBackend(stdout, stderr), vision_model="vertex_ai/gemini-3.7-flash", **kwargs
     )
 

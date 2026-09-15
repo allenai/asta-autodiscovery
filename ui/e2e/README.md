@@ -14,7 +14,7 @@ End-to-end tests for the AutoDiscovery application using Playwright.
 2. **Start the application stack**:
    ```bash
    # From the repository root
-   docker-compose up --build
+   make dev
    ```
 
    The application should be running at `http://localhost:8080` (or `http://localhost:3000` for the UI directly).
@@ -70,7 +70,7 @@ Tests that require **no third-party credentials** (no Auth0/GCP/Modal) are tagge
 
 ```bash
 # Start the stack under the auth backend you want to exercise, then:
-AUTH_PROVIDER=password_file docker compose up --build   # or AUTH_PROVIDER=none
+AUTH_PROVIDER=password_file make dev                     # or AUTH_PROVIDER=none
 E2E_AUTH_PROVIDER=password_file yarn test:e2e:public     # matches the running stack
 ```
 

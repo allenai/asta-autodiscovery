@@ -9,7 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
  * - Prod: E2E_BASE_URL=https://autodiscovery.example.com
  *
  * Prerequisites:
- * - For local: Start the stack with `docker compose up --build`
+ * - For local: Start the stack with `make dev` (from the repository root)
  * - For deployed envs: Ensure you have test credentials
  *
  * Run tests with: yarn test:e2e

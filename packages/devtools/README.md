@@ -7,7 +7,7 @@ Developer Tools for AutoDiscovery
 Run from the repo root:
 
 ```bash
-just adk-web
+make adk-web
 ```
 
 Or directly:

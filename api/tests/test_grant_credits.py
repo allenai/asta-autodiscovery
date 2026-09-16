@@ -6,155 +6,146 @@ path.
 """
 
 import importlib.util
-from datetime import UTC, datetime
+import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
-from autodiscovery_jobs import JobConfig
-from autodiscovery_jobs.user_profile import UserProfile
+from google.api_core.exceptions import PreconditionFailed
 
 _SCRIPT = Path(__file__).parents[1] / "scripts" / "grant_credits.py"
 _spec = importlib.util.spec_from_file_location("grant_credits", _SCRIPT)
 grant_credits = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(grant_credits)
 
-CONFIG = JobConfig(bucket="bucket", project_id="project")
-CUTOFF = datetime(2026, 9, 15, 23, 0, 0, tzinfo=UTC)
-BEFORE = datetime(2026, 5, 1, tzinfo=UTC)
-AFTER = datetime(2026, 9, 20, tzinfo=UTC)
+GENERATION = 1234
 
 
-def _profile(granted=None, created_at=""):
-    return UserProfile(granted_credits=granted, created_at=created_at, updated_at="")
+def make_bucket(document, generation=GENERATION):
+    """Build a bucket whose single profile blob returns ``document``.
 
-
-# --- resolve_base_credits ------------------------------------------------
-
-
-def test_user_with_override_is_credited_from_that_override():
-    with patch.object(grant_credits, "get_user_profile", return_value=_profile(2500)):
-        base, _ = grant_credits.resolve_base_credits("u", CUTOFF, CONFIG)
-    assert base == 2500
-
-
-def test_profileless_user_is_credited_from_the_pinned_old_default():
-    """Not from DEFAULT_CREDITS_GRANTED, which has already been raised."""
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=None),
-        patch.object(grant_credits, "get_first_seen", return_value=BEFORE),
-    ):
-        base, _ = grant_credits.resolve_base_credits("u", CUTOFF, CONFIG)
-    assert base == grant_credits.OLD_DEFAULT_CREDITS == 500
-
-
-def test_user_first_seen_after_cutoff_is_skipped_as_a_new_signup():
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=None),
-        patch.object(grant_credits, "get_first_seen", return_value=AFTER),
-    ):
-        base, reason = grant_credits.resolve_base_credits("u", CUTOFF, CONFIG)
-    assert base is None
-    assert "new user" in reason
-
-
-def test_undatable_user_is_skipped_rather_than_guessed():
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=None),
-        patch.object(grant_credits, "get_first_seen", return_value=None),
-    ):
-        base, _ = grant_credits.resolve_base_credits("u", CUTOFF, CONFIG)
-    assert base is None
-
-
-def test_profile_timestamp_is_preferred_over_listing_objects():
-    profile = _profile(granted=None, created_at=BEFORE.isoformat())
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=profile),
-        patch.object(grant_credits, "get_first_seen") as listed,
-    ):
-        base, _ = grant_credits.resolve_base_credits("u", CUTOFF, CONFIG)
-    assert base == 500
-    listed.assert_not_called()
-
-
-# --- grant_user ----------------------------------------------------------
-
-
-@pytest.fixture
-def granting():
-    """Patch a fresh user with a 500 override and capture the writes."""
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=_profile(500)),
-        patch.object(grant_credits, "read_marker", return_value=None),
-        patch.object(grant_credits, "write_marker") as write_marker,
-        patch.object(grant_credits, "update_user_profile") as update_profile,
-    ):
-        yield write_marker, update_profile
-
-
-def test_grant_adds_the_full_amount(granting):
-    _, update_profile = granting
-    assert grant_credits.grant_user("u", CUTOFF, CONFIG, dry_run=False) == "granted"
-    update_profile.assert_called_once_with("u", {"granted_credits": 1500}, CONFIG)
-
-
-def test_marker_is_written_before_the_profile(granting):
-    """A crash between the two must leave the grant detectable, not repeatable.
-
-    Marker-then-profile leaves a marker whose "before" still matches the
-    profile, which the next run retries. The reverse order would leave a
-    granted user with no marker -- indistinguishable from an ungranted one.
+    Passing None for ``document`` models a user with no profile at all.
     """
-    write_marker, update_profile = granting
-    order = []
-    write_marker.side_effect = lambda *a, **k: order.append("marker")
-    update_profile.side_effect = lambda *a, **k: order.append("profile")
-
-    grant_credits.grant_user("u", CUTOFF, CONFIG, dry_run=False)
-
-    assert order == ["marker", "profile"]
-
-
-def test_dry_run_writes_nothing(granting):
-    write_marker, update_profile = granting
-    assert grant_credits.grant_user("u", CUTOFF, CONFIG, dry_run=True) == "granted"
-    write_marker.assert_not_called()
-    update_profile.assert_not_called()
+    bucket = MagicMock()
+    if document is None:
+        bucket.get_blob.return_value = None
+    else:
+        blob = MagicMock()
+        blob.generation = generation
+        blob.download_as_text.return_value = json.dumps(document)
+        bucket.get_blob.return_value = blob
+    return bucket
 
 
-def test_rerun_skips_a_user_already_granted():
-    """The whole point of the marker: +1000 compounds if repeated."""
-    marker = {"previous_granted": 500, "new_granted": 1500}
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=_profile(1500)),
-        patch.object(grant_credits, "read_marker", return_value=marker),
-        patch.object(grant_credits, "update_user_profile") as update_profile,
-    ):
-        assert grant_credits.grant_user("u", CUTOFF, CONFIG, dry_run=False) == "skipped"
-    update_profile.assert_not_called()
+def written_document(bucket):
+    """Return the document handed to upload_from_string."""
+    upload = bucket.blob.return_value.upload_from_string
+    return json.loads(upload.call_args.args[0])
 
 
-def test_interrupted_grant_is_retried_to_the_recorded_value():
-    """Marker written, profile write lost: reapply, and do not stack a second grant."""
-    marker = {"previous_granted": 500, "new_granted": 1500}
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=_profile(500)),
-        patch.object(grant_credits, "read_marker", return_value=marker),
-        patch.object(grant_credits, "write_marker"),
-        patch.object(grant_credits, "update_user_profile") as update_profile,
-    ):
-        assert grant_credits.grant_user("u", CUTOFF, CONFIG, dry_run=False) == "granted"
-    update_profile.assert_called_once_with("u", {"granted_credits": 1500}, CONFIG)
+def profile(granted=500, grants=None):
+    return {
+        "granted_credits": granted,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+        "grants": grants or [],
+    }
 
 
-def test_profile_changed_since_the_grant_is_left_alone():
-    marker = {"previous_granted": 500, "new_granted": 1500}
-    with (
-        patch.object(grant_credits, "get_user_profile", return_value=_profile(9000)),
-        patch.object(grant_credits, "read_marker", return_value=marker),
-        patch.object(grant_credits, "update_user_profile") as update_profile,
-    ):
-        outcome = grant_credits.grant_user("u", CUTOFF, CONFIG, dry_run=False)
-    assert outcome == "needs_review"
-    update_profile.assert_not_called()
+# --- eligibility ---------------------------------------------------------
+
+
+def test_user_without_a_profile_is_skipped():
+    bucket = make_bucket(None)
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "skipped"
+    bucket.blob.return_value.upload_from_string.assert_not_called()
+
+
+def test_user_whose_override_is_null_is_skipped():
+    """A null override falls through to the default, so there is nothing to add to."""
+    bucket = make_bucket(profile(granted=None))
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "skipped"
+    bucket.blob.return_value.upload_from_string.assert_not_called()
+
+
+# --- the grant itself ----------------------------------------------------
+
+
+def test_grant_adds_the_credits_and_records_the_grant():
+    bucket = make_bucket(profile(granted=500))
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "granted"
+
+    document = written_document(bucket)
+    assert document["granted_credits"] == 1500
+    assert [entry["id"] for entry in document["grants"]] == [grant_credits.GRANT_ID]
+    assert document["grants"][0]["amount"] == 1000
+    assert document["grants"][0]["previous_granted"] == 500
+
+
+def test_grant_preserves_unrelated_profile_fields():
+    bucket = make_bucket(profile(granted=500) | {"something_else": "keep me"})
+    grant_credits.grant_user(bucket, "u", dry_run=False)
+    assert written_document(bucket)["something_else"] == "keep me"
+
+
+def test_grant_appends_to_an_existing_grants_list():
+    earlier = {"id": "some-earlier-grant", "amount": 250}
+    bucket = make_bucket(profile(granted=750, grants=[earlier]))
+    grant_credits.grant_user(bucket, "u", dry_run=False)
+
+    document = written_document(bucket)
+    assert document["grants"][0] == earlier
+    assert document["grants"][1]["id"] == grant_credits.GRANT_ID
+    assert document["granted_credits"] == 1750
+
+
+def test_write_is_conditional_on_the_generation_that_was_read():
+    bucket = make_bucket(profile(granted=500), generation=99)
+    grant_credits.grant_user(bucket, "u", dry_run=False)
+    upload = bucket.blob.return_value.upload_from_string
+    assert upload.call_args.kwargs["if_generation_match"] == 99
+
+
+def test_dry_run_writes_nothing():
+    bucket = make_bucket(profile(granted=500))
+    assert grant_credits.grant_user(bucket, "u", dry_run=True) == "granted"
+    bucket.blob.return_value.upload_from_string.assert_not_called()
+
+
+# --- re-running ----------------------------------------------------------
+
+
+def test_rerun_skips_a_user_already_carrying_this_grant():
+    """The whole point of recording it: +1000 compounds if repeated."""
+    applied = [{"id": grant_credits.GRANT_ID, "amount": 1000}]
+    bucket = make_bucket(profile(granted=1500, grants=applied))
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "skipped"
+    bucket.blob.return_value.upload_from_string.assert_not_called()
+
+
+def test_an_unrelated_credit_change_does_not_block_the_grant():
+    """State is tracked by grant id, not by comparing balances."""
+    bucket = make_bucket(profile(granted=9000))
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "granted"
+    assert written_document(bucket)["granted_credits"] == 10000
+
+
+# --- concurrency ---------------------------------------------------------
+
+
+def test_a_profile_changed_before_the_write_is_reported_not_clobbered():
+    bucket = make_bucket(profile(granted=500))
+    bucket.blob.return_value.upload_from_string.side_effect = PreconditionFailed("412")
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "conflict"
+
+
+def test_a_profile_changed_during_the_read_is_reported():
+    bucket = make_bucket(profile(granted=500))
+    bucket.get_blob.return_value.download_as_text.side_effect = PreconditionFailed("412")
+    assert grant_credits.grant_user(bucket, "u", dry_run=False) == "conflict"
+
+
+def test_a_profile_with_no_generation_cannot_be_written_safely():
+    bucket = make_bucket(profile(granted=500), generation=None)
+    with pytest.raises(ValueError):
+        grant_credits.read_profile(bucket, "u")

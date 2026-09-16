@@ -1,46 +1,42 @@
 #!/usr/bin/env python3
-"""Grant a one-time credit top-up to every existing user.
+"""Grant a one-time credit top-up to users who have a credit override.
 
-Adds ``GRANT_CREDITS`` to each existing user's ``granted_credits`` override in
-GCS (``users/{userid}/user.json``). Running experiments became cheaper, so the
-saving is passed back to users as additional credits.
+Raises each eligible user's credit allowance by ``GRANT_AMOUNT`` and records
+that it did so, both in the user's profile (``users/{userid}/user.json``).
 
-Why this is a grant and not a reset
+Scope: only users who have an explicit ``granted_credits`` override
+---------------------------------------------------------------------
+A user with no override, or with the field set to null, falls through to
+``DEFAULT_CREDITS_GRANTED`` at read time and is already on the current default.
+Those users are skipped. This is why nothing here needs to know what the
+default is, before or after it was raised -- the script only ever adds to a
+value that is already stored, so there is no way for it to credit someone
+against the wrong baseline.
+
+Why the record lives in the profile
 -----------------------------------
-There is no stored balance. Only ``granted_credits`` is persisted, and the
-balance is derived at read time as ``available = granted - consumed - pending``.
-Adding to ``granted`` therefore needs one read and one write per user, and no
-user's balance can decrease. Resetting everyone to a fixed available balance
-would instead require aggregating every job the user has ever run.
+``granted = granted + N`` compounds, so the script has to know whether it has
+already run for a user. Writing that fact into the profile being changed makes
+the credit and the record of the credit the same write: there is no window in
+which one landed and the other did not, nothing to reconcile on a restart, and
+no separate bookkeeping object to purge when a user is erased. The check is by
+grant id, so an unrelated edit to the user's credits between runs is simply
+irrelevant rather than looking like corruption.
 
-The pinned old default
-----------------------
-``DEFAULT_CREDITS_GRANTED`` in ``utils.credits`` is the balance a user gets
-when they have no profile at all, and it has already been raised to the new
-value. This script must therefore *not* import it: a user with no profile has
-to be credited against the default they had **before** that change, or they
-would be counted from the new default and granted twice. ``OLD_DEFAULT_CREDITS``
-below pins that previous value, which also makes this script independent of
-whether the default change has shipped yet.
+    "grants": [
+      {"id": "grant-1000-credits-v1", "amount": 1000,
+       "previous_granted": 500, "granted_at": "..."}
+    ]
 
-Existing users vs. new signups
-------------------------------
-Raising the default already moved every profile-less user to the new balance,
-and that fallback is evaluated lazily on each read. A user who signed up after
-that shipped is therefore already where they should be and must be skipped;
-only users who predate it are owed the top-up. Users with a profile are
-identified by ``created_at``; users without one are dated by their oldest
-object in GCS. ``--cutoff`` sets the boundary.
+Concurrency
+-----------
+Each profile is read with its GCS generation and written back with
+``if_generation_match``, so a write fails outright if anything else modified
+the profile in between rather than silently discarding that change. Such a user
+is reported as a conflict and left alone; re-running the script picks them up.
 
-Re-running
-----------
-``granted = granted + N`` compounds, so this script is not naturally idempotent.
-Each grant writes a marker to ``migrations/{MIGRATION_ID}/{userid}.json``
-recording the before and after values. On a later run a user whose profile
-still matches the recorded "after" is skipped; one that still matches the
-recorded "before" is treated as an interrupted write and retried; anything else
-is left alone and reported for review. A crash partway through is therefore
-safe to resume by simply running the script again.
+Re-running is safe: users whose profile already carries this grant id are
+skipped, so an interrupted run can simply be run again.
 
 Usage:
     uv run python api/scripts/grant_credits.py --dry-run
@@ -56,15 +52,14 @@ import json
 import logging
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
-
-# Add api/ to path so we can import from utils
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from typing import Any
 
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.client import get_storage_client
 from autodiscovery_jobs.gcs import list_user_ids
-from autodiscovery_jobs.user_profile import get_user_profile, update_user_profile
+from autodiscovery_jobs.user_profile import get_user_profile_path
+from google.api_core.exceptions import PreconditionFailed
+from google.cloud.storage import Bucket
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,226 +67,155 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Credits added to every existing user's grant.
-GRANT_CREDITS = 1000
+# Credits added to each eligible user's override.
+GRANT_AMOUNT = 1000
 
-# The value DEFAULT_CREDITS_GRANTED held *before* it was raised. Deliberately a
-# literal rather than an import -- see the module docstring.
-OLD_DEFAULT_CREDITS = 500
-
-# Identifies this migration's markers in GCS. Bump it for a future grant so the
-# new run does not read this one's markers.
-MIGRATION_ID = "grant-1000-credits-v1"
-
-# When the raised default shipped. Users first seen at or after this already
-# receive the new default and are not owed a top-up.
-DEFAULT_CUTOFF = "2026-09-15T23:01:52+00:00"
+# Identifies this grant in a profile's "grants" list. Bump it for a future
+# grant so that one does not read this one as already applied.
+GRANT_ID = "grant-1000-credits-v1"
 
 
-def get_marker_path(userid: str) -> str:
-    """Get the GCS blob path for this migration's marker for a user.
+def read_profile(bucket: Bucket, userid: str) -> tuple[dict[str, Any], int] | None:
+    """Read a user's profile together with the generation it was read at.
+
+    The content is fetched with the generation as a precondition, so the
+    returned document is guaranteed to be the one that generation names.
 
     Args:
+        bucket: Bucket holding user profiles
         userid: User identifier
 
     Returns:
-        Blob path for the marker
+        Tuple of (profile document, generation), or None if the user has no
+        profile
+
+    Raises:
+        PreconditionFailed: If the profile changed between the metadata read
+            and the content read
+        ValueError: If GCS returned no generation, leaving no way to write the
+            profile back safely
     """
-    return f"migrations/{MIGRATION_ID}/{userid}.json"
-
-
-def read_marker(userid: str, config: JobConfig) -> dict | None:
-    """Read this migration's marker for a user.
-
-    Args:
-        userid: User identifier
-        config: Job configuration
-
-    Returns:
-        The marker dict, or None if the user has not been granted yet
-    """
-    client = get_storage_client(config.project_id)
-    blob = client.bucket(config.bucket).blob(get_marker_path(userid))
-    try:
-        return json.loads(blob.download_as_text(retry=None))
-    except Exception:
+    blob = bucket.get_blob(get_user_profile_path(userid))
+    if blob is None:
         return None
+    generation = blob.generation
+    if generation is None:
+        raise ValueError(f"no generation returned for {get_user_profile_path(userid)}")
+    document = json.loads(blob.download_as_text(if_generation_match=generation))
+    return document, generation
 
 
-def write_marker(userid: str, previous: int, new: int, config: JobConfig) -> None:
-    """Record that a user has been granted, and what their values were.
+def is_already_granted(document: dict[str, Any]) -> bool:
+    """Check whether this grant has already been applied to a profile.
 
     Args:
-        userid: User identifier
-        previous: granted_credits before the grant
-        new: granted_credits after the grant
-        config: Job configuration
+        document: Profile document
+
+    Returns:
+        True if the profile already records a grant with this script's ID
     """
-    client = get_storage_client(config.project_id)
-    blob = client.bucket(config.bucket).blob(get_marker_path(userid))
-    blob.upload_from_string(
-        json.dumps(
-            {
-                "migration": MIGRATION_ID,
-                "userid": userid,
-                "previous_granted": previous,
-                "new_granted": new,
-                "granted_at": datetime.now(UTC).isoformat(),
-            },
-            indent=2,
-        )
+    return any(
+        entry.get("id") == GRANT_ID
+        for entry in document.get("grants") or []
+        if isinstance(entry, dict)
     )
 
 
-def _parse_created_at(created_at: str) -> datetime | None:
-    """Parse a profile's created_at into an aware datetime.
+def apply_grant(document: dict[str, Any], previous: int) -> dict[str, Any]:
+    """Build the updated profile document for a granted user.
 
     Args:
-        created_at: ISO timestamp, possibly empty on older profiles
+        document: Profile document as read from GCS
+        previous: The user's granted_credits before this grant
 
     Returns:
-        Timezone-aware datetime, or None if absent or unparseable
+        A new document with the credits added and the grant recorded
     """
-    if not created_at:
-        return None
-    try:
-        parsed = datetime.fromisoformat(created_at)
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-
-
-def get_first_seen(userid: str, config: JobConfig) -> datetime | None:
-    """Get the creation time of a user's oldest object in GCS.
-
-    Used to date users who have no profile, since they have no ``created_at``.
-    A user only appears in the bucket once they have run something, so this is
-    a lower bound on when they started using the product.
-
-    Args:
-        userid: User identifier
-        config: Job configuration
-
-    Returns:
-        Creation time of the oldest object, or None if the user has none
-    """
-    client = get_storage_client(config.project_id)
-    times = [
-        blob.time_created
-        for blob in client.list_blobs(config.bucket, prefix=f"users/{userid}/")
-        if blob.time_created is not None
+    now = datetime.now(UTC).isoformat()
+    updated = dict(document)
+    updated["granted_credits"] = previous + GRANT_AMOUNT
+    updated["updated_at"] = now
+    updated["grants"] = [
+        *(document.get("grants") or []),
+        {
+            "id": GRANT_ID,
+            "amount": GRANT_AMOUNT,
+            "previous_granted": previous,
+            "granted_at": now,
+        },
     ]
-    return min(times) if times else None
+    return updated
 
 
-def resolve_base_credits(
-    userid: str, cutoff: datetime, config: JobConfig
-) -> tuple[int | None, str]:
-    """Determine the grant's starting point for a user.
+def grant_user(bucket: Bucket, userid: str, dry_run: bool) -> str:
+    """Apply the grant to one user, if they are eligible and have not had it.
 
     Args:
+        bucket: Bucket holding user profiles
         userid: User identifier
-        cutoff: Users first seen at or after this are new and get nothing
-        config: Job configuration
+        dry_run: When True, report the planned change without writing
 
     Returns:
-        Tuple of (base credits, reason). Base is None when the user should be
-        skipped, and reason explains the decision either way.
+        One of "granted", "skipped" or "conflict"
     """
-    profile = get_user_profile(userid, config)
+    try:
+        result = read_profile(bucket, userid)
+    except PreconditionFailed:
+        logger.warning(f"CONFLICT {userid}: profile changed while being read")
+        return "conflict"
 
-    if profile is not None and profile.granted_credits is not None:
-        return profile.granted_credits, "has profile override"
-
-    # No usable override: the user is on the default. Only top them up if they
-    # predate the raised default, otherwise they already have it. Prefer the
-    # profile's own timestamp when there is one; fall back to listing the
-    # user's objects, which costs a request per user.
-    first_seen = _parse_created_at(profile.created_at) if profile is not None else None
-    if first_seen is None:
-        first_seen = get_first_seen(userid, config)
-
-    if first_seen is None:
-        return None, "cannot date user (no profile timestamp, no objects)"
-    if first_seen >= cutoff:
-        return None, f"first seen {first_seen.date()}, at/after cutoff (new user)"
-
-    return OLD_DEFAULT_CREDITS, f"no override, first seen {first_seen.date()}"
-
-
-def grant_user(
-    userid: str,
-    cutoff: datetime,
-    config: JobConfig,
-    dry_run: bool,
-) -> str:
-    """Grant one user their top-up, if they are owed one.
-
-    Args:
-        userid: User identifier
-        cutoff: Users first seen at or after this are new and get nothing
-        config: Job configuration
-        dry_run: When True, log the planned change without writing
-
-    Returns:
-        One of "granted", "skipped" or "needs_review"
-    """
-    base, reason = resolve_base_credits(userid, cutoff, config)
-    if base is None:
-        logger.info(f"SKIP    {userid}: {reason}")
+    if result is None:
+        logger.info(f"SKIP     {userid}: no profile, already on the default")
         return "skipped"
 
-    new_granted = base + GRANT_CREDITS
+    document, generation = result
 
-    # Already processed? Compare the profile against what we recorded to tell a
-    # completed grant from one that was interrupted mid-write.
-    marker = read_marker(userid, config)
-    if marker is not None:
-        if base == marker.get("new_granted"):
-            logger.info(f"SKIP    {userid}: already granted ({base})")
-            return "skipped"
-        if base != marker.get("previous_granted"):
-            logger.warning(
-                f"REVIEW  {userid}: granted={base} matches neither the recorded "
-                f"before ({marker.get('previous_granted')}) nor after "
-                f"({marker.get('new_granted')}); changed since the grant, leaving alone"
-            )
-            return "needs_review"
-        logger.warning(f"RETRY   {userid}: previous grant was interrupted, re-applying")
-        new_granted = marker["new_granted"]
+    previous = document.get("granted_credits")
+    if previous is None:
+        logger.info(f"SKIP     {userid}: no override, already on the default")
+        return "skipped"
+
+    if is_already_granted(document):
+        logger.info(f"SKIP     {userid}: already granted (granted_credits={previous})")
+        return "skipped"
+
+    updated = apply_grant(document, previous)
+    new_granted = updated["granted_credits"]
 
     if dry_run:
-        logger.info(f"DRY-RUN {userid}: {base} -> {new_granted} ({reason})")
+        logger.info(f"DRY-RUN  {userid}: {previous} -> {new_granted}")
         return "granted"
 
-    # Marker first, profile second. A crash between the two then leaves a marker
-    # whose "before" still matches the profile, which the next run recognises as
-    # an interrupted write and retries. Writing the profile first would instead
-    # leave a granted user with no marker, indistinguishable from one who has
-    # not been granted yet -- and the next run would grant them a second time.
-    write_marker(userid, previous=base, new=new_granted, config=config)
-    update_user_profile(userid, {"granted_credits": new_granted}, config)
-    logger.info(f"GRANT   {userid}: {base} -> {new_granted} ({reason})")
+    try:
+        bucket.blob(get_user_profile_path(userid)).upload_from_string(
+            json.dumps(updated, indent=2),
+            if_generation_match=generation,
+        )
+    except PreconditionFailed:
+        logger.warning(f"CONFLICT {userid}: profile changed before the write, skipping")
+        return "conflict"
+
+    logger.info(f"GRANT    {userid}: {previous} -> {new_granted}")
     return "granted"
 
 
-def grant_credits(
+def grant_all_users(
     config: JobConfig,
-    cutoff: datetime,
     dry_run: bool = False,
     userid: str | None = None,
 ) -> dict[str, int]:
-    """Grant the top-up to every existing user.
+    """Apply the grant to every eligible user.
 
     Args:
         config: Job configuration
-        cutoff: Users first seen at or after this are new and get nothing
-        dry_run: When True, log planned changes without writing to GCS
+        dry_run: When True, report planned changes without writing to GCS
         userid: When set, only process this single user
 
     Returns:
-        Counts keyed by outcome ("granted", "skipped", "needs_review", "errors")
+        Counts keyed by outcome ("granted", "skipped", "conflict", "errors")
     """
+    bucket = get_storage_client(config.project_id).bucket(config.bucket)
+
     if userid:
         user_ids = [userid]
         logger.info(f"Processing single user: {userid}")
@@ -304,15 +228,15 @@ def grant_credits(
             f"(skipped {len(all_ids) - len(user_ids)} non-Auth0 IDs)"
         )
 
-    counts = {"granted": 0, "skipped": 0, "needs_review": 0, "errors": 0}
+    counts = {"granted": 0, "skipped": 0, "conflict": 0, "errors": 0}
 
     total = len(user_ids)
     for i, uid in enumerate(user_ids, 1):
         logger.debug(f"[{i}/{total}] {uid}")
         try:
-            counts[grant_user(uid, cutoff, config, dry_run)] += 1
+            counts[grant_user(bucket, uid, dry_run)] += 1
         except Exception as e:
-            logger.error(f"ERROR   {uid}: {e}")
+            logger.error(f"ERROR    {uid}: {e}")
             counts["errors"] += 1
 
     return counts
@@ -322,10 +246,10 @@ def main() -> int:
     """Parse arguments, run the grant and report a summary.
 
     Returns:
-        Process exit code: 0 when no user errored, 1 otherwise
+        Process exit code: 0 when nothing errored or conflicted, 1 otherwise
     """
     parser = argparse.ArgumentParser(
-        description=f"Grant {GRANT_CREDITS} additional credits to every existing user"
+        description=(f"Grant {GRANT_AMOUNT} additional credits to users who have a credit override")
     )
     parser.add_argument(
         "--dry-run",
@@ -338,53 +262,34 @@ def main() -> int:
         default=None,
         help="Only process this specific user ID",
     )
-    parser.add_argument(
-        "--cutoff",
-        type=str,
-        default=DEFAULT_CUTOFF,
-        help=(
-            "ISO timestamp when the raised default shipped. Users without a "
-            f"profile first seen at or after it are new and are skipped "
-            f"(default: {DEFAULT_CUTOFF})"
-        ),
-    )
     args = parser.parse_args()
-
-    cutoff = datetime.fromisoformat(args.cutoff)
-    if cutoff.tzinfo is None:
-        cutoff = cutoff.replace(tzinfo=UTC)
 
     config = JobConfig.from_env()
 
     logger.info("=" * 60)
     logger.info("Credit Grant")
-    logger.info(f"Bucket:        {config.bucket}")
-    logger.info(f"Grant:         +{GRANT_CREDITS}")
-    logger.info(f"Old default:   {OLD_DEFAULT_CREDITS} (pinned)")
-    logger.info(f"New-user cutoff: {cutoff.isoformat()}")
-    logger.info(f"Migration:     {MIGRATION_ID}")
-    logger.info(f"Dry run:       {args.dry_run}")
-    logger.info(f"User filter:   {args.userid or 'all users'}")
+    logger.info(f"Bucket:      {config.bucket}")
+    logger.info(f"Grant:       +{GRANT_AMOUNT}")
+    logger.info(f"Grant ID:    {GRANT_ID}")
+    logger.info(f"Dry run:     {args.dry_run}")
+    logger.info(f"User filter: {args.userid or 'all users'}")
     logger.info("=" * 60)
 
-    counts = grant_credits(
-        config,
-        cutoff=cutoff,
-        dry_run=args.dry_run,
-        userid=args.userid,
-    )
+    counts = grant_all_users(config, dry_run=args.dry_run, userid=args.userid)
 
     logger.info("=" * 60)
     logger.info("Summary:")
-    logger.info(f"  Granted:      {counts['granted']}")
-    logger.info(f"  Skipped:      {counts['skipped']}")
-    logger.info(f"  Needs review: {counts['needs_review']}")
-    logger.info(f"  Errors:       {counts['errors']}")
+    logger.info(f"  Granted:   {counts['granted']}")
+    logger.info(f"  Skipped:   {counts['skipped']}")
+    logger.info(f"  Conflicts: {counts['conflict']}")
+    logger.info(f"  Errors:    {counts['errors']}")
+    if counts["conflict"]:
+        logger.info("  Conflicting users were left unchanged; re-run to pick them up.")
     if args.dry_run:
         logger.info("  (dry run -- nothing was written)")
     logger.info("=" * 60)
 
-    return 0 if counts["errors"] == 0 else 1
+    return 0 if counts["errors"] == 0 and counts["conflict"] == 0 else 1
 
 
 if __name__ == "__main__":

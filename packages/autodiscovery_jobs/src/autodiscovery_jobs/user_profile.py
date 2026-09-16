@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,15 +30,23 @@ class UserProfile:
         granted_credits: Custom credit allocation for user (None = use default)
         created_at: ISO timestamp when profile was created
         updated_at: ISO timestamp when profile was last updated
-        grants: One entry per one-off credit grant already applied to this
-            user, so a migration can tell whether it has already run. Carried
-            through reads and writes verbatim; nothing here interprets it.
+
+    A stored user.json may hold keys this class does not model, and they are
+    not round-tripped: ``from_dict`` keeps only the attributes above, so
+    ``update_user_profile`` rewrites the file without them. One such key is in
+    use today:
+
+        grants: list of one-off credit grants already applied to the user,
+            written by ``api/scripts/grant_credits.py`` so that re-running it
+            does not credit anyone twice. That script reads and writes
+            user.json directly rather than going through this class, precisely
+            so the list survives. Anything that saves a profile *through* this
+            class will drop it.
     """
 
     granted_credits: int | None = None
     created_at: str = ""
     updated_at: str = ""
-    grants: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -46,7 +54,6 @@ class UserProfile:
             "granted_credits": self.granted_credits,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "grants": self.grants,
         }
 
     @classmethod
@@ -56,8 +63,6 @@ class UserProfile:
             granted_credits=data.get("granted_credits"),
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at", ""),
-            # Absent on every profile written before grants were tracked.
-            grants=data.get("grants") or [],
         )
 
     @classmethod
@@ -164,6 +169,12 @@ def update_user_profile(
     """Update user profile in GCS.
 
     Automatically sets updated_at timestamp.
+
+    This rewrites user.json from a :class:`UserProfile`, so any key the stored
+    file holds that the class does not model is dropped -- including ``grants``,
+    the record of one-off credit grants that keeps them from being applied
+    twice. See :class:`UserProfile` before using this on a profile that may
+    carry one.
 
     Args:
         userid: User identifier

@@ -110,18 +110,7 @@ def test_any_litellm_provider_is_accepted() -> None:
 
 @pytest.mark.skip(reason="litellm no longer reports unknown models as unmapped; see issue #96")
 def test_models_litellm_has_not_mapped_still_resolve() -> None:
-    """A model newer than the pinned litellm resolves from its prefix alone.
-
-    Skipped, not fixed. litellm's model map now carries regex rules that
-    synthesize capabilities for ids it has not catalogued, and they ship in the
-    map it fetches from upstream at import -- so the version pin does not cover
-    them. A rule matches any Gemini chat id at 2.5 or higher, so ``model_info``
-    returns a baseline dict here rather than None.
-
-    That makes ``validate()`` unable to tell a curated entry from an inferred
-    one, which is a real startup check we lose. See issue #96 for the assumption
-    this encoded and the risk accepted by skipping it.
-    """
+    """A model newer than the pinned litellm resolves from its prefix alone."""
     assert provider_of("vertex_ai/gemini-4.7-pro-preview") == "vertex_ai"
     assert model_info("vertex_ai/gemini-4.7-pro-preview") is None
 

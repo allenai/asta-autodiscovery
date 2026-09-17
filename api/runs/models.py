@@ -310,7 +310,7 @@ class GetRunExperimentsResponseModel(BaseModel):
     experiments: list[ExperimentModel] = Field(
         ...,
         description=(
-            "Page of experiments in the run, excluding the ids the client already has. "
+            "Page of experiments in the run starting at the requested cursor. "
             "Each entry omits `code` and `code_output`; fetch those per experiment."
         ),
     )

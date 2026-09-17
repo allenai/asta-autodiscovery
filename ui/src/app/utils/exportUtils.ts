@@ -164,7 +164,9 @@ export async function hydrateExperimentsForExport(
     const hydrated = [...experiments];
     const pending = experiments
         .map((_, index) => index)
-        .filter((index) => experiments[index].code == null || experiments[index].codeOutput == null);
+        .filter(
+            (index) => experiments[index].code == null || experiments[index].codeOutput == null
+        );
 
     for (let start = 0; start < pending.length; start += batchSize) {
         const batch = pending.slice(start, start + batchSize);

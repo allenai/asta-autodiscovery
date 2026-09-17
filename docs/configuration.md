@@ -126,6 +126,9 @@ docker compose build autodiscovery
 docker compose up
 ```
 
+`make dev` from the repository root runs both, and is what the README points at — the job image
+is behind compose's `jobs` profile, so a plain `docker compose up --build` never rebuilds it.
+
 The job container gets the run's data as a filesystem mount at `/mnt/gcs`, supplied
 according to `STORAGE_BACKEND`: a bind mount of the run's directory under `STORAGE_HOST_DIR`
 (`local`), or a gcsfuse mount the container makes itself (`gcs`, triggered by

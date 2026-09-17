@@ -7,7 +7,8 @@ route. The script prints an inventory of the subject's data, requires the
 operator to retype the subject identifier, and only then deletes. Deletion is
 immediate and unrecoverable.
 
-Scope is the AutoDiscovery bucket. Data AutoDiscovery hands to other systems --
+Scope is the AutoDiscovery object store (whichever STORAGE_BACKEND selects).
+Data AutoDiscovery hands to other systems --
 the dataset copies in the Asta workspaces bucket, the Asta user record, Auth0 --
 is erased by those systems; see UNCOVERED_SURFACES below.
 
@@ -58,12 +59,12 @@ def _format_bytes(num_bytes: int) -> str:
 
 
 def print_summary(summary: gcs.UserDataSummary, show_paths: bool) -> None:
-    """Print the primary-bucket inventory for a subject."""
+    """Print the store inventory for a subject."""
     print("")
     print("=" * 72)
     print(f"AutoDiscovery data for sub: {summary.userid}")
     print("=" * 72)
-    print(f"  Bucket:              gs://{summary.bucket}/users/{summary.userid}/")
+    print(f"  Location:            {summary.location}/users/{summary.userid}/")
     print(f"  Objects:             {summary.object_count} ({_format_bytes(summary.total_bytes)})")
     print(f"  Jobs:                {len(summary.job_ids)}")
     print(f"  Credits profile:     {'present' if summary.has_user_profile else 'absent'}")
@@ -78,7 +79,7 @@ def print_summary(summary: gcs.UserDataSummary, show_paths: bool) -> None:
     if show_paths and summary.object_paths:
         print("  Objects:")
         for path in summary.object_paths:
-            print(f"    - gs://{summary.bucket}/{path}")
+            print(f"    - {summary.location}/{path}")
 
 
 def print_uncovered() -> None:
@@ -189,7 +190,7 @@ def main() -> int:
     print("")
     print(
         f"Deleted {len(result['deleted_objects'])} objects "
-        f"({_format_bytes(result['deleted_bytes'])}) from gs://{result['bucket']}/"
+        f"({_format_bytes(result['deleted_bytes'])}) from {result['location']}/"
     )
     print(f"Deleted {len(result['deleted_shared_run_ids'])} shared-run index entries")
 

@@ -1,8 +1,9 @@
-"""Service for managing user.json files in GCS.
+"""Service for managing user.json documents.
 
 This module provides a UserProfile data class and functions for creating,
-reading, and updating user profiles stored in GCS. Each user can have a
-user.json file that stores custom settings like credit allocation.
+reading, and updating user profiles in the configured object store
+(:mod:`autodiscovery_jobs.storage`). Each user can have a user.json object that
+stores custom settings like credit allocation.
 """
 
 from __future__ import annotations
@@ -13,18 +14,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from google.api_core import retry as google_retry
-from google.cloud.exceptions import NotFound
-
-from .client import get_storage_client
 from .config import JobConfig
+from .exceptions import ObjectNotFoundError
+from .storage import get_store
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class UserProfile:
-    """Data class representing user profile stored in GCS.
+    """Data class representing a persisted user profile.
 
     Attributes:
         granted_credits: Custom credit allocation for user (None = use default)
@@ -72,13 +71,13 @@ class UserProfile:
 
 
 def get_user_profile_path(userid: str) -> str:
-    """Get the GCS blob path for user.json.
+    """Get the object key for user.json.
 
     Args:
         userid: User identifier
 
     Returns:
-        Blob path for user.json
+        Object key for user.json
     """
     return f"users/{userid}/user.json"
 
@@ -105,14 +104,15 @@ def create_user_profile(
         raise ValueError(f"granted_credits must be non-negative, got {granted_credits}")
 
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store = get_store(config)
 
     user_profile = UserProfile.create_new(granted_credits=granted_credits)
 
-    blob_path = get_user_profile_path(userid)
-    blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(user_profile.to_dict(), indent=2))
+    store.write_text(
+        get_user_profile_path(userid),
+        json.dumps(user_profile.to_dict(), indent=2),
+        content_type="application/json",
+    )
 
     return user_profile
 
@@ -121,7 +121,7 @@ def get_user_profile(
     userid: str,
     config: JobConfig | None = None,
 ) -> UserProfile | None:
-    """Get user profile from GCS.
+    """Get user profile from the object store.
 
     Args:
         userid: User identifier
@@ -131,17 +131,12 @@ def get_user_profile(
         UserProfile object, or None if not found or on error
     """
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    blob_path = get_user_profile_path(userid)
-    blob = bucket.blob(blob_path)
+    store = get_store(config)
 
     try:
-        content = blob.download_as_text(retry=None)
-        data = json.loads(content)
-        return UserProfile.from_dict(data)
-    except NotFound:
+        content = store.read_text(get_user_profile_path(userid))
+        return UserProfile.from_dict(json.loads(content))
+    except ObjectNotFoundError:
         logger.debug(f"User profile not found for {userid} (expected behavior)")
         return None
     except Exception as e:
@@ -154,7 +149,7 @@ def update_user_profile(
     updates: dict[str, Any],
     config: JobConfig | None = None,
 ) -> UserProfile:
-    """Update user profile in GCS.
+    """Update user profile in the object store.
 
     Automatically sets updated_at timestamp.
 
@@ -176,8 +171,7 @@ def update_user_profile(
             raise ValueError(f"granted_credits must be non-negative, got {credits}")
 
     config = config or JobConfig.from_env()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store = get_store(config)
 
     # Get existing profile
     user_profile = get_user_profile(userid, config)
@@ -190,10 +184,12 @@ def update_user_profile(
     user_profile_dict.update(updates)
     user_profile_dict["updated_at"] = datetime.now(UTC).isoformat()
 
-    # Save back to GCS
-    blob_path = get_user_profile_path(userid)
-    blob = bucket.blob(blob_path)
-    blob.upload_from_string(json.dumps(user_profile_dict, indent=2))
+    # Save back to the store
+    store.write_text(
+        get_user_profile_path(userid),
+        json.dumps(user_profile_dict, indent=2),
+        content_type="application/json",
+    )
 
     return UserProfile.from_dict(user_profile_dict)
 

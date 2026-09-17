@@ -330,10 +330,29 @@ class GenerateUploadUrlRequestModel(BaseModel):
 
 
 class GenerateUploadUrlResponseModel(BaseModel):
-    """Model for the response containing the presigned upload URL"""
+    """Model for the response containing the upload URL"""
 
-    upload_url: str = Field(..., description="Presigned URL for uploading the file to GCS")
-    gcs_path: str = Field(..., description="GCS path where file will be stored")
+    upload_url: str = Field(
+        ...,
+        description=(
+            "Where to send the file. Either a presigned storage URL (the upload bypasses "
+            "this API entirely) or a URL on this API, when the storage backend cannot "
+            "issue presigned URLs. Clients should not care which."
+        ),
+    )
+    upload_method: str = Field(
+        "PUT", description="HTTP method to use for the upload request."
+    )
+    upload_fields: dict[str, str] | None = Field(
+        None,
+        description=(
+            "When set, send the upload as multipart/form-data containing these fields "
+            "plus the file under the field name 'file'. When null, send the raw file as "
+            "the request body. (Presigned PUT URLs use the latter; presigned POST "
+            "policies and this API's own endpoint use the former.)"
+        ),
+    )
+    gcs_path: str = Field(..., description="Storage URI where the file will be stored")
     filename: str = Field(..., description="Name of the file")
     expires_at_unix: int = Field(
         ..., description="Unix timestamp (seconds since epoch) when the URL expires"

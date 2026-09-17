@@ -1,7 +1,9 @@
-"""autodiscovery_jobs - Python package for managing Cloud Run jobs.
+"""autodiscovery_jobs - Python package for managing AutoDiscovery jobs.
 
-This package provides a clean API for managing Cloud Run jobs for the
-autodiscovery system, including GCS operations, job execution, and result retrieval.
+This package provides a clean API for managing AutoDiscovery runs, including
+persistence, job execution, and result retrieval. Both persistence
+(:mod:`~autodiscovery_jobs.storage`) and job execution
+(:mod:`~autodiscovery_jobs.backends`) are swappable per deployment.
 
 Example:
     Class-based usage:
@@ -59,10 +61,14 @@ from .exceptions import (
     JobAlreadyExistsError,
     JobBackendError,
     JobNotFoundError,
+    ObjectNotFoundError,
+    StorageBackendError,
+    StorageError,
 )
+from .manager import ForkResult, JobManager
 
 # Re-export functional APIs for direct use
-from .gcs import (
+from .persistence import (
     UserDataSummary,
     create_job_directory,
     delete_job_directory,
@@ -81,7 +87,6 @@ from .gcs import (
     upload_dataset,
     upload_metadata,
 )
-from .manager import ForkResult, JobManager
 
 # Run details management
 from .run_details import (
@@ -92,6 +97,18 @@ from .run_details import (
     get_run_details_path,
     refresh_run_status,
     update_run_details,
+)
+
+# Storage backends
+from .storage import (
+    STORAGE_BACKENDS,
+    FilesystemStore,
+    GcsStore,
+    JobDataMount,
+    ObjectInfo,
+    ObjectStore,
+    get_store,
+    get_store_class,
 )
 
 # User profile management
@@ -116,18 +133,30 @@ __all__ = [
     "AutodiscoveryJobError",
     "JobNotFoundError",
     "JobAlreadyExistsError",
+    "StorageError",
     "GCSError",
+    "ObjectNotFoundError",
+    "StorageBackendError",
     "JobBackendError",
     "CloudRunError",
     "DockerBackendError",
     "DatasetExpiredError",
     "Auth0Error",
+    # Storage backends
+    "STORAGE_BACKENDS",
+    "ObjectStore",
+    "ObjectInfo",
+    "JobDataMount",
+    "GcsStore",
+    "FilesystemStore",
+    "get_store",
+    "get_store_class",
     # Job backends
     "JobBackend",
     "CloudRunBackend",
     "get_backend",
     "build_job_args",
-    # GCS functions
+    # Persistence functions
     "parse_gcs_path",
     "get_user_path",
     "get_job_path",

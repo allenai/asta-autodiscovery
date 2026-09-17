@@ -2,24 +2,36 @@
 
 Launches AutoDiscovery jobs as local Docker containers via the host Docker
 daemon (reached through a mounted ``/var/run/docker.sock``). The launched job
-runs the same AD image with the same CLI arguments as the Cloud Run backend and
-continues to use Modal for its code-execution sandboxes — only the process
-launcher differs.
+runs the same AD image with the same CLI arguments as the Cloud Run backend —
+only the process launcher differs.
 
-Because there is no Cloud Run GCS FUSE volume locally, the job container mounts
-the real bucket at ``/mnt/gcs`` itself via gcsfuse in its entrypoint. This
-backend enables that by passing ``GCSFUSE_BUCKET`` plus GCP credentials and the
-``/dev/fuse`` device / ``SYS_ADMIN`` capability to the container.
+Cloud Run provides the job's data as a GCS FUSE volume; locally this backend has
+to supply the equivalent mount itself. Which mechanism to use comes from the
+store's declared :class:`~autodiscovery_jobs.storage.JobDataMount`:
+
+- ``HOST_PATH`` — bind-mounts the run's own directory from the host data
+  directory. No credentials, no FUSE, no cloud dependency.
+- ``GCSFUSE`` — has the container gcsfuse-mount the bucket itself, by passing
+  ``GCSFUSE_BUCKET`` plus GCP credentials and the ``/dev/fuse`` device /
+  ``SYS_ADMIN`` capability.
+- ``UNSUPPORTED`` — refused with a clear error, rather than launching a job whose
+  data directory would be empty.
+
+Either way the mount is **scoped to the current run's prefix** and appears at
+:data:`JOB_MOUNT_ROOT` under the same deep path, so the job arguments are
+identical across storage and job backends.
 """
 
 from __future__ import annotations
 
 import os
 import uuid
+from pathlib import Path
 from typing import Any
 
 from ..exceptions import DockerBackendError
-from .base import JobBackend, build_job_args
+from ..storage import JobDataMount, get_store_class
+from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args, job_prefix
 
 # Environment variables forwarded from the API container to each job container.
 # These mirror the secrets/env the Cloud Run job receives (see
@@ -82,27 +94,50 @@ class DockerBackend(JobBackend):
         # Unique, inspectable container name used as the execution_id.
         execution_id = f"{self.config.job_name}-{uuid.uuid4().hex[:8]}"
 
-        # Forward the secrets/env the job needs, plus the gcsfuse trigger.
+        # Forward the secrets/env the job needs.
         environment: dict[str, str] = {
             k: os.environ[k] for k in _JOB_ENV_PASSTHROUGH if os.environ.get(k)
         }
-        environment["GCSFUSE_BUCKET"] = self.config.bucket
-        environment["GOOGLE_APPLICATION_CREDENTIALS"] = _CONTAINER_GCP_KEY_PATH
-        # Scope the gcsfuse mount to this job's own prefix (mounted at the same
-        # deep path build_job_args expects, so the args are unchanged) rather than
-        # the whole bucket. This keeps other users' data out of the container even
-        # when code runs in-process (CODE_EXECUTION_BACKEND=process/local). Unlike
-        # Cloud Run's fixed job-level mount, the Docker backend can scope per run.
-        environment["GCSFUSE_ONLY_DIR"] = f"users/{userid}/jobs/{jobid}"
-
-        # Bind-mount the GCP credentials file so gcsfuse (and google-cloud
-        # clients) can authenticate. In docker-out-of-docker the bind source
-        # must be a *host* path, so it is provided out-of-band via
-        # GCP_KEY_HOST_PATH (the same file docker-compose binds into the API).
         volumes: dict[str, dict[str, str]] = {}
-        host_key_path = os.environ.get("GCP_KEY_HOST_PATH")
-        if host_key_path:
-            volumes[host_key_path] = {"bind": _CONTAINER_GCP_KEY_PATH, "mode": "ro"}
+        # Scope the run's data mount to its own prefix, mounted at the same deep
+        # path build_job_args expects so the args are unchanged. This keeps other
+        # users' data out of the container even when code runs in-process
+        # (CODE_EXECUTION_BACKEND=process/local). Unlike Cloud Run's fixed
+        # job-level mount, the Docker backend can scope per run.
+        prefix = job_prefix(userid, jobid)
+        container_mount = f"{JOB_MOUNT_ROOT}/{prefix}"
+
+        # Ask the store how its data can be mounted rather than assuming from its
+        # name, so a backend this method has no mechanism for is rejected instead of
+        # silently getting the wrong kind of mount. Read from the class: constructing
+        # a store here would create the filesystem backend's root as a side effect.
+        mount = get_store_class(self.config.storage_backend).job_data_mount
+        needs_fuse = mount is JobDataMount.GCSFUSE
+
+        if mount is JobDataMount.UNSUPPORTED:
+            raise DockerBackendError(
+                f"Storage backend {self.config.storage_backend!r} does not declare how a job "
+                "container can mount run data (job_data_mount is UNSUPPORTED), so the job "
+                "would start against an empty directory. Expose the data as a POSIX tree and "
+                "use STORAGE_BACKEND=local, or declare a supported JobDataMount on the store."
+            )
+
+        if needs_fuse:
+            # The container gcsfuse-mounts the bucket itself in its entrypoint.
+            environment["GCSFUSE_BUCKET"] = self.config.bucket
+            environment["GCSFUSE_ONLY_DIR"] = prefix
+            environment["GOOGLE_APPLICATION_CREDENTIALS"] = _CONTAINER_GCP_KEY_PATH
+            # Bind-mount the GCP credentials file so gcsfuse (and google-cloud
+            # clients) can authenticate. In docker-out-of-docker the bind source
+            # must be a *host* path, so it is provided out-of-band via
+            # GCP_KEY_HOST_PATH (the same file docker-compose binds into the API).
+            host_key_path = os.environ.get("GCP_KEY_HOST_PATH")
+            if host_key_path:
+                volumes[host_key_path] = {"bind": _CONTAINER_GCP_KEY_PATH, "mode": "ro"}
+        else:
+            # HOST_PATH: bind-mount the run's directory straight off the host. No
+            # FUSE, no credentials — the job just reads and writes files.
+            volumes[self._host_run_dir(prefix)] = {"bind": container_mount, "mode": "rw"}
 
         client = _docker_client()
         try:
@@ -113,15 +148,39 @@ class DockerBackend(JobBackend):
                 detach=True,
                 environment=environment,
                 volumes=volumes,
-                # gcsfuse inside the container needs FUSE + mount privileges.
-                devices=["/dev/fuse"],
-                cap_add=["SYS_ADMIN"],
-                security_opt=["apparmor:unconfined"],
+                # gcsfuse inside the container needs FUSE + mount privileges; a
+                # plain bind mount needs neither, so they are not granted.
+                devices=["/dev/fuse"] if needs_fuse else [],
+                cap_add=["SYS_ADMIN"] if needs_fuse else [],
+                security_opt=["apparmor:unconfined"] if needs_fuse else [],
             )
         except Exception as e:
             raise DockerBackendError(f"Failed to launch job container: {e}") from e
 
         return execution_id
+
+    def _host_run_dir(self, prefix: str) -> str:
+        """Return the **host** path of a run's data directory for a bind mount.
+
+        ``config.storage_dir`` is where the data directory is mounted inside *this*
+        (API) container, which is unusable as a bind source for the host daemon in
+        docker-out-of-docker. The host path is supplied out-of-band via
+        ``STORAGE_HOST_DIR``, exactly as ``GCP_KEY_HOST_PATH`` supplies the key's.
+        When unset — i.e. this process is not containerized — ``storage_dir`` is
+        already a host path.
+
+        Raises:
+            DockerBackendError: If the resolved path is not absolute; the host
+                daemon has no working directory to resolve it against.
+        """
+        host_root = os.environ.get("STORAGE_HOST_DIR") or self.config.storage_dir
+        if not Path(host_root).is_absolute():
+            raise DockerBackendError(
+                f"Storage host directory {host_root!r} must be an absolute path so the "
+                "Docker daemon can bind-mount it into job containers. Set STORAGE_HOST_DIR "
+                "(or STORAGE_DIR when the API is not containerized) to an absolute path."
+            )
+        return f"{host_root.rstrip('/')}/{prefix}"
 
     def _get_container(self, execution_id: str):
         client = _docker_client()

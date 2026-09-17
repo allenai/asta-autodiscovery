@@ -1,8 +1,7 @@
 """Tests for the one-time credit grant script.
 
-The script lives in ``api/scripts``, which is not importable as a package (the
-repository root has its own ``scripts/`` that shadows it), so it is loaded by
-path.
+Loaded by path: the repository root has its own ``scripts/``, which shadows
+``api/scripts`` and stops it importing as a package.
 """
 
 import importlib.util
@@ -22,10 +21,7 @@ GENERATION = 1234
 
 
 def make_bucket(document, generation=GENERATION):
-    """Build a bucket whose single profile blob returns ``document``.
-
-    Passing None for ``document`` models a user with no profile at all.
-    """
+    """A bucket whose profile blob returns ``document``; None means no profile."""
     bucket = MagicMock()
     if document is None:
         bucket.get_blob.return_value = None
@@ -38,7 +34,6 @@ def make_bucket(document, generation=GENERATION):
 
 
 def written_document(bucket):
-    """Return the document handed to upload_from_string."""
     upload = bucket.blob.return_value.upload_from_string
     return json.loads(upload.call_args.args[0])
 
@@ -62,7 +57,6 @@ def test_user_without_a_profile_is_skipped():
 
 
 def test_user_whose_override_is_null_is_skipped():
-    """A null override falls through to the default, so there is nothing to add to."""
     bucket = make_bucket(profile(granted=None))
     assert grant_credits.grant_user(bucket, "u", dry_run=False) == "skipped"
     bucket.blob.return_value.upload_from_string.assert_not_called()
@@ -116,7 +110,7 @@ def test_dry_run_writes_nothing():
 
 
 def test_rerun_skips_a_user_already_carrying_this_grant():
-    """The whole point of recording it: +1000 compounds if repeated."""
+    # The point of recording the grant: the amount compounds if repeated.
     applied = [{"id": grant_credits.GRANT_ID, "amount": 1000}]
     bucket = make_bucket(profile(granted=1500, grants=applied))
     assert grant_credits.grant_user(bucket, "u", dry_run=False) == "skipped"
@@ -124,7 +118,7 @@ def test_rerun_skips_a_user_already_carrying_this_grant():
 
 
 def test_an_unrelated_credit_change_does_not_block_the_grant():
-    """State is tracked by grant id, not by comparing balances."""
+    # State is tracked by grant id, not by comparing balances.
     bucket = make_bucket(profile(granted=9000))
     assert grant_credits.grant_user(bucket, "u", dry_run=False) == "granted"
     assert written_document(bucket)["granted_credits"] == 10000

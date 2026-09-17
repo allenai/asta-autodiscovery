@@ -118,8 +118,10 @@ export interface GetRunExperimentsResponseBody {
     runid: string;
     has_job_completed: boolean;
     experiments: ExperimentFromApi[];
-    /** More experiments remain beyond this page; re-request with the returned ids known. */
+    /** More experiments remain beyond this page; re-request with next_cursor. */
     has_more?: boolean;
+    /** Cursor to pass on the next request, including later polling requests. */
+    next_cursor: number;
 }
 
 export interface GetRunExperimentDetailsResponseBody {
@@ -233,18 +235,18 @@ export class RunsApi extends BaseApi {
     async getRunExperiments({
         userid,
         runid,
-        knownExperimentIds,
+        cursor,
     }: {
         userid?: string;
         runid: string;
-        knownExperimentIds: string[];
+        cursor: number;
     }) {
         const effectiveUserid = await this.requireUserId(userid);
 
         return this.request<GetRunExperimentsResponseBody>({
             url: `${RUNS_URL_PREFIX}/${encodeURIComponent(effectiveUserid)}/${encodeURIComponent(runid)}/experiments`,
             method: 'POST',
-            body: { known_experiment_ids: knownExperimentIds },
+            body: { cursor },
         });
     }
 

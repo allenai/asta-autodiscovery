@@ -154,8 +154,8 @@ function transformExperimentForExport(exp: Experiment): ExperimentExport {
  * The experiments list endpoint omits those two fields — they are unbounded
  * captured source and stdout, and including them for every node made the list
  * response grow without limit — so the JSON export has to hydrate them from the
- * per-experiment detail route. Experiments whose detail fetch fails are exported
- * as-is rather than failing the whole download.
+ * per-experiment detail route. A failed detail request rejects the export rather
+ * than silently producing an incomplete JSON file.
  */
 export async function hydrateExperimentsForExport(
     experiments: Experiment[],
@@ -165,9 +165,10 @@ export async function hydrateExperimentsForExport(
     const hydrated = [...experiments];
     const pending = experiments
         .map((exp, index) => ({ exp, index }))
-        .filter(({ exp }) => exp.code == null && exp.codeOutput == null);
+        .filter(({ exp }) => exp.code == null || exp.codeOutput == null);
 
     let cursor = 0;
+    const failedExperimentIds: string[] = [];
     const worker = async () => {
         while (cursor < pending.length) {
             const { exp, index } = pending[cursor++];
@@ -180,9 +181,12 @@ export async function hydrateExperimentsForExport(
                         codeOutput: detail.codeOutput ?? exp.codeOutput,
                         richOutputs: detail.richOutputs ?? exp.richOutputs,
                     };
+                } else {
+                    failedExperimentIds.push(exp.experimentId);
                 }
             } catch (error) {
                 console.warn(`Failed to fetch details for ${exp.experimentId}:`, error);
+                failedExperimentIds.push(exp.experimentId);
             }
         }
     };
@@ -190,6 +194,10 @@ export async function hydrateExperimentsForExport(
     await Promise.all(
         Array.from({ length: Math.min(concurrency, pending.length) }, () => worker())
     );
+
+    if (failedExperimentIds.length > 0) {
+        throw new Error(`Failed to fetch details for ${failedExperimentIds.length} experiment(s)`);
+    }
 
     return hydrated;
 }

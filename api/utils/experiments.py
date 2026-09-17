@@ -14,7 +14,7 @@ from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
 # The list endpoint is polled repeatedly for the whole tree, so an unbounded
 # response grows with the run and can exceed the serving layer's response-size
 # limit, which surfaces to the browser as a 5xx. Clients page through the
-# remainder with `known_experiment_ids`.
+# remainder with a numeric cursor.
 EXPERIMENT_PAGE_SIZE = 200
 
 
@@ -33,7 +33,7 @@ class ExperimentNode:
         self.parent_id: str | None = node_data.get("parent_id")
         self.creation_idx: int = node_data.get("creation_idx", 0)
         self.filename: str = filename
-        self.created_at: str | None = node_data.get("created_at")  
+        self.created_at: str | None = node_data.get("created_at")
 
         # Derive level and index from filename if not in data
         # Format: mcts_node_{level}_{index}.json
@@ -85,7 +85,6 @@ class ExperimentNode:
         # Tree relationships (populated during tree building)
         self.parent: ExperimentNode | None = None
         self.children: list[ExperimentNode] = []
-
 
     def to_dict(self, include_code: bool = False) -> dict[str, Any]:
         """Convert node to ExperimentModel dict for API response.
@@ -299,20 +298,10 @@ class ExperimentTree:
         """Access root node directly."""
         return self._root
 
-    def count(self, exclude_experiment_ids: list[str] | None = None) -> int:
-        """Count nodes that would be returned by :meth:`as_list`.
-
-        Args:
-            exclude_experiment_ids: Optional list of experiment IDs to exclude
-
-        Returns:
-            Number of matching nodes
-        """
-        return len(self.as_list(exclude_experiment_ids=exclude_experiment_ids))
-
     def to_experiment_models(
         self,
         exclude_experiment_ids: list[str] | None = None,
+        offset: int = 0,
         limit: int | None = None,
         include_code: bool = False,
     ) -> list[dict[str, Any]]:
@@ -320,6 +309,7 @@ class ExperimentTree:
 
         Args:
             exclude_experiment_ids: Optional list of experiment IDs to exclude
+            offset: Number of creation-ordered nodes to skip
             limit: Optional maximum number of nodes to serialize, taken from the
                 front of the creation-ordered list
             include_code: Include each node's `code` and `code_output`
@@ -328,6 +318,7 @@ class ExperimentTree:
             List of dictionaries matching ExperimentModel schema
         """
         nodes = self.as_list(exclude_experiment_ids=exclude_experiment_ids)
+        nodes = nodes[offset:]
         if limit is not None:
             nodes = nodes[:limit]
         return [node.to_dict(include_code=include_code) for node in nodes]

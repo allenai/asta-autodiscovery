@@ -69,25 +69,20 @@ def test_to_experiment_models_respects_limit():
     assert [payload["experiment_id"] for payload in payloads] == ["node_0_0", "node_0_1"]
 
 
-def test_count_reflects_exclusions_so_paging_can_detect_more():
+def test_cursor_paging_drains_the_tree():
     tree = make_tree(5)
-
-    assert tree.count() == 5
-    assert tree.count(exclude_experiment_ids=["node_0_0", "node_0_1"]) == 3
-
-
-def test_paging_with_known_ids_drains_the_tree():
-    tree = make_tree(5)
-    known: list[str] = []
+    cursor = 0
+    experiment_ids: list[str] = []
 
     pages = 0
-    while tree.count(exclude_experiment_ids=known) > 0:
-        page = tree.to_experiment_models(exclude_experiment_ids=known, limit=2)
-        known.extend(payload["experiment_id"] for payload in page)
+    while cursor < len(tree):
+        page = tree.to_experiment_models(offset=cursor, limit=2)
+        experiment_ids.extend(payload["experiment_id"] for payload in page)
+        cursor += len(page)
         pages += 1
         assert pages <= 5, "paging failed to make forward progress"
 
-    assert sorted(known) == [f"node_0_{i}" for i in range(5)]
+    assert experiment_ids == [f"node_0_{i}" for i in range(5)]
 
 
 def test_page_size_is_bounded():

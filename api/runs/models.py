@@ -293,9 +293,10 @@ class GetViewerRunsResponseModel(BaseModel):
 class GetRunExperimentsRequestModel(BaseModel):
     """Model for the request to get experiments within a run"""
 
-    known_experiment_ids: list[str] = Field(
-        default_factory=list,
-        description="List of experiment IDs the client already has"
+    cursor: int = Field(
+        0,
+        ge=0,
+        description="Zero-based offset of the next experiment page to return",
     )
 
 
@@ -315,10 +316,11 @@ class GetRunExperimentsResponseModel(BaseModel):
     )
     has_more: bool = Field(
         False,
-        description=(
-            "Flag indicating more experiments are available beyond this page. The client "
-            "should request again with the returned ids added to known_experiment_ids."
-        ),
+        description="Flag indicating more experiments are available beyond this page.",
+    )
+    next_cursor: int = Field(
+        ...,
+        description="Cursor to pass on the next request, including later polling requests",
     )
 
 

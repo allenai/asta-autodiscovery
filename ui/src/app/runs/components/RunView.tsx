@@ -602,14 +602,14 @@ function RunViewContent({
                                                     {...mkDownloadCsvMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => void handleDownload('csv')}>
+                                                    onClick={() => handleDownload('csv')}>
                                                     CSV
                                                 </MenuItem>
                                                 <MenuItem
                                                     {...mkDownloadJsonMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => void handleDownload('json')}>
+                                                    onClick={() => handleDownload('json')}>
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>
@@ -673,14 +673,14 @@ function RunViewContent({
                                                     {...mkDownloadCsvMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => void handleDownload('csv')}>
+                                                    onClick={() => handleDownload('csv')}>
                                                     CSV
                                                 </MenuItem>
                                                 <MenuItem
                                                     {...mkDownloadJsonMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => void handleDownload('json')}>
+                                                    onClick={() => handleDownload('json')}>
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>

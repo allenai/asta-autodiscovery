@@ -97,7 +97,7 @@ export const RunExperimentsProvider = ({
     const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
     const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
 
-    const knownExperimentIds = useRef<Set<string>>(new Set());
+    const experimentCursor = useRef(0);
     const selectedExperimentRequestId = useRef<number>(0);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
     const shouldScrollToSelected = useRef<boolean>(true);
@@ -206,7 +206,7 @@ export const RunExperimentsProvider = ({
             setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
             setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
             setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
-            knownExperimentIds.current = new Set();
+            experimentCursor.current = 0;
             selectedExperimentRequestId.current += 1;
             return;
         }
@@ -223,16 +223,13 @@ export const RunExperimentsProvider = ({
             const { data } = await runsApi.getRunExperiments({
                 userid,
                 runid,
-                knownExperimentIds: Array.from(knownExperimentIds.current),
+                cursor: experimentCursor.current,
             });
             const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
 
-            // Record the ids before requesting the next page, so the server excludes
-            // them and each page makes forward progress. Doing this outside the state
-            // updater also means a later failure can't cost us pages we already have.
-            newExperiments.forEach((exp) => {
-                knownExperimentIds.current.add(exp.experimentId);
-            });
+            // Advance before requesting the next page. A later failure preserves the
+            // pages already fetched, and the request body remains fixed-size.
+            experimentCursor.current = data.next_cursor;
 
             if (newExperiments.length > 0) {
                 setExperiments((prevExperiments) => {
@@ -262,19 +259,21 @@ export const RunExperimentsProvider = ({
             try {
                 setIsLoading(true);
                 let jobCompleted = false;
+                let hasMore = false;
                 // The list endpoint is paged; drain the backlog now rather than one page
                 // per poll interval. Bounded so a server that always reports has_more
                 // can't spin.
                 for (let page = 0; page < MAX_PAGES_PER_POLL; page++) {
                     const result = await fetchExperimentPage();
                     jobCompleted = result.hasJobCompleted;
-                    if (!result.hasMore) {
+                    hasMore = result.hasMore;
+                    if (!hasMore) {
                         break;
                     }
                 }
 
                 // Handle job completion
-                if (jobCompleted && !hasJobCompleted) {
+                if (jobCompleted && !hasMore && !hasJobCompleted) {
                     setHasJobCompleted(true);
                     setIsPolling(false);
                 }

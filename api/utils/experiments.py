@@ -10,13 +10,6 @@ from typing import Any
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
 
-# Maximum number of experiment nodes serialized into a single list response.
-# The list endpoint is polled repeatedly for the whole tree, so an unbounded
-# response grows with the run and can exceed the serving layer's response-size
-# limit, which surfaces to the browser as a 5xx. Clients page through the
-# remainder with a numeric cursor.
-EXPERIMENT_PAGE_SIZE = 200
-
 
 class ExperimentNode:
     """Represents a single experiment node with tree relationships."""
@@ -301,26 +294,18 @@ class ExperimentTree:
     def to_experiment_models(
         self,
         exclude_experiment_ids: list[str] | None = None,
-        offset: int = 0,
-        limit: int | None = None,
         include_code: bool = False,
     ) -> list[dict[str, Any]]:
         """Convert to list of ExperimentModel dicts for API response.
 
         Args:
             exclude_experiment_ids: Optional list of experiment IDs to exclude
-            offset: Number of creation-ordered nodes to skip
-            limit: Optional maximum number of nodes to serialize, taken from the
-                front of the creation-ordered list
             include_code: Include each node's `code` and `code_output`
 
         Returns:
             List of dictionaries matching ExperimentModel schema
         """
         nodes = self.as_list(exclude_experiment_ids=exclude_experiment_ids)
-        nodes = nodes[offset:]
-        if limit is not None:
-            nodes = nodes[:limit]
         return [node.to_dict(include_code=include_code) for node in nodes]
 
     def __len__(self) -> int:

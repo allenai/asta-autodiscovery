@@ -28,7 +28,7 @@ from utils.credits import (
     check_experiment_limits,
     get_job_stats,
 )
-from utils.experiments import EXPERIMENT_PAGE_SIZE, ExperimentTree
+from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
@@ -1104,9 +1104,8 @@ def create() -> Blueprint:
     @api.route("/<userid>/<runid>/experiments", methods=["POST"])
     @optional_enrollment
     def get_run_experiments(userid: str, runid: str):
-        """Fetch details about the experiments within a run.
-
-        This is used to build the experiments table in the UI.
+        """Fetch details about the experiments within a run. This is used to build
+        the experiments table in the UI.
 
         Args:
             userid: User ID from URL path. Must match authenticated user, be in PUBLIC_USERS,
@@ -1114,11 +1113,7 @@ def create() -> Blueprint:
             runid: Run identifier
 
         Request Body:
-            cursor: Zero-based offset of the next experiment page to return
-
-        The payload excludes each node's `code` and `code_output` (fetch those
-        per node from the detail route) and is capped at EXPERIMENT_PAGE_SIZE
-        nodes. The response supplies the fixed-size cursor for the next request.
+            known_experiment_ids: List of experiment IDs the client already has
         """
         token_userid, error = _get_userid_for_read()
         if error:
@@ -1140,23 +1135,15 @@ def create() -> Blueprint:
         run_details = get_run_details(userid, runid)
         has_job_completed = run_details.is_finished if run_details else False
 
-        # Load experiment tree and convert to models. Both the request and response
-        # stay bounded as the run grows: the client sends only a numeric cursor and
-        # receives at most EXPERIMENT_PAGE_SIZE nodes.
+        # Load experiment tree and convert to models
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        experiment_nodes = tree.to_experiment_models(
-            offset=req.cursor,
-            limit=EXPERIMENT_PAGE_SIZE,
-        )
+        experiment_nodes = tree.to_experiment_models(exclude_experiment_ids=req.known_experiment_ids)
         experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
-        next_cursor = req.cursor + len(experiment_models)
 
         resp = GetRunExperimentsResponseModel(
             runid=runid,
             experiments=experiment_models,
             has_job_completed=has_job_completed,
-            has_more=next_cursor < len(tree),
-            next_cursor=next_cursor,
         )
         return jsonify(resp.model_dump()), 200
 

@@ -293,10 +293,9 @@ class GetViewerRunsResponseModel(BaseModel):
 class GetRunExperimentsRequestModel(BaseModel):
     """Model for the request to get experiments within a run"""
 
-    cursor: int = Field(
-        0,
-        ge=0,
-        description="Zero-based offset of the next experiment page to return",
+    known_experiment_ids: list[str] = Field(
+        default_factory=list,
+        description="List of experiment IDs the client already has"
     )
 
 
@@ -310,17 +309,9 @@ class GetRunExperimentsResponseModel(BaseModel):
     experiments: list[ExperimentModel] = Field(
         ...,
         description=(
-            "Page of experiments in the run starting at the requested cursor. "
-            "Each entry omits `code` and `code_output`; fetch those per experiment."
+            "List of experiments in the run. Each entry omits `code` and "
+            "`code_output`; fetch those from the per-experiment detail route."
         ),
-    )
-    has_more: bool = Field(
-        False,
-        description="Flag indicating more experiments are available beyond this page.",
-    )
-    next_cursor: int = Field(
-        ...,
-        description="Cursor to pass on the next request, including later polling requests",
     )
 
 

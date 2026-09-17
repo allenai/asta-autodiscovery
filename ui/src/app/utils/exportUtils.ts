@@ -149,54 +149,42 @@ function transformExperimentForExport(exp: Experiment): ExperimentExport {
 }
 
 /**
- * Fetch `code`/`codeOutput` for experiments that don't have them.
+ * Hydrate `code`/`codeOutput` from the per-experiment detail route.
  *
- * The experiments list endpoint omits those two fields — they are unbounded
- * captured source and stdout, and including them for every node made the list
- * response grow without limit — so the JSON export has to hydrate them from the
- * per-experiment detail route. A failed detail request rejects the export rather
- * than silently producing an incomplete JSON file.
+ * The experiments list omits those two fields — they are unbounded captured
+ * source and stdout — so the JSON export fetches them per experiment. Requests
+ * go out in bounded batches, and a missing or failed detail response rejects the
+ * export rather than silently writing an incomplete file.
  */
 export async function hydrateExperimentsForExport(
     experiments: Experiment[],
     fetchDetails: (experimentId: string) => Promise<Experiment | null>,
-    concurrency: number = 6
+    batchSize: number = 6
 ): Promise<Experiment[]> {
     const hydrated = [...experiments];
     const pending = experiments
-        .map((exp, index) => ({ exp, index }))
-        .filter(({ exp }) => exp.code == null || exp.codeOutput == null);
+        .map((_, index) => index)
+        .filter((index) => experiments[index].code == null || experiments[index].codeOutput == null);
 
-    let cursor = 0;
-    const failedExperimentIds: string[] = [];
-    const worker = async () => {
-        while (cursor < pending.length) {
-            const { exp, index } = pending[cursor++];
-            try {
-                const detail = await fetchDetails(exp.experimentId);
-                if (detail) {
-                    hydrated[index] = {
-                        ...exp,
-                        code: detail.code ?? exp.code,
-                        codeOutput: detail.codeOutput ?? exp.codeOutput,
-                        richOutputs: detail.richOutputs ?? exp.richOutputs,
-                    };
-                } else {
-                    failedExperimentIds.push(exp.experimentId);
-                }
-            } catch (error) {
-                console.warn(`Failed to fetch details for ${exp.experimentId}:`, error);
-                failedExperimentIds.push(exp.experimentId);
+    for (let start = 0; start < pending.length; start += batchSize) {
+        const batch = pending.slice(start, start + batchSize);
+        const details = await Promise.all(
+            batch.map((index) => fetchDetails(experiments[index].experimentId))
+        );
+        batch.forEach((index, position) => {
+            const detail = details[position];
+            if (!detail) {
+                throw new Error(
+                    `Missing experiment details for ${experiments[index].experimentId}`
+                );
             }
-        }
-    };
-
-    await Promise.all(
-        Array.from({ length: Math.min(concurrency, pending.length) }, () => worker())
-    );
-
-    if (failedExperimentIds.length > 0) {
-        throw new Error(`Failed to fetch details for ${failedExperimentIds.length} experiment(s)`);
+            hydrated[index] = {
+                ...experiments[index],
+                code: detail.code,
+                codeOutput: detail.codeOutput,
+                richOutputs: detail.richOutputs ?? experiments[index].richOutputs,
+            };
+        });
     }
 
     return hydrated;

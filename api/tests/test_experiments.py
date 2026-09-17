@@ -1,11 +1,11 @@
 """Tests for the experiment list/detail serialization contract.
 
-The list endpoint is polled for the whole tree, so its payload must stay bounded:
-`code`/`code_output` are detail-only and the page is capped.
+The list endpoint is polled for the whole tree, so `code`/`code_output` —
+unbounded captured source and stdout — are detail-only.
 """
 
 from autodiscovery_jobs import JobConfig
-from utils.experiments import EXPERIMENT_PAGE_SIZE, ExperimentNode, ExperimentTree
+from utils.experiments import ExperimentNode, ExperimentTree
 
 
 def make_node(idx: int) -> ExperimentNode:
@@ -59,31 +59,3 @@ def test_list_payload_excludes_code_fields():
     assert len(payloads) == 3
     assert all("code" not in payload for payload in payloads)
     assert all("code_output" not in payload for payload in payloads)
-
-
-def test_to_experiment_models_respects_limit():
-    tree = make_tree(5)
-
-    payloads = tree.to_experiment_models(limit=2)
-
-    assert [payload["experiment_id"] for payload in payloads] == ["node_0_0", "node_0_1"]
-
-
-def test_cursor_paging_drains_the_tree():
-    tree = make_tree(5)
-    cursor = 0
-    experiment_ids: list[str] = []
-
-    pages = 0
-    while cursor < len(tree):
-        page = tree.to_experiment_models(offset=cursor, limit=2)
-        experiment_ids.extend(payload["experiment_id"] for payload in page)
-        cursor += len(page)
-        pages += 1
-        assert pages <= 5, "paging failed to make forward progress"
-
-    assert experiment_ids == [f"node_0_{i}" for i in range(5)]
-
-
-def test_page_size_is_bounded():
-    assert 0 < EXPERIMENT_PAGE_SIZE <= 1000

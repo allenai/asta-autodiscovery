@@ -51,13 +51,6 @@ export const DEFAULT_STATE: RunExperimentsState = {
 
 export const DEFAULT_REFRESH_INTERVAL_MS = 15000; // 15 seconds
 
-/**
- * Upper bound on pages drained in a single poll. The experiments endpoint caps
- * each response, so a large run arrives over several requests; this keeps a
- * misbehaving `has_more` from looping forever.
- */
-const MAX_PAGES_PER_POLL = 50;
-
 const RunExperimentsContext = createContext<RunExperimentsState>(DEFAULT_STATE);
 export default RunExperimentsContext;
 
@@ -97,7 +90,7 @@ export const RunExperimentsProvider = ({
     const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
     const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
 
-    const experimentCursor = useRef(0);
+    const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
     const shouldScrollToSelected = useRef<boolean>(true);
@@ -206,7 +199,7 @@ export const RunExperimentsProvider = ({
             setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
             setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
             setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
-            experimentCursor.current = 0;
+            knownExperimentIds.current = new Set();
             selectedExperimentRequestId.current += 1;
             return;
         }
@@ -214,66 +207,37 @@ export const RunExperimentsProvider = ({
             return;
         }
 
-        // Fetch one page of experiments the client doesn't have yet, appending it to
-        // state. Returns whether the server says more pages remain.
-        const fetchExperimentPage = async (): Promise<{
-            hasMore: boolean;
-            hasJobCompleted: boolean;
-        }> => {
-            const { data } = await runsApi.getRunExperiments({
-                userid,
-                runid,
-                cursor: experimentCursor.current,
-            });
-            const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
-
-            // Advance before requesting the next page. A later failure preserves the
-            // pages already fetched, and the request body remains fixed-size.
-            experimentCursor.current = data.next_cursor;
-
-            if (newExperiments.length > 0) {
-                setExperiments((prevExperiments) => {
-                    // Deduplicate: only add experiments we don't already have
-                    const existingIds = new Set(prevExperiments.map((e) => e.experimentId));
-                    const trulyNewExperiments = newExperiments.filter(
-                        (exp) => !existingIds.has(exp.experimentId)
-                    );
-                    return trulyNewExperiments.length > 0
-                        ? [...prevExperiments, ...trulyNewExperiments]
-                        : prevExperiments;
-                });
-            }
-
-            return {
-                // A page that returned nothing can't advance the cursor, so stop
-                // regardless of the flag.
-                hasMore: Boolean(data.has_more) && newExperiments.length > 0,
-                hasJobCompleted: data.has_job_completed,
-            };
-        };
-
         const fetchLatestExperiments = async () => {
             if (!isPolling) {
                 return;
             }
             try {
                 setIsLoading(true);
-                let jobCompleted = false;
-                let hasMore = false;
-                // The list endpoint is paged; drain the backlog now rather than one page
-                // per poll interval. Bounded so a server that always reports has_more
-                // can't spin.
-                for (let page = 0; page < MAX_PAGES_PER_POLL; page++) {
-                    const result = await fetchExperimentPage();
-                    jobCompleted = result.hasJobCompleted;
-                    hasMore = result.hasMore;
-                    if (!hasMore) {
-                        break;
-                    }
+                const { data } = await runsApi.getRunExperiments({
+                    userid,
+                    runid,
+                    knownExperimentIds: Array.from(knownExperimentIds.current),
+                });
+                const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
+                if (newExperiments.length > 0) {
+                    setExperiments((prevExperiments) => {
+                        // Deduplicate: only add experiments we don't already have
+                        const existingIds = new Set(prevExperiments.map((e) => e.experimentId));
+                        const trulyNewExperiments = newExperiments.filter(
+                            (exp) => !existingIds.has(exp.experimentId)
+                        );
+
+                        // Update the ref with new IDs
+                        trulyNewExperiments.forEach((exp) => {
+                            knownExperimentIds.current.add(exp.experimentId);
+                        });
+
+                        return [...prevExperiments, ...trulyNewExperiments];
+                    });
                 }
 
                 // Handle job completion
-                if (jobCompleted && !hasMore && !hasJobCompleted) {
+                if (data.has_job_completed && !hasJobCompleted) {
                     setHasJobCompleted(true);
                     setIsPolling(false);
                 }

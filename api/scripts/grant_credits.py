@@ -1,50 +1,23 @@
 #!/usr/bin/env python3
 """Grant a one-time credit top-up to users who have a credit override.
 
-Raises each eligible user's credit allowance by ``GRANT_AMOUNT`` and records
-that it did so, both in the user's profile (``users/{userid}/user.json``).
+Adds ``GRANT_AMOUNT`` to ``granted_credits`` in ``users/{userid}/user.json`` and
+appends a record of the grant to that profile's ``grants`` list.
 
-Scope: only users who have an explicit ``granted_credits`` override
----------------------------------------------------------------------
-A user with no override, or with the field set to null, falls through to
-``DEFAULT_CREDITS_GRANTED`` at read time and is already on the current default.
-Those users are skipped. This is why nothing here needs to know what the
-default is, before or after it was raised -- the script only ever adds to a
-value that is already stored, so there is no way for it to credit someone
-against the wrong baseline.
+Users with no override are skipped -- they already follow
+``DEFAULT_CREDITS_GRANTED``. The script therefore only ever adds to a value that
+is already stored, and never needs to know what the default is.
 
-Why the record lives in the profile
------------------------------------
-``granted = granted + N`` compounds, so the script has to know whether it has
-already run for a user. Writing that fact into the profile being changed makes
-the credit and the record of the credit the same write: there is no window in
-which one landed and the other did not, nothing to reconcile on a restart, and
-no separate bookkeeping object to purge when a user is erased. The check is by
-grant id, so an unrelated edit to the user's credits between runs is simply
-irrelevant rather than looking like corruption.
-
-    "grants": [
-      {"id": "grant-1000-credits-v1", "amount": 1000,
-       "previous_granted": 500, "granted_at": "..."}
-    ]
-
-Concurrency
------------
-Each profile is read with its GCS generation and written back with
-``if_generation_match``, so a write fails outright if anything else modified
-the profile in between rather than silently discarding that change. Such a user
-is reported as a conflict and left alone; re-running the script picks them up.
-
-Re-running is safe: users whose profile already carries this grant id are
-skipped, so an interrupted run can simply be run again.
+Safe to re-run: users already carrying ``GRANT_ID`` are skipped, so an
+interrupted run resumes by running it again. Profiles are read with their GCS
+generation and written back with ``if_generation_match``, so one that changed
+underneath is reported as a conflict rather than clobbered.
 
 Usage:
     uv run python api/scripts/grant_credits.py --dry-run
-    uv run python api/scripts/grant_credits.py
     uv run python api/scripts/grant_credits.py --userid "google-oauth2|123"
 
-Environment variables required:
-    GCS_BUCKET, GCP_PROJECT and GCS credentials (read/write on user profiles).
+Requires GCS_BUCKET, GCP_PROJECT and GCS credentials.
 """
 
 import argparse
@@ -67,33 +40,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Credits added to each eligible user's override.
 GRANT_AMOUNT = 1000
 
-# Identifies this grant in a profile's "grants" list. Bump it for a future
-# grant so that one does not read this one as already applied.
+# Recorded in each granted profile. Bump it for a future grant, so that one
+# does not read this one as already applied.
 GRANT_ID = "grant-1000-credits-v1"
 
 
 def read_profile(bucket: Bucket, userid: str) -> tuple[dict[str, Any], int] | None:
-    """Read a user's profile together with the generation it was read at.
+    """Read a profile with the generation it was read at, or None if absent.
 
-    The content is fetched with the generation as a precondition, so the
-    returned document is guaranteed to be the one that generation names.
-
-    Args:
-        bucket: Bucket holding user profiles
-        userid: User identifier
-
-    Returns:
-        Tuple of (profile document, generation), or None if the user has no
-        profile
+    The content is fetched with that generation as a precondition, so the
+    document returned is the one the generation names.
 
     Raises:
-        PreconditionFailed: If the profile changed between the metadata read
-            and the content read
-        ValueError: If GCS returned no generation, leaving no way to write the
-            profile back safely
+        PreconditionFailed: The profile changed mid-read.
+        ValueError: GCS returned no generation, so it cannot be written safely.
     """
     blob = bucket.get_blob(get_user_profile_path(userid))
     if blob is None:
@@ -106,14 +68,7 @@ def read_profile(bucket: Bucket, userid: str) -> tuple[dict[str, Any], int] | No
 
 
 def is_already_granted(document: dict[str, Any]) -> bool:
-    """Check whether this grant has already been applied to a profile.
-
-    Args:
-        document: Profile document
-
-    Returns:
-        True if the profile already records a grant with this script's ID
-    """
+    """Check whether this script's grant is already recorded in a profile."""
     return any(
         entry.get("id") == GRANT_ID
         for entry in document.get("grants") or []
@@ -122,15 +77,7 @@ def is_already_granted(document: dict[str, Any]) -> bool:
 
 
 def apply_grant(document: dict[str, Any], previous: int) -> dict[str, Any]:
-    """Build the updated profile document for a granted user.
-
-    Args:
-        document: Profile document as read from GCS
-        previous: The user's granted_credits before this grant
-
-    Returns:
-        A new document with the credits added and the grant recorded
-    """
+    """Return a copy of the profile with the credits added and the grant recorded."""
     now = datetime.now(UTC).isoformat()
     updated = dict(document)
     updated["granted_credits"] = previous + GRANT_AMOUNT
@@ -148,16 +95,7 @@ def apply_grant(document: dict[str, Any], previous: int) -> dict[str, Any]:
 
 
 def grant_user(bucket: Bucket, userid: str, dry_run: bool) -> str:
-    """Apply the grant to one user, if they are eligible and have not had it.
-
-    Args:
-        bucket: Bucket holding user profiles
-        userid: User identifier
-        dry_run: When True, report the planned change without writing
-
-    Returns:
-        One of "granted", "skipped" or "conflict"
-    """
+    """Grant one eligible user, returning "granted", "skipped" or "conflict"."""
     try:
         result = read_profile(bucket, userid)
     except PreconditionFailed:
@@ -204,16 +142,7 @@ def grant_all_users(
     dry_run: bool = False,
     userid: str | None = None,
 ) -> dict[str, int]:
-    """Apply the grant to every eligible user.
-
-    Args:
-        config: Job configuration
-        dry_run: When True, report planned changes without writing to GCS
-        userid: When set, only process this single user
-
-    Returns:
-        Counts keyed by outcome ("granted", "skipped", "conflict", "errors")
-    """
+    """Grant every eligible user, or just ``userid``, returning counts by outcome."""
     bucket = get_storage_client(config.project_id).bucket(config.bucket)
 
     if userid:
@@ -243,11 +172,7 @@ def grant_all_users(
 
 
 def main() -> int:
-    """Parse arguments, run the grant and report a summary.
-
-    Returns:
-        Process exit code: 0 when nothing errored or conflicted, 1 otherwise
-    """
+    """Run the grant and report a summary; non-zero on errors or conflicts."""
     parser = argparse.ArgumentParser(
         description=(f"Grant {GRANT_AMOUNT} additional credits to users who have a credit override")
     )

@@ -31,17 +31,12 @@ class UserProfile:
         created_at: ISO timestamp when profile was created
         updated_at: ISO timestamp when profile was last updated
 
-    A stored user.json may hold keys this class does not model, and they are
-    not round-tripped: ``from_dict`` keeps only the attributes above, so
-    ``update_user_profile`` rewrites the file without them. One such key is in
-    use today:
-
-        grants: list of one-off credit grants already applied to the user,
-            written by ``api/scripts/grant_credits.py`` so that re-running it
-            does not credit anyone twice. That script reads and writes
-            user.json directly rather than going through this class, precisely
-            so the list survives. Anything that saves a profile *through* this
-            class will drop it.
+    ``from_dict`` keeps only the attributes above, so any other key a stored
+    user.json holds is dropped when the profile is saved through this class.
+    One such key is in use: ``grants``, the list of one-off credit grants
+    already applied, written by ``api/scripts/grant_credits.py`` so re-running
+    it cannot credit anyone twice. That script reads and writes user.json
+    directly to keep the list intact.
     """
 
     granted_credits: int | None = None
@@ -170,11 +165,9 @@ def update_user_profile(
 
     Automatically sets updated_at timestamp.
 
-    This rewrites user.json from a :class:`UserProfile`, so any key the stored
-    file holds that the class does not model is dropped -- including ``grants``,
-    the record of one-off credit grants that keeps them from being applied
-    twice. See :class:`UserProfile` before using this on a profile that may
-    carry one.
+    Rewrites user.json from a :class:`UserProfile`, so keys that class does not
+    model are dropped -- including ``grants``, which guards against applying a
+    credit grant twice. See :class:`UserProfile`.
 
     Args:
         userid: User identifier

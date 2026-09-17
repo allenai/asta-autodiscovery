@@ -10,6 +10,13 @@ from typing import Any
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.gcs import list_experiment_files, read_experiment_node
 
+# Maximum number of experiment nodes serialized into a single list response.
+# The list endpoint is polled repeatedly for the whole tree, so an unbounded
+# response grows with the run and can exceed the serving layer's response-size
+# limit, which surfaces to the browser as a 5xx. Clients page through the
+# remainder with `known_experiment_ids`.
+EXPERIMENT_PAGE_SIZE = 200
+
 
 class ExperimentNode:
     """Represents a single experiment node with tree relationships."""
@@ -80,13 +87,18 @@ class ExperimentNode:
         self.children: list[ExperimentNode] = []
 
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, include_code: bool = False) -> dict[str, Any]:
         """Convert node to ExperimentModel dict for API response.
+
+        Args:
+            include_code: Include the `code` and `code_output` fields. These are
+                unbounded captured source and stdout, so they are omitted by
+                default and served only by the per-experiment detail route.
 
         Returns:
             Dictionary matching ExperimentModel schema
         """
-        return {
+        node = {
             "experiment_id": self.id,
             "parent_id": self.parent_id,
             "child_ids": [child.id for child in self.children],
@@ -103,10 +115,12 @@ class ExperimentNode:
             "analysis": self.analysis,
             "experiment_plan": self.experiment_plan,
             "review": self.review,
-            "code": self.code,
-            "code_output": self.code_output,
             "created_at": self.created_at,
         }
+        if include_code:
+            node["code"] = self.code
+            node["code_output"] = self.code_output
+        return node
 
     def __repr__(self) -> str:
         return f"ExperimentNode(id={self.id}, parent_id={self.parent_id}, status={self.status})"
@@ -285,17 +299,38 @@ class ExperimentTree:
         """Access root node directly."""
         return self._root
 
-    def to_experiment_models(self, exclude_experiment_ids: list[str] | None = None) -> list[dict[str, Any]]:
-        """Convert to list of ExperimentModel dicts for API response.
+    def count(self, exclude_experiment_ids: list[str] | None = None) -> int:
+        """Count nodes that would be returned by :meth:`as_list`.
 
         Args:
             exclude_experiment_ids: Optional list of experiment IDs to exclude
 
         Returns:
+            Number of matching nodes
+        """
+        return len(self.as_list(exclude_experiment_ids=exclude_experiment_ids))
+
+    def to_experiment_models(
+        self,
+        exclude_experiment_ids: list[str] | None = None,
+        limit: int | None = None,
+        include_code: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Convert to list of ExperimentModel dicts for API response.
+
+        Args:
+            exclude_experiment_ids: Optional list of experiment IDs to exclude
+            limit: Optional maximum number of nodes to serialize, taken from the
+                front of the creation-ordered list
+            include_code: Include each node's `code` and `code_output`
+
+        Returns:
             List of dictionaries matching ExperimentModel schema
         """
         nodes = self.as_list(exclude_experiment_ids=exclude_experiment_ids)
-        return [node.to_dict() for node in nodes]
+        if limit is not None:
+            nodes = nodes[:limit]
+        return [node.to_dict(include_code=include_code) for node in nodes]
 
     def __len__(self) -> int:
         """Return number of nodes in tree."""

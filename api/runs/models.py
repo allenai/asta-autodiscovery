@@ -306,7 +306,20 @@ class GetRunExperimentsResponseModel(BaseModel):
     has_job_completed: bool = Field(
         ..., description="Flag indicating if the job has completed, polling can stop"
     )
-    experiments: list[ExperimentModel] = Field(..., description="List of experiments in the run")
+    experiments: list[ExperimentModel] = Field(
+        ...,
+        description=(
+            "Page of experiments in the run, excluding the ids the client already has. "
+            "Each entry omits `code` and `code_output`; fetch those per experiment."
+        ),
+    )
+    has_more: bool = Field(
+        False,
+        description=(
+            "Flag indicating more experiments are available beyond this page. The client "
+            "should request again with the returned ids added to known_experiment_ids."
+        ),
+    )
 
 
 class GetExperimentStatusResponseModel(BaseModel):

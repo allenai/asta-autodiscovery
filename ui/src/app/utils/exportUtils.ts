@@ -148,6 +148,52 @@ function transformExperimentForExport(exp: Experiment): ExperimentExport {
     };
 }
 
+/**
+ * Fetch `code`/`codeOutput` for experiments that don't have them.
+ *
+ * The experiments list endpoint omits those two fields — they are unbounded
+ * captured source and stdout, and including them for every node made the list
+ * response grow without limit — so the JSON export has to hydrate them from the
+ * per-experiment detail route. Experiments whose detail fetch fails are exported
+ * as-is rather than failing the whole download.
+ */
+export async function hydrateExperimentsForExport(
+    experiments: Experiment[],
+    fetchDetails: (experimentId: string) => Promise<Experiment | null>,
+    concurrency: number = 6
+): Promise<Experiment[]> {
+    const hydrated = [...experiments];
+    const pending = experiments
+        .map((exp, index) => ({ exp, index }))
+        .filter(({ exp }) => exp.code == null && exp.codeOutput == null);
+
+    let cursor = 0;
+    const worker = async () => {
+        while (cursor < pending.length) {
+            const { exp, index } = pending[cursor++];
+            try {
+                const detail = await fetchDetails(exp.experimentId);
+                if (detail) {
+                    hydrated[index] = {
+                        ...exp,
+                        code: detail.code ?? exp.code,
+                        codeOutput: detail.codeOutput ?? exp.codeOutput,
+                        richOutputs: detail.richOutputs ?? exp.richOutputs,
+                    };
+                }
+            } catch (error) {
+                console.warn(`Failed to fetch details for ${exp.experimentId}:`, error);
+            }
+        }
+    };
+
+    await Promise.all(
+        Array.from({ length: Math.min(concurrency, pending.length) }, () => worker())
+    );
+
+    return hydrated;
+}
+
 export function generateRunJson(experiments: Experiment[]): string {
     const exportData = experiments.map(transformExperimentForExport);
     return JSON.stringify(exportData, null, 2);

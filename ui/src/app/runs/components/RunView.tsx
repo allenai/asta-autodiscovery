@@ -34,7 +34,7 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 
 import { getRunsApi } from '@/api/RunsApi';
-import { Run, getRunFromApi } from '@/types/Run';
+import { Run, getExperimentFromApi, getRunFromApi } from '@/types/Run';
 import { ExperimentGraph } from '@/runs/components/ExperimentGraph';
 import { ExperimentsTable } from '@/runs/components/ExperimentsTable';
 import { ExperimentDetails } from '@/runs/components/ExperimentDetails';
@@ -57,6 +57,7 @@ import {
     generateFilename,
     generateRunCsv,
     generateRunJson,
+    hydrateExperimentsForExport,
 } from '@/utils/exportUtils';
 import { getRunStatusString } from '@/runs/utils/runUtils';
 import { useToasts } from '@/contexts/ToastsContext';
@@ -278,6 +279,7 @@ function RunViewContent({
     const [downloadAnchorEl, setDownloadAnchorEl] = useState<null | HTMLElement>(null);
     const [overflowAnchorEl, setOverflowAnchorEl] = useState<null | HTMLElement>(null);
     const [isForking, setIsForking] = useState(false);
+    const [isPreparingDownload, setIsPreparingDownload] = useState(false);
     const isTreeVisible = useMediaQuery('(min-width:1000px)');
     const isDragEnabled = useMediaQuery('(min-width:1200px)');
     const showCompactActions = useMediaQuery('(max-width:799px)');
@@ -372,7 +374,7 @@ function RunViewContent({
     }, [run.id, selectedExperiment?.idInRun, runsApi, addSuccessToast, addErrorToast]);
 
     const handleDownload = useCallback(
-        (format: ExportFormat) => {
+        async (format: ExportFormat) => {
             setDownloadAnchorEl(null);
 
             try {
@@ -380,7 +382,23 @@ function RunViewContent({
 
                 switch (format) {
                     case 'json': {
-                        const content = generateRunJson(experiments);
+                        // The experiments list omits code/codeOutput, so pull them per
+                        // experiment before serializing.
+                        setIsPreparingDownload(true);
+                        const detailed = await hydrateExperimentsForExport(
+                            experiments,
+                            async (experimentId) => {
+                                const { data } = await runsApi.getRunExperimentDetails({
+                                    userid: run.userid,
+                                    runid: run.id,
+                                    experimentId,
+                                });
+                                return data?.experiment
+                                    ? getExperimentFromApi(data.experiment)
+                                    : null;
+                            }
+                        );
+                        const content = generateRunJson(detailed);
                         downloadJson(content, filename);
                         break;
                     }
@@ -395,9 +413,11 @@ function RunViewContent({
             } catch (error) {
                 console.error(`Failed to download ${format.toUpperCase()}:`, error);
                 addErrorToast(`Failed to download ${format.toUpperCase()}`);
+            } finally {
+                setIsPreparingDownload(false);
             }
         },
-        [run.name, experiments, addErrorToast]
+        [run.name, run.id, run.userid, experiments, runsApi, addErrorToast]
     );
 
     // Read from URL: Initial selection when exp param is present
@@ -582,14 +602,14 @@ function RunViewContent({
                                                     {...mkDownloadCsvMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('csv')}>
+                                                    onClick={() => void handleDownload('csv')}>
                                                     CSV
                                                 </MenuItem>
                                                 <MenuItem
                                                     {...mkDownloadJsonMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('json')}>
+                                                    onClick={() => void handleDownload('json')}>
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>
@@ -633,12 +653,16 @@ function RunViewContent({
                                                 onClick={(e) =>
                                                     setDownloadAnchorEl(e.currentTarget)
                                                 }
-                                                disabled={experiments.length === 0}
+                                                disabled={
+                                                    experiments.length === 0 || isPreparingDownload
+                                                }
                                                 size="small"
                                                 variant="outlined">
                                                 <FileDownloadOutlinedIcon fontSize="small" />
                                                 <ButtonLabel className="button-label">
-                                                    Download
+                                                    {isPreparingDownload
+                                                        ? 'Preparing...'
+                                                        : 'Download'}
                                                 </ButtonLabel>
                                             </ExpandingActionButton>
                                             <DownloadMenu
@@ -649,14 +673,14 @@ function RunViewContent({
                                                     {...mkDownloadCsvMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('csv')}>
+                                                    onClick={() => void handleDownload('csv')}>
                                                     CSV
                                                 </MenuItem>
                                                 <MenuItem
                                                     {...mkDownloadJsonMenuItemAttrs({
                                                         runId: run.id,
                                                     })}
-                                                    onClick={() => handleDownload('json')}>
+                                                    onClick={() => void handleDownload('json')}>
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>

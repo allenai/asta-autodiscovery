@@ -28,7 +28,7 @@ from utils.credits import (
     check_experiment_limits,
     get_job_stats,
 )
-from utils.experiments import ExperimentTree
+from utils.experiments import EXPERIMENT_PAGE_SIZE, ExperimentTree
 from werkzeug.exceptions import BadRequest
 
 from runs.models import (
@@ -1114,6 +1114,11 @@ def create() -> Blueprint:
 
         Request Body:
             known_experiment_ids: List of experiment IDs the client already has
+
+        The payload excludes each node's `code` and `code_output` (fetch those
+        per node from the detail route) and is capped at EXPERIMENT_PAGE_SIZE
+        nodes. When `has_more` is true the client should immediately re-request
+        with the ids it just received appended to `known_experiment_ids`.
         """
         token_userid, error = _get_userid_for_read()
         if error:
@@ -1135,15 +1140,22 @@ def create() -> Blueprint:
         run_details = get_run_details(userid, runid)
         has_job_completed = run_details.is_finished if run_details else False
 
-        # Load experiment tree and convert to models
+        # Load experiment tree and convert to models. The response is capped so a
+        # large run cannot produce a payload the serving layer rejects; the client
+        # pages through the rest via known_experiment_ids.
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        experiment_nodes = tree.to_experiment_models(exclude_experiment_ids=req.known_experiment_ids)
+        unknown_count = tree.count(exclude_experiment_ids=req.known_experiment_ids)
+        experiment_nodes = tree.to_experiment_models(
+            exclude_experiment_ids=req.known_experiment_ids,
+            limit=EXPERIMENT_PAGE_SIZE,
+        )
         experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
         resp = GetRunExperimentsResponseModel(
             runid=runid,
             experiments=experiment_models,
             has_job_completed=has_job_completed,
+            has_more=unknown_count > len(experiment_models),
         )
         return jsonify(resp.model_dump()), 200
 
@@ -1173,9 +1185,8 @@ def create() -> Blueprint:
         job_manager = get_job_manager()
         node = ExperimentTree.load_node(userid=userid, jobid=runid, experiment_id=experiment_id, config=job_manager.config)
 
-        experiment_node = node.to_dict() if node else None
+        experiment_node = node.to_dict(include_code=True) if node else None
         if experiment_node and node:
-            experiment_node["code_output"] = node.code_output
             if node.level is not None and node.index is not None:
                 try:
                     experiment_node["rich_outputs"] = read_rich_outputs(

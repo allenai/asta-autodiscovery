@@ -193,7 +193,8 @@ export const getExperimentFromApi = (experimentFromApi: ExperimentFromApi): Expe
         analysis: experimentFromApi.analysis,
         experimentPlan: experimentFromApi.experiment_plan,
         review: experimentFromApi.review,
-        code: experimentFromApi.code,
+        // `code`/`codeOutput` are detail-only: list payloads omit them.
+        code: experimentFromApi.code ?? null,
         codeOutput: experimentFromApi.code_output ?? null,
         richOutputs: experimentFromApi.rich_outputs ?? null,
         createdAt: experimentFromApi.created_at ?? null,

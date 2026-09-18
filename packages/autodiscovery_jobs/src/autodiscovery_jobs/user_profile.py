@@ -30,6 +30,13 @@ class UserProfile:
         granted_credits: Custom credit allocation for user (None = use default)
         created_at: ISO timestamp when profile was created
         updated_at: ISO timestamp when profile was last updated
+
+    ``from_dict`` keeps only the attributes above, so any other key a stored
+    user.json holds is dropped when the profile is saved through this class.
+    One such key is in use: ``grants``, the list of one-off credit grants
+    already applied, written by ``api/scripts/grant_credits.py`` so re-running
+    it cannot credit anyone twice. That script reads and writes user.json
+    directly to keep the list intact.
     """
 
     granted_credits: int | None = None
@@ -157,6 +164,10 @@ def update_user_profile(
     """Update user profile in GCS.
 
     Automatically sets updated_at timestamp.
+
+    Rewrites user.json from a :class:`UserProfile`, so keys that class does not
+    model are dropped -- including ``grants``, which guards against applying a
+    credit grant twice. See :class:`UserProfile`.
 
     Args:
         userid: User identifier

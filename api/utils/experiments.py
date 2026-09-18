@@ -26,7 +26,7 @@ class ExperimentNode:
         self.parent_id: str | None = node_data.get("parent_id")
         self.creation_idx: int = node_data.get("creation_idx", 0)
         self.filename: str = filename
-        self.created_at: str | None = node_data.get("created_at")  
+        self.created_at: str | None = node_data.get("created_at")
 
         # Derive level and index from filename if not in data
         # Format: mcts_node_{level}_{index}.json
@@ -79,14 +79,18 @@ class ExperimentNode:
         self.parent: ExperimentNode | None = None
         self.children: list[ExperimentNode] = []
 
-
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, include_code: bool = False) -> dict[str, Any]:
         """Convert node to ExperimentModel dict for API response.
+
+        Args:
+            include_code: Include the `code` and `code_output` fields. These are
+                unbounded captured source and stdout, so they are omitted by
+                default and served only by the per-experiment detail route.
 
         Returns:
             Dictionary matching ExperimentModel schema
         """
-        return {
+        node = {
             "experiment_id": self.id,
             "parent_id": self.parent_id,
             "child_ids": [child.id for child in self.children],
@@ -103,10 +107,12 @@ class ExperimentNode:
             "analysis": self.analysis,
             "experiment_plan": self.experiment_plan,
             "review": self.review,
-            "code": self.code,
-            "code_output": self.code_output,
             "created_at": self.created_at,
         }
+        if include_code:
+            node["code"] = self.code
+            node["code_output"] = self.code_output
+        return node
 
     def __repr__(self) -> str:
         return f"ExperimentNode(id={self.id}, parent_id={self.parent_id}, status={self.status})"
@@ -285,17 +291,22 @@ class ExperimentTree:
         """Access root node directly."""
         return self._root
 
-    def to_experiment_models(self, exclude_experiment_ids: list[str] | None = None) -> list[dict[str, Any]]:
+    def to_experiment_models(
+        self,
+        exclude_experiment_ids: list[str] | None = None,
+        include_code: bool = False,
+    ) -> list[dict[str, Any]]:
         """Convert to list of ExperimentModel dicts for API response.
 
         Args:
             exclude_experiment_ids: Optional list of experiment IDs to exclude
+            include_code: Include each node's `code` and `code_output`
 
         Returns:
             List of dictionaries matching ExperimentModel schema
         """
         nodes = self.as_list(exclude_experiment_ids=exclude_experiment_ids)
-        return [node.to_dict() for node in nodes]
+        return [node.to_dict(include_code=include_code) for node in nodes]
 
     def __len__(self) -> int:
         """Return number of nodes in tree."""

@@ -48,7 +48,7 @@ export default function CreditsChip() {
                     <PopoverHeading>How experiment credits work</PopoverHeading>
                     <PopoverParagraph>
                         To support your research, we are providing up to{' '}
-                        <strong>500 credits</strong> per user to run experiments.
+                        <strong>1,000 credits</strong> per user to run experiments.
                     </PopoverParagraph>
                     <ul>
                         <li>

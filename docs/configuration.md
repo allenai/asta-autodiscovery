@@ -55,6 +55,8 @@ Run metadata, uploaded datasets, results, and user profiles are held in a swappa
 
 - `local` (default) — a directory on the host, bind-mounted into the containers. No cloud
   account, bucket, or credentials required; the stack persists real data out of the box.
+  Required by `JOB_BACKEND=docker`, which bind-mounts each run's directory into its job
+  container.
 - `gcs` — a Google Cloud Storage bucket. Required by `JOB_BACKEND=gcp` and
   `CODE_EXECUTION_BACKEND=modal` (see [Choosing a workable
   combination](#choosing-a-workable-combination)).
@@ -72,7 +74,7 @@ interchangeable (`gsutil rsync` moves data either way). See
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `STORAGE_BACKEND` | No | `local` | Persistence backend: `local` (host directory) or `gcs` (Cloud Storage bucket). Set explicitly for any deployment that keeps data in GCS. |
+| `STORAGE_BACKEND` | No | `local` | Persistence backend: `local` (host directory) or `gcs` (Cloud Storage bucket). Each job backend needs one: `docker` requires `local`, `gcp` requires `gcs`. Set explicitly for any deployment that keeps data in GCS. |
 | `STORAGE_DIR` | No | `/mnt/data` | **local backend.** Root directory of the store as the process sees it. In `.env` this is the **host** directory to keep run data in (default `./data`); compose mounts it at `/mnt/data`. Use an **absolute** path: the docker job backend bind-mounts each run's subtree into its job container and the host daemon needs an absolute bind source. |
 | `STORAGE_HOST_DIR` | No | *(unset)* | **local backend.** Host path of the store, used as the bind source for job containers. Set automatically by `docker-compose.yaml`; when unset, `STORAGE_DIR` is assumed to already be a host path. |
 
@@ -111,9 +113,10 @@ Each AutoDiscovery run is launched by a swappable **job backend**, selected with
 | `AUTODISCOVERY_IMAGE` | docker | `autodiscovery:dev` | **docker backend.** Image the backend launches per job. Build it locally with `docker compose build autodiscovery`. |
 | `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | **gcp backend.** Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
 
-The docker backend bind-mounts the GCP key into each job container using the **host** path of
-`GOOGLE_APPLICATION_CREDENTIALS` (compose forwards it internally as `GCP_KEY_HOST_PATH`), which is
-why that variable must be an absolute path for the docker backend.
+When `GOOGLE_APPLICATION_CREDENTIALS` is set, the docker backend bind-mounts that key into each
+job container so Google-hosted models (Vertex AI) can authenticate. It uses the **host** path
+(compose forwards it internally as `GCP_KEY_HOST_PATH`), which is why the variable must be an
+absolute path. Leave it unset if your jobs use no Google models.
 
 ### Docker backend (default)
 
@@ -129,12 +132,11 @@ docker compose up
 `make dev` from the repository root runs both, and is what the README points at — the job image
 is behind compose's `jobs` profile, so a plain `docker compose up --build` never rebuilds it.
 
-The job container gets the run's data as a filesystem mount at `/mnt/gcs`, supplied
-according to `STORAGE_BACKEND`: a bind mount of the run's directory under `STORAGE_HOST_DIR`
-(`local`), or a gcsfuse mount the container makes itself (`gcs`, triggered by
-`GCSFUSE_BUCKET` which the backend sets from `GCS_BUCKET`). On Cloud Run the platform
-provides that mount instead. Either way the docker backend scopes it to the run's own prefix
-(`users/<uid>/jobs/<jid>`), so a job container never sees other users' data — see
+The job container gets the run's data as a bind mount of the run's directory under
+`STORAGE_HOST_DIR`, at `/mnt/gcs/users/<uid>/jobs/<jid>` (the same path Cloud Run's GCS
+volume provides). This is why the docker backend requires `STORAGE_BACKEND=local`: a bucket
+has no host directory to bind. The mount is scoped to the run's own prefix, so a job
+container never sees other users' data — see
 [Code-execution backend](#code-execution-backend) for why that matters.
 
 To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then

@@ -5,18 +5,12 @@ daemon (reached through a mounted ``/var/run/docker.sock``). The launched job
 runs the same AD image with the same CLI arguments as the Cloud Run backend —
 only the process launcher differs.
 
-Cloud Run provides the job's data as a GCS FUSE volume; locally this backend has
-to supply the equivalent mount itself, depending on the configured store:
-
-- ``local`` — bind-mounts the run's own directory from the host data directory.
-  No credentials, no FUSE, no cloud dependency.
-- ``gcs`` — has the container gcsfuse-mount the bucket itself, by passing
-  ``GCSFUSE_BUCKET`` plus GCP credentials and the ``/dev/fuse`` device /
-  ``SYS_ADMIN`` capability.
-
-Either way the mount is **scoped to the current run's prefix** and appears at
-:data:`JOB_MOUNT_ROOT` under the same deep path, so the job arguments are
-identical across storage and job backends.
+Cloud Run provides the job's data as a GCS volume; locally this backend
+bind-mounts the run's own directory from the host data directory instead, which
+is why it requires ``STORAGE_BACKEND=local`` (enforced at startup by
+``JobManager``). The mount is **scoped to the current run's prefix** and appears
+at :data:`JOB_MOUNT_ROOT` under the same deep path Cloud Run uses, so the job
+arguments are identical across job backends.
 """
 
 from __future__ import annotations
@@ -28,7 +22,6 @@ from typing import Any
 
 from ..exceptions import DockerBackendError
 from ..keys import job_dir
-from ..storage import GcsStore, get_store
 from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args
 
 # Environment variables forwarded from the API container to each job container.
@@ -49,8 +42,9 @@ _JOB_ENV_PASSTHROUGH = (
     "GCS_BUCKET",
 )
 
-# In-container path where the GCP credentials file is mounted (matches the API
-# container's GOOGLE_APPLICATION_CREDENTIALS convention in docker-compose).
+# In-container path where the GCP credentials file is mounted, for jobs that use
+# Google-hosted models (Vertex AI). Matches the API container's
+# GOOGLE_APPLICATION_CREDENTIALS convention in docker-compose.
 _CONTAINER_GCP_KEY_PATH = "/secrets/gcp-key.json"
 
 
@@ -97,34 +91,26 @@ class DockerBackend(JobBackend):
             k: os.environ[k] for k in _JOB_ENV_PASSTHROUGH if os.environ.get(k)
         }
         volumes: dict[str, dict[str, str]] = {}
-        # Scope the run's data mount to its own prefix, mounted at the same deep
-        # path build_job_args expects so the args are unchanged. This keeps other
-        # users' data out of the container even when code runs in-process
-        # (CODE_EXECUTION_BACKEND=process/local). Unlike Cloud Run's fixed
-        # job-level mount, the Docker backend can scope per run.
+
+        # Bind-mount the run's own directory, scoped to its prefix and mounted at
+        # the same deep path build_job_args expects so the args are unchanged. This
+        # keeps other users' data out of the container even when code runs
+        # in-process (CODE_EXECUTION_BACKEND=process/local). Unlike Cloud Run's
+        # fixed job-level mount, the Docker backend can scope per run.
         prefix = job_dir(userid, jobid)
-        container_mount = f"{JOB_MOUNT_ROOT}/{prefix}"
+        volumes[self._host_run_dir(prefix)] = {
+            "bind": f"{JOB_MOUNT_ROOT}/{prefix}",
+            "mode": "rw",
+        }
 
-        # A GCS store is gcsfuse-mounted by the container; the filesystem store is
-        # bind-mounted from the host. get_store() rejects unknown backend names.
-        needs_fuse = isinstance(get_store(self.config), GcsStore)
-
-        if needs_fuse:
-            # The container gcsfuse-mounts the bucket itself in its entrypoint.
-            environment["GCSFUSE_BUCKET"] = self.config.bucket
-            environment["GCSFUSE_ONLY_DIR"] = prefix
+        # Forward GCP credentials when available, for Google-hosted models. In
+        # docker-out-of-docker the bind source must be a *host* path, so it is
+        # provided out-of-band via GCP_KEY_HOST_PATH (the same file docker-compose
+        # binds into the API).
+        host_key_path = os.environ.get("GCP_KEY_HOST_PATH")
+        if host_key_path:
+            volumes[host_key_path] = {"bind": _CONTAINER_GCP_KEY_PATH, "mode": "ro"}
             environment["GOOGLE_APPLICATION_CREDENTIALS"] = _CONTAINER_GCP_KEY_PATH
-            # Bind-mount the GCP credentials file so gcsfuse (and google-cloud
-            # clients) can authenticate. In docker-out-of-docker the bind source
-            # must be a *host* path, so it is provided out-of-band via
-            # GCP_KEY_HOST_PATH (the same file docker-compose binds into the API).
-            host_key_path = os.environ.get("GCP_KEY_HOST_PATH")
-            if host_key_path:
-                volumes[host_key_path] = {"bind": _CONTAINER_GCP_KEY_PATH, "mode": "ro"}
-        else:
-            # Bind-mount the run's directory straight off the host. No FUSE, no
-            # credentials — the job just reads and writes files.
-            volumes[self._host_run_dir(prefix)] = {"bind": container_mount, "mode": "rw"}
 
         client = _docker_client()
         try:
@@ -135,11 +121,6 @@ class DockerBackend(JobBackend):
                 detach=True,
                 environment=environment,
                 volumes=volumes,
-                # gcsfuse inside the container needs FUSE + mount privileges; a
-                # plain bind mount needs neither, so they are not granted.
-                devices=["/dev/fuse"] if needs_fuse else [],
-                cap_add=["SYS_ADMIN"] if needs_fuse else [],
-                security_opt=["apparmor:unconfined"] if needs_fuse else [],
             )
         except Exception as e:
             raise DockerBackendError(f"Failed to launch job container: {e}") from e

@@ -139,26 +139,24 @@ container's disk. It now streams `file.stream` into the store. This is also why 
 
 ### Backend checks are `isinstance` checks
 
-Two things outside the store need to know which backend is active: the docker job backend
-(bind-mount a host directory, or gcsfuse-mount the bucket?) and the startup validator (can
-Cloud Run or Modal reach this data?). Both call `get_store(config)` and `isinstance` the
+The startup validator needs to know which backend is active (can Cloud Run, Modal, or a
+local job container reach this data?). It calls `get_store(config)` and `isinstance`s the
 result against `GcsStore`, the same way `asta_gcs.py` and the preloaded-dataset sync do.
 Constructing a store is side-effect-free — `FilesystemStore` creates its root on first
 write, not in `__init__` — so validating configuration never touches the filesystem.
 
 ### Combinations that cannot work
 
-Two other backends need run data to be reachable from outside the API process, and only
-`gcs` can offer that:
+Each job backend is tied to one store, and Modal needs `gs://`:
 
 | | `STORAGE_BACKEND=local` | `STORAGE_BACKEND=gcs` |
 | --- | --- | --- |
-| `JOB_BACKEND=docker` | ✅ job container bind-mounts the run's host directory | ✅ job container gcsfuse-mounts the run's prefix |
+| `JOB_BACKEND=docker` | ✅ job container bind-mounts the run's host directory | ❌ a bucket has no host directory to bind |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ Cloud Run mounts the bucket |
 | `CODE_EXECUTION_BACKEND=process`/`local` | ✅ reads the job's own mount | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
-Both ❌ rows **raise at startup** rather than warning. The likeliest way to hit the first
+Every ❌ cell **raises at startup** rather than warning. The likeliest way to hit the first
 is a GCS deployment that never sets `STORAGE_BACKEND`: silently defaulting to local disk
 there would look like every run and dataset had vanished, which is worse than failing to
 boot. (Contrast `_warn_if_unsafe_code_execution`, which only warns — that configuration
@@ -168,20 +166,26 @@ boot. (Contrast `_warn_if_unsafe_code_execution`, which only warns — that conf
 
 The docker job backend scopes the job container's data mount to that run's own prefix, so
 a container never sees another user's data even when untrusted generated code runs
-in-process. Both storage backends keep that property, and both mount at the same
-in-container path so the job's CLI arguments are byte-identical either way:
+in-process. It mounts at the same in-container path Cloud Run uses, so the job's CLI
+arguments are byte-identical across job backends:
 
 ```
-local:  bind  $STORAGE_HOST_DIR/users/<uid>/jobs/<jid>  →  /mnt/gcs/users/<uid>/jobs/<jid>
-gcs:    gcsfuse --only-dir users/<uid>/jobs/<jid>        →  /mnt/gcs/users/<uid>/jobs/<jid>
+bind  $STORAGE_HOST_DIR/users/<uid>/jobs/<jid>  →  /mnt/gcs/users/<uid>/jobs/<jid>
 ```
 
-The bind-mount path needs no FUSE device, no `SYS_ADMIN`, and no credentials, so those are
-granted only in the `gcs` case.
+A bind mount needs no FUSE device, no extra capabilities, and no credentials. The only
+credential a docker job container receives is the GCP key, bind-mounted when
+`GCP_KEY_HOST_PATH` is set, for Google-hosted models.
 
 `STORAGE_HOST_DIR` exists for the same reason as `GCP_KEY_HOST_PATH`: in
 docker-out-of-docker, the API's own container path is not a valid bind source for the host
 daemon, so the host path is passed out-of-band by compose.
+
+Before this change the docker backend gcsfuse-mounted the bucket into the job container,
+which needed gcsfuse in the job image, `/dev/fuse`, `CAP_SYS_ADMIN`, and an unconfined
+AppArmor profile. That was the only way to run jobs locally when GCS was the only store. It
+is gone: `docker` + `gcs` is rejected at startup, and the job image no longer installs
+gcsfuse or carries an entrypoint wrapper.
 
 ---
 
@@ -256,6 +260,11 @@ backend raises a clear error if it is relative.
   machinery for a third backend that does not exist, and removing `match_glob` turned the
   shared-run owner lookup and the metrics discovery into full-bucket listings on GCS.
 - `create_exclusive` (atomic create-if-absent) was dropped from the interface; see above.
+- The `docker` + `gcs` pairing was dropped. The intermediate draft kept the docker backend's
+  gcsfuse path alongside the new bind mount so local job containers could still run against
+  the bucket, but that exercised a mount mechanism production never uses (Cloud Run supplies
+  a platform volume), at the cost of gcsfuse in the job image and `SYS_ADMIN` on the
+  container. Each job backend now maps to exactly one store.
 - `GCSError` is now an alias of the new `StorageError` rather than being renamed, so
   existing `except GCSError` sites and imports keep working.
 - The `generate-upload-url` response keeps its `gcs_path` field name (now carrying a

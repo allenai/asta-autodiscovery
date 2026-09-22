@@ -74,6 +74,8 @@ def test_unsafe_code_execution_warning(
         ("local", "gcp", "process"),
         # The Modal sandbox mounts the dataset from gs://.
         ("local", "docker", "modal"),
+        # A local job container bind-mounts a host directory; a bucket has none.
+        ("gcs", "docker", "process"),
         # Unknown backend name.
         ("s3", "docker", "process"),
     ],
@@ -95,7 +97,7 @@ def test_rejects_unworkable_storage_config(storage_backend, backend, code_backen
     "storage_backend,backend,code_backend",
     [
         ("local", "docker", "process"),  # the out-of-the-box default
-        ("gcs", "docker", "process"),
+        ("gcs", "gcp", "process"),
         ("gcs", "gcp", "modal"),
     ],
 )

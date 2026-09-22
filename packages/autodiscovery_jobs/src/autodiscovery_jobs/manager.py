@@ -18,15 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 def _validate_storage_config(config: JobConfig) -> None:
-    """Reject storage backend pairings that cannot work.
+    """Reject storage/job backend pairings that cannot work.
 
-    Two consumers read run data from outside this process, and both understand
-    Google Cloud Storage specifically, so they need the ``gcs`` store:
+    Each job backend is tied to one store:
 
-    - **Cloud Run jobs** (``JOB_BACKEND=gcp``) get their data as a bucket volume;
-      they cannot mount a directory on this host.
+    - **Cloud Run jobs** (``JOB_BACKEND=gcp``) get their data as a bucket volume,
+      so they need ``gcs``; they cannot mount a directory on this host.
+    - **Docker jobs** (``JOB_BACKEND=docker``) bind-mount the run's directory from
+      the host, so they need ``local``; a bucket has no host directory.
     - **Modal sandboxes** (``CODE_EXECUTION_BACKEND=modal``) mount the run's data
-      prefix from ``gs://`` (``--bucket_path``).
+      prefix from ``gs://`` (``--bucket_path``), so they need ``gcs``.
 
     These fail loudly at startup instead of warning, because the most likely way
     to hit the first one is a GCS deployment that never set ``STORAGE_BACKEND``:
@@ -34,28 +35,36 @@ def _validate_storage_config(config: JobConfig) -> None:
     dataset had vanished.
 
     Raises:
-        StorageBackendError: If ``storage_backend`` is unknown, or its data is not
-            reachable by Cloud Run / Modal while one of those is selected.
+        StorageBackendError: If ``storage_backend`` is unknown, or is paired with
+            a job or code-execution backend that cannot reach its data.
     """
     # Raises StorageBackendError for an unknown name; constructing a store has no
     # side effects, so this is safe to do just to inspect the result.
-    if isinstance(get_store(config), GcsStore):
-        return
+    is_gcs = isinstance(get_store(config), GcsStore)
+    job_backend = (config.backend or "gcp").lower()
+    see = "See docs/design/storage-backends.md."
 
-    if config.backend == "gcp":
+    if job_backend == "gcp" and not is_gcs:
         raise StorageBackendError(
             f"STORAGE_BACKEND={config.storage_backend} is incompatible with JOB_BACKEND=gcp: "
             "a Cloud Run job mounts run data from a GCS bucket and cannot reach this store. "
             "Set STORAGE_BACKEND=gcs to keep run data in the bucket, or JOB_BACKEND=docker "
-            "to run jobs locally. See docs/design/storage-backends.md."
+            f"to run jobs locally. {see}"
         )
 
-    if config.code_execution_backend == "modal":
+    if job_backend == "docker" and is_gcs:
+        raise StorageBackendError(
+            "STORAGE_BACKEND=gcs is incompatible with JOB_BACKEND=docker: a local job "
+            "container bind-mounts the run's directory from the host, which a bucket "
+            f"cannot provide. Set STORAGE_BACKEND=local, or JOB_BACKEND=gcp. {see}"
+        )
+
+    if config.code_execution_backend == "modal" and not is_gcs:
         raise StorageBackendError(
             f"STORAGE_BACKEND={config.storage_backend} is incompatible with "
             "CODE_EXECUTION_BACKEND=modal: the Modal sandbox mounts the run's dataset from "
             "gs://, which this store has no address in. Set STORAGE_BACKEND=gcs, or use the "
-            "default CODE_EXECUTION_BACKEND=process. See docs/design/storage-backends.md."
+            f"default CODE_EXECUTION_BACKEND=process. {see}"
         )
 
 

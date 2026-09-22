@@ -3,7 +3,6 @@ import math
 import os
 import shutil
 import threading
-import traceback
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -47,6 +46,7 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
+from autodiscovery.progress import NoProgressError, ProgressGuard
 
 
 def _theoretical_max_boolean_cat(
@@ -282,27 +282,6 @@ def compute_and_store_reward(
         # TODO: Update all past nodes with the new surprisal set
 
 
-class NoProgressError(RuntimeError):
-    """Raised when exploration stops committing nodes and cannot recover.
-
-    Attributes:
-        iterations: Number of consecutive iterations that committed no node.
-        last_error: The last per-node expansion error, when one was raised.
-    """
-
-    def __init__(self, message, *, iterations, last_error=None):
-        """Initialize the error.
-
-        Args:
-            message: Human-readable description of the stall.
-            iterations: Number of consecutive iterations that committed no node.
-            last_error: The last per-node expansion error, when one was raised.
-        """
-        super().__init__(message)
-        self.iterations = iterations
-        self.last_error = last_error
-
-
 def run_mcts(
     root,
     nodes_by_level,
@@ -435,8 +414,6 @@ def run_mcts(
     usage_tracker = UsageTracker()
     usage_tracker.save_events(log_dirname)
 
-    no_progress_error: NoProgressError | None = None
-
     try:
         if agent_usage_mode == "per_response":
             # LiteLLMAG2Client records each response as it is produced.
@@ -505,34 +482,9 @@ def run_mcts(
         total_to_sample = max_iterations
         n_sampled = 0
         iteration_idx = 0
-        consecutive_no_progress = 0
-        last_expansion_error: Exception | None = None
-        expansion_error_guard = threading.Lock()
+        progress = ProgressGuard(max_no_progress_iterations, total_to_sample=total_to_sample)
         node_mutation_locks: dict[str, threading.Lock] = {}
         node_mutation_locks_guard = threading.Lock()
-
-        def _on_expand_error(node_id: str, exc: Exception) -> None:
-            """Report a failed node expansion and remember it as the latest failure cause."""
-            nonlocal last_expansion_error
-            with expansion_error_guard:
-                last_expansion_error = exc
-            # Keep exploration running when one node expansion fails.
-            print(f"[run_mcts] Failed expanding node {node_id}: {exc.__class__.__name__}: {exc}")
-            traceback.print_exception(type(exc), exc, exc.__traceback__)
-
-        def _no_progress_error(reason: str) -> NoProgressError:
-            """Build the abort error for a stalled run, naming the last underlying failure."""
-            cause = (
-                f"{last_expansion_error.__class__.__name__}: {last_expansion_error}"
-                if last_expansion_error is not None
-                else "no usable experiment was generated"
-            )
-            return NoProgressError(
-                f"Exploration aborted: {reason} "
-                f"({n_sampled}/{total_to_sample} experiments completed). Last failure: {cause}",
-                iterations=consecutive_no_progress,
-                last_error=last_expansion_error,
-            )
 
         def _get_node_mutation_lock(node_obj: MCTSNode) -> threading.Lock:
             """Return a per-node lock used to serialize mutable node state updates."""
@@ -558,14 +510,7 @@ def run_mcts(
                 return_n=min(batch_size, remaining_budget),
             )[:remaining_budget]
             if not next_nodes:
-                # Running out of nodes is the normal way exploration ends early. It is a failure
-                # only when the tree ran dry because expansion kept erroring, or when the run never
-                # committed a single node (e.g. the data loader could never be created).
-                if consecutive_no_progress and (last_expansion_error is not None or n_sampled == 0):
-                    raise _no_progress_error(
-                        f"no node is left to expand after {consecutive_no_progress} "
-                        "consecutive iteration(s) that committed no node"
-                    ) from last_expansion_error
+                progress.check_exhausted(n_sampled)
                 break
             print(
                 "SAMPLED "
@@ -848,7 +793,7 @@ def run_mcts(
 
                     expanded_nodes = gather_completed_futures(
                         future_labels,
-                        on_error=_on_expand_error,
+                        on_error=progress.record_expansion_error,
                     )
             else:
                 # Sequential expansion of nodes
@@ -891,7 +836,7 @@ def run_mcts(
                         )
                     except Exception as exc:
                         # Align sequential behavior with threaded mode by continuing after per-node failures.
-                        _on_expand_error(node_id, exc)
+                        progress.record_expansion_error(node_id, exc)
                         continue
                     if new_node is not None:
                         expanded_nodes.append(new_node)
@@ -904,53 +849,28 @@ def run_mcts(
             for node in expanded_nodes:
                 nodes_by_level[node.level].append(node)
 
-            # Abort instead of spinning when nothing gets committed iteration after iteration.
-            # Without this, a durable failure (bad credentials, exhausted quota, replies that never
-            # parse into an experiment) loops at full speed and buries its own cause in log noise.
-            if expanded_nodes:
-                consecutive_no_progress = 0
-                last_expansion_error = None
-            else:
-                consecutive_no_progress += 1
-                print(
-                    f"NO NODE COMMITTED IN ITERATION {iteration_idx} "
-                    f"({consecutive_no_progress}/{max_no_progress_iterations} consecutive)\n"
-                )
-                if consecutive_no_progress >= max_no_progress_iterations:
-                    raise _no_progress_error(
-                        f"{consecutive_no_progress} consecutive iterations committed no node"
-                    ) from last_expansion_error
+            progress.check_iteration(len(expanded_nodes), n_sampled)
     except KeyboardInterrupt:
         print("\n\n######### EXPLORATION INTERRUPTED! SAVING THE CURRENT STATE... #########\n\n")
     except NoProgressError as exc:
-        # Save whatever was explored before re-raising, so the partial run is not lost.
-        no_progress_error = exc
         print(f"\n\n######### EXPLORATION ABORTED! {exc} #########\n\n")
+        raise
     finally:
         clear_ag2_usage_context()
         configure_ag2_usage_tracking(None)
-
-    # End time tracking
-    end_time = time()
-    time_elapsed = end_time - start_time
-
-    # Save all MCTS nodes
-    save_nodes(
-        nodes_by_level,
-        log_dirname,
-        run_dedupe=run_dedupe,
-        model=belief_model_name,
-        embedding_model=embedding_model,
-        embedding_dimensions=embedding_dimensions,
-        time_elapsed=time_elapsed,
-        usage_tracker=usage_tracker,
-    )
-    usage_tracker.save_events(log_dirname)
-    usage_tracker.save_summary(log_dirname)
-
-    if no_progress_error is not None:
-        # Surface the failure to the caller (non-zero exit for the CLI) now that state is saved.
-        raise no_progress_error
+        # In `finally` so a partial run is saved on every exit path, aborted ones included.
+        save_nodes(
+            nodes_by_level,
+            log_dirname,
+            run_dedupe=run_dedupe,
+            model=belief_model_name,
+            embedding_model=embedding_model,
+            embedding_dimensions=embedding_dimensions,
+            time_elapsed=time() - start_time,
+            usage_tracker=usage_tracker,
+        )
+        usage_tracker.save_events(log_dirname)
+        usage_tracker.save_summary(log_dirname)
 
 
 def resolve_model_args(args) -> None:

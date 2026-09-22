@@ -16,7 +16,9 @@ project/location, expired credentials, exhausted quota, replies that never parse
 into an experiment — used to spin `run_mcts` at full speed forever, emitting
 gigabytes of the same four log lines and burying the underlying error. It now
 aborts, saves whatever was explored, and raises `run.NoProgressError` naming the
-last failure, so the CLI exits non-zero.
+last failure, so the CLI exits non-zero. The stall tracking itself lives in the
+new `autodiscovery.progress` module (`ProgressGuard`, `NoProgressError`), which
+`run` re-exports.
 
 `run.run_mcts(...)` takes a new `max_no_progress_iterations` keyword argument
 (default `3`): the number of consecutive iterations that may commit no node

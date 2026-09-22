@@ -31,13 +31,14 @@ def test_aborts_at_the_limit_and_names_the_last_failure():
     assert "0/10 experiments completed" in str(excinfo.value)
 
 
-def test_a_committed_iteration_forgets_the_earlier_error():
+def test_a_clean_committed_iteration_forgets_the_earlier_error():
     guard = ProgressGuard(1, total_to_sample=10)
     guard.record_expansion_error("1_0", RuntimeError("transient"))
     guard.check_iteration(1, n_sampled=1)
+    guard.check_iteration(1, n_sampled=2)
 
     with pytest.raises(NoProgressError) as excinfo:
-        guard.check_iteration(0, n_sampled=1)
+        guard.check_iteration(0, n_sampled=2)
 
     assert excinfo.value.last_error is None
     assert "no usable experiment was generated" in str(excinfo.value)
@@ -49,6 +50,33 @@ def test_exhaustion_is_normal_after_progress():
 
     # Ran dry with work committed and nothing erroring: a clean early finish.
     guard.check_exhausted(n_sampled=1)
+
+
+def test_exhaustion_reports_failure_in_an_iteration_that_also_committed_nodes():
+    guard = ProgressGuard(3, total_to_sample=10)
+    guard.record_expansion_error("1_1", RuntimeError("quota exhausted"))
+    guard.check_iteration(1, n_sampled=1)
+
+    with pytest.raises(NoProgressError, match="quota exhausted") as excinfo:
+        guard.check_exhausted(n_sampled=1)
+
+    assert excinfo.value.last_error is not None
+    assert excinfo.value.iterations == 0
+
+
+def test_successful_iteration_without_failures_clears_a_previous_failure():
+    guard = ProgressGuard(3, total_to_sample=10)
+    guard.record_expansion_error("1_1", RuntimeError("transient"))
+    guard.check_iteration(1, n_sampled=1)
+    guard.check_iteration(1, n_sampled=2)
+
+    guard.check_exhausted(n_sampled=2)
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5, "2"])
+def test_no_progress_limit_must_be_a_positive_integer(limit):
+    with pytest.raises(ValueError, match="positive integer"):
+        ProgressGuard(limit)
 
 
 @pytest.mark.parametrize(

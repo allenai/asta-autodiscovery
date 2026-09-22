@@ -2,7 +2,9 @@ import json
 import math
 import os
 import shutil
+import sys
 import threading
+import traceback
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -856,21 +858,27 @@ def run_mcts(
         print(f"\n\n######### EXPLORATION ABORTED! {exc} #########\n\n")
         raise
     finally:
+        primary_error = sys.exception()
         clear_ag2_usage_context()
         configure_ag2_usage_tracking(None)
-        # In `finally` so a partial run is saved on every exit path, aborted ones included.
-        save_nodes(
-            nodes_by_level,
-            log_dirname,
-            run_dedupe=run_dedupe,
-            model=belief_model_name,
-            embedding_model=embedding_model,
-            embedding_dimensions=embedding_dimensions,
-            time_elapsed=time() - start_time,
-            usage_tracker=usage_tracker,
-        )
-        usage_tracker.save_events(log_dirname)
-        usage_tracker.save_summary(log_dirname)
+        try:
+            save_nodes(
+                nodes_by_level,
+                log_dirname,
+                run_dedupe=run_dedupe,
+                model=belief_model_name,
+                embedding_model=embedding_model,
+                embedding_dimensions=embedding_dimensions,
+                time_elapsed=time() - start_time,
+                usage_tracker=usage_tracker,
+            )
+            usage_tracker.save_events(log_dirname)
+            usage_tracker.save_summary(log_dirname)
+        except Exception as persistence_error:
+            if primary_error is None:
+                raise
+            sys.stderr.write("Failed to save partial exploration:\n")
+            traceback.print_exception(persistence_error, file=sys.stderr)
 
 
 def resolve_model_args(args) -> None:

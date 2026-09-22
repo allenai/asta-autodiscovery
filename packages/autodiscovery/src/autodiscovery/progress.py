@@ -46,16 +46,24 @@ class ProgressGuard:
                 before ``check_iteration`` aborts the run.
             total_to_sample: Experiment budget, used only in the abort message.
         """
+        if (
+            isinstance(max_no_progress_iterations, bool)
+            or not isinstance(max_no_progress_iterations, int)
+            or max_no_progress_iterations <= 0
+        ):
+            raise ValueError("max_no_progress_iterations must be a positive integer")
         self.max_no_progress_iterations = max_no_progress_iterations
         self.total_to_sample = total_to_sample
         self.consecutive_no_progress = 0
         self.last_error = None
+        self._iteration_had_error = False
         self._error_guard = threading.Lock()
 
     def record_expansion_error(self, node_id, exc):
         """Report a failed node expansion and remember it as the latest failure cause."""
         with self._error_guard:
             self.last_error = exc
+            self._iteration_had_error = True
         # Keep exploration running when one node expansion fails.
         print(f"[run_mcts] Failed expanding node {node_id}: {exc.__class__.__name__}: {exc}")
         traceback.print_exception(type(exc), exc, exc.__traceback__)
@@ -73,9 +81,12 @@ class ProgressGuard:
         """
         if n_committed:
             self.consecutive_no_progress = 0
-            self.last_error = None
+            if not self._iteration_had_error:
+                self.last_error = None
+            self._iteration_had_error = False
             return
 
+        self._iteration_had_error = False
         self.consecutive_no_progress += 1
         print(
             "NO NODE COMMITTED IN THIS ITERATION "
@@ -97,10 +108,15 @@ class ProgressGuard:
         Raises:
             NoProgressError: If the tree ran dry abnormally.
         """
-        if self.consecutive_no_progress and (self.last_error is not None or n_sampled == 0):
-            raise self._abort(
+        if self.last_error is not None or (self.consecutive_no_progress and n_sampled == 0):
+            reason = (
                 f"no node is left to expand after {self.consecutive_no_progress} "
-                "consecutive iteration(s) that committed no node",
+                "consecutive iteration(s) that committed no node"
+                if self.consecutive_no_progress
+                else "no node is left to expand after failed expansions"
+            )
+            raise self._abort(
+                reason,
                 n_sampled,
             )
 

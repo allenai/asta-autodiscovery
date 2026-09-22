@@ -138,6 +138,28 @@ def test_run_mcts_aborts_when_data_loader_node_cannot_be_created(tmp_path, monke
     assert output.count("######### ITERATION") <= 3
 
 
+@pytest.mark.parametrize("failed_save", ["save_nodes", "save_summary"])
+def test_persistence_failure_does_not_mask_stall_error(tmp_path, monkeypatch, capsys, failed_save):
+    root, nodes_by_level = _make_root(untried_experiments=[LOAD_DATASET_EXPERIMENT])
+
+    def _fail_expansion(*args, **kwargs):
+        raise RuntimeError("Vertex AI project not set")
+
+    def _fail_save(*args, **kwargs):
+        raise OSError("disk full")
+
+    _install_stubs(monkeypatch, _AlwaysGeneratesExperiments(), _fail_expansion)
+    if failed_save == "save_nodes":
+        monkeypatch.setattr(run_module, "save_nodes", _fail_save)
+    else:
+        monkeypatch.setattr(run_module.UsageTracker, "save_summary", _fail_save)
+
+    with pytest.raises(NoProgressError, match="Vertex AI project not set"):
+        _run(root, nodes_by_level, tmp_path)
+
+    assert "Failed to save partial exploration" in capsys.readouterr().err
+
+
 def test_run_mcts_aborts_when_experiment_generation_always_fails(tmp_path, monkeypatch, capsys):
     """Replies that never parse into an experiment stop the run after a bounded number of tries."""
     root, nodes_by_level = _make_root(allow_generate_experiments=True)

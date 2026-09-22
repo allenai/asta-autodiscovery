@@ -128,7 +128,7 @@ export default function RunPage({ params }: RunPageProps) {
                 <RunSetup runid={runId} onSubmitSuccess={handleSubmitSuccess} />
             )}
             {runState === 'submitted' && (
-                <RunView runid={runId} onRunCancelled={handleRunCancelled} />
+                <RunView key={runId} runid={runId} onRunCancelled={handleRunCancelled} />
             )}
         </URLSearchParamsProvider>
     );

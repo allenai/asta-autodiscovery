@@ -108,7 +108,9 @@ export interface ExperimentFromApi {
     analysis: string | null;
     experiment_plan: Record<string, any> | null;
     review: string | null;
-    code: string | null;
+    /** Only populated by the per-experiment detail route; omitted from list payloads. */
+    code?: string | null;
+    /** Only populated by the per-experiment detail route; omitted from list payloads. */
     code_output?: string | null;
     rich_outputs?: Record<string, string>[] | null;
     created_at?: string | null;

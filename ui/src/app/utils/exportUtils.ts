@@ -148,6 +148,50 @@ function transformExperimentForExport(exp: Experiment): ExperimentExport {
     };
 }
 
+/**
+ * Hydrate `code`/`codeOutput` from the per-experiment detail route.
+ *
+ * The experiments list omits those two fields — they are unbounded captured
+ * source and stdout — so the JSON export fetches them per experiment. Requests
+ * go out in bounded batches, and a missing or failed detail response rejects the
+ * export rather than silently writing an incomplete file.
+ */
+export async function hydrateExperimentsForExport(
+    experiments: Experiment[],
+    fetchDetails: (experimentId: string) => Promise<Experiment | null>,
+    batchSize: number = 6
+): Promise<Experiment[]> {
+    const hydrated = [...experiments];
+    const pending = experiments
+        .map((_, index) => index)
+        .filter(
+            (index) => experiments[index].code == null || experiments[index].codeOutput == null
+        );
+
+    for (let start = 0; start < pending.length; start += batchSize) {
+        const batch = pending.slice(start, start + batchSize);
+        const details = await Promise.all(
+            batch.map((index) => fetchDetails(experiments[index].experimentId))
+        );
+        batch.forEach((index, position) => {
+            const detail = details[position];
+            if (!detail) {
+                throw new Error(
+                    `Missing experiment details for ${experiments[index].experimentId}`
+                );
+            }
+            hydrated[index] = {
+                ...experiments[index],
+                code: detail.code,
+                codeOutput: detail.codeOutput,
+                richOutputs: detail.richOutputs ?? experiments[index].richOutputs,
+            };
+        });
+    }
+
+    return hydrated;
+}
+
 export function generateRunJson(experiments: Experiment[]): string {
     const exportData = experiments.map(transformExperimentForExport);
     return JSON.stringify(exportData, null, 2);

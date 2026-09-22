@@ -306,7 +306,13 @@ class GetRunExperimentsResponseModel(BaseModel):
     has_job_completed: bool = Field(
         ..., description="Flag indicating if the job has completed, polling can stop"
     )
-    experiments: list[ExperimentModel] = Field(..., description="List of experiments in the run")
+    experiments: list[ExperimentModel] = Field(
+        ...,
+        description=(
+            "List of experiments in the run. Each entry omits `code` and "
+            "`code_output`; fetch those from the per-experiment detail route."
+        ),
+    )
 
 
 class GetExperimentStatusResponseModel(BaseModel):

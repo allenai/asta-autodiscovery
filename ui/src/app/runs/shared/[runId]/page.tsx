@@ -30,6 +30,12 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
     useEffect(() => {
         if (authLoading) return;
 
+        // Re-enter the loading state on a runId change so the owner lookup for the new
+        // run can't be rendered against the previous run's owner.
+        setIsLoadingOwner(true);
+        setUserid(null);
+        setError(null);
+
         const fetchOwner = async () => {
             try {
                 const { data } = await api.getSharedRunOwner({ runId });
@@ -59,7 +65,7 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
 
     return (
         <URLSearchParamsProvider>
-            <RunView runid={runId} userid={userid} />
+            <RunView key={runId} runid={runId} userid={userid} />
         </URLSearchParamsProvider>
     );
 }

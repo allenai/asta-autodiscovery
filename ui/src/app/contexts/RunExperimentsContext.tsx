@@ -174,41 +174,39 @@ export const RunExperimentsProvider = ({
         [runid, userid, runsApi]
     );
 
-    // Reset initial loading state when runid changes
+    // Discard the previous run's accumulated state whenever runid changes, not just
+    // when it goes null: the provider stays mounted across a client-side navigation
+    // between two runs, so without this the new run inherits the old experiments and
+    // the old fetch position (known ids). Declared before the fetch effect so the
+    // refs are already cleared when that effect runs in the same commit.
     useEffect(() => {
+        setExperiments(DEFAULT_STATE.experiments);
+        setIsLoading(DEFAULT_STATE.isLoading);
         setIsLoadingInitial(true);
         hasLoadedOnce.current = false;
-    }, [runid]);
+        setLastError(DEFAULT_STATE.lastError);
+        setHasJobCompleted(DEFAULT_STATE.hasJobCompleted);
+        setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
+        setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
+        setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
+        knownExperimentIds.current = new Set();
+        selectedExperimentRequestId.current += 1;
+        // Restarting polling here (rather than in its own effect reading isPolling)
+        // keeps the reset from silently stopping an autoStart provider.
+        setIsPolling(Boolean(runid) && autoStart);
+    }, [runid, autoStart]);
 
-    // Auto-start polling on mount if autoStart is true
     useEffect(() => {
-        if (autoStart && runid && !isPolling) {
-            setIsPolling(true);
-        }
-    }, [autoStart, runid]);
-
-    useEffect(() => {
-        if (!runid) {
-            setIsPolling(DEFAULT_STATE.isPolling);
-            setExperiments(DEFAULT_STATE.experiments);
-            setIsLoading(DEFAULT_STATE.isLoading);
-            setIsLoadingInitial(true);
-            hasLoadedOnce.current = false;
-            setLastError(DEFAULT_STATE.lastError);
-            setHasJobCompleted(DEFAULT_STATE.hasJobCompleted);
-            setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
-            setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
-            setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
-            knownExperimentIds.current = new Set();
-            selectedExperimentRequestId.current += 1;
+        if (!runid || !isPolling) {
             return;
         }
-        if (!isPolling) {
-            return;
-        }
+
+        // A request issued for the previous runid must not append its results to the
+        // new run's list, so drop anything that resolves after this effect is torn down.
+        let cancelled = false;
 
         const fetchLatestExperiments = async () => {
-            if (!isPolling) {
+            if (cancelled) {
                 return;
             }
             try {
@@ -218,6 +216,9 @@ export const RunExperimentsProvider = ({
                     runid,
                     knownExperimentIds: Array.from(knownExperimentIds.current),
                 });
+                if (cancelled) {
+                    return;
+                }
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
                 if (newExperiments.length > 0) {
                     setExperiments((prevExperiments) => {
@@ -246,12 +247,17 @@ export const RunExperimentsProvider = ({
                     setLastError(null);
                 }
             } catch (error: any) {
+                if (cancelled) {
+                    return;
+                }
                 setLastError(error.message || 'Failed to fetch experiments');
             } finally {
-                setIsLoading(false);
-                if (!hasLoadedOnce.current) {
-                    hasLoadedOnce.current = true;
-                    setIsLoadingInitial(false);
+                if (!cancelled) {
+                    setIsLoading(false);
+                    if (!hasLoadedOnce.current) {
+                        hasLoadedOnce.current = true;
+                        setIsLoadingInitial(false);
+                    }
                 }
             }
         };
@@ -259,6 +265,7 @@ export const RunExperimentsProvider = ({
         fetchLatestExperiments();
         const interval = setInterval(fetchLatestExperiments, refreshIntervalMsRef.current);
         return () => {
+            cancelled = true;
             clearInterval(interval);
         };
     }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted]);

@@ -191,10 +191,15 @@ export const RunExperimentsProvider = ({
         setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
         knownExperimentIds.current = new Set();
         selectedExperimentRequestId.current += 1;
-        // Restarting polling here (rather than in its own effect reading isPolling)
-        // keeps the reset from silently stopping an autoStart provider.
-        setIsPolling(Boolean(runid) && autoStart);
-    }, [runid, autoStart]);
+        setIsPolling(DEFAULT_STATE.isPolling);
+    }, [runid]);
+
+    // Queue this after the run reset so auto-start wins when both effects run.
+    useEffect(() => {
+        if (autoStart && runid) {
+            setIsPolling(true);
+        }
+    }, [autoStart, runid]);
 
     useEffect(() => {
         if (!runid || !isPolling) {

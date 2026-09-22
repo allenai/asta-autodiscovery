@@ -36,19 +36,28 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
         setUserid(null);
         setError(null);
 
+        let cancelled = false;
+
         const fetchOwner = async () => {
             try {
                 const { data } = await api.getSharedRunOwner({ runId });
+                if (cancelled) return;
                 setUserid(data.userid);
             } catch (err) {
+                if (cancelled) return;
                 console.error('Error fetching shared run owner:', err);
                 setError('This run is not available or has not been shared.');
             } finally {
-                setIsLoadingOwner(false);
+                if (!cancelled) {
+                    setIsLoadingOwner(false);
+                }
             }
         };
 
         fetchOwner();
+        return () => {
+            cancelled = true;
+        };
     }, [runId, authLoading]);
 
     if (authLoading || isLoadingOwner) {

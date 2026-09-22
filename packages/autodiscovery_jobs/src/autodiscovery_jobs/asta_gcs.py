@@ -15,6 +15,7 @@ import os
 
 from google.cloud import storage
 
+from . import keys
 from .config import JobConfig
 from .storage import GcsStore, get_store
 
@@ -54,7 +55,7 @@ def copy_dataset_to_asta_workspace(
     client = storage.Client()
     asta_bucket = client.bucket(ASTA_BUCKET)
 
-    source_prefix = f"users/{ad_userid}/jobs/{ad_runid}/data/"
+    source_prefix = f"{keys.job_prefix(ad_userid, ad_runid)}data/"
     dest_prefix = f"owners/{user_uuid}/{thread_id}/data/"
 
     uris: list[str] = []

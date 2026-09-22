@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from ..exceptions import ObjectNotFoundError, StorageError
-from .base import JobDataMount, ObjectInfo, ObjectStore
+from .base import ObjectInfo, ObjectStore, glob_to_regex
 
 # Filename prefix for in-flight writes staged next to their destination. Listings
 # skip these so a concurrent reader never sees a half-written object as an object
@@ -50,25 +50,18 @@ class FilesystemStore(ObjectStore):
     filesystem the operator has mounted — not necessarily a physically local disk.
     """
 
-    #: A job container gets the run's data as a plain bind mount of its directory:
-    #: no FUSE, no credentials, no cloud dependency.
-    job_data_mount = JobDataMount.HOST_PATH
-
     def __init__(self, root: str | Path):
-        """Bind the store to a root directory, creating it if needed.
+        """Bind the store to a root directory.
+
+        The directory is created on first write, not here, so constructing a
+        store (which configuration validation does just to inspect it) has no
+        side effects.
 
         Args:
             root: Directory that holds the whole key namespace. In containers
                 this is the mount point of the host data directory.
-
-        Raises:
-            StorageError: If the directory cannot be created.
         """
         self._root = Path(root).expanduser()
-        try:
-            self._root.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-            raise StorageError(f"Failed to create storage directory {self._root}: {e}") from e
 
     @property
     def root_uri(self) -> str:
@@ -222,6 +215,7 @@ class FilesystemStore(ObjectStore):
         self,
         prefix: str = "",
         *,
+        match_glob: str | None = None,
         limit: int | None = None,
     ) -> Iterator[ObjectInfo]:
         """Walk the tree under ``prefix``, filtering like a GCS prefix listing.
@@ -229,6 +223,7 @@ class FilesystemStore(ObjectStore):
         ``prefix`` is a key *prefix*, not necessarily a directory, so the walk
         starts at the nearest enclosing directory and re-checks each key.
         """
+        pattern = glob_to_regex(match_glob) if match_glob else None
         root = self._root.resolve()
         # Start from the deepest directory the prefix definitely lives under.
         start = root / prefix.rsplit("/", 1)[0] if "/" in prefix else root
@@ -247,6 +242,8 @@ class FilesystemStore(ObjectStore):
                 except ValueError:  # pragma: no cover - symlink pointing outside the root
                     continue
                 if not key.startswith(prefix):
+                    continue
+                if pattern and not pattern.fullmatch(key):
                     continue
                 try:
                     info = self._info(path)

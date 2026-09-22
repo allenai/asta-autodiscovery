@@ -54,7 +54,7 @@ ObjectStore
   upload_file(key, local_path)
   delete(key)                             idempotent
   copy(source_key, dest_key)               within the store
-  list(prefix, *, limit)                  -> Iterator[ObjectInfo]
+  list(prefix, *, match_glob, limit)      -> Iterator[ObjectInfo]
   list_dirs(prefix)                       -> immediate child names
   signed_upload_url(...) -> str | None    None when unsupported
 ```
@@ -62,36 +62,27 @@ ObjectStore
 Keys are the existing GCS blob names, unchanged, so **the on-disk layout is the same
 layout as the bucket** and one can be copied to the other with `gsutil rsync`.
 
-Eight of those are abstract. `upload_file`, `download_file`, and `copy` have working
-defaults derived from the primitives, so a minimal backend can skip them and override only
-what its service does better — GCS copies server-side, for instance, which matters because
-forking a run copies its whole dataset. `read_text`, `write_text`, `uri`, and
-`signed_upload_url` are also defaulted.
+`read_text`, `write_text`, `uri`, and `signed_upload_url` (default `None`) are derived;
+everything else each backend implements. Keys are built in one place,
+`autodiscovery_jobs/keys.py`, so the layout is spelled out once.
 
 ### Making a filesystem behave like an object store
 
-Two GCS behaviors the rest of the code already depended on had to be reproduced:
+Three GCS behaviors the rest of the code already depended on had to be reproduced:
 
 | GCS behavior | `FilesystemStore` implementation |
 | --- | --- |
 | No directories — a prefix stops existing once its last object is deleted | Deletes prune the directories they empty; `list_dirs` skips directories with no objects beneath them. Otherwise deleted users/runs would linger in listings. |
+| `matchGlob` on listings, where `*` does not cross `/` | `glob_to_regex()` (`*` → `[^/]*`, `**` → `.*`), applied while walking. Deliberately **not** `fnmatch`, whose `*` crosses `/` and would make `users/*/jobs/*/x.json` match arbitrarily deep keys. On GCS the glob is pushed to the API, so the metrics scan and the shared-run owner lookup return one object per run instead of listing the whole bucket. |
 | Object writes are atomic; a reader never sees a partial object | Writes stage into a uniquely-named `.ad-staging.*` file in the destination directory and `os.replace` into place; listings skip staging files. This matters because the API polls run files *while the job container writes them*. |
 
 `created_at` comes from `st_mtime` (POSIX has no portable creation time); these objects are
 written once, so it is the same instant in practice. Dataset expiry depends on it.
 
-Two further GCS features were deliberately **left off the interface** rather than
-reproduced, because each existed for a handful of rare callers and would have obliged every
-backend to implement — or quietly fake — a guarantee it cannot make:
+One GCS feature was deliberately **left off the interface**, because it existed for one
+rare caller and would have obliged every backend to implement — or quietly fake — a
+guarantee it cannot make:
 
-- **`matchGlob`.** Only GCS has server-side pattern matching; S3-compatible stores and
-  filesystems do not. Its three callers are all cold paths — the metrics scan's job
-  discovery (at most once per five-minute refresh, file-locked to one worker), the
-  per-job experiment count (inside an already-narrow `output/` prefix), and the
-  shared-run owner lookup's index-miss fallback. They now filter returned keys
-  themselves. The cost is a longer listing on a cold path; the benefit is that no
-  backend has to reimplement GCS's specific glob semantics (where `*` does not cross
-  `/` — note `fnmatch` gets this wrong).
 - **Atomic create-if-absent.** One caller: the `--acquire-lock` flag on the
   completion-email job, which only runs in the hosted deployment. It now uses GCS's
   generation precondition directly, in `scripts/send_completion_emails.py`, and refuses
@@ -146,32 +137,14 @@ temp file before storing it — a second full copy of a multi-GB upload on the A
 container's disk. It now streams `file.stream` into the store. This is also why the proxy's
 `client_max_body_size` for `/api` is load-bearing again.
 
-### Capabilities, not backend names
+### Backend checks are `isinstance` checks
 
-Two things outside the store need to know what a store can do: the job backend (how do I
-give a container this data as files?) and the startup validator (can an off-host consumer
-read it?). Both ask the store class, never its configured name:
-
-```python
-class ObjectStore:
-    job_data_mount: JobDataMount = JobDataMount.UNSUPPORTED  # HOST_PATH | GCSFUSE | UNSUPPORTED
-    gs_addressable: bool = False
-```
-
-Both default to "no", so a backend that declares nothing is **refused with a clear error**
-rather than inheriting whichever branch happened to be the fallback. That mattered: an
-earlier draft compared `storage_backend == "gcs"` and bind-mounted a host path in the
-`else`, which for a hypothetical S3 backend would have launched a job against a directory
-that doesn't exist.
-
-`gs_addressable` is narrower than "is remote" deliberately. The two off-host consumers —
-Cloud Run's GCS volume mount and the Modal sandbox's `--bucket_path` — understand Google
-Cloud Storage specifically, not object storage in general, so an S3-backed store is remote
-*and* still unusable by them.
-
-Both are read from the **class**, not an instance: `FilesystemStore.__init__` creates its
-root directory, and merely validating configuration shouldn't `mkdir` a possibly-unwritable
-`STORAGE_DIR`.
+Two things outside the store need to know which backend is active: the docker job backend
+(bind-mount a host directory, or gcsfuse-mount the bucket?) and the startup validator (can
+Cloud Run or Modal reach this data?). Both call `get_store(config)` and `isinstance` the
+result against `GcsStore`, the same way `asta_gcs.py` and the preloaded-dataset sync do.
+Constructing a store is side-effect-free — `FilesystemStore` creates its root on first
+write, not in `__init__` — so validating configuration never touches the filesystem.
 
 ### Combinations that cannot work
 
@@ -220,10 +193,11 @@ daemon, so the host path is passed out-of-band by compose.
 packages/autodiscovery_jobs/src/autodiscovery_jobs/
   storage/
     __init__.py        # get_store(config) factory, STORAGE_BACKENDS
-    base.py            # ObjectStore ABC, ObjectInfo, JobDataMount
+    base.py            # ObjectStore ABC, ObjectInfo, glob_to_regex
     gcs.py             # GcsStore (google-cloud-storage)
     local.py           # FilesystemStore (atomic writes, prefix pruning)
-  persistence.py       # functional job-data API (was gcs.py), owns the key layout
+  keys.py              # the key layout, built in one place
+  persistence.py       # functional job-data API (was gcs.py)
   gcs.py               # backward-compat shim re-exporting persistence
   client.py            # cached storage.Client, now only used by GcsStore
 ```
@@ -233,45 +207,26 @@ package, mirroring the `cloudrun.py` shim from the job-backend change. In-repo i
 point at `persistence`; note that patching a name on the shim does **not** affect callers
 that imported it from `persistence`, so tests must target the real module.
 
-### Adding a third backend
+### Using other storage
 
-There are two levels of effort, and the cheap one is probably the right one.
+`FilesystemStore` is a POSIX-tree implementation, not a "local disk only" one, so anything
+the operator can mount works with no code: NFS, s3fs, Azure Files, JuiceFS, a SAN. Point
+`STORAGE_DIR` at the mount and the whole application runs, job containers included.
 
-**Tier 1 — no code.** Mount your storage and use `local`. `FilesystemStore` is a POSIX-tree
-implementation, not a "local disk only" one, so anything the operator can mount works: NFS,
-s3fs, Azure Files, JuiceFS, a SAN. Point `STORAGE_DIR` at the mount and the whole
-application runs — including the job containers, which get a bind mount of the run's
-subdirectory and never learn where the bytes actually live.
-
-What you give up, all of it a consequence of a filesystem not being an object store:
+What a mount gives up, all of it a consequence of a filesystem not being an object store:
 
 | | Cost on a mount |
 | --- | --- |
 | Presigned uploads | Gone. Every dataset upload streams through the API instead of going browser→storage. |
-| Prefix listings | A directory walk rather than one paginated request. The metrics scan lists everything under `users/`; over a mount that's one readdir per directory. |
-| `copy` | No server-side copy, so forking a run pulls its dataset down and pushes it back up through the API. |
+| Prefix and glob listings | A directory walk rather than one paginated request. |
+| `copy` | No server-side copy, so forking a run reads the dataset and writes it back through the API. |
 | Atomic replace | `os.replace` is atomic on a real filesystem; over a FUSE object-store adapter a rename is typically copy+delete, so a reader can observe a partial object. |
 
-For a single-operator or on-prem deployment none of those usually bite: uploads through the
-API are fine, and a few hundred runs makes a directory walk cheap. The completion-email job,
-which is the one thing that needs a guarantee a mount can't give, only runs in the hosted
-deployment and now keeps its own GCS-specific lock.
-
-**Tier 2 — a subclass.** Implement the eight abstract members of `ObjectStore` (~150 lines
-for S3/MinIO), declare `job_data_mount` and `gs_addressable`, and register the class in
-`_STORES` in `storage/__init__.py`. Worth it when the Tier-1 costs above actually hurt.
-A Tier-2 backend that isn't presentable as a POSIX tree also has to answer the job-container
-question — leaving `job_data_mount` at `UNSUPPORTED` means jobs are refused, so such a
-backend needs a new `JobDataMount` mechanism (e.g. its own FUSE adapter) implemented in the
-job backend.
-
-`tests/test_storage.py::MinimalStore` is a dict-backed store implementing exactly those eight
-members; `test_persistence_api_works_against_a_minimal_store` runs the functional layer
-against it, which is the executable statement of the contract.
-
-Note that registration is still a source edit — there are no entry points. That's a
-deliberate stopping point, not an oversight: a plugin mechanism can be added when a third
-backend actually exists to justify its shape.
+For a single-operator or on-prem deployment none of those usually bite. If they do, a native
+backend is a subclass of `ObjectStore` plus a branch in `get_store()`; the two `isinstance`
+sites above are where it would need to say how job containers reach its data. There is no
+registry or plugin mechanism, on purpose: one can be added when a third backend exists to
+justify its shape.
 
 ### Configuration
 
@@ -291,20 +246,16 @@ backend raises a clear error if it is relative.
 
 ### Deltas from the proposal
 
-- The job backend and the validator ask the store class for capabilities
-  (`job_data_mount`, `gs_addressable`) instead of comparing `storage_backend` strings, and
-  the factory became a name→class registry so those capabilities are readable without
-  constructing a store. This came out of review: the name comparisons meant an unrecognized
-  backend silently took a fallback branch rather than being rejected.
-- `LocalStore` was renamed `FilesystemStore`, because the Tier-1 story above is "any POSIX
-  tree you can mount", not "local dev only". The configured name stays `local`, which
-  remains accurate about the constraint that matters (the data is only reachable from this
-  host, which is what rules out Cloud Run and Modal).
-- `upload_file`, `download_file`, and `copy` moved from abstract to defaulted, and
-  `match_glob` / `create_exclusive` were dropped entirely — cutting the required surface
-  from twelve members to eight. The two dropped ones each served a few rare callers while
-  obliging every backend to reproduce a GCS-specific guarantee; see above.
-
+- `LocalStore` was renamed `FilesystemStore`, because the story above is "any POSIX tree you
+  can mount", not "local dev only". The configured name stays `local`, which remains
+  accurate about the constraint that matters (the data is only reachable from this host,
+  which is what rules out Cloud Run and Modal).
+- An intermediate draft replaced the backend-name checks with declared capabilities on the
+  store class (`job_data_mount`, `gs_addressable`) and a name→class registry, and dropped
+  `match_glob` from the interface. Both were reverted in review: the capabilities were
+  machinery for a third backend that does not exist, and removing `match_glob` turned the
+  shared-run owner lookup and the metrics discovery into full-bucket listings on GCS.
+- `create_exclusive` (atomic create-if-absent) was dropped from the interface; see above.
 - `GCSError` is now an alias of the new `StorageError` rather than being renamed, so
   existing `except GCSError` sites and imports keep working.
 - The `generate-upload-url` response keeps its `gcs_path` field name (now carrying a

@@ -17,7 +17,7 @@ from google.cloud.exceptions import NotFound
 
 from ..client import get_storage_client
 from ..exceptions import ObjectNotFoundError, StorageError
-from .base import JobDataMount, ObjectInfo, ObjectStore
+from .base import ObjectInfo, ObjectStore
 
 if TYPE_CHECKING:
     from google.cloud import storage
@@ -28,14 +28,6 @@ class GcsStore(ObjectStore):
 
     Object keys map 1:1 onto blob names in ``bucket``.
     """
-
-    #: Job containers mount the bucket themselves with gcsfuse (Cloud Run does it
-    #: for them via a GCS volume).
-    job_data_mount = JobDataMount.GCSFUSE
-
-    #: Objects are ``gs://<bucket>/<key>``, so Cloud Run volumes and Modal sandboxes
-    #: can read run data without going through this process.
-    gs_addressable = True
 
     def __init__(self, bucket: str, project_id: str | None = None):
         """Bind the store to a bucket.
@@ -138,12 +130,14 @@ class GcsStore(ObjectStore):
         self,
         prefix: str = "",
         *,
+        match_glob: str | None = None,
         limit: int | None = None,
     ) -> Iterator[ObjectInfo]:
-        """List blobs, pushing the prefix and limit down to the GCS API."""
+        """List blobs, pushing prefix, glob, and limit down to the GCS API."""
         try:
             blobs = self._bucket().list_blobs(
                 prefix=prefix or None,
+                match_glob=match_glob,
                 max_results=limit,
             )
             for blob in blobs:

@@ -67,7 +67,7 @@ interchangeable (`gsutil rsync` moves data either way). See
 > local-disk-only one. If you can *mount* your storage — NFS, s3fs, Azure Files, JuiceFS, a
 > SAN — point `STORAGE_DIR` at the mount and everything works, job containers included. You
 > trade away presigned uploads, single-request prefix listings, and server-side copy; see
-> [Adding a third backend](design/storage-backends.md#adding-a-third-backend) for whether
+> [Using other storage](design/storage-backends.md#using-other-storage) for whether
 > that matters at your scale.
 
 | Variable | Required | Default | Description |

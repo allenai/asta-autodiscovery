@@ -1,17 +1,6 @@
 """Job data persistence — the functional API over the configured object store.
 
-This module owns the **key layout** for everything a run persists::
-
-    users/<userid>/user.json                            # user profile
-    users/<userid>/jobs/<jobid>/metadata.json           # run configuration
-    users/<userid>/jobs/<jobid>/run_details.json        # execution state
-    users/<userid>/jobs/<jobid>/email_state.json        # notification state
-    users/<userid>/jobs/<jobid>/data/<filename>         # uploaded datasets
-    users/<userid>/jobs/<jobid>/output/args.json        # resolved job args
-    users/<userid>/jobs/<jobid>/output/mcts_node_*.json # experiment results
-    index/shared-runs/<jobid>                           # shared-run owner index
-
-Reads and writes go through a swappable :class:`~autodiscovery_jobs.storage.ObjectStore`
+Keys follow the layout in :mod:`autodiscovery_jobs.keys`. Reads and writes go through a swappable :class:`~autodiscovery_jobs.storage.ObjectStore`
 (:mod:`autodiscovery_jobs.storage`), so the same layout lives in a GCS bucket or
 in a host directory depending on ``STORAGE_BACKEND``. The AD job container sees
 the ``users/<userid>/jobs/<jobid>/`` subtree as a filesystem mount either way.
@@ -24,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import keys
 from .config import JobConfig
 from .exceptions import (
     JobAlreadyExistsError,
@@ -57,11 +47,6 @@ def _store(config: JobConfig | None) -> tuple[ObjectStore, JobConfig]:
     """
     config = config or JobConfig.from_env()
     return get_store(config), config
-
-
-def _job_prefix(userid: str, jobid: str) -> str:
-    """Key prefix holding everything for one run."""
-    return f"users/{userid}/jobs/{jobid}/"
 
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
@@ -106,7 +91,7 @@ def get_user_path(userid: str, config: JobConfig | None = None) -> str:
         URI like "gs://bucket/users/{userid}/" or "file:///data/users/{userid}/"
     """
     store, _ = _store(config)
-    return store.uri(f"users/{userid}/")
+    return store.uri(keys.user_prefix(userid))
 
 
 def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> str:
@@ -121,7 +106,7 @@ def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> st
         URI like "gs://bucket/users/{userid}/jobs/{jobid}/"
     """
     store, _ = _store(config)
-    return store.uri(_job_prefix(userid, jobid))
+    return store.uri(keys.job_prefix(userid, jobid))
 
 
 def list_user_ids(config: JobConfig | None = None) -> list[str]:
@@ -160,7 +145,7 @@ def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
     """
     store, _ = _store(config)
     try:
-        return store.list_dirs(f"users/{userid}/jobs/")
+        return store.list_dirs(f"{keys.user_prefix(userid)}jobs/")
     except StorageError:
         raise
     except Exception as e:
@@ -182,11 +167,11 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
     """
     store, _ = _store(config)
 
-    # Scans every key under users/. This is the index-miss fallback for shared-run
-    # lookups (see JobManager.get_shared_run_owner), so it is a cold path; filtering
-    # here rather than server-side keeps pattern matching out of the store interface.
+    # The glob is pushed to the service where possible (GCS matchGlob), so this
+    # returns at most one object rather than listing the whole bucket. The key is
+    # still re-checked because jobid comes from a URL and could contain glob chars.
     try:
-        for info in store.list("users/"):
+        for info in store.list("users/", match_glob=f"users/*/jobs/{jobid}/metadata.json"):
             # key looks like: "users/{userid}/jobs/{jobid}/metadata.json"
             parts = info.key.split("/")
             if len(parts) == 5 and parts[3] == jobid and parts[4] == "metadata.json":
@@ -196,11 +181,6 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
         raise
     except Exception as e:
         raise StorageError(f"Failed to find user for job {jobid}: {e}")
-
-
-def _shared_run_index_key(jobid: str) -> str:
-    """Return the object key for a shared run index entry."""
-    return f"index/shared-runs/{jobid}"
 
 
 def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | None:
@@ -215,7 +195,7 @@ def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | N
     """
     store, _ = _store(config)
     try:
-        data = json.loads(store.read_text(_shared_run_index_key(jobid)))
+        data = json.loads(store.read_text(keys.shared_run_index_key(jobid)))
         return data["userid"]
     except Exception:
         return None
@@ -232,7 +212,7 @@ def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = N
     store, _ = _store(config)
     try:
         store.write_text(
-            _shared_run_index_key(jobid), json.dumps({"runid": jobid, "userid": userid})
+            keys.shared_run_index_key(jobid), json.dumps({"runid": jobid, "userid": userid})
         )
     except Exception:
         pass  # Best-effort; the glob fallback covers misses
@@ -247,7 +227,7 @@ def delete_shared_run_index(jobid: str, config: JobConfig | None = None) -> None
     """
     store, _ = _store(config)
     try:
-        store.delete(_shared_run_index_key(jobid))
+        store.delete(keys.shared_run_index_key(jobid))
     except Exception:
         pass  # Best-effort; entry may not exist
 
@@ -265,7 +245,7 @@ def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool
     """
     store, _ = _store(config)
     try:
-        return any(store.list(_job_prefix(userid, jobid), limit=1))
+        return any(store.list(keys.job_prefix(userid, jobid), limit=1))
     except Exception:
         return False
 
@@ -297,7 +277,7 @@ def create_job_directory(
     if not overwrite and job_exists(userid, jobid, config):
         raise JobAlreadyExistsError(f"Job {jobid} already exists for user {userid}")
 
-    base = _job_prefix(userid, jobid)
+    base = keys.job_prefix(userid, jobid)
 
     try:
         # Create placeholder files to establish directory structure
@@ -336,8 +316,8 @@ def copy_job_data_files(
     """
     store, _ = _store(config)
 
-    source_prefix = f"{_job_prefix(source_userid, source_jobid)}data/"
-    dest_prefix = f"{_job_prefix(dest_userid, dest_jobid)}data/"
+    source_prefix = f"{keys.job_prefix(source_userid, source_jobid)}data/"
+    dest_prefix = f"{keys.job_prefix(dest_userid, dest_jobid)}data/"
 
     copied_files: list[str] = []
 
@@ -370,7 +350,7 @@ def has_data_files(
         True if the job's data/ directory contains at least one real file
     """
     store, _ = _store(config)
-    prefix = f"{_job_prefix(userid, jobid)}data/"
+    prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
     for info in store.list(prefix, limit=10):
         filename = info.key[len(prefix):]
@@ -396,7 +376,7 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    prefix = _job_prefix(userid, jobid)
+    prefix = keys.job_prefix(userid, jobid)
 
     try:
         # Materialize the listing before deleting, so mutation can't disturb it.
@@ -439,7 +419,7 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    job_prefix = _job_prefix(userid, jobid)
+    job_prefix = keys.job_prefix(userid, jobid)
     data_prefix = f"{job_prefix}data/"
     deleted_files = []
 
@@ -509,7 +489,7 @@ def upload_dataset(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    data_prefix = f"{_job_prefix(userid, jobid)}data/"
+    data_prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
     try:
         if local_path.is_file():
@@ -563,7 +543,7 @@ def expire_datasets(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    prefix = f"{_job_prefix(userid, jobid)}data/"
+    prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
     # Calculate cutoff time
     cutoff_time = datetime.now(UTC) - timedelta(days=max_age_days)
@@ -616,7 +596,7 @@ def upload_metadata(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    key = f"{_job_prefix(userid, jobid)}metadata.json"
+    key = f"{keys.job_prefix(userid, jobid)}metadata.json"
 
     try:
         store.write_text(key, json.dumps(metadata, indent=2), content_type="application/json")
@@ -648,7 +628,7 @@ def upload_job_args(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    key = f"{_job_prefix(userid, jobid)}output/args.json"
+    key = f"{keys.job_prefix(userid, jobid)}output/args.json"
 
     try:
         store.write_text(key, json.dumps(args, indent=2), content_type="application/json")
@@ -680,7 +660,7 @@ def get_metadata_or_none(
     store, _ = _store(config)
 
     try:
-        return json.loads(store.read_text(f"{_job_prefix(userid, jobid)}metadata.json"))
+        return json.loads(store.read_text(f"{keys.job_prefix(userid, jobid)}metadata.json"))
     except ObjectNotFoundError:
         return None
     except Exception as e:
@@ -736,7 +716,7 @@ def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) ->
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    prefix = f"{_job_prefix(userid, jobid)}output/"
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
         return [
@@ -773,7 +753,7 @@ def download_job_results(
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    prefix = f"{_job_prefix(userid, jobid)}output/"
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
         downloaded = []
@@ -816,7 +796,7 @@ def count_experiment_results(userid: str, jobid: str, config: JobConfig | None =
     """
     store, _ = _store(config)
 
-    prefix = f"{_job_prefix(userid, jobid)}output/"
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
         count = 0
@@ -849,7 +829,7 @@ def get_job_args(userid: str, jobid: str, config: JobConfig | None = None) -> di
     """
     store, _ = _store(config)
 
-    key = f"{_job_prefix(userid, jobid)}output/args.json"
+    key = f"{keys.job_prefix(userid, jobid)}output/args.json"
 
     # Read directly rather than pre-checking existence with a separate
     # request; a miss surfaces as ObjectNotFoundError and is handled like before.
@@ -888,7 +868,7 @@ def list_experiment_files(userid: str, jobid: str, config: JobConfig | None = No
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    prefix = f"{_job_prefix(userid, jobid)}output/"
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
         filenames = []
@@ -922,7 +902,7 @@ def read_experiment_node(
     """
     store, _ = _store(config)
 
-    key = f"{_job_prefix(userid, jobid)}output/{filename}"
+    key = f"{keys.job_prefix(userid, jobid)}output/{filename}"
 
     try:
         return json.loads(store.read_text(key))
@@ -960,7 +940,7 @@ def read_rich_outputs(
     store, _ = _store(config)
 
     filename = f"ro_{level}_{index}.json"
-    key = f"{_job_prefix(userid, jobid)}output/rich_outputs/{filename}"
+    key = f"{keys.job_prefix(userid, jobid)}output/rich_outputs/{filename}"
 
     try:
         parsed = json.loads(store.read_text(key))
@@ -997,7 +977,7 @@ def dataset_key(userid: str, jobid: str, filename: str) -> str:
     Returns:
         Object key under the job's data/ prefix.
     """
-    return f"{_job_prefix(userid, jobid)}data/{filename}"
+    return f"{keys.job_prefix(userid, jobid)}data/{filename}"
 
 
 def generate_upload_url(
@@ -1176,7 +1156,7 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
     _validate_userid(userid)
     store, config = _store(config)
 
-    user_prefix = f"users/{userid}/"
+    user_prefix = keys.user_prefix(userid)
     jobs_prefix = f"{user_prefix}jobs/"
     profile_key = f"{user_prefix}user.json"
 
@@ -1265,7 +1245,7 @@ def purge_user_data(
     """
     _validate_userid(userid)
     store, config = _store(config)
-    user_prefix = f"users/{userid}/"
+    user_prefix = keys.user_prefix(userid)
 
     deleted_objects: list[str] = []
     deleted_bytes = 0

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from . import keys
 from .config import JobConfig
 from .storage import get_store
 
@@ -95,7 +96,7 @@ def get_run_details_path(userid: str, runid: str) -> str:
     Returns:
         Object key for run_details.json
     """
-    return f"users/{userid}/jobs/{runid}/run_details.json"
+    return keys.job_key(userid, runid, "run_details.json")
 
 
 def create_run_details(

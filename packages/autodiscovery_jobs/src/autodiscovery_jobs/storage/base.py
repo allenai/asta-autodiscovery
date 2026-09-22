@@ -16,39 +16,45 @@ backend is a deployment choice rather than a code dependency. See
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import BinaryIO
 
 
-class JobDataMount(Enum):
-    """How a job container can be handed one run's subtree of a store as files.
+def glob_to_regex(pattern: str) -> re.Pattern[str]:
+    """Compile a key glob with GCS ``matchGlob`` semantics.
 
-    The AD job reads its inputs and writes its results as ordinary files, so every
-    store must be presentable to a container as a filesystem mount. Only the job
-    backend knows how to build a container, so a store declares *which mechanism*
-    applies and the backend implements it.
+    ``*`` and ``?`` match within one path segment (they never cross ``/``);
+    ``**`` matches across segments. Everything else is literal. This is *not*
+    :mod:`fnmatch`, whose ``*`` crosses ``/`` and would make
+    ``users/*/jobs/*/x.json`` match arbitrarily deep keys.
 
-    This deliberately enumerates the mechanisms this codebase implements rather
-    than pretending to be open-ended: a new store either reuses one of them or is
-    rejected with a clear error instead of silently getting the wrong mount.
+    Args:
+        pattern: Glob over full keys, e.g. ``users/*/jobs/*/run_details.json``.
+
+    Returns:
+        A compiled pattern; use :meth:`re.Pattern.fullmatch` against the key.
     """
-
-    #: The store is a POSIX directory tree on this host; bind-mount the run's
-    #: subdirectory. Covers anything the operator has mounted locally — a plain
-    #: directory, NFS, s3fs, JuiceFS — with no code and no credentials in the job.
-    HOST_PATH = "host_path"
-
-    #: The container mounts the bucket itself with gcsfuse, scoped to the run's
-    #: prefix. Needs GCP credentials, `/dev/fuse`, and `CAP_SYS_ADMIN`.
-    GCSFUSE = "gcsfuse"
-
-    #: No known way to present this store to a job container.
-    UNSUPPORTED = "unsupported"
+    out: list[str] = []
+    i = 0
+    while i < len(pattern):
+        ch = pattern[i]
+        if pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+            continue
+        if ch == "*":
+            out.append("[^/]*")
+        elif ch == "?":
+            out.append("[^/]")
+        else:
+            out.append(re.escape(ch))
+        i += 1
+    return re.compile("".join(out))
 
 
 @dataclass(frozen=True)
@@ -72,35 +78,14 @@ class ObjectStore(ABC):
     """Abstract keyed blob store backing all AutoDiscovery persistence.
 
     Implementations are safe to share across threads (the API scans jobs from a
-    thread pool) and are expected to be cheap to construct after the first call,
-    since helpers obtain one per operation.
+    thread pool) and must be cheap and side-effect-free to construct, since
+    helpers obtain one per operation and configuration validation constructs one
+    just to inspect it.
 
     Reads of a missing key raise :class:`~autodiscovery_jobs.exceptions.ObjectNotFoundError`;
     any other failure raises :class:`~autodiscovery_jobs.exceptions.StorageError`.
     Deletes of a missing key are a no-op, so cleanup paths are idempotent.
-
-    A subclass must implement the eight abstract members below. ``upload_file``,
-    ``download_file``, and ``copy`` have working (if unoptimized) defaults derived
-    from those, so a minimal backend can skip them and override only the ones its
-    service can do better — GCS, for instance, copies server-side.
-
-    The two class attributes are *capabilities*: they let the job backend and the
-    startup validator ask what a store can do instead of comparing its name, so a
-    third backend fails loudly rather than inheriting whichever branch happened to
-    be the fallback.
     """
-
-    #: How a job container can be given a run's data as files. Declaring
-    #: :attr:`JobDataMount.UNSUPPORTED` (the default) means jobs cannot run against
-    #: this store, and the job backend says so instead of guessing.
-    job_data_mount: JobDataMount = JobDataMount.UNSUPPORTED
-
-    #: Whether objects are addressable as ``gs://<bucket>/<key>``. This is narrower
-    #: than "is remote" on purpose: the two consumers that read run data from off
-    #: this host — Cloud Run's GCS volume mount and the Modal sandbox's
-    #: ``--bucket_path`` — both understand Google Cloud Storage specifically, not
-    #: object storage in general.
-    gs_addressable: bool = False
 
     @property
     @abstractmethod
@@ -146,19 +131,17 @@ class ObjectStore(ABC):
         """Return whether an object exists at ``key``."""
         ...
 
+    @abstractmethod
     def download_file(self, key: str, local_path: Path) -> None:
         """Write an object's contents to a local file.
 
         The parent directory of ``local_path`` must already exist.
 
-        Buffers the whole object in memory; override when the backend can stream
-        or has a native download.
-
         Raises:
             ObjectNotFoundError: If the key does not exist.
             StorageError: If the download fails for any other reason.
         """
-        local_path.write_bytes(self.read_bytes(key))
+        ...
 
     # Writes
 
@@ -179,14 +162,10 @@ class ObjectStore(ABC):
         """
         ...
 
+    @abstractmethod
     def upload_file(self, key: str, local_path: Path) -> None:
-        """Copy a local file's contents to ``key``.
-
-        Streams through :meth:`write_stream`; override when the backend has a
-        native upload-from-path.
-        """
-        with open(local_path, "rb") as fh:
-            self.write_stream(key, fh)
+        """Copy a local file's contents to ``key``."""
+        ...
 
     # Deletes, copies, listing
 
@@ -195,36 +174,35 @@ class ObjectStore(ABC):
         """Delete ``key``. Missing keys are not an error."""
         ...
 
+    @abstractmethod
     def copy(self, source_key: str, dest_key: str) -> None:
         """Copy ``source_key`` to ``dest_key`` within this store.
 
-        Reads and re-writes the bytes. **Override this** if the backend can copy
-        server-side: forking a run copies its whole dataset, so the default sends
-        every byte through this process twice.
+        Forking a run copies its whole dataset, so backends that can copy
+        server-side should.
 
         Raises:
             ObjectNotFoundError: If ``source_key`` does not exist.
         """
-        self.write_bytes(dest_key, self.read_bytes(source_key))
+        ...
 
     @abstractmethod
     def list(
         self,
         prefix: str = "",
         *,
+        match_glob: str | None = None,
         limit: int | None = None,
     ) -> Iterator[ObjectInfo]:
         """Iterate over objects whose key starts with ``prefix``.
 
-        There is deliberately no server-side pattern filter. GCS has one
-        (``matchGlob``) and S3-compatible stores and filesystems do not, and every
-        caller that wanted one is a rare operation — the metrics scan (once per five
-        minutes) and the shared-run owner lookup's index-miss fallback. They filter
-        the returned keys themselves, which costs a longer listing on a cold path in
-        exchange for one less semantic every backend has to reproduce.
-
         Args:
             prefix: Key prefix to restrict the listing to (``""`` lists all).
+            match_glob: Glob over the *full key* with :func:`glob_to_regex`
+                semantics (``*`` does not cross ``/``). Backends push this to the
+                service when they can (GCS ``matchGlob``), so callers that only
+                want one file per run out of a large tree should use it rather
+                than filter a full listing themselves.
             limit: Stop after this many objects. Callers that only need
                 existence should pass ``limit=1``.
 

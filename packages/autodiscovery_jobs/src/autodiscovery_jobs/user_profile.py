@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from . import keys
 from .config import JobConfig
 from .exceptions import ObjectNotFoundError
 from .storage import get_store
@@ -79,7 +80,7 @@ def get_user_profile_path(userid: str) -> str:
     Returns:
         Object key for user.json
     """
-    return f"users/{userid}/user.json"
+    return f"{keys.user_prefix(userid)}user.json"
 
 
 def create_user_profile(

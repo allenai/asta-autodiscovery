@@ -20,11 +20,8 @@ from autodiscovery_jobs.exceptions import (
 from autodiscovery_jobs.storage import (
     FilesystemStore,
     GcsStore,
-    JobDataMount,
-    ObjectInfo,
-    ObjectStore,
     get_store,
-    get_store_class,
+    glob_to_regex,
 )
 
 # ---------------------------------------------------------------------------
@@ -47,152 +44,49 @@ def test_get_store_unknown():
         get_store(JobConfig(storage_backend="s3"))
 
 
-def test_get_store_class_unknown():
-    with pytest.raises(StorageBackendError):
-        get_store_class("s3")
-
-
-def test_local_store_creates_root(tmp_path):
+def test_local_store_constructs_without_touching_disk(tmp_path):
+    """Validation constructs a store just to inspect it; that must not mkdir."""
     root = tmp_path / "nested" / "data"
-    FilesystemStore(root)
+    store = FilesystemStore(root)
+    assert not root.exists()
+    assert list(store.list()) == []
+    assert store.list_dirs("users/") == []
+
+    store.write_text("users/u1/a.json", "{}")
     assert root.is_dir()
 
 
 # ---------------------------------------------------------------------------
-# Capabilities
+# Glob semantics (must match GCS matchGlob)
 # ---------------------------------------------------------------------------
 
 
-def test_declared_capabilities():
-    assert FilesystemStore.job_data_mount is JobDataMount.HOST_PATH
-    assert FilesystemStore.gs_addressable is False
-
-    assert GcsStore.job_data_mount is JobDataMount.GCSFUSE
-    assert GcsStore.gs_addressable is True
-
-
-def test_capabilities_default_to_refusing():
-    """A backend that declares nothing inherits "no", so it's rejected not defaulted."""
-    assert ObjectStore.job_data_mount is JobDataMount.UNSUPPORTED
-    assert ObjectStore.gs_addressable is False
-
-
-def test_capabilities_are_readable_without_constructing_a_store():
-    """Validation and job launching read the class; instantiating has side effects.
-
-    ``FilesystemStore.__init__`` creates its root directory, so asking a *class*
-    for its capabilities must not touch the filesystem — otherwise merely starting
-    a JobManager would mkdir the (possibly unwritable) default STORAGE_DIR.
-    """
-    store_class = get_store_class("local")
-    assert store_class.job_data_mount is JobDataMount.HOST_PATH  # no instance built
-
-
-# ---------------------------------------------------------------------------
-# Derived defaults (what a minimal third-party backend inherits)
-# ---------------------------------------------------------------------------
-
-
-class MinimalStore(ObjectStore):
-    """The smallest useful backend: the 8 abstract members over a dict.
-
-    Exists to pin the contract a third-party implementation actually has to meet —
-    ``upload_file``, ``download_file``, and ``copy`` are deliberately not
-    implemented here, so these tests exercise the base class's derived versions.
-    """
-
-    job_data_mount = JobDataMount.HOST_PATH
-
-    def __init__(self):
-        self.objects: dict[str, bytes] = {}
-
-    @property
-    def root_uri(self):
-        return "mem://test"
-
-    def read_bytes(self, key):
-        if key not in self.objects:
-            raise ObjectNotFoundError(key)
-        return self.objects[key]
-
-    def exists(self, key):
-        return key in self.objects
-
-    def write_bytes(self, key, data, content_type=None):
-        self.objects[key] = data
-
-    def write_stream(self, key, stream, content_type=None):
-        self.objects[key] = stream.read()
-
-    def delete(self, key):
-        self.objects.pop(key, None)
-
-    def list(self, prefix="", *, limit=None):
-        count = 0
-        for key in sorted(self.objects):
-            if not key.startswith(prefix):
-                continue
-            yield ObjectInfo(key=key, size=len(self.objects[key]))
-            count += 1
-            if limit is not None and count >= limit:
-                return
-
-    def list_dirs(self, prefix):
-        return sorted({k[len(prefix):].split("/")[0] for k in self.objects if k.startswith(prefix)})
-
-
-def test_minimal_store_is_instantiable():
-    """i.e. the abstract surface really is only those eight members."""
-    MinimalStore()
-
-
-def test_derived_copy(tmp_path):
-    store = MinimalStore()
-    store.write_text("a.csv", "x,y")
-    store.copy("a.csv", "b.csv")
-    assert store.read_text("b.csv") == "x,y"
-
-
-def test_derived_upload_and_download_file(tmp_path):
-    store = MinimalStore()
-    src = tmp_path / "in.csv"
-    src.write_text("x,y")
-
-    store.upload_file("a.csv", src)
-    assert store.read_text("a.csv") == "x,y"
-
-    dest = tmp_path / "out.csv"
-    store.download_file("a.csv", dest)
-    assert dest.read_text() == "x,y"
-
-
-def test_derived_read_write_text_and_uri():
-    store = MinimalStore()
-    store.write_text("a.json", '{"k": 1}')
-    assert store.read_text("a.json") == '{"k": 1}'
-    assert store.uri("a.json") == "mem://test/a.json"
-
-
-def test_minimal_store_has_no_presigned_uploads():
-    assert MinimalStore().signed_upload_url("a.csv", "text/csv", 60) is None
-
-
-def test_persistence_api_works_against_a_minimal_store(monkeypatch):
-    """The whole functional layer runs on the nine-member contract alone."""
-    from autodiscovery_jobs import persistence
-
-    store = MinimalStore()
-    monkeypatch.setattr(persistence, "get_store", lambda config: store)
-    config = JobConfig()
-
-    persistence.create_job_directory("u1", "j1", config)
-    persistence.upload_metadata("u1", "j1", {"name": "run"}, config)
-
-    assert persistence.job_exists("u1", "j1", config) is True
-    assert persistence.get_metadata("u1", "j1", config) == {"name": "run"}
-    assert persistence.list_user_ids(config) == ["u1"]
-    assert persistence.list_user_jobs("u1", config) == ["j1"]
-    assert persistence.get_userid_for_job("j1", config) == "u1"
+@pytest.mark.parametrize(
+    "pattern,key,matches",
+    [
+        ("users/*/jobs/*/run_details.json", "users/u1/jobs/j1/run_details.json", True),
+        # `*` must not cross `/` -- fnmatch would get this wrong.
+        ("users/*/jobs/*/run_details.json", "users/u1/x/jobs/j1/run_details.json", False),
+        ("users/*/jobs/*/run_details.json", "users/u1/jobs/j1/output/run_details.json", False),
+        ("users/**/run_details.json", "users/u1/jobs/j1/run_details.json", True),
+        (
+            "users/u1/jobs/j1/output/mcts_node_*_*.json",
+            "users/u1/jobs/j1/output/mcts_node_1_2.json",
+            True,
+        ),
+        (
+            "users/u1/jobs/j1/output/mcts_node_*_*.json",
+            "users/u1/jobs/j1/output/rich_outputs/mcts_node_1_2.json",
+            False,
+        ),
+        # `?` is one non-slash character; regex metachars in the pattern are literal.
+        ("a?c.json", "abc.json", True),
+        ("a?c.json", "a/c.json", False),
+        ("a.json", "aXjson", False),
+    ],
+)
+def test_glob_to_regex(pattern, key, matches):
+    assert bool(glob_to_regex(pattern).fullmatch(key)) is matches
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +238,16 @@ def test_list_respects_limit(store):
     assert len(list(store.list("users/u1/", limit=2))) == 2
 
 
+def test_list_with_match_glob(store):
+    store.write_text("users/u1/jobs/j1/run_details.json", "{}")
+    store.write_text("users/u1/jobs/j1/metadata.json", "{}")
+    store.write_text("users/u1/jobs/j1/output/run_details.json", "{}")  # wrong depth
+    store.write_text("users/u2/jobs/j2/run_details.json", "{}")
+
+    keys = {i.key for i in store.list("users/", match_glob="users/*/jobs/*/run_details.json")}
+    assert keys == {"users/u1/jobs/j1/run_details.json", "users/u2/jobs/j2/run_details.json"}
+
+
 def test_list_reports_size_and_created_at(store):
     store.write_text("k", "12345")
     (info,) = list(store.list("k"))
@@ -395,14 +299,15 @@ def test_gcs_delete_tolerates_missing(mock_storage_client):
     GcsStore(bucket="test-bucket").delete("missing.json")  # does not raise
 
 
-def test_gcs_list_pushes_prefix_and_limit_to_the_api(mock_storage_client):
+def test_gcs_list_pushes_prefix_glob_and_limit_to_the_api(mock_storage_client):
     _, bucket = mock_storage_client
     bucket.list_blobs.return_value = iter([])
 
-    list(GcsStore(bucket="test-bucket").list("users/", limit=3))
+    list(GcsStore(bucket="test-bucket").list("users/", match_glob="users/*/x", limit=3))
 
     kwargs = bucket.list_blobs.call_args.kwargs
     assert kwargs["prefix"] == "users/"
+    assert kwargs["match_glob"] == "users/*/x"
     assert kwargs["max_results"] == 3
 
 

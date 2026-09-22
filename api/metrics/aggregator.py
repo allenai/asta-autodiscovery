@@ -16,7 +16,6 @@ import fcntl
 import json
 import logging
 import os
-import re
 import statistics
 import threading
 import time
@@ -26,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from autodiscovery_jobs import keys
 from autodiscovery_jobs.config import JobConfig
 from autodiscovery_jobs.storage import ObjectStore, get_store
 
@@ -47,8 +47,6 @@ STARTED_STATUSES = {"PENDING", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"}
 TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 # Historical runs may use either root filename; both are non-experiment init nodes.
 ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
-# Experiment result files, matched client-side now that listings are unfiltered.
-_EXPERIMENT_NODE_FILENAME = re.compile(r"mcts_node_\d+_\d+\.json$")
 
 # Where the persisted metrics cache snapshot lives in the shared store.
 # Loaded on cold start so pod restarts don't re-scan every job from scratch.
@@ -329,13 +327,12 @@ def _count_experiments_inline(
     Excludes the root initialisation node (legacy filename variants),
     which is not a real experiment.
     """
-    prefix = f"users/{userid}/jobs/{jobid}/output/"
+    prefix = keys.job_key(userid, jobid, "output/")
     try:
         return sum(
             1
-            for info in store.list(prefix)
-            if _EXPERIMENT_NODE_FILENAME.match(info.key.rsplit("/", 1)[-1])
-            and info.key.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
+            for info in store.list(prefix, match_glob=f"{prefix}mcts_node_*_*.json")
+            if info.key.rsplit("/", 1)[-1] not in ROOT_NODE_FILENAMES
         )
     except Exception:
         return 0
@@ -359,7 +356,7 @@ def _scan_job(
 ) -> JobSnapshot | None:
     """Scan a single job and build a snapshot. Returns None on critical failure."""
     try:
-        base_path = f"users/{userid}/jobs/{jobid}"
+        base_path = keys.job_dir(userid, jobid)
 
         # Read run_details.json
         run_details = _read_json(store, f"{base_path}/run_details.json")
@@ -429,15 +426,9 @@ def _scan_job(
 def _discover_jobs(
     store: ObjectStore,
 ) -> list[tuple[str, str]]:
-    """Discover all (userid, jobid) pairs by scanning for run_details.json keys.
-
-    Lists everything under users/ and picks out the run markers, rather than asking
-    the store for a server-side pattern match: only GCS can do that, and this runs
-    at most once per refresh interval (five minutes, and file-locked to one worker),
-    so the longer listing is not worth a capability every backend must implement.
-    """
+    """Discover all (userid, jobid) pairs with a single glob listing."""
     job_keys: list[tuple[str, str]] = []
-    for info in store.list("users/"):
+    for info in store.list("users/", match_glob="users/*/jobs/*/run_details.json"):
         # key: "users/{userid}/jobs/{jobid}/run_details.json"
         parts = info.key.split("/")
         if len(parts) == 5 and parts[2] == "jobs" and parts[4] == "run_details.json":

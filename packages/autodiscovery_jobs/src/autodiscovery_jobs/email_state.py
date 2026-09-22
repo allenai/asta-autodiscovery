@@ -22,6 +22,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
+from . import keys
 from .config import JobConfig
 from .storage import get_store
 
@@ -36,7 +37,7 @@ def get_email_state_path(userid: str, runid: str) -> str:
     Returns:
         Object key for email_state.json
     """
-    return f"users/{userid}/jobs/{runid}/email_state.json"
+    return keys.job_key(userid, runid, "email_state.json")
 
 
 def get_email_state(

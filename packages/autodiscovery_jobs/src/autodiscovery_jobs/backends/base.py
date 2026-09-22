@@ -17,6 +17,7 @@ from typing import Any
 
 from ..config import JobConfig
 from ..exceptions import JobBackendError
+from ..keys import job_dir
 
 # Code-execution backends the AD job understands (its --backend choices). "modal"
 # runs code in a remote Modal sandbox with a scoped, read-only per-job data mount;
@@ -30,22 +31,6 @@ _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
 #: reproduces the same path so job arguments stay backend-agnostic, whether the
 #: mount comes from GCS FUSE or a host bind mount.
 JOB_MOUNT_ROOT = "/mnt/gcs"
-
-
-def job_prefix(userid: str, jobid: str) -> str:
-    """Return the store key prefix (without trailing slash) holding one run's data.
-
-    Shared with :mod:`autodiscovery_jobs.persistence`'s key layout: backends need
-    it to scope the job container's mount to exactly this run.
-
-    Args:
-        userid: User identifier
-        jobid: Job identifier
-
-    Returns:
-        Prefix such as ``users/u1/jobs/j1``.
-    """
-    return f"users/{userid}/jobs/{jobid}"
 
 
 def build_job_args(
@@ -107,7 +92,7 @@ def build_job_args(
         )
 
     # Construct paths
-    job_base = job_prefix(userid, jobid)
+    job_base = job_dir(userid, jobid)
     metadata_path = f"{JOB_MOUNT_ROOT}/{job_base}/metadata.json"
     output_path = f"{JOB_MOUNT_ROOT}/{job_base}/output"
 

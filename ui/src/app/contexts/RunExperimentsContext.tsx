@@ -95,9 +95,6 @@ export const RunExperimentsProvider = ({
     const selectedExperimentRequestId = useRef<number>(0);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
     const shouldScrollToSelected = useRef<boolean>(true);
-    const currentRunid = useRef<string | null>(runid);
-    currentRunid.current = runid;
-
     // Keep ref in sync with prop
     useEffect(() => {
         refreshIntervalMsRef.current = refreshIntervalMs;
@@ -228,7 +225,7 @@ export const RunExperimentsProvider = ({
                     runid,
                     knownExperimentIds: Array.from(knownExperimentIds.current),
                 });
-                if (cancelled || currentRunid.current !== runid) {
+                if (cancelled) {
                     return;
                 }
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
@@ -257,12 +254,12 @@ export const RunExperimentsProvider = ({
 
                 setLastError(null);
             } catch (error: any) {
-                if (cancelled || currentRunid.current !== runid) {
+                if (cancelled) {
                     return;
                 }
                 setLastError(error.message || 'Failed to fetch experiments');
             } finally {
-                if (!cancelled && currentRunid.current === runid) {
+                if (!cancelled) {
                     setIsLoading(false);
                     if (!hasLoadedOnce.current) {
                         hasLoadedOnce.current = true;

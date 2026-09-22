@@ -56,7 +56,7 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
         return () => {
             cancelled = true;
         };
-    }, [runId, authLoading]);
+    }, [api, runId, authLoading]);
 
     if (authLoading || ownerResult?.runId !== runId) {
         return <LoadingSpinner />;

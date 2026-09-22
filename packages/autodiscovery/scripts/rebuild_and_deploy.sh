@@ -94,10 +94,10 @@ gcloud run jobs update ${JOB_NAME} \
     --update-secrets "${UPDATE_SECRETS_ARG}" \
     --update-env-vars "VERTEXAI_PROJECT=${PROJECT_ID},VERTEXAI_LOCATION=${VERTEXAI_LOCATION}" \
     --add-volume name=job-storage,type=cloud-storage,bucket=${BUCKET} \
-    --add-volume-mount volume=job-storage,mount-path=/mnt/gcs
+    --add-volume-mount volume=job-storage,mount-path=/mnt/data
 
 echo ""
-echo "Note: GCS bucket '${BUCKET}' is now mounted at /mnt/gcs/"
+echo "Note: GCS bucket '${BUCKET}' is now mounted at /mnt/data/"
 
 echo ""
 echo "========================================="

@@ -133,7 +133,7 @@ docker compose up
 is behind compose's `jobs` profile, so a plain `docker compose up --build` never rebuilds it.
 
 The job container gets the run's data as a bind mount of the run's directory under
-`STORAGE_HOST_DIR`, at `/mnt/gcs/users/<uid>/jobs/<jid>` (the same path Cloud Run's GCS
+`STORAGE_HOST_DIR`, at `/mnt/data/users/<uid>/jobs/<jid>` (the same path Cloud Run's GCS
 volume provides). This is why the docker backend requires `STORAGE_BACKEND=local`: a bucket
 has no host directory to bind. The mount is scoped to the run's own prefix, so a job
 container never sees other users' data — see

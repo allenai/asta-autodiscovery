@@ -24,7 +24,7 @@ RUN /root/.local/bin/uv sync --frozen --package asta-autodiscovery
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# The run's data is mounted at /mnt/gcs by whichever job backend launched the
+# The run's data is mounted at /mnt/data by whichever job backend launched the
 # container (a GCS volume on Cloud Run, a host bind mount under the docker
 # backend); the job itself just reads and writes files there.
 ENTRYPOINT ["/root/.local/bin/uv", "run", "python", "-m", "autodiscovery.run"]

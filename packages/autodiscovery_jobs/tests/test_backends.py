@@ -48,8 +48,8 @@ def test_build_job_args_required(mock_config):
     # mock_config leaves code_execution_backend at its default ("process").
     args = build_job_args("testuser", "job1", mock_config, n_experiments=4, model="gpt-4o")
 
-    assert "--dataset_metadata=/mnt/gcs/users/testuser/jobs/job1/metadata.json" in args
-    assert "--out_dir=/mnt/gcs/users/testuser/jobs/job1/output" in args
+    assert "--dataset_metadata=/mnt/data/users/testuser/jobs/job1/metadata.json" in args
+    assert "--out_dir=/mnt/data/users/testuser/jobs/job1/output" in args
     assert "--n_experiments=4" in args
     assert "--backend=process" in args
     assert "--no-timestamp_dir" in args
@@ -132,10 +132,10 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     # The run's own host subtree is bind-mounted where the job args expect it, at
     # the same in-container path Cloud Run's GCS volume uses.
     assert kwargs["volumes"]["/host/ad-data/users/testuser/jobs/job1"] == {
-        "bind": "/mnt/gcs/users/testuser/jobs/job1",
+        "bind": "/mnt/data/users/testuser/jobs/job1",
         "mode": "rw",
     }
-    assert "--dataset_metadata=/mnt/gcs/users/testuser/jobs/job1/metadata.json" in kwargs[
+    assert "--dataset_metadata=/mnt/data/users/testuser/jobs/job1/metadata.json" in kwargs[
         "command"
     ]
 

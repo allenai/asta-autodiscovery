@@ -223,6 +223,40 @@ class ObjectStore(ABC):
         """
         ...
 
+    @abstractmethod
+    def create_exclusive(self, key: str, data: bytes, content_type: str | None = None) -> bool:
+        """Write ``data`` to ``key`` only if no object exists there yet.
+
+        Atomic with respect to other writers of the same store, which is what
+        makes it usable as a cross-process lock.
+
+        Returns:
+            True if the object was created, False if ``key`` already existed.
+        """
+        ...
+
+    # Transfers to and from Google Cloud Storage
+    #
+    # Two systems next to AutoDiscovery are GCS whatever the run store is: the
+    # Ai2-curated preloaded datasets a run can start from, and the Asta workspace
+    # bucket a run's dataset is handed to. Each backend does these transfers the
+    # best way it can (server-side when it is itself GCS), so callers never need
+    # to know which backend they hold.
+
+    @abstractmethod
+    def import_from_gs(self, source_uri: str, dest_key: str) -> None:
+        """Copy the object at ``gs://bucket/name`` into this store at ``dest_key``."""
+        ...
+
+    @abstractmethod
+    def export_to_gs(self, key: str, dest_uri: str) -> None:
+        """Copy the object at ``key`` out of this store to ``gs://bucket/name``.
+
+        Raises:
+            ObjectNotFoundError: If ``key`` does not exist.
+        """
+        ...
+
     # Direct browser uploads
 
     def signed_upload_url(

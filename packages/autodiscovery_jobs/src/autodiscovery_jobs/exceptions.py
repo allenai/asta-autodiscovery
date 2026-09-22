@@ -25,10 +25,6 @@ class StorageError(AutodiscoveryJobError):
     pass
 
 
-# Historical name from when persistence was GCS-only. Retained as an alias so
-# existing `except GCSError` / import sites keep working across both backends.
-GCSError = StorageError
-
 
 class ObjectNotFoundError(StorageError):
     """Raised when a specific object/key does not exist in the store."""

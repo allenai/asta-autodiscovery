@@ -36,6 +36,7 @@ from typing import BinaryIO
 
 from ..exceptions import ObjectNotFoundError, StorageError
 from .base import ObjectInfo, ObjectStore, glob_to_regex
+from .gcs import gs_blob
 
 # Filename prefix for in-flight writes staged next to their destination. Listings
 # skip these so a concurrent reader never sees a half-written object as an object
@@ -271,3 +272,44 @@ class FilesystemStore(ObjectStore):
         except OSError as e:
             raise StorageError(f"Failed to list directories under {self.uri(prefix)}: {e}") from e
         return names
+
+    def create_exclusive(self, key: str, data: bytes, content_type: str | None = None) -> bool:
+        """Create the file only if absent, via ``O_CREAT | O_EXCL``.
+
+        Bypasses the staging-and-rename path on purpose: ``os.replace`` would
+        clobber an existing file, and ``O_EXCL`` is the atomic create the
+        filesystem actually offers. ``content_type`` has no meaning here.
+        """
+        path = self._path(key)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        except FileExistsError:
+            return False
+        except OSError as e:
+            raise StorageError(f"Failed to create {self.uri(key)}: {e}") from e
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        return True
+
+    # Transfers to and from Google Cloud Storage
+
+    def import_from_gs(self, source_uri: str, dest_key: str) -> None:
+        """Stream the GCS object down into the store (atomically, via the staging path)."""
+        blob = gs_blob(source_uri)
+        try:
+            self._write(dest_key, lambda fh: blob.download_to_file(fh))
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to import {source_uri} to {self.uri(dest_key)}: {e}") from e
+
+    def export_to_gs(self, key: str, dest_uri: str) -> None:
+        """Stream the stored file up to GCS."""
+        path = self._path(key)
+        if not path.is_file():
+            raise ObjectNotFoundError(f"{self.uri(key)} not found")
+        try:
+            gs_blob(dest_uri).upload_from_filename(str(path))
+        except Exception as e:
+            raise StorageError(f"Failed to export {self.uri(key)} to {dest_uri}: {e}") from e

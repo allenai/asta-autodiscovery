@@ -266,6 +266,59 @@ def test_list_dirs_ignores_empty_directories(store, tmp_path):
     assert store.list_dirs("users/nobody/jobs/") == []
 
 
+def test_create_exclusive(store):
+    assert store.create_exclusive("scripts/lock", b"first") is True
+    assert store.create_exclusive("scripts/lock", b"second") is False
+    assert store.read_bytes("scripts/lock") == b"first"  # loser did not clobber
+    store.delete("scripts/lock")
+    assert store.create_exclusive("scripts/lock", b"third") is True
+
+
+def test_create_exclusive_is_atomic_under_contention(store):
+    from concurrent.futures import ThreadPoolExecutor
+
+    def try_create(i: int) -> bool:
+        return store.create_exclusive("lock", str(i).encode())
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(try_create, range(8)))
+    assert results.count(True) == 1
+
+
+def test_local_import_from_gs_streams_the_blob(store, monkeypatch):
+    from unittest.mock import Mock
+
+    blob = Mock()
+    blob.download_to_file.side_effect = lambda fh: fh.write(b"a,b\n1,2\n")
+    monkeypatch.setattr("autodiscovery_jobs.storage.local.gs_blob", lambda uri: blob)
+
+    store.import_from_gs("gs://datasets/iris.csv", "users/u1/jobs/j1/data/iris.csv")
+
+    assert store.read_bytes("users/u1/jobs/j1/data/iris.csv") == b"a,b\n1,2\n"
+
+
+def test_local_export_to_gs_uploads_the_file(store, monkeypatch):
+    from unittest.mock import Mock
+
+    blob = Mock()
+    seen = {}
+    monkeypatch.setattr(
+        "autodiscovery_jobs.storage.local.gs_blob", lambda uri: seen.setdefault(uri, blob)
+    )
+    store.write_text("users/u1/jobs/j1/data/x.csv", "a,b")
+
+    store.export_to_gs("users/u1/jobs/j1/data/x.csv", "gs://asta/owners/o/t/data/x.csv")
+
+    assert list(seen) == ["gs://asta/owners/o/t/data/x.csv"]
+    (path,), _ = blob.upload_from_filename.call_args
+    assert path.endswith("/users/u1/jobs/j1/data/x.csv")
+
+
+def test_local_export_to_gs_missing_source(store):
+    with pytest.raises(ObjectNotFoundError):
+        store.export_to_gs("nope", "gs://asta/x")
+
+
 def test_local_store_has_no_signed_upload_url(store):
     assert store.signed_upload_url("users/u1/jobs/j1/data/x.csv", "text/csv", 3600) is None
 
@@ -341,3 +394,42 @@ def test_gcs_download_file_passes_path(mock_storage_client, tmp_path):
     GcsStore(bucket="test-bucket").download_file("k", dest)
 
     bucket.blob.return_value.download_to_filename.assert_called_once_with(str(dest))
+
+
+def test_gcs_create_exclusive_uses_generation_precondition(mock_storage_client):
+    from google.api_core.exceptions import PreconditionFailed
+
+    _, bucket = mock_storage_client
+    blob = bucket.blob.return_value
+
+    assert GcsStore(bucket="test-bucket").create_exclusive("lock", b"x") is True
+    assert blob.upload_from_string.call_args.kwargs["if_generation_match"] == 0
+
+    blob.upload_from_string.side_effect = PreconditionFailed("exists")
+    assert GcsStore(bucket="test-bucket").create_exclusive("lock", b"x") is False
+
+
+def test_gcs_import_and_export_rewrite_server_side(mock_storage_client):
+    """Both directions go through the rewrite API, so no bytes reach this process."""
+    client, bucket = mock_storage_client
+    other_bucket = client.bucket.return_value  # the mock returns the same bucket for any name
+    other_bucket.blob.return_value.rewrite.return_value = (None, 3, 3)
+
+    GcsStore(bucket="test-bucket").import_from_gs("gs://datasets/iris.csv", "users/u1/x.csv")
+    GcsStore(bucket="test-bucket").export_to_gs("users/u1/x.csv", "gs://asta/o/t/x.csv")
+
+    assert other_bucket.blob.return_value.rewrite.call_count == 2
+
+
+@pytest.mark.parametrize("bad", ["s3://b/k", "gs://bucket-only", "gs:///k", "bucket/key"])
+def test_split_gs_uri_rejects_non_object_uris(bad):
+    from autodiscovery_jobs.storage import split_gs_uri
+
+    with pytest.raises(StorageError):
+        split_gs_uri(bad)
+
+
+def test_split_gs_uri():
+    from autodiscovery_jobs.storage import split_gs_uri
+
+    assert split_gs_uri("gs://b/path/to/obj.csv") == ("b", "path/to/obj.csv")

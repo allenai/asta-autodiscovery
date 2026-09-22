@@ -37,9 +37,9 @@ Everything the app persists lived directly on `google-cloud-storage`:
   Ai2-preloaded datasets.
 
 The **job side is already storage-agnostic**: the AD job reads `metadata.json` and writes
-`output/` as ordinary files under `/mnt/gcs`, which Cloud Run supplies as a GCS FUSE
-volume and the docker job backend supplies via gcsfuse. Only the webstack talked to GCS
-directly.
+`output/` as ordinary files under a mount point, which Cloud Run supplies as a GCS volume
+(and which the docker job backend, at the time, supplied via gcsfuse). Only the webstack
+talked to GCS directly.
 
 ## The abstraction
 
@@ -54,8 +54,11 @@ ObjectStore
   upload_file(key, local_path)
   delete(key)                             idempotent
   copy(source_key, dest_key)               within the store
+  create_exclusive(key, data) -> bool     atomic create-if-absent (locks)
   list(prefix, *, match_glob, limit)      -> Iterator[ObjectInfo]
   list_dirs(prefix)                       -> immediate child names
+  import_from_gs(uri, key)                 transfers to/from GCS, which two
+  export_to_gs(key, uri)                   neighbouring systems always are
   signed_upload_url(...) -> str | None    None when unsupported
 ```
 
@@ -68,27 +71,24 @@ everything else each backend implements. Keys are built in one place,
 
 ### Making a filesystem behave like an object store
 
-Three GCS behaviors the rest of the code already depended on had to be reproduced:
+Four GCS behaviors the rest of the code already depended on had to be reproduced:
 
 | GCS behavior | `FilesystemStore` implementation |
 | --- | --- |
 | No directories — a prefix stops existing once its last object is deleted | Deletes prune the directories they empty; `list_dirs` skips directories with no objects beneath them. Otherwise deleted users/runs would linger in listings. |
 | `matchGlob` on listings, where `*` does not cross `/` | `glob_to_regex()` (`*` → `[^/]*`, `**` → `.*`), applied while walking. Deliberately **not** `fnmatch`, whose `*` crosses `/` and would make `users/*/jobs/*/x.json` match arbitrarily deep keys. On GCS the glob is pushed to the API, so the metrics scan and the shared-run owner lookup return one object per run instead of listing the whole bucket. |
 | Object writes are atomic; a reader never sees a partial object | Writes stage into a uniquely-named `.ad-staging.*` file in the destination directory and `os.replace` into place; listings skip staging files. This matters because the API polls run files *while the job container writes them*. |
+| Create-if-absent via `if_generation_match=0` | `os.open(..., O_CREAT \| O_EXCL)`, bypassing the staging path (a rename would clobber). Backs the completion-email job's `--acquire-lock`, which therefore works on either backend. |
 
 `created_at` comes from `st_mtime` (POSIX has no portable creation time); these objects are
 written once, so it is the same instant in practice. Dataset expiry depends on it.
 
-One GCS feature was deliberately **left off the interface**, because it existed for one
-rare caller and would have obliged every backend to implement — or quietly fake — a
-guarantee it cannot make:
-
-- **Atomic create-if-absent.** One caller: the `--acquire-lock` flag on the
-  completion-email job, which only runs in the hosted deployment. It now uses GCS's
-  generation precondition directly, in `scripts/send_completion_emails.py`, and refuses
-  to run with a non-GCS backend rather than silently degrading. A filesystem can do this
-  with `O_EXCL` locally but cannot promise it across machines, which is exactly the kind
-  of near-miss that makes a shared interface dangerous.
+Two systems next to AutoDiscovery are GCS whatever the run store is: the Ai2-curated
+preloaded datasets a run can start from, and the Asta workspace bucket a run's dataset is
+handed to. Rather than have those callers `isinstance`-check the store and reach for the
+GCS client themselves, the interface carries `import_from_gs` / `export_to_gs`. `GcsStore`
+does both as a server-side rewrite; `FilesystemStore` streams through the process. The
+methods are named for GCS honestly, because that is what the other side is.
 
 Keys can originate in user-supplied filenames, so `FilesystemStore` rejects any key that
 resolves outside its root rather than normalizing it away.
@@ -137,13 +137,14 @@ temp file before storing it — a second full copy of a multi-GB upload on the A
 container's disk. It now streams `file.stream` into the store. This is also why the proxy's
 `client_max_body_size` for `/api` is load-bearing again.
 
-### Backend checks are `isinstance` checks
+### The one backend check
 
-The startup validator needs to know which backend is active (can Cloud Run, Modal, or a
-local job container reach this data?). It calls `get_store(config)` and `isinstance`s the
-result against `GcsStore`, the same way `asta_gcs.py` and the preloaded-dataset sync do.
-Constructing a store is side-effect-free — `FilesystemStore` creates its root on first
-write, not in `__init__` — so validating configuration never touches the filesystem.
+Exactly one place outside the store needs to know which backend is active: the startup
+validator (can Cloud Run, Modal, or a local job container reach this data?). It calls
+`get_store(config)` and `isinstance`s the result against `GcsStore`. Constructing a store is
+side-effect-free — `FilesystemStore` creates its root on first write, not in `__init__` —
+so validating configuration never touches the filesystem. Everything else talks to the
+store through its interface.
 
 ### Combinations that cannot work
 
@@ -170,7 +171,7 @@ in-process. It mounts at the same in-container path Cloud Run uses, so the job's
 arguments are byte-identical across job backends:
 
 ```
-bind  $STORAGE_HOST_DIR/users/<uid>/jobs/<jid>  →  /mnt/gcs/users/<uid>/jobs/<jid>
+bind  $STORAGE_HOST_DIR/users/<uid>/jobs/<jid>  →  /mnt/data/users/<uid>/jobs/<jid>
 ```
 
 A bind mount needs no FUSE device, no extra capabilities, and no credentials. The only
@@ -202,14 +203,10 @@ packages/autodiscovery_jobs/src/autodiscovery_jobs/
     local.py           # FilesystemStore (atomic writes, prefix pruning)
   keys.py              # the key layout, built in one place
   persistence.py       # functional job-data API (was gcs.py)
-  gcs.py               # backward-compat shim re-exporting persistence
   client.py            # cached storage.Client, now only used by GcsStore
 ```
 
-`autodiscovery_jobs.gcs` remains importable for external consumers of the published
-package, mirroring the `cloudrun.py` shim from the job-backend change. In-repo imports all
-point at `persistence`; note that patching a name on the shim does **not** affect callers
-that imported it from `persistence`, so tests must target the real module.
+`autodiscovery_jobs.gcs` is gone; imports point at `persistence`.
 
 ### Using other storage
 
@@ -227,8 +224,8 @@ What a mount gives up, all of it a consequence of a filesystem not being an obje
 | Atomic replace | `os.replace` is atomic on a real filesystem; over a FUSE object-store adapter a rename is typically copy+delete, so a reader can observe a partial object. |
 
 For a single-operator or on-prem deployment none of those usually bite. If they do, a native
-backend is a subclass of `ObjectStore` plus a branch in `get_store()`; the two `isinstance`
-sites above are where it would need to say how job containers reach its data. There is no
+backend is a subclass of `ObjectStore` plus a branch in `get_store()`, and the validator
+above is where it would need to say how job containers reach its data. There is no
 registry or plugin mechanism, on purpose: one can be added when a third backend exists to
 justify its shape.
 
@@ -259,25 +256,30 @@ backend raises a clear error if it is relative.
   `match_glob` from the interface. Both were reverted in review: the capabilities were
   machinery for a third backend that does not exist, and removing `match_glob` turned the
   shared-run owner lookup and the metrics discovery into full-bucket listings on GCS.
-- `create_exclusive` (atomic create-if-absent) was dropped from the interface; see above.
+- `create_exclusive` was dropped from an intermediate draft, which kept the completion-email
+  lock on the GCS client directly and refused to run on other backends. Review put it back
+  on the interface, implemented per backend, so the lock works everywhere.
+- `import_from_gs` / `export_to_gs` were added in review in place of two `isinstance`
+  checks (the preloaded-dataset sync and the Asta handoff) that reached for the GCS client
+  when the store happened to be GCS.
 - The `docker` + `gcs` pairing was dropped. The intermediate draft kept the docker backend's
   gcsfuse path alongside the new bind mount so local job containers could still run against
   the bucket, but that exercised a mount mechanism production never uses (Cloud Run supplies
   a platform volume), at the cost of gcsfuse in the job image and `SYS_ADMIN` on the
   container. Each job backend now maps to exactly one store.
-- `GCSError` is now an alias of the new `StorageError` rather than being renamed, so
-  existing `except GCSError` sites and imports keep working.
-- The `generate-upload-url` response keeps its `gcs_path` field name (now carrying a
-  `file://` URI under the local backend) rather than breaking the wire format. It gained
-  `upload_method` / `upload_fields` so the response describes a complete request. Two
+- `GCSError` is renamed `StorageError` outright; an intermediate draft kept an alias, which
+  review dropped along with the `autodiscovery_jobs.gcs` re-export shim.
+- The `generate-upload-url` response field `gcs_path` is renamed `storage_path` (it carries
+  a `file://` URI under the local backend); the UI is updated to match. The response also
+  gained `upload_method` / `upload_fields` so it describes a complete request. Two
   earlier drafts — a dedicated streaming route, then a `same_origin` boolean, then a
   nullable `upload_url` — were dropped in review: `upload-dataset` already did the job, and
   a sentinel still left the client interpreting instead of just executing.
-- The in-container mount point stays `/mnt/gcs` even for the local backend. The deployed
-  Cloud Run job definition pins that path (`--add-volume-mount` in
-  `rebuild_and_deploy.sh`), so renaming it would couple this change to a Cloud Run
-  redeploy. It is now the single constant `backends.base.JOB_MOUNT_ROOT`, so renaming it
-  later is a one-line change plus a redeploy.
+- The in-container mount point is renamed from `/mnt/gcs` to `/mnt/data`
+  (`backends.base.JOB_MOUNT_ROOT`), since it is a GCS volume only on Cloud Run. **The
+  deployed Cloud Run job definition pins that path**, so `rebuild_and_deploy.sh` (updated
+  here) must be run when this lands; until it is, Cloud Run jobs launched by the new API
+  will look for their data at a path the old job definition does not mount.
 - The Asta workspace handoff (`asta_gcs.py`) still writes to a GCS bucket — that bucket is
-  Asta's, not ours — but now reads its source through the store, doing a server-side copy
-  only when the source is also GCS.
+  Asta's, not ours — but does so through `export_to_gs`, so it is server-side when the run
+  store is GCS and streamed otherwise.

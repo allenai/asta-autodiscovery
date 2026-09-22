@@ -13,6 +13,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
+from google.api_core.exceptions import PreconditionFailed
 from google.cloud.exceptions import NotFound
 
 from ..client import get_storage_client
@@ -21,6 +22,35 @@ from .base import ObjectInfo, ObjectStore
 
 if TYPE_CHECKING:
     from google.cloud import storage
+
+
+def split_gs_uri(uri: str) -> tuple[str, str]:
+    """Split ``gs://bucket/path/to/object`` into ``(bucket, object_name)``.
+
+    Raises:
+        StorageError: If ``uri`` is not a ``gs://`` URI naming an object.
+    """
+    if not uri.startswith("gs://"):
+        raise StorageError(f"Not a gs:// URI: {uri!r}")
+    bucket, _, name = uri[len("gs://"):].partition("/")
+    if not bucket or not name:
+        raise StorageError(f"gs:// URI must name a bucket and an object: {uri!r}")
+    return bucket, name
+
+
+def gs_blob(uri: str, project_id: str | None = None) -> storage.Blob:
+    """Return a blob handle for ``gs://bucket/name`` on the shared client."""
+    bucket, name = split_gs_uri(uri)
+    return get_storage_client(project_id).bucket(bucket).blob(name)
+
+
+def _rewrite(source: storage.Blob, dest: storage.Blob) -> None:
+    """Server-side copy via the rewrite API, which handles cross-bucket and large objects."""
+    token = None
+    while True:
+        token, _, _ = dest.rewrite(source, token=token)
+        if token is None:
+            return
 
 
 class GcsStore(ObjectStore):
@@ -174,3 +204,37 @@ class GcsStore(ObjectStore):
             )
         except Exception as e:
             raise StorageError(f"Failed to sign upload URL for {self.uri(key)}: {e}") from e
+
+    def create_exclusive(self, key: str, data: bytes, content_type: str | None = None) -> bool:
+        """Create the blob only if absent, via a generation-0 precondition."""
+        blob = self._bucket().blob(key)
+        try:
+            if content_type:
+                blob.upload_from_string(data, content_type=content_type, if_generation_match=0)
+            else:
+                blob.upload_from_string(data, if_generation_match=0)
+            return True
+        except PreconditionFailed:
+            return False
+        except Exception as e:
+            raise StorageError(f"Failed to create {self.uri(key)}: {e}") from e
+
+    # Transfers to and from Google Cloud Storage
+
+    def import_from_gs(self, source_uri: str, dest_key: str) -> None:
+        """Server-side copy from another bucket; no bytes flow through this process."""
+        try:
+            _rewrite(gs_blob(source_uri, self._project_id), self._bucket().blob(dest_key))
+        except NotFound:
+            raise ObjectNotFoundError(f"{source_uri} not found") from None
+        except Exception as e:
+            raise StorageError(f"Failed to import {source_uri} to {self.uri(dest_key)}: {e}") from e
+
+    def export_to_gs(self, key: str, dest_uri: str) -> None:
+        """Server-side copy to another bucket; no bytes flow through this process."""
+        try:
+            _rewrite(self._bucket().blob(key), gs_blob(dest_uri, self._project_id))
+        except NotFound:
+            raise ObjectNotFoundError(f"{self.uri(key)} not found") from None
+        except Exception as e:
+            raise StorageError(f"Failed to export {self.uri(key)} to {dest_uri}: {e}") from e

@@ -5,9 +5,8 @@ This script scans for successfully completed runs and sends email notifications 
 Failed and cancelled runs do not trigger notifications.
 It tracks sent emails in email_state.json to avoid duplicates.
 
-With --acquire-lock, uses a GCS-backed lock to prevent concurrent executions when
-scheduled frequently. That flag therefore requires STORAGE_BACKEND=gcs; this job is
-only run in the hosted deployment.
+With --acquire-lock, uses a lock object in the store to prevent concurrent
+executions when scheduled frequently.
 
 Environment variables required:
     - STORAGE_BACKEND (plus GCS credentials when it is "gcs") for reading/writing job state
@@ -34,7 +33,9 @@ from autodiscovery_jobs import (
     send_email,
     was_email_sent,
 )
+from autodiscovery_jobs.exceptions import ObjectNotFoundError
 from autodiscovery_jobs.persistence import list_experiment_files, read_experiment_node
+from autodiscovery_jobs.storage import get_store
 
 # Set up Jinja2 environment for email templates
 TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
@@ -47,7 +48,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Lock configuration. Only used with --acquire-lock, which requires the GCS backend.
+# Lock configuration. Only used with --acquire-lock.
 LOCK_OBJECT_KEY = "scripts/send_emails.lock"
 LOCK_MAX_AGE_HOURS = 2  # Fail if lock older than this (something is wrong)
 
@@ -58,54 +59,26 @@ class LockError(Exception):
     pass
 
 
-def _lock_blob(config: JobConfig):
-    """Return the GCS blob used as the cross-process lock.
-
-    The lock lives here, on ``google-cloud-storage`` directly, rather than as an
-    ObjectStore capability. It needs an atomic create-if-absent, which GCS provides
-    via a generation precondition but a filesystem cannot promise across machines and
-    S3-compatible stores express differently — so putting it on the store interface
-    would have every backend implement, or quietly fake, a guarantee that exists for
-    exactly this one caller. This job runs only in the hosted deployment, where the
-    store is GCS.
-
-    Raises:
-        LockError: If the configured storage backend is not GCS.
-    """
-    from google.cloud import storage
-
-    if config.storage_backend != "gcs":
-        raise LockError(
-            f"--acquire-lock requires STORAGE_BACKEND=gcs (got {config.storage_backend!r}): "
-            "the lock relies on a GCS generation precondition for atomic create. Run "
-            "without --acquire-lock if concurrent invocations are not possible."
-        )
-
-    return storage.Client(project=config.project_id).bucket(config.bucket).blob(LOCK_OBJECT_KEY)
-
-
 def acquire_lock(config: JobConfig) -> bool:
-    """Acquire the distributed lock via an atomic create in GCS.
+    """Acquire the distributed lock via an atomic create-if-absent in the store.
 
     Returns True if lock acquired, False if lock held by another run.
     Raises LockError if lock is older than LOCK_MAX_AGE_HOURS (indicates a problem).
     """
-    from google.api_core.exceptions import PreconditionFailed
-
-    blob = _lock_blob(config)
+    store = get_store(config)
     lock_data = json.dumps({"locked_at": datetime.now(UTC).isoformat()})
 
-    # if_generation_match=0 succeeds only when the object does not yet exist.
-    try:
-        blob.upload_from_string(lock_data, if_generation_match=0)
+    if store.create_exclusive(LOCK_OBJECT_KEY, lock_data.encode(), content_type="application/json"):
         logger.info("Lock acquired")
         return True
-    except PreconditionFailed:
-        pass  # Lock exists, check age
 
     # Lock exists - check how old it is
-    blob.reload()
-    content = json.loads(blob.download_as_text())
+    try:
+        content = json.loads(store.read_text(LOCK_OBJECT_KEY))
+    except ObjectNotFoundError:
+        # Released between our create attempt and this read; let the next run take it.
+        logger.info("Lock released by another run, skipping this run")
+        return False
     locked_at = datetime.fromisoformat(content["locked_at"])
     lock_age = datetime.now(UTC) - locked_at
 
@@ -119,7 +92,7 @@ def acquire_lock(config: JobConfig) -> bool:
 def release_lock(config: JobConfig) -> None:
     """Release the distributed lock."""
     try:
-        _lock_blob(config).delete()
+        get_store(config).delete(LOCK_OBJECT_KEY)
         logger.info("Lock released")
     except Exception:
         logger.warning("Lock already released or missing")

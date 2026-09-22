@@ -24,7 +24,7 @@ from __future__ import annotations
 from ..config import JobConfig
 from ..exceptions import StorageBackendError
 from .base import ObjectInfo, ObjectStore, glob_to_regex
-from .gcs import GcsStore
+from .gcs import GcsStore, split_gs_uri
 from .local import FilesystemStore
 
 #: Backend names accepted in ``STORAGE_BACKEND``.
@@ -64,4 +64,5 @@ __all__ = [
     "ObjectStore",
     "get_store",
     "glob_to_regex",
+    "split_gs_uri",
 ]

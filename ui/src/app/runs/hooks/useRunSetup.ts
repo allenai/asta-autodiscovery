@@ -73,7 +73,7 @@ export interface FileUploadState {
     secondsRemaining: number | null; // seconds, null while calculating
     uploadStartTime: number | null;
     uploadUrl: string | null;
-    gcsPath: string | null;
+    storagePath: string | null;
     error: string | null;
     abortController: AbortController | null;
 }
@@ -192,7 +192,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                                 secondsRemaining: 0,
                                 uploadStartTime: null,
                                 uploadUrl: null,
-                                gcsPath: null, // Could reconstruct from userid/runid/filename if needed
+                                storagePath: null, // Could reconstruct from userid/runid/filename if needed
                                 error: null,
                                 abortController: null,
                             };
@@ -434,7 +434,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
                 updateUploadState(index, {
                     uploadUrl: data.upload_url,
-                    gcsPath: data.gcs_path,
+                    storagePath: data.storage_path,
                 });
 
                 await uploadFile(
@@ -473,7 +473,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 secondsRemaining: null,
                 uploadStartTime: null,
                 uploadUrl: null,
-                gcsPath: null,
+                storagePath: null,
                 error: null,
                 abortController: null,
             };

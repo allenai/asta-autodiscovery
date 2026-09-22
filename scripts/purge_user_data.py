@@ -2,7 +2,7 @@
 """Permanently erase one user's AutoDiscovery data (GDPR right to be forgotten).
 
 MAINTAINER-ONLY. This is the only caller of the purge helpers in
-autodiscovery_jobs.gcs; they are intentionally not reachable from any HTTP
+autodiscovery_jobs.persistence; they are intentionally not reachable from any HTTP
 route. The script prints an inventory of the subject's data, requires the
 operator to retype the subject identifier, and only then deletes. Deletion is
 immediate and unrecoverable.

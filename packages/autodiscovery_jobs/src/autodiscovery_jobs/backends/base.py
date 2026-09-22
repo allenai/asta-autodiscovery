@@ -24,13 +24,12 @@ from ..keys import job_dir
 # "process"/"local" run it inside the job container (subprocess / in-process).
 _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
 
-#: In-container path where the run's persisted data is mounted. Historically named
-#: for GCS because Cloud Run mounts the bucket there, and the deployed Cloud Run
-#: job definition pins it (``--add-volume-mount`` in
-#: ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``). Every backend
-#: reproduces the same path so job arguments stay backend-agnostic, whether the
-#: mount comes from GCS FUSE or a host bind mount.
-JOB_MOUNT_ROOT = "/mnt/gcs"
+#: In-container path where the store root appears to the job, so a run's data is
+#: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every job backend mounts at this path
+#: (Cloud Run as a GCS volume, docker as a host bind mount) so the job arguments
+#: are backend-agnostic. The deployed Cloud Run job definition must agree
+#: (``--add-volume-mount`` in ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
+JOB_MOUNT_ROOT = "/mnt/data"
 
 
 def build_job_args(

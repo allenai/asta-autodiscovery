@@ -76,7 +76,7 @@ export interface GenerateUploadUrlResponseBody {
     upload_method: string;
     /** When set, send multipart/form-data with these fields plus the file. */
     upload_fields?: Record<string, string> | null;
-    gcs_path: string;
+    storage_path: string;
     filename: string;
     expires_at_unix: number;
 }

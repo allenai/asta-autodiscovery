@@ -358,7 +358,7 @@ class GenerateUploadUrlResponseModel(BaseModel):
             "policies and this API's own endpoint use the former.)"
         ),
     )
-    gcs_path: str = Field(..., description="Storage URI where the file will be stored")
+    storage_path: str = Field(..., description="Storage URI where the file will be stored")
     filename: str = Field(..., description="Name of the file")
     expires_at_unix: int = Field(
         ..., description="Unix timestamp (seconds since epoch) when the URL expires"

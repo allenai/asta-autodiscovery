@@ -6,18 +6,17 @@ only the dataset copy.
 
 The destination is always GCS — it is Asta's workspace bucket, not ours — so this
 is one of the few places that stays vendor-specific no matter which
-``STORAGE_BACKEND`` holds the AD run data. Only the *source* side varies: a GCS
-store copies server-side, while any other store streams the bytes up.
+``STORAGE_BACKEND`` holds the AD run data. The store does the transfer
+(:meth:`~autodiscovery_jobs.storage.ObjectStore.export_to_gs`): server-side when
+it is itself GCS, streamed otherwise.
 """
 
 import logging
 import os
 
-from google.cloud import storage
-
 from . import keys
 from .config import JobConfig
-from .storage import GcsStore, get_store
+from .storage import get_store
 
 _log = logging.getLogger(__name__)
 
@@ -35,8 +34,7 @@ def copy_dataset_to_asta_workspace(
 
     Copies everything under users/{ad_userid}/jobs/{ad_runid}/data/ in the AD
     store into owners/{user_uuid}/{thread_id}/data/ in ASTA_BUCKET. When AD data
-    already lives in GCS the copy is server-side, so no data flows through the
-    API server.
+    already lives in GCS the copy is server-side.
 
     Args:
         ad_userid: AD user identifier
@@ -49,11 +47,9 @@ def copy_dataset_to_asta_workspace(
         List of GCS URIs of the copied dataset files
 
     Raises:
-        google.cloud.exceptions.GoogleCloudError: If the copy fails
+        StorageError: If the copy fails
     """
     source_store = get_store(ad_config)
-    client = storage.Client()
-    asta_bucket = client.bucket(ASTA_BUCKET)
 
     source_prefix = f"{keys.job_prefix(ad_userid, ad_runid)}data/"
     dest_prefix = f"owners/{user_uuid}/{thread_id}/data/"
@@ -64,17 +60,8 @@ def copy_dataset_to_asta_workspace(
         if not filename or filename == ".placeholder":
             continue
 
-        dest_blob_name = f"{dest_prefix}{filename}"
-        if isinstance(source_store, GcsStore):
-            ad_bucket = client.bucket(ad_config.bucket)
-            ad_bucket.copy_blob(ad_bucket.blob(info.key), asta_bucket, dest_blob_name)
-        else:
-            # No cross-vendor server-side copy exists; stream the object up.
-            asta_bucket.blob(dest_blob_name).upload_from_string(
-                source_store.read_bytes(info.key)
-            )
-
-        uri = f"gs://{ASTA_BUCKET}/{dest_blob_name}"
+        uri = f"gs://{ASTA_BUCKET}/{dest_prefix}{filename}"
+        source_store.export_to_gs(info.key, uri)
         uris.append(uri)
         _log.info("Copied %s → %s", source_store.uri(info.key), uri)
 

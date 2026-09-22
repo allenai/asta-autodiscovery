@@ -11,7 +11,6 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, jsonify, request, url_for
-from google.cloud import storage
 from utils.asta_context_client import is_configured as asta_integration_enabled
 from utils.auth import (
     PermissionType,
@@ -77,7 +76,7 @@ try:
     from autodiscovery_jobs.exceptions import (
         CloudRunError,
         DatasetExpiredError,
-        GCSError,
+        StorageError,
         JobAlreadyExistsError,
         JobNotFoundError,
     )
@@ -119,42 +118,17 @@ def sync_preloaded_dataset(source_gs_url, config, dest_key):
     """Copy a preloaded ``gs://`` dataset into a run's data prefix.
 
     Preloaded datasets are Ai2-curated and always live in GCS, whatever store
-    holds run data. When the run's store is also GCS the copy is a server-side
-    rewrite (fastest, no bytes through this process); otherwise the object is
-    streamed into the store.
+    holds run data; the store does the transfer the best way it can (server-side
+    when it is itself GCS).
 
     Args:
         source_gs_url: Source object as ``gs://bucket/path/to/file``.
         config: AD JobConfig selecting the destination store.
         dest_key: Destination object key in that store.
     """
-    from autodiscovery_jobs.storage import GcsStore
-
-    # Parse the source URL (gs://source-bucket/path/to/file)
-    parsed_url = urlparse(source_gs_url)
-    source_bucket_name = parsed_url.netloc
-    source_blob_name = parsed_url.path.lstrip('/')
-
-    storage_client = storage.Client()
-    source_blob = storage_client.bucket(source_bucket_name).blob(source_blob_name)
-
     dest_store = get_store(config)
     logging.debug(f"DATASET SYNC: {source_gs_url} -> {dest_store.uri(dest_key)}")
-
-    if isinstance(dest_store, GcsStore):
-        dest_blob = storage_client.bucket(config.bucket).blob(dest_key)
-        # Use rewrite instead of download/upload for maximum speed
-        rewrite_token = None
-        while True:
-            rewrite_token, bytes_rewritten, total_bytes = dest_blob.rewrite(
-                source_blob, token=rewrite_token
-            )
-            if rewrite_token is None:
-                break
-    else:
-        with source_blob.open("rb") as stream:
-            dest_store.write_stream(dest_key, stream)
-
+    dest_store.import_from_gs(source_gs_url, dest_key)
     logging.debug(f"DATASET SYNC COMPLETE: {dest_key}")
 
 def create() -> Blueprint:
@@ -333,7 +307,7 @@ def create() -> Blueprint:
             )
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
-        except GCSError as e:
+        except StorageError as e:
             current_app.logger.error(f"GCS error forking run: {e}")
             return jsonify({"error": str(e)}), 500
         except Exception as e:
@@ -791,7 +765,7 @@ def create() -> Blueprint:
             file_size_bytes: Size of file in bytes
 
         Returns:
-            JSON with upload_url, upload_method, upload_fields, gcs_path, filename,
+            JSON with upload_url, upload_method, upload_fields, storage_path, filename,
             and expires_at_unix (Unix timestamp)
 
         Raises:
@@ -855,7 +829,7 @@ def create() -> Blueprint:
                 upload_url=upload_url,
                 upload_method=upload_method,
                 upload_fields=upload_fields,
-                gcs_path=result["storage_path"],
+                storage_path=result["storage_path"],
                 filename=req.filename,
                 expires_at_unix=expires_at_unix,
             )
@@ -863,7 +837,7 @@ def create() -> Blueprint:
 
         except JobNotFoundError as e:
             return jsonify({"error": str(e)}), 404
-        except GCSError as e:
+        except StorageError as e:
             current_app.logger.error(f"Failed to generate upload URL: {e}")
             return jsonify({"error": str(e)}), 400
         except Exception as e:

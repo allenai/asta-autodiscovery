@@ -15,6 +15,12 @@ interface SharedRunPageProps {
     }>;
 }
 
+interface OwnerResult {
+    runId: string;
+    userid: string | null;
+    error: string | null;
+}
+
 /**
  * Page for viewing shared runs via /runs/shared/[runId].
  * Fetches the run owner and displays in read-only mode.
@@ -23,18 +29,10 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
     const api = getRunsApi();
     const { isLoading: authLoading } = useAuth0();
     const { runId } = use(params);
-    const [userid, setUserid] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [isLoadingOwner, setIsLoadingOwner] = useState(true);
+    const [ownerResult, setOwnerResult] = useState<OwnerResult | null>(null);
 
     useEffect(() => {
         if (authLoading) return;
-
-        // Re-enter the loading state on a runId change so the owner lookup for the new
-        // run can't be rendered against the previous run's owner.
-        setIsLoadingOwner(true);
-        setUserid(null);
-        setError(null);
 
         let cancelled = false;
 
@@ -42,15 +40,15 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
             try {
                 const { data } = await api.getSharedRunOwner({ runId });
                 if (cancelled) return;
-                setUserid(data.userid);
+                setOwnerResult({ runId, userid: data.userid, error: null });
             } catch (err) {
                 if (cancelled) return;
                 console.error('Error fetching shared run owner:', err);
-                setError('This run is not available or has not been shared.');
-            } finally {
-                if (!cancelled) {
-                    setIsLoadingOwner(false);
-                }
+                setOwnerResult({
+                    runId,
+                    userid: null,
+                    error: 'This run is not available or has not been shared.',
+                });
             }
         };
 
@@ -60,21 +58,21 @@ export default function SharedRunPage({ params }: SharedRunPageProps) {
         };
     }, [runId, authLoading]);
 
-    if (authLoading || isLoadingOwner) {
+    if (authLoading || ownerResult?.runId !== runId) {
         return <LoadingSpinner />;
     }
 
-    if (error || !userid) {
+    if (ownerResult.error || !ownerResult.userid) {
         return (
             <Box sx={{ p: 3 }}>
-                <Alert severity="error">{error || 'Unable to load shared run.'}</Alert>
+                <Alert severity="error">{ownerResult.error || 'Unable to load shared run.'}</Alert>
             </Box>
         );
     }
 
     return (
         <URLSearchParamsProvider>
-            <RunView key={runId} runid={runId} userid={userid} />
+            <RunView key={runId} runid={runId} userid={ownerResult.userid} />
         </URLSearchParamsProvider>
     );
 }

@@ -89,11 +89,14 @@ export const RunExperimentsProvider = ({
     const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
     const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
     const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
+    const [stateRunid, setStateRunid] = useState<string | null>(runid);
 
     const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
     const shouldScrollToSelected = useRef<boolean>(true);
+    const currentRunid = useRef<string | null>(runid);
+    currentRunid.current = runid;
 
     // Keep ref in sync with prop
     useEffect(() => {
@@ -174,12 +177,13 @@ export const RunExperimentsProvider = ({
         [runid, userid, runsApi]
     );
 
-    // Discard the previous run's accumulated state whenever runid changes, not just
-    // when it goes null: the provider stays mounted across a client-side navigation
-    // between two runs, so without this the new run inherits the old experiments and
-    // the old fetch position (known ids). Declared before the fetch effect so the
-    // refs are already cleared when that effect runs in the same commit.
+    // Keep the state associated with the run that produced it. Consumers see defaults
+    // while this reset commits, so they never render the previous run's data.
     useEffect(() => {
+        if (stateRunid === runid) {
+            return;
+        }
+
         setExperiments(DEFAULT_STATE.experiments);
         setIsLoading(DEFAULT_STATE.isLoading);
         setIsLoadingInitial(true);
@@ -191,18 +195,21 @@ export const RunExperimentsProvider = ({
         setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
         knownExperimentIds.current = new Set();
         selectedExperimentRequestId.current += 1;
-        setIsPolling(DEFAULT_STATE.isPolling);
-    }, [runid]);
+        shouldScrollToSelected.current = true;
+        if (!runid) {
+            setIsPolling(DEFAULT_STATE.isPolling);
+        }
+        setStateRunid(runid);
+    }, [runid, stateRunid]);
 
-    // Queue this after the run reset so auto-start wins when both effects run.
     useEffect(() => {
-        if (autoStart && runid) {
+        if (stateRunid === runid && autoStart && runid) {
             setIsPolling(true);
         }
-    }, [autoStart, runid]);
+    }, [autoStart, runid, stateRunid]);
 
     useEffect(() => {
-        if (!runid || !isPolling) {
+        if (!runid || stateRunid !== runid || !isPolling) {
             return;
         }
 
@@ -221,7 +228,7 @@ export const RunExperimentsProvider = ({
                     runid,
                     knownExperimentIds: Array.from(knownExperimentIds.current),
                 });
-                if (cancelled) {
+                if (cancelled || currentRunid.current !== runid) {
                     return;
                 }
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
@@ -243,21 +250,19 @@ export const RunExperimentsProvider = ({
                 }
 
                 // Handle job completion
-                if (data.has_job_completed && !hasJobCompleted) {
+                if (data.has_job_completed) {
                     setHasJobCompleted(true);
                     setIsPolling(false);
                 }
 
-                if (lastError !== null) {
-                    setLastError(null);
-                }
+                setLastError(null);
             } catch (error: any) {
-                if (cancelled) {
+                if (cancelled || currentRunid.current !== runid) {
                     return;
                 }
                 setLastError(error.message || 'Failed to fetch experiments');
             } finally {
-                if (!cancelled) {
+                if (!cancelled && currentRunid.current === runid) {
                     setIsLoading(false);
                     if (!hasLoadedOnce.current) {
                         hasLoadedOnce.current = true;
@@ -273,20 +278,28 @@ export const RunExperimentsProvider = ({
             cancelled = true;
             clearInterval(interval);
         };
-    }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted]);
+    }, [runid, stateRunid, userid, isPolling, runsApi]);
+
+    const stateMatchesRun = stateRunid === runid;
 
     const memoizedState = useMemo<RunExperimentsState>(
         () => ({
             runid,
-            isPolling,
-            isLoading,
-            isLoadingInitial,
-            experiments,
-            lastError,
-            hasJobCompleted,
-            selectedExperiment,
-            selectedExperimentError,
-            isLoadingSelectedExperiment,
+            isPolling: stateMatchesRun ? isPolling : DEFAULT_STATE.isPolling,
+            isLoading: stateMatchesRun ? isLoading : DEFAULT_STATE.isLoading,
+            isLoadingInitial: stateMatchesRun ? isLoadingInitial : true,
+            experiments: stateMatchesRun ? experiments : DEFAULT_STATE.experiments,
+            lastError: stateMatchesRun ? lastError : DEFAULT_STATE.lastError,
+            hasJobCompleted: stateMatchesRun ? hasJobCompleted : DEFAULT_STATE.hasJobCompleted,
+            selectedExperiment: stateMatchesRun
+                ? selectedExperiment
+                : DEFAULT_STATE.selectedExperiment,
+            selectedExperimentError: stateMatchesRun
+                ? selectedExperimentError
+                : DEFAULT_STATE.selectedExperimentError,
+            isLoadingSelectedExperiment: stateMatchesRun
+                ? isLoadingSelectedExperiment
+                : DEFAULT_STATE.isLoadingSelectedExperiment,
             startPolling,
             stopPolling,
             selectExperiment,
@@ -294,6 +307,7 @@ export const RunExperimentsProvider = ({
         }),
         [
             runid,
+            stateMatchesRun,
             isPolling,
             isLoading,
             isLoadingInitial,

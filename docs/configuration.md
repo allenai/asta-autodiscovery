@@ -179,7 +179,7 @@ rather than running against data the job or sandbox cannot see:
 
 | Setting | Works with `STORAGE_BACKEND=local` | Works with `STORAGE_BACKEND=gcs` |
 | --- | --- | --- |
-| `JOB_BACKEND=docker` | ✅ | ❌ a bucket has no host directory to bind-mount |
+| `JOB_BACKEND=docker` | ✅ | ❌ local job containers bind-mount a host directory, not a bucket |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
 | `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |

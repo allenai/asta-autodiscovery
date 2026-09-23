@@ -152,7 +152,7 @@ Each job backend is tied to one store, and Modal needs `gs://`:
 
 | | `STORAGE_BACKEND=local` | `STORAGE_BACKEND=gcs` |
 | --- | --- | --- |
-| `JOB_BACKEND=docker` | ✅ job container bind-mounts the run's host directory | ❌ a bucket has no host directory to bind |
+| `JOB_BACKEND=docker` | ✅ job container bind-mounts the run's host directory | ❌ local job containers bind-mount a host directory, not a bucket |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ Cloud Run mounts the bucket |
 | `CODE_EXECUTION_BACKEND=process`/`local` | ✅ reads the job's own mount | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |

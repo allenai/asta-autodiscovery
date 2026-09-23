@@ -9,22 +9,80 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
-### Fixed: a run whose experiment generation always fails now stops ([#79])
+### Plot interpretation always happens outside the execution environment ([#74])
 
-A durable model failure at the data-loader step — misconfigured Vertex
-project/location, expired credentials, exhausted quota, replies that never parse
-into an experiment — used to spin `run_mcts` at full speed forever, emitting
-gigabytes of the same four log lines and burying the underlying error. It now
-aborts, saves whatever was explored, and raises `run.NoProgressError` naming the
-last failure, so the CLI exits non-zero. The stall tracking itself lives in the
-new `autodiscovery.progress` module (`ProgressGuard`, `NoProgressError`), which
-`run` re-exports.
+Every `--backend` now returns figures as structured outputs, and the CLI process
+interprets them with `--vision_model`. Previously only `process` and `modal` did
+that; `--backend local` instead had a generated matplotlib patch prepended to
+each code block, which called the vision model from *inside* the executed
+program and reported its token usage back as a marker line on stdout.
 
-`run.run_mcts(...)` takes a new `max_no_progress_iterations` keyword argument
-(default `3`): the number of consecutive iterations that may commit no node
-before the run aborts.
+- Model credentials are no longer needed inside any execution environment, and
+  `--vision_model` may name any provider on any backend — including
+  `github_copilot`, which `local` previously could not use.
+- The agent's code is no longer rewritten before execution.
+- `local` figures now persist to `rich_outputs/` and appear in the HTML report,
+  which they never did before.
+- Image-analysis token usage is recorded through the usage tracker like every
+  other call, under the `image_analysis` component (`image_analysis.local` and
+  `image_analysis.modal` are gone).
+- `asta-code-execution` returns matplotlib figures a cell left open, so a figure
+  is captured whether or not the code called `plt.show()`.
+- `asta-code-execution` no longer deadlocks when a cell run with
+  `use_subprocess=True` returns more data than a pipe buffers — which any cell
+  producing a figure does. `IPythonSession` now reads the child's result before
+  waiting for the child to exit.
+
+`--backend local` now runs each cell as an IPython cell in a child process using
+the CLI's own Python environment, rather than as a script through AG2's
+`LocalCommandLineCodeExecutor`. It remains the least isolated backend; `process`
+(the default) is unchanged.
+
+[#74]: https://github.com/allenai/asta-autodiscovery/issues/74
+
+### Fixed: a failed data-loader step no longer spins forever ([#79])
+
+If the data-loader experiment failed — e.g. a missing Vertex AI variable — the
+root was re-selected forever with nothing left to run, writing the same log
+lines at full speed. Exploration now stops after that failure.
 
 [#79]: https://github.com/allenai/asta-autodiscovery/issues/79
+
+## 1.0.1
+
+### Breaking: Vertex AI is configured with litellm's own variables ([#78])
+
+**`VERTEX_PROJECT_ID` and `VERTEX_LOCATION` are no longer read. Use
+`VERTEXAI_PROJECT` and `VERTEXAI_LOCATION`, and set both.**
+
+```sh
+export VERTEXAI_PROJECT=your-gcp-project    # was VERTEX_PROJECT_ID
+export VERTEXAI_LOCATION=global             # was VERTEX_LOCATION, was optional
+```
+
+litellm reads both variables itself, so this package no longer maps, defaults or
+infers any Vertex setting — it only checks at startup that both are set, and
+names the missing one in a one-line error. That check is the point of the
+change: each of litellm's fallbacks silently produces a mid-run 404 that reads
+as if the model does not exist. An unset project takes whatever project the
+Application Default Credentials carry, and an unset location takes
+`us-central1`, which does not serve `vertex_ai/gemini-3.7-flash`.
+
+This fixes both 1.0.0 regressions in [#78] — an unset location no longer means
+`us-central1`, and an unset project no longer means the credentials' project —
+and it does so without a second set of names for the same two settings. The
+rename is safe to make loudly: a deployment still setting only the old names
+now fails at startup naming the new ones, rather than drifting onto a fallback.
+
+litellm also accepts shorter `VERTEX_PROJECT` / `VERTEX_LOCATION` aliases, but
+only in `embedding()` — every completion path reads the `VERTEXAI_` pair alone.
+Set the `VERTEXAI_` pair; the startup check does not accept the aliases.
+
+A model-flag mistake now exits with a one-line error instead of a traceback.
+That covers the `<provider>/<model>` prefix error every 0.2.x command line hits
+on upgrade.
+
+[#78]: https://github.com/allenai/asta-autodiscovery/issues/78
 
 ## 1.0.0
 
@@ -99,6 +157,9 @@ gcloud auth application-default login
 `VERTEX_PROJECT_ID` and `VERTEX_LOCATION` keep working — they are mapped onto
 litellm's `vertex_project` / `vertex_location` — so existing deployment config
 needs no change beyond credentials. `OPENAI_API_KEY` is unchanged.
+
+> Superseded: as of the next release these two names are no longer read. See
+> [Vertex AI is configured with litellm's own variables](#breaking-vertex-ai-is-configured-with-litellms-own-variables-78) above.
 
 ### Breaking: default models changed
 

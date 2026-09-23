@@ -93,6 +93,9 @@ docker compose build autodiscovery
 docker compose up
 ```
 
+`make dev` from the repository root runs both, and is what the README points at — the job image
+is behind compose's `jobs` profile, so a plain `docker compose up --build` never rebuilds it.
+
 The job container mounts its GCS data at `/mnt/gcs` itself via gcsfuse (triggered by
 `GCSFUSE_BUCKET`, which the backend sets from `GCS_BUCKET`); on Cloud Run the platform provides
 that mount instead. The docker backend scopes the mount to the run's own prefix
@@ -113,14 +116,20 @@ The AD job runs the LLM-generated experiment code through a configurable executo
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (in-process, no isolation), or `modal` (remote sandbox). |
+| `CODE_EXECUTION_BACKEND` | No | `process` | `process` (isolated subprocess in the job container), `local` (subprocess sharing the job's own environment), or `modal` (remote sandbox). |
 
 - `process` (default) — runs code in an isolated subprocess inside the job container, in a separate
   sandbox venv; per-cell package installs are discarded, and no state carries across cells. No cloud
   dependency (Modal is not required). Reads the dataset from the job's `/mnt/gcs` mount.
-- `local` — runs code in-process with no isolation. Lowest overhead, least safe.
+- `local` — runs code in a subprocess that shares the job's own Python environment, with no separate
+  sandbox venv. Lowest overhead, least isolated: generated code sees, and installs into, the packages
+  the job itself runs on.
 - `modal` — runs code in a remote Modal sandbox that mounts **only** the per-job data prefix,
   read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables.
+
+All three return the figures a run produced as structured outputs, which the job then interprets
+with `--vision_model` in its own process. No backend needs model credentials inside the execution
+environment, and every backend persists its figures to `rich_outputs/` for the HTML report.
 
 ### Choosing a safe combination
 
@@ -165,8 +174,8 @@ Model access for the discovery agents.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `OPENAI_API_KEY` | Conditional | *(none)* | OpenAI API key. Required when using OpenAI models. |
-| `VERTEX_PROJECT_ID` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models. |
-| `VERTEX_LOCATION` | No | `global` | Vertex AI location/region. |
+| `VERTEXAI_PROJECT` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models, and checked at startup; it is not inferred from the Application Default Credentials project. Read by litellm itself — this is litellm's own variable name, not one this package defines. |
+| `VERTEXAI_LOCATION` | Conditional | *(none)* | Vertex AI location/region, required alongside `VERTEXAI_PROJECT` and checked at startup. Use `global` unless you have a reason not to: it serves the Gemini models the CLI defaults to, and litellm's own fallback, `us-central1`, does not. Also litellm's variable. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Conditional | *(none)* | Service-account key for Vertex. Vertex uses Application Default Credentials; run `gcloud auth application-default login` instead for local development. |
 | `GITHUB_COPILOT_TOKEN_DIR` | No | `~/.config/litellm/github_copilot` | Directory holding an `access-token` file with a GitHub OAuth token. Interactive runs obtain and cache this via device-code login; pre-seed it for non-interactive runs, which otherwise block on a device prompt. |
 | `ASTA_AGENTS_MODEL` | No | `openai/gpt-5-mini` | Model used by the `agents` package (LiteLLM model string). |

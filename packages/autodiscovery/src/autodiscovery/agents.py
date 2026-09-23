@@ -8,7 +8,7 @@ from typing import Any
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
-from autogen.coding import CodeBlock, CodeExecutor, CodeResult, LocalCommandLineCodeExecutor
+from autogen.coding import CodeBlock, CodeExecutor, CodeResult
 
 from autodiscovery import llm
 from autodiscovery.llm_usage import UsageTracker, record_ag2_response_usage
@@ -35,6 +35,76 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 4. Annotations and Legends: Describe key annotations or legends.
 5. Statistical Insights: Provide insights based on the information presented in the plot."""
 
+# Cap on how much of a code block's output is kept. Generated code regularly prints
+# an entire dataset (a raw .sql dump, a full dataframe), and the executor's output
+# becomes a chat message that is then re-serialized into every subsequent LLM
+# request — so an uncapped output is copied many times over and OOM-kills the job.
+# Observed in production: a single block emitted 676 MB of stdout and the container
+# was SIGKILLed (exit 137) on the next turn. 20k characters is roughly 5k LLM
+# tokens: enough for about 10k characters from each end (including a typical
+# traceback or many tabular rows) without letting one tool result consume a large
+# fraction of a future model request.
+MAX_CODE_OUTPUT_CHARS = 20_000
+
+
+def _truncate_output_parts(parts: list[str]) -> str:
+    """Assemble and clip code-output sections to the fixed cap, keeping both ends.
+
+    The head carries whatever the code printed first (headers, schema, counts) and
+    the tail carries the final result, so both are worth keeping; only the middle
+    is dropped. The truncation notice itself counts toward the cap. Working from
+    sections avoids first concatenating potentially enormous stdout and stderr.
+    """
+    output_length = sum(len(part) for part in parts)
+    if output_length <= MAX_CODE_OUTPUT_CHARS:
+        return "".join(parts)
+
+    dropped = output_length - MAX_CODE_OUTPUT_CHARS
+    while True:
+        notice = (
+            f"\n\n... [output truncated: {dropped} of {output_length} characters omitted; "
+            f"limit is {MAX_CODE_OUTPUT_CHARS}. Do not print whole datasets — "
+            f"aggregate, sample, or write to a file and read back only what you "
+            f"need.] ...\n\n"
+        )
+        retained = max(0, MAX_CODE_OUTPUT_CHARS - len(notice))
+        actual_dropped = output_length - retained
+        if actual_dropped == dropped:
+            break
+        dropped = actual_dropped
+
+    # The cap is intentionally fixed well above the notice length, but preserve
+    # the size invariant if a future edit lowers it: no Python ``[-0:]`` slice
+    # should accidentally retain an entire output section.
+    if retained == 0:
+        return notice[: max(0, MAX_CODE_OUTPUT_CHARS)]
+
+    head = retained // 2
+    tail = retained - head
+    prefix_parts = []
+    prefix_remaining = head
+    for part in parts:
+        prefix_parts.append(part[:prefix_remaining])
+        prefix_remaining -= min(len(part), prefix_remaining)
+        if prefix_remaining == 0:
+            break
+    prefix = "".join(prefix_parts)
+
+    suffix_parts = []
+    suffix_remaining = tail
+    for part in reversed(parts):
+        suffix_parts.append(part[-suffix_remaining:])
+        suffix_remaining -= min(len(part), suffix_remaining)
+        if suffix_remaining == 0:
+            break
+    suffix = "".join(reversed(suffix_parts))
+    return prefix + notice + suffix
+
+
+def _truncate_output(output: str) -> str:
+    """Clip an over-long code output to the fixed cap, keeping both ends."""
+    return _truncate_output_parts([output])
+
 
 def _run_async(coro):
     """Run a coroutine from a synchronous context.
@@ -49,16 +119,35 @@ def _run_async(coro):
         return asyncio.run(coro)
 
 
-class _ProcessBackendAdapter:
-    """Wraps ProcessIPythonBackend in an async interface compatible with ModalSandboxExecutor."""
+class _IPythonBackendAdapter:
+    """Wraps a ``code_execution`` IPython backend in the async sandbox interface.
 
-    def __init__(self, backend) -> None:
+    Both non-Modal backends run through this: ``process``
+    (:class:`~code_execution.ProcessIPythonBackend`, an isolated venv in a
+    subprocess) and ``local`` (:class:`~code_execution.LocalIPythonBackend`, the
+    job's own environment). Adapting them to the same interface as the Modal
+    executor is what lets every backend return figures as rich outputs, so plot
+    interpretation happens in one place -- the parent process.
+    """
+
+    def __init__(self, backend, *, use_subprocess: bool = False) -> None:
+        """Initialize the adapter.
+
+        Args:
+            backend: Synchronous ``code_execution`` backend exposing ``run_cell``.
+            use_subprocess: Run each cell in a child process. Required for the
+                in-process backend so a hard timeout can be enforced and cell
+                state does not leak into the job process.
+        """
         self._backend = backend
+        self._use_subprocess = use_subprocess
 
     async def run_code(self, code: str, timeout_seconds: float | None = None):
         from asta_sandbox import ExecutionError, ExecutionResult, RichOutput
 
-        result = self._backend.run_cell(code, timeout_s=timeout_seconds)
+        result = self._backend.run_cell(
+            code, use_subprocess=self._use_subprocess, timeout_s=timeout_seconds
+        )
         error = None
         if result.get("error"):
             err = result["error"]
@@ -82,7 +171,7 @@ class _ProcessBackendAdapter:
         )
 
 
-class ModalSandboxExecutor(CodeExecutor):
+class SandboxCodeExecutor(CodeExecutor):
     """Wraps an async sandbox executor to satisfy Autogen's synchronous CodeExecutor interface."""
 
     def __init__(
@@ -96,7 +185,7 @@ class ModalSandboxExecutor(CodeExecutor):
         """Initialize the sandbox executor wrapper.
 
         Args:
-            backend: Async sandbox executor (ModalEphemeralExecutor or _ProcessBackendAdapter)
+            backend: Async sandbox executor (ModalEphemeralExecutor or _IPythonBackendAdapter)
             timeout: Timeout in seconds (for Autogen compatibility)
             vision_model: Vision model, as litellm's ``<provider>/<model>``
             usage_tracker: Optional usage tracker for image analysis calls.
@@ -145,7 +234,7 @@ class ModalSandboxExecutor(CodeExecutor):
             self._usage_tracker.record_response(
                 response,
                 source=llm.provider_of(self.vision_model),
-                component="image_analysis.modal",
+                component="image_analysis",
                 agent_name="code_executor",
                 node_id=self._usage_node_id,
             )
@@ -171,13 +260,13 @@ class ModalSandboxExecutor(CodeExecutor):
             print("[CodeExecutor] Execution completed")
             print(f"[CodeExecutor] Success: {result.success}")
 
-            output = result.stdout or ""
+            output_parts = [result.stdout or ""]
 
-            print(f"[CodeExecutor] Stdout length: {len(output)} characters")
+            print(f"[CodeExecutor] Stdout length: {len(output_parts[0])} characters")
 
             if result.stderr:
                 print(f"[CodeExecutor] Stderr: {result.stderr[:200]}")
-                output += f"\nSTDERR:\n{result.stderr}"
+                output_parts.extend(("\nSTDERR:\n", result.stderr))
 
             if not result.success:
                 if result.error:
@@ -192,11 +281,11 @@ class ModalSandboxExecutor(CodeExecutor):
                     error_msg = f"Execution timed out after {self._timeout}s"
                 else:
                     error_msg = "Unknown error"
-                print(f"[CodeExecutor] Error: {error_msg}")
-                output += f"\nERROR: {error_msg}"
+                print(f"[CodeExecutor] Error: {error_msg[:200]}")
+                output_parts.append(f"\nERROR: {error_msg}")
 
-            if not output.strip():
-                output = "[CodeExecutor] Code executed but produced no output"
+            if not any(part.strip() for part in output_parts):
+                output_parts = ["[CodeExecutor] Code executed but produced no output"]
                 print("[CodeExecutor] Warning: No output produced")
 
             # Store rich output data dicts for image analysis
@@ -221,8 +310,12 @@ class ModalSandboxExecutor(CodeExecutor):
                             )
 
                 if image_analyses:
-                    output += "\n" + "\n".join(image_analyses)
+                    output_parts.append("\n" + "\n".join(image_analyses))
 
+            output_length = sum(len(part) for part in output_parts)
+            output = _truncate_output_parts(output_parts)
+            if len(output) != output_length:
+                print(f"[CodeExecutor] Output truncated to {len(output)} characters")
             return CodeResult(exit_code=0 if result.success else 1, output=output)
 
         except Exception as e:
@@ -231,9 +324,8 @@ class ModalSandboxExecutor(CodeExecutor):
             error_details = traceback.format_exc()
             print(f"[CodeExecutor] Exception occurred: {str(e)}")
             print(f"[CodeExecutor] Traceback:\n{error_details}")
-            return CodeResult(
-                exit_code=1, output=f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
-            )
+            output = f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}"
+            return CodeResult(exit_code=1, output=_truncate_output(output))
 
     def get_last_rich_outputs(self):
         """Get rich outputs from the last execution."""
@@ -295,108 +387,6 @@ def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
         key_prefix += "/"
 
     return bucket_name, key_prefix
-
-
-def build_image_analysis_patch(vision_model: str) -> str:
-    """Build the matplotlib patch injected into locally executed experiment code.
-
-    Only the ``local`` backend uses this, and it runs in-process, so the patch
-    can call straight back into :mod:`autodiscovery.llm` rather than
-    reimplementing provider routing and auth for the execution context.
-    """
-    # Fail fast here, in the parent, rather than inside generated code.
-    llm.provider_of(vision_model)
-    template = """\
-import matplotlib.pyplot as plt
-import functools
-import base64
-import json
-from io import BytesIO
-
-from autodiscovery import llm
-from autodiscovery.llm_usage import LOCAL_IMAGE_USAGE_MARKER
-
-VISION_MODEL = __VISION_MODEL__
-image_analyst_prompt = __IMAGE_ANALYST_PROMPT__
-
-
-def image_to_text():
-    for fig_num in plt.get_fignums():
-        fig = plt.figure(fig_num)
-        with BytesIO() as buf:
-            fig.savefig(buf, format='png', dpi=200)
-            buf.seek(0)
-            base64_image = base64.b64encode(buf.read()).decode('utf-8')
-            messages = [
-                {
-                    'role': 'system',
-                    'content': 'You are a research scientist responsible for analyzing plots and figures from running experiments and providing detailed descriptions.'
-                },
-                {
-                    'role': 'user',
-                    'content': [
-                        {'type': 'text', 'text': image_analyst_prompt},
-                        {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64_image}},
-                    ]
-                }
-            ]
-            try:
-                response = llm.complete(VISION_MODEL, messages, max_tokens=1000)
-            except Exception as exc:
-                print('Image analysis skipped: ' + str(exc))
-                plt.close(fig)
-                continue
-            usage = getattr(response, 'usage', None)
-            if usage is not None:
-                print(LOCAL_IMAGE_USAGE_MARKER + json.dumps({
-                    'source': llm.provider_of(VISION_MODEL),
-                    'component': 'image_analysis.local',
-                    'agent_name': 'code_executor',
-                    'model': getattr(response, 'model', VISION_MODEL),
-                    'prompt_tokens': getattr(usage, 'prompt_tokens', 0) or 0,
-                    'completion_tokens': getattr(usage, 'completion_tokens', 0) or 0,
-                    'total_tokens': getattr(usage, 'total_tokens', 0) or 0,
-                }, sort_keys=True))
-            print("\\n=== Plot Analysis (fig. {{}}) ===\\n".format(fig_num))
-            print(response.choices[0].message.content)
-            print("\\n" + "="*50)
-
-        plt.close(fig)
-
-
-def patch_matplotlib_show():
-    plt.show = functools.partial(image_to_text)
-
-
-patch_matplotlib_show()
-"""
-    return template.replace("__VISION_MODEL__", repr(vision_model)).replace(
-        "__IMAGE_ANALYST_PROMPT__", repr(IMAGE_ANALYST_PROMPT)
-    )
-
-
-class CodeBlockWrapperTransform(transforms.MessageTransform):
-    def __init__(self, vision_model: str):
-        self.image_analysis_patch = build_image_analysis_patch(vision_model)
-
-    def apply_transform(self, messages: list[dict]) -> list[dict]:
-        # Deep copy messages to avoid modifying the original
-        transformed_messages = copy.deepcopy(messages)
-        message = transformed_messages[-1]
-
-        try:
-            code = json.loads(message["content"]).get("code", "# Failed to parse code from message")
-        except json.JSONDecodeError:
-            code = "# Failed to parse code from message"
-
-        message["content"] = f"```python\n{self.image_analysis_patch}\n\n{code}\n```"
-
-        return transformed_messages
-
-    def get_logs(
-        self, pre_transform_messages: list[dict], post_transform_messages: list[dict]
-    ) -> tuple[str, bool]:
-        return "CodeBlockWrapperTransform", True
 
 
 def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: str | None) -> str:
@@ -771,7 +761,7 @@ def install(package):
         )
         _run_async(modal_executor.add_shares(cloud_share))
 
-        executor = ModalSandboxExecutor(
+        executor = SandboxCodeExecutor(
             modal_executor,
             timeout=code_timeout,
             vision_model=vision_model,
@@ -786,19 +776,30 @@ def install(package):
         from code_execution import ProcessIPythonBackend
 
         process_backend = ProcessIPythonBackend(cwd=work_dir)
-        executor = ModalSandboxExecutor(
-            _ProcessBackendAdapter(process_backend),
+        executor = SandboxCodeExecutor(
+            _IPythonBackendAdapter(process_backend),
             timeout=code_timeout,
             vision_model=vision_model,
             usage_tracker=usage_tracker,
         )
         print(f"Using process backend with work_dir: {work_dir}")
-    else:
-        # Use local code executor (in-process, no isolation)
-        executor = LocalCommandLineCodeExecutor(
+    elif backend == "local":
+        # Local: the job's own Python environment, with no per-cell venv.
+        # It still runs each cell in a child process (use_subprocess), which is
+        # what LocalCommandLineCodeExecutor used to give us and what makes the
+        # timeout enforceable; the difference from `process` is only that the
+        # cell sees the job's installed packages rather than a curated venv.
+        from code_execution import LocalIPythonBackend
+
+        executor = SandboxCodeExecutor(
+            _IPythonBackendAdapter(LocalIPythonBackend(cwd=work_dir), use_subprocess=True),
             timeout=code_timeout,
-            work_dir=work_dir,
+            vision_model=vision_model,
+            usage_tracker=usage_tracker,
         )
+        print(f"Using local backend with work_dir: {work_dir}")
+    else:
+        raise ValueError(f"unknown code execution backend: {backend!r}")
 
     # Create an agent with code executor configuration.
     code_executor = ConversableAgent(
@@ -808,22 +809,15 @@ def install(package):
         human_input_mode="NEVER",
     )
 
-    # Apply appropriate transform based on executor type
-    if backend in ("modal", "process"):
-        # For sandbox-style backends, use simple transform without image analysis patch
-        # (the executor handles image analysis internally)
-        # Pass the working_dir so code can change to that directory.
-        sandbox_working_dir = code_transform_working_dir(backend, work_dir, modal_working_dir)
-        transform_messages_capability = transform_messages.TransformMessages(
-            transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
-        )
-        transform_messages_capability.add_to_agent(code_executor)
-    else:
-        # For local executor, use full transform with image analysis patch
-        transform_messages_capability = transform_messages.TransformMessages(
-            transforms=[CodeBlockWrapperTransform(vision_model=vision_model)]
-        )
-        transform_messages_capability.add_to_agent(code_executor)
+    # Every backend gets the same transform: the agent's code, prefixed only by a
+    # chdir into the directory the data is mounted at. Figure interpretation is not
+    # injected here -- the executor returns figures as rich outputs and analyses them
+    # in this process.
+    sandbox_working_dir = code_transform_working_dir(backend, work_dir, modal_working_dir)
+    transform_messages_capability = transform_messages.TransformMessages(
+        transforms=[SimpleCodeBlockTransform(working_dir=sandbox_working_dir)]
+    )
+    transform_messages_capability.add_to_agent(code_executor)
 
     user_proxy = UserProxyAgent(
         name="user_proxy",

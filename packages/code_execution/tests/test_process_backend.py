@@ -106,3 +106,20 @@ def test_sandbox_python_is_not_host_python(tmp_path: Path) -> None:
     sandbox_py = result["stdout"].strip()
     assert sandbox_py != sys.executable
     assert "sandbox_venv" in sandbox_py
+
+
+def test_explicit_env_overrides_the_inherited_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cell inherits the job environment, with `env=` applied on top of it."""
+    monkeypatch.setenv("PROC_TEST_VAR", "dummy-inherited")
+    backend = ProcessIPythonBackend(
+        env={"PROC_TEST_VAR": "dummy-explicit"},
+        sandbox_venv_path=str(tmp_path / "sandbox_venv"),
+        packages=[],
+    )
+
+    result = backend.run_cell("import os\nprint(os.environ.get('PROC_TEST_VAR'))")
+
+    assert result["success"] is True
+    assert "dummy-explicit" in result["stdout"]

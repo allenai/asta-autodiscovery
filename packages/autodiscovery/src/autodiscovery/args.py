@@ -232,7 +232,7 @@ class ArgParser(argparse.ArgumentParser):
             type=str,
             choices=["local", "process", "modal"],
             default="process",
-            help="Code execution backend: local (in-process), process (isolated subprocess, default), or modal (Modal sandbox)",
+            help="Code execution backend: local (subprocess sharing this environment), process (isolated subprocess, default), or modal (Modal sandbox)",
         )
         self.add_argument(
             "--use_modal_sandbox",

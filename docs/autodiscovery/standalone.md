@@ -75,14 +75,24 @@ credentials follow litellm's conventions per provider.
 Default Credentials:
 
 ```sh
-export VERTEX_PROJECT_ID=your-gcp-project
-export VERTEX_LOCATION=global            # optional, defaults to global
+export VERTEXAI_PROJECT=your-gcp-project
+export VERTEXAI_LOCATION=global          # `global` serves the default models
 
 # Either a service-account key...
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 # ...or local user credentials:
 gcloud auth application-default login
 ```
+
+Both variables are litellm's own — this package defines no Vertex settings of
+its own and maps nothing. Both are required: a run naming a `vertex_ai/` model
+without them stops at startup naming the ones that are missing, because
+litellm's fallback for each is worse than an error. An unset project takes
+whatever project your Application Default Credentials carry, which is
+frequently not the one you meant; an unset location takes `us-central1`, which
+does not serve the Gemini models this package defaults to. Either way the first
+model call 404s mid-run, and the 404 reads as if the model does not exist. Set
+`VERTEXAI_LOCATION=global` unless you have a specific region in mind.
 
 **OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 
@@ -125,9 +135,9 @@ modes constrain temperature at the provider.
 
 `github_copilot/text-embedding-3-small` at 1536 dimensions is not numerically
 identical to the OpenAI `text-embedding-3-large` default, so keep the OpenAI
-embedding model when exact embedding geometry must be preserved. Copilot
-currently requires the `process` or `modal` execution backend; the `local`
-backend's generated image analysis code is tied to an OpenAI client.
+embedding model when exact embedding geometry must be preserved. Copilot works
+with every execution backend, including `local`: figures are interpreted in the
+CLI's own process, so `--vision_model` is never resolved inside the sandbox.
 
 ## Run
 

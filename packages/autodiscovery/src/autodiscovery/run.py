@@ -2,7 +2,6 @@ import json
 import math
 import os
 import shutil
-import sys
 import threading
 import traceback
 from collections import defaultdict
@@ -24,7 +23,6 @@ from autodiscovery.llm_usage import (
     UsageTracker,
     clear_ag2_usage_context,
     configure_ag2_usage_tracking,
-    extract_local_image_usage_markers,
     set_ag2_usage_context,
     snapshot_agents_actual_usage,
 )
@@ -48,7 +46,6 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
-from autodiscovery.progress import NoProgressError, ProgressGuard
 
 
 def _theoretical_max_boolean_cat(
@@ -326,7 +323,6 @@ def run_mcts(
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
-    max_no_progress_iterations: int = 3,
 ):
     """Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
 
@@ -374,13 +370,6 @@ def run_mcts(
         agent_usage_mode: Tracking mode for agents chat usage. ``per_response`` records
             usage from each AG2 model response. ``summary_delta`` records usage from
             AG2 usage-summary deltas.
-        max_no_progress_iterations: Number of consecutive iterations that may commit no
-            node before exploration aborts. Guards against a durable failure (bad model
-            credentials, exhausted quota, unparseable replies) spinning the loop forever.
-
-    Raises:
-        NoProgressError: If ``max_no_progress_iterations`` consecutive iterations commit
-            no node. Whatever was explored before the abort is still saved.
     """
 
     def _get_executor_rich_outputs(code_executor_agent) -> list:
@@ -484,7 +473,6 @@ def run_mcts(
         total_to_sample = max_iterations
         n_sampled = 0
         iteration_idx = 0
-        progress = ProgressGuard(max_no_progress_iterations, total_to_sample=total_to_sample)
         node_mutation_locks: dict[str, threading.Lock] = {}
         node_mutation_locks_guard = threading.Lock()
 
@@ -512,7 +500,6 @@ def run_mcts(
                 return_n=min(batch_size, remaining_budget),
             )[:remaining_budget]
             if not next_nodes:
-                progress.check_exhausted(n_sampled)
                 break
             print(
                 "SAMPLED "
@@ -657,22 +644,6 @@ def run_mcts(
                         if node.level == 1 and _warmstart_experiments is not None
                         else True
                     )
-                    if node.code_output:
-                        image_usage_entries, cleaned_output = extract_local_image_usage_markers(
-                            node.code_output
-                        )
-                        for usage_entry in image_usage_entries:
-                            usage_tracker.record_event(
-                                source=usage_entry.get("source", "openai"),
-                                component=usage_entry.get("component", "image_analysis.local"),
-                                model=usage_entry.get("model"),
-                                prompt_tokens=usage_entry.get("prompt_tokens", 0),
-                                completion_tokens=usage_entry.get("completion_tokens", 0),
-                                total_tokens=usage_entry.get("total_tokens"),
-                                agent_name=usage_entry.get("agent_name", "code_executor"),
-                                node_id=node.id,
-                            )
-                        node.code_output = cleaned_output
                     rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
                     _write_rich_outputs(node.level, node.node_idx, rich_outputs)
 
@@ -784,6 +755,14 @@ def run_mcts(
                         is_threaded=True,
                     )
 
+                def _on_expand_error(node_id: str, exc: Exception) -> None:
+                    # Keep exploration running when one node expansion fails.
+                    print(
+                        f"[run_mcts] Failed expanding node {node_id}: "
+                        f"{exc.__class__.__name__}: {exc}"
+                    )
+                    traceback.print_exception(type(exc), exc, exc.__traceback__)
+
                 expanded_nodes = []
                 with ThreadPoolExecutor(max_workers=n_threads) as executor:
                     future_labels = {
@@ -795,7 +774,7 @@ def run_mcts(
 
                     expanded_nodes = gather_completed_futures(
                         future_labels,
-                        on_error=progress.record_expansion_error,
+                        on_error=_on_expand_error,
                     )
             else:
                 # Sequential expansion of nodes
@@ -838,7 +817,11 @@ def run_mcts(
                         )
                     except Exception as exc:
                         # Align sequential behavior with threaded mode by continuing after per-node failures.
-                        progress.record_expansion_error(node_id, exc)
+                        print(
+                            f"[run_mcts] Failed expanding node {node_id}: "
+                            f"{exc.__class__.__name__}: {exc}"
+                        )
+                        traceback.print_exception(type(exc), exc, exc.__traceback__)
                         continue
                     if new_node is not None:
                         expanded_nodes.append(new_node)
@@ -850,35 +833,29 @@ def run_mcts(
             expanded_nodes.sort(key=lambda n: (n.level, n.node_idx))
             for node in expanded_nodes:
                 nodes_by_level[node.level].append(node)
-
-            progress.check_iteration(len(expanded_nodes), n_sampled)
     except KeyboardInterrupt:
         print("\n\n######### EXPLORATION INTERRUPTED! SAVING THE CURRENT STATE... #########\n\n")
-    except NoProgressError as exc:
-        print(f"\n\n######### EXPLORATION ABORTED! {exc} #########\n\n")
-        raise
     finally:
-        primary_error = sys.exception()
         clear_ag2_usage_context()
         configure_ag2_usage_tracking(None)
-        try:
-            save_nodes(
-                nodes_by_level,
-                log_dirname,
-                run_dedupe=run_dedupe,
-                model=belief_model_name,
-                embedding_model=embedding_model,
-                embedding_dimensions=embedding_dimensions,
-                time_elapsed=time() - start_time,
-                usage_tracker=usage_tracker,
-            )
-            usage_tracker.save_events(log_dirname)
-            usage_tracker.save_summary(log_dirname)
-        except Exception as persistence_error:
-            if primary_error is None:
-                raise
-            sys.stderr.write("Failed to save partial exploration:\n")
-            traceback.print_exception(persistence_error, file=sys.stderr)
+
+    # End time tracking
+    end_time = time()
+    time_elapsed = end_time - start_time
+
+    # Save all MCTS nodes
+    save_nodes(
+        nodes_by_level,
+        log_dirname,
+        run_dedupe=run_dedupe,
+        model=belief_model_name,
+        embedding_model=embedding_model,
+        embedding_dimensions=embedding_dimensions,
+        time_elapsed=time_elapsed,
+        usage_tracker=usage_tracker,
+    )
+    usage_tracker.save_events(log_dirname)
+    usage_tracker.save_summary(log_dirname)
 
 
 def resolve_model_args(args) -> None:

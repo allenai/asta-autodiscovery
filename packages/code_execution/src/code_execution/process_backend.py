@@ -86,7 +86,7 @@ def _find_uv() -> str:
 # TODO: Transplant this implementation onto asta_sandbox.SandboxBase (making run_cell
 # async via asyncio.to_thread) and move it into the asta-sandbox library as a first-class
 # local process backend alongside InProcessExecutor and ModalEphemeralExecutor. Once done,
-# _ProcessBackendAdapter in agents.py can be removed and ProcessIPythonBackend can be used
+# _IPythonBackendAdapter in agents.py can be removed and ProcessIPythonBackend can be used
 # directly wherever a SandboxBase is expected.
 class ProcessIPythonBackend:
     """Backend that executes IPython cells in isolated subprocesses.

@@ -1173,9 +1173,8 @@ def create() -> Blueprint:
         job_manager = get_job_manager()
         node = ExperimentTree.load_node(userid=userid, jobid=runid, experiment_id=experiment_id, config=job_manager.config)
 
-        experiment_node = node.to_dict() if node else None
+        experiment_node = node.to_dict(include_code=True) if node else None
         if experiment_node and node:
-            experiment_node["code_output"] = node.code_output
             if node.level is not None and node.index is not None:
                 try:
                     experiment_node["rich_outputs"] = read_rich_outputs(

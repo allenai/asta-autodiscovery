@@ -89,12 +89,12 @@ export const RunExperimentsProvider = ({
     const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
     const [selectedExperimentError, setSelectedExperimentError] = useState<string | null>(null);
     const [isLoadingSelectedExperiment, setIsLoadingSelectedExperiment] = useState<boolean>(false);
+    const [stateRunid, setStateRunid] = useState<string | null>(runid);
 
     const knownExperimentIds = useRef<Set<string>>(new Set());
     const selectedExperimentRequestId = useRef<number>(0);
     const refreshIntervalMsRef = useRef<number>(refreshIntervalMs);
     const shouldScrollToSelected = useRef<boolean>(true);
-
     // Keep ref in sync with prop
     useEffect(() => {
         refreshIntervalMsRef.current = refreshIntervalMs;
@@ -174,41 +174,48 @@ export const RunExperimentsProvider = ({
         [runid, userid, runsApi]
     );
 
-    // Reset initial loading state when runid changes
+    // Keep the state associated with the run that produced it. Consumers see defaults
+    // while this reset commits, so they never render the previous run's data.
     useEffect(() => {
+        if (stateRunid === runid) {
+            return;
+        }
+
+        setExperiments(DEFAULT_STATE.experiments);
+        setIsLoading(DEFAULT_STATE.isLoading);
         setIsLoadingInitial(true);
         hasLoadedOnce.current = false;
-    }, [runid]);
-
-    // Auto-start polling on mount if autoStart is true
-    useEffect(() => {
-        if (autoStart && runid && !isPolling) {
-            setIsPolling(true);
-        }
-    }, [autoStart, runid]);
-
-    useEffect(() => {
+        setLastError(DEFAULT_STATE.lastError);
+        setHasJobCompleted(DEFAULT_STATE.hasJobCompleted);
+        setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
+        setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
+        setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
+        knownExperimentIds.current = new Set();
+        selectedExperimentRequestId.current += 1;
+        shouldScrollToSelected.current = true;
         if (!runid) {
             setIsPolling(DEFAULT_STATE.isPolling);
-            setExperiments(DEFAULT_STATE.experiments);
-            setIsLoading(DEFAULT_STATE.isLoading);
-            setIsLoadingInitial(true);
-            hasLoadedOnce.current = false;
-            setLastError(DEFAULT_STATE.lastError);
-            setHasJobCompleted(DEFAULT_STATE.hasJobCompleted);
-            setSelectedExperiment(DEFAULT_STATE.selectedExperiment);
-            setSelectedExperimentError(DEFAULT_STATE.selectedExperimentError);
-            setIsLoadingSelectedExperiment(DEFAULT_STATE.isLoadingSelectedExperiment);
-            knownExperimentIds.current = new Set();
-            selectedExperimentRequestId.current += 1;
-            return;
         }
-        if (!isPolling) {
+        setStateRunid(runid);
+    }, [runid, stateRunid]);
+
+    useEffect(() => {
+        if (stateRunid === runid && autoStart && runid) {
+            setIsPolling(true);
+        }
+    }, [autoStart, runid, stateRunid]);
+
+    useEffect(() => {
+        if (!runid || stateRunid !== runid || !isPolling) {
             return;
         }
 
+        // A request issued for the previous runid must not append its results to the
+        // new run's list, so drop anything that resolves after this effect is torn down.
+        let cancelled = false;
+
         const fetchLatestExperiments = async () => {
-            if (!isPolling) {
+            if (cancelled) {
                 return;
             }
             try {
@@ -218,6 +225,9 @@ export const RunExperimentsProvider = ({
                     runid,
                     knownExperimentIds: Array.from(knownExperimentIds.current),
                 });
+                if (cancelled) {
+                    return;
+                }
                 const newExperiments = data.experiments.map((exp) => getExperimentFromApi(exp));
                 if (newExperiments.length > 0) {
                     setExperiments((prevExperiments) => {
@@ -237,21 +247,24 @@ export const RunExperimentsProvider = ({
                 }
 
                 // Handle job completion
-                if (data.has_job_completed && !hasJobCompleted) {
+                if (data.has_job_completed) {
                     setHasJobCompleted(true);
                     setIsPolling(false);
                 }
 
-                if (lastError !== null) {
-                    setLastError(null);
-                }
+                setLastError(null);
             } catch (error: any) {
+                if (cancelled) {
+                    return;
+                }
                 setLastError(error.message || 'Failed to fetch experiments');
             } finally {
-                setIsLoading(false);
-                if (!hasLoadedOnce.current) {
-                    hasLoadedOnce.current = true;
-                    setIsLoadingInitial(false);
+                if (!cancelled) {
+                    setIsLoading(false);
+                    if (!hasLoadedOnce.current) {
+                        hasLoadedOnce.current = true;
+                        setIsLoadingInitial(false);
+                    }
                 }
             }
         };
@@ -259,22 +272,31 @@ export const RunExperimentsProvider = ({
         fetchLatestExperiments();
         const interval = setInterval(fetchLatestExperiments, refreshIntervalMsRef.current);
         return () => {
+            cancelled = true;
             clearInterval(interval);
         };
-    }, [runid, userid, isPolling, runsApi, lastError, hasJobCompleted]);
+    }, [runid, stateRunid, userid, isPolling, runsApi]);
+
+    const stateMatchesRun = stateRunid === runid;
 
     const memoizedState = useMemo<RunExperimentsState>(
         () => ({
             runid,
-            isPolling,
-            isLoading,
-            isLoadingInitial,
-            experiments,
-            lastError,
-            hasJobCompleted,
-            selectedExperiment,
-            selectedExperimentError,
-            isLoadingSelectedExperiment,
+            isPolling: stateMatchesRun ? isPolling : DEFAULT_STATE.isPolling,
+            isLoading: stateMatchesRun ? isLoading : DEFAULT_STATE.isLoading,
+            isLoadingInitial: stateMatchesRun ? isLoadingInitial : true,
+            experiments: stateMatchesRun ? experiments : DEFAULT_STATE.experiments,
+            lastError: stateMatchesRun ? lastError : DEFAULT_STATE.lastError,
+            hasJobCompleted: stateMatchesRun ? hasJobCompleted : DEFAULT_STATE.hasJobCompleted,
+            selectedExperiment: stateMatchesRun
+                ? selectedExperiment
+                : DEFAULT_STATE.selectedExperiment,
+            selectedExperimentError: stateMatchesRun
+                ? selectedExperimentError
+                : DEFAULT_STATE.selectedExperimentError,
+            isLoadingSelectedExperiment: stateMatchesRun
+                ? isLoadingSelectedExperiment
+                : DEFAULT_STATE.isLoadingSelectedExperiment,
             startPolling,
             stopPolling,
             selectExperiment,
@@ -282,6 +304,7 @@ export const RunExperimentsProvider = ({
         }),
         [
             runid,
+            stateMatchesRun,
             isPolling,
             isLoading,
             isLoadingInitial,

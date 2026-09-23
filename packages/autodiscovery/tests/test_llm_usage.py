@@ -6,11 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from autodiscovery.llm_usage import (
-    LOCAL_IMAGE_USAGE_MARKER,
-    UsageTracker,
-    extract_local_image_usage_markers,
-)
+from autodiscovery.llm_usage import UsageTracker
 from autodiscovery.utils import query_llm
 
 
@@ -169,24 +165,6 @@ def test_usage_tracker_records_agent_usage_deltas() -> None:
     assert node_summary["totals"]["completion_tokens"] == 10
     assert node_summary["totals"]["total_tokens"] == 30
     assert node_summary["totals"]["reasoning_tokens"] == 0
-
-
-def test_extract_local_image_usage_markers() -> None:
-    """Ensure local marker lines are parsed and removed from output text."""
-    payload = {
-        "source": "openai",
-        "component": "image_analysis.local",
-        "model": "openai/gpt-4o",
-        "prompt_tokens": 42,
-        "completion_tokens": 7,
-        "total_tokens": 49,
-    }
-    text = "before\n" + LOCAL_IMAGE_USAGE_MARKER + json.dumps(payload) + "\n" + "after\n"
-
-    entries, cleaned = extract_local_image_usage_markers(text)
-    assert len(entries) == 1
-    assert entries[0]["component"] == "image_analysis.local"
-    assert cleaned == "before\nafter\n"
 
 
 def test_usage_tracker_save_events_and_summary_separately(tmp_path: Path) -> None:

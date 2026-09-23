@@ -167,22 +167,22 @@ The AD job runs the LLM-generated experiment code through a configurable executo
   read-only. Requires the [Modal](#modal-code-execution-sandbox-backend) variables and
   `STORAGE_BACKEND=gcs` (the sandbox mounts the dataset from `gs://`).
 
-### Choosing a workable combination
-
-Two backends need the run's data reachable from outside the API process, so they only work with
-`STORAGE_BACKEND=gcs`. The API **fails to start** on either mismatch rather than running against
-data the job or sandbox cannot see:
-
-| Setting | Works with `STORAGE_BACKEND=local` | Works with `STORAGE_BACKEND=gcs` |
-| --- | --- | --- |
-| `JOB_BACKEND=docker` | ✅ | ✅ |
-| `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
-| `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
-| `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
-
 All three return the figures a run produced as structured outputs, which the job then interprets
 with `--vision_model` in its own process. No backend needs model credentials inside the execution
 environment, and every backend persists its figures to `rich_outputs/` for the HTML report.
+
+### Choosing a workable combination
+
+Each job backend is tied to one store, and the Modal sandbox needs the run's data reachable from
+outside the API process, which only `gcs` offers. The API **fails to start** on any mismatch
+rather than running against data the job or sandbox cannot see:
+
+| Setting | Works with `STORAGE_BACKEND=local` | Works with `STORAGE_BACKEND=gcs` |
+| --- | --- | --- |
+| `JOB_BACKEND=docker` | ✅ | ❌ a bucket has no host directory to bind-mount |
+| `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
+| `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
+| `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
 ### Choosing a safe combination
 
@@ -195,7 +195,7 @@ job backend (how the mount is scoped) and on whether the deployment is multi-use
 | --- | --- | --- | --- |
 | `docker` | `process` / `local` | ✅ safe | ✅ safe — mount is scoped to the job's own prefix |
 | `gcp` | `process` / `local` | ✅ safe | ⚠️ **unsafe** — Cloud Run mounts the whole bucket; executed code can read every user's data |
-| `docker` / `gcp` | `modal` | ✅ safe | ✅ safe — scoped, read-only per-job data mount |
+| `gcp` | `modal` | ✅ safe | ✅ safe — scoped, read-only per-job data mount |
 
 The unsafe combination arises because Cloud Run's GCS mount is fixed per job (it cannot be scoped
 per execution), while the docker backend re-mounts only the current job's prefix each run. The API

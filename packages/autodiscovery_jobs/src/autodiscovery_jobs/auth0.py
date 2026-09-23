@@ -27,6 +27,12 @@ class Auth0Error(Exception):
     pass
 
 
+class Auth0UserNotFoundError(Auth0Error):
+    """Raised when Auth0 has no user record for the requested user ID."""
+
+    pass
+
+
 def _require_env(name: str) -> str:
     """Return the value of a required environment variable, or raise."""
     try:
@@ -92,5 +98,9 @@ def get_user(userid: str) -> dict[str, Any]:
 
         with urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
+    except HTTPError as e:
+        if e.code == 404:
+            raise Auth0UserNotFoundError(f"No Auth0 user found for {userid}") from e
+        raise Auth0Error(f"Failed to get user {userid}: {e}") from e
     except Exception as e:
-        raise Auth0Error(f"Failed to get user {userid}: {e}")
+        raise Auth0Error(f"Failed to get user {userid}: {e}") from e

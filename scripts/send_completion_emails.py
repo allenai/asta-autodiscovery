@@ -25,6 +25,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from autodiscovery_jobs import (
     Auth0Error,
+    Auth0UserNotFoundError,
     JobConfig,
     JobManager,
     get_user,
@@ -284,6 +285,10 @@ def send_completion_emails(
                         logger.warning(f"No email found for user {userid}")
                         errors += 1
                         continue
+                except Auth0UserNotFoundError:
+                    # Deleted/unknown accounts can't be emailed; skipping them must not fail the job.
+                    logger.warning(f"Skipping {userid}/{runid}: no Auth0 user record for {userid}")
+                    continue
                 except Auth0Error as e:
                     logger.error(f"Failed to get email for user {userid}: {e}")
                     errors += 1

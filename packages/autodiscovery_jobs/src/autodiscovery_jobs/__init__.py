@@ -23,6 +23,7 @@ Example:
 # Auth0 client
 from .auth0 import (
     Auth0Error,
+    Auth0UserNotFoundError,
     get_user,
 )
 from .backends import (
@@ -138,6 +139,7 @@ __all__ = [
     "DockerBackendError",
     "DatasetExpiredError",
     "Auth0Error",
+    "Auth0UserNotFoundError",
     # Storage backends
     "STORAGE_BACKENDS",
     "ObjectStore",

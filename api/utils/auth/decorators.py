@@ -23,7 +23,13 @@ def requires_auth(
     required_permission=None,
     check_permissions: list[PermissionType] = [],
 ):
-    """Require authentication and optionally check specific permissions."""
+    """Require authentication and optionally check specific permissions.
+
+    `required_permission` is a permission string, or a list of them any one of
+    which grants access.
+    """
+    if isinstance(required_permission, str):
+        required_permission = [required_permission]
 
     def decorator(f):
         @wraps(f)
@@ -40,10 +46,9 @@ def requires_auth(
             if not isinstance(permissions, list):
                 permissions = [permissions]
 
-            if required_permission and required_permission not in permissions:
-                return jsonify(
-                    {"error": f"Access denied. Required permission: {required_permission}"}
-                ), 403
+            if required_permission and not any(p in permissions for p in required_permission):
+                needed = " or ".join(required_permission)
+                return jsonify({"error": f"Access denied. Required permission: {needed}"}), 403
 
             if check_permissions:
                 for perm_type in check_permissions:

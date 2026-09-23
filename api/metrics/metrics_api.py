@@ -1,6 +1,9 @@
 """Flask blueprint for the metrics dashboard API.
 
-All endpoints require the `enroll:autodiscovery_admin` permission.
+All endpoints accept the `enroll:autodiscovery_admin` permission. The aggregate
+endpoints (`/overview`, `/usage/aggregated`) also accept the read-only
+`read:autodiscovery_metrics` permission; per-user, per-run, and cache endpoints
+stay admin-only.
 """
 
 from __future__ import annotations
@@ -22,12 +25,14 @@ from .aggregator import (
 
 logger = logging.getLogger(__name__)
 
+AGGREGATE_READ = [PermissionType.ADMIN.value, PermissionType.METRICS_READ.value]
+
 
 def create() -> Blueprint:
     api = Blueprint("metrics_api", __name__)
 
     @api.route("/overview")
-    @requires_auth(required_permission=PermissionType.ADMIN.value)
+    @requires_auth(required_permission=AGGREGATE_READ)
     def overview():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
@@ -62,7 +67,7 @@ def create() -> Blueprint:
         return jsonify(metrics)
 
     @api.route("/usage/aggregated")
-    @requires_auth(required_permission=PermissionType.ADMIN.value)
+    @requires_auth(required_permission=AGGREGATE_READ)
     def aggregated_usage():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")

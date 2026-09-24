@@ -1,8 +1,7 @@
-'use client';
 
 import { Box, Button, styled } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from '@/router';
 
 import AuthButton from '@/components/AuthButton';
 import CreditsChip from '@/components/CreditsChip';

@@ -1,5 +1,5 @@
 import { Button, styled } from '@mui/material';
-import Link from 'next/link';
+import { Link } from '@/router';
 
 import { TEST_ID_ABOUT_BUTTON } from '@/testIds';
 

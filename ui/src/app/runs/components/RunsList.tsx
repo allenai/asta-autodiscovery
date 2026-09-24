@@ -1,4 +1,3 @@
-'use client';
 
 import { useState, useMemo } from 'react';
 import {
@@ -22,8 +21,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link } from '@/router';
+import { useRouter } from '@/router';
 
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { CreateRunButton } from '@/runs/components/CreateRunButton';

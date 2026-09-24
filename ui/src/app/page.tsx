@@ -1,7 +1,6 @@
-'use client';
 
 import { styled } from '@mui/material';
-import { useRouter } from 'next/dist/client/components/navigation';
+import { useRouter } from '@/router';
 import { useEffect } from 'react';
 
 export default function HomePage() {

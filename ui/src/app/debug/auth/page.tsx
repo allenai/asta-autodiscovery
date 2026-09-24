@@ -1,4 +1,3 @@
-'use client';
 
 import { styled, Typography } from '@mui/material';
 

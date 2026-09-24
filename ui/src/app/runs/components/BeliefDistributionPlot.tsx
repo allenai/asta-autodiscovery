@@ -1,4 +1,3 @@
-'use client';
 
 import { styled } from '@mui/material';
 import { useTheme } from '@mui/material/styles';

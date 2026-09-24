@@ -7,7 +7,6 @@ export const AboutButton = () => {
     return (
         <Link
             href="https://allenai.org/blog/autodiscovery"
-            passHref
             target="_blank"
             rel="noopener noreferrer"
             data-test-id={TEST_ID_ABOUT_BUTTON}>

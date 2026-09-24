@@ -24,7 +24,7 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
     const href = isSharedRun ? `/shared/${userid}/${id}` : `/runs/${id}`;
 
     return (
-        <LayoutLink href={href} passHref>
+        <LayoutLink href={href}>
             <Layout>
                 <LayoutIcon>
                     <IconWrapper>

@@ -116,7 +116,10 @@ Each AutoDiscovery run is launched by a swappable **job backend**, selected with
 When `GOOGLE_APPLICATION_CREDENTIALS` is set, the docker backend bind-mounts that key into each
 job container so Google-hosted models (Vertex AI) can authenticate. It uses the **host** path
 (compose forwards it internally as `GCP_KEY_HOST_PATH`), which is why the variable must be an
-absolute path. Leave it unset if your jobs use no Google models.
+absolute path. Leave it unset if your jobs use no Google models. `GITHUB_COPILOT_TOKEN_DIR` is
+handled the same way for `github_copilot/` models (forwarded as
+`GITHUB_COPILOT_TOKEN_HOST_DIR`). API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`AZURE_API_*`) are forwarded as environment variables.
 
 ### Docker backend (default)
 
@@ -220,18 +223,41 @@ Used only when `CODE_EXECUTION_BACKEND=modal`. With the default `process` (or `l
 | `MODAL_APP_NAME` | No | `asta-autodiscovery` | Modal app name the sandboxes are associated with. Created on demand if it doesn't exist. |
 | `MODAL_BUCKET_SECRET` | modal | `example-bucket-secret` | Name of the Modal [secret](https://modal.com/docs/guide/secrets) holding the GCS credentials the sandbox uses to mount dataset files. The default is a **placeholder that does not exist** — you must set this to the name of a real secret in your `MODAL_ENVIRONMENT`, or every run fails at sandbox creation with `Secret '…' not found`. |
 
-## LLM providers
+## Model and LLM providers
 
-Model access for the discovery agents.
+Which model the discovery agents use, and how it is reached. **There is no default
+model**: `AUTODISCOVERY_MODEL` is the one required setting in the whole configuration, and
+both `make dev` and the API refuse to start without it. The [Quick start](quickstart.md)
+has a complete `.env` per provider.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `OPENAI_API_KEY` | Conditional | *(none)* | OpenAI API key. Required when using OpenAI models. |
-| `VERTEXAI_PROJECT` | Conditional | *(none)* | Google Vertex AI project id. Required when using Vertex-backed models, and checked at startup; it is not inferred from the Application Default Credentials project. Read by litellm itself — this is litellm's own variable name, not one this package defines. |
-| `VERTEXAI_LOCATION` | Conditional | *(none)* | Vertex AI location/region, required alongside `VERTEXAI_PROJECT` and checked at startup. Use `global` unless you have a reason not to: it serves the Gemini models the CLI defaults to, and litellm's own fallback, `us-central1`, does not. Also litellm's variable. |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Conditional | *(none)* | Service-account key for Vertex. Vertex uses Application Default Credentials; run `gcloud auth application-default login` instead for local development. |
-| `GITHUB_COPILOT_TOKEN_DIR` | No | `~/.config/litellm/github_copilot` | Directory holding an `access-token` file with a GitHub OAuth token. Interactive runs obtain and cache this via device-code login; pre-seed it for non-interactive runs, which otherwise block on a device prompt. |
+| `AUTODISCOVERY_MODEL` | **Yes** | *(none)* | Model for every run, as litellm's `<provider>/<model>` (e.g. `openai/gpt-5.4-mini`, `anthropic/claude-sonnet-5`, `azure/<deployment>`, `vertex_ai/gemini-3.7-flash`, `github_copilot/claude-haiku-4.5`). The provider prefix is required. The API passes it to each job as `--model`. |
+| `AUTODISCOVERY_BELIEF_MODEL` | No | `AUTODISCOVERY_MODEL` | Model for belief elicitation (the job's `--belief_model`). |
+| `AUTODISCOVERY_VISION_MODEL` | No | `AUTODISCOVERY_MODEL` | Model for interpreting plots (the job's `--vision_model`). Must accept image input. |
+| `AUTODISCOVERY_EMBEDDING_MODEL` | No | *(none)* | Embedding model for hypothesis deduplication (the job's `--embedding_model`). Only used, and only required, with the standalone CLI's `--dedupe`. |
+
+Provider variables follow litellm's conventions. The job checks the chosen provider's at
+startup so a missing one is a named error rather than an auth failure mid-run; with the
+docker job backend the API checks them at *its* startup too, since its environment is what
+jobs receive.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `OPENAI_API_KEY` | openai | *(none)* | OpenAI API key. |
+| `ANTHROPIC_API_KEY` | anthropic | *(none)* | Anthropic API key. Anthropic has no embedding models, so `--dedupe` needs `AUTODISCOVERY_EMBEDDING_MODEL` from another provider. |
+| `AZURE_API_KEY` | azure | *(none)* | Azure OpenAI key. The model is `azure/<deployment name>`; name deployments after the model they serve so reasoning-model handling applies. |
+| `AZURE_API_BASE` | azure | *(none)* | Azure OpenAI endpoint, `https://<resource>.openai.azure.com`. |
+| `AZURE_API_VERSION` | No | *(litellm default)* | Azure OpenAI API version. |
+| `VERTEXAI_PROJECT` | vertex_ai | *(none)* | Google Vertex AI project id, checked at startup; it is not inferred from the Application Default Credentials project. Read by litellm itself — this is litellm's own variable name, not one this package defines. |
+| `VERTEXAI_LOCATION` | vertex_ai | *(none)* | Vertex AI location/region, checked at startup alongside `VERTEXAI_PROJECT`. Use `global` unless you have a reason not to: it serves current Gemini models, and litellm's own fallback, `us-central1`, does not. Also litellm's variable. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | vertex_ai | *(none)* | Service-account key for Vertex. With the docker job backend it must be an absolute host path (it is bind-mounted into each job). Outside containers, `gcloud auth application-default login` works instead. |
+| `GITHUB_COPILOT_TOKEN_DIR` | github_copilot | `~/.config/litellm/github_copilot` | Directory holding litellm's cached GitHub OAuth token (`access-token`). Interactive runs obtain and cache it via device-code login; pre-seed it for non-interactive runs, which otherwise block on a device prompt. With the docker job backend it must be an absolute host path: compose forwards it as `GITHUB_COPILOT_TOKEN_HOST_DIR` and the backend bind-mounts it read-write into each job (litellm writes a derived, short-lived key beside the token). |
 | `ASTA_AGENTS_MODEL` | No | `openai/gpt-5-mini` | Model used by the `agents` package (LiteLLM model string). |
+
+Any other [litellm provider](https://docs.litellm.ai/docs/providers) can be named; its
+variables are then yours to supply, and with the docker job backend must be added to the
+forwarding list in `backends/docker.py` to reach job containers.
 
 `VERTEX_ACCESS_TOKEN`, `GOOGLE_OAUTH_ACCESS_TOKEN` and `VERTEX_OPENAI_BASE_URL`
 are no longer read. Vertex traffic goes through litellm's Vertex client, which

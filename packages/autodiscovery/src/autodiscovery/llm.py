@@ -20,8 +20,9 @@ else -- which parameters a model accepts, wire formats, credentials -- is
 litellm's job.
 
 Any of litellm's providers can be named; supplying credentials for one is the
-operator's job and follows litellm's own env-var conventions. The three this
-package documents and tests:
+operator's job and follows litellm's own env-var conventions. There is no
+default model: the operator picks one (``--model`` or ``AUTODISCOVERY_MODEL``)
+and sets that provider's variables. The four this package documents and tests:
 
 - ``vertex_ai`` uses Application Default Credentials. Set
   ``GOOGLE_APPLICATION_CREDENTIALS`` to a service-account key, or run
@@ -31,7 +32,14 @@ package documents and tests:
   are required, and their presence is checked at startup so an unset one is a
   named flag error rather than litellm's silent fallback to the credentials'
   project and to ``us-central1`` (which does not serve the default models).
-- ``openai`` uses ``OPENAI_API_KEY``.
+- ``openai`` uses ``OPENAI_API_KEY``, checked at startup.
+- ``azure`` (Azure OpenAI) uses ``AZURE_API_KEY`` and ``AZURE_API_BASE``, both
+  checked at startup, plus litellm's optional ``AZURE_API_VERSION``. The model
+  is ``azure/<deployment name>``; name deployments after the model they serve
+  so the registry checks below still apply.
+- ``anthropic`` uses ``ANTHROPIC_API_KEY``, checked at startup. Anthropic has
+  no embedding models, so ``--dedupe`` needs a second provider for
+  ``--embedding_model``.
 - ``github_copilot`` caches a GitHub OAuth token at
   ``$GITHUB_COPILOT_TOKEN_DIR/access-token`` (default
   ``~/.config/litellm/github_copilot``). litellm obtains it via device-code login
@@ -51,8 +59,21 @@ from autodiscovery.llm_retry import call_with_backoff
 # Providers this package has special handling for. Any litellm provider works;
 # these are the ones with a documented credential path or a quirk below.
 OPENAI = "openai"
+AZURE = "azure"
+ANTHROPIC = "anthropic"
 VERTEX_AI = "vertex_ai"
 GITHUB_COPILOT = "github_copilot"
+
+#: Environment variables a provider cannot be called without, checked by
+#: :func:`validate` so a missing one is a startup error naming the variable
+#: rather than an auth failure on the first model call mid-run. Vertex is
+#: handled separately: its variables are litellm settings, not credentials.
+#: ``autodiscovery_jobs.model_config`` keeps the API-side copy of this table.
+_REQUIRED_ENV = {
+    OPENAI: ("OPENAI_API_KEY",),
+    AZURE: ("AZURE_API_KEY", "AZURE_API_BASE"),
+    ANTHROPIC: ("ANTHROPIC_API_KEY",),
+}
 
 #: Per-request timeout, matching the previous AG2/OpenAI client default.
 REQUEST_TIMEOUT_S = 600
@@ -151,8 +172,8 @@ def accepts_temperature(model: str) -> bool:
 
     Not answerable from litellm: ``get_supported_openai_params`` lists
     ``temperature`` for ``o4-mini``, which rejects it at the API, so
-    ``drop_params`` will not strip it. OpenAI's reasoning models reject it;
-    Gemini's reasoning models accept it.
+    ``drop_params`` will not strip it. OpenAI's reasoning models reject it,
+    on OpenAI and Azure alike; Gemini's reasoning models accept it.
 
     Args:
         model: A litellm-qualified model name.
@@ -160,7 +181,7 @@ def accepts_temperature(model: str) -> bool:
     Returns:
         True when a temperature may be sent.
     """
-    if provider_of(model) != OPENAI:
+    if provider_of(model) not in (OPENAI, AZURE):
         return True
     info = model_info(model)
     return not (info and info.get("supports_reasoning"))
@@ -181,13 +202,17 @@ def max_n(model: str) -> int | None:
     provider = provider_of(model)
     if provider == VERTEX_AI:
         return 5
+    if provider == ANTHROPIC:
+        # The Messages API has no ``n``; litellm drops it silently under
+        # drop_params, so a multi-sample request would come back as one sample.
+        return 1
     if provider == GITHUB_COPILOT:
         # Measured: n=10 fails with "Invalid 'n': ... Expected a value <= 8".
         # Without this, anything above 8 errors instead of batching -- notably
         # dedupe, which asks for 10 merge votes.
         return 8
     info = model_info(model)
-    if provider == OPENAI and info and info.get("supports_reasoning"):
+    if provider in (OPENAI, AZURE) and info and info.get("supports_reasoning"):
         return 8
     return None
 
@@ -302,6 +327,12 @@ def validate(
             missing configuration the run cannot proceed without.
     """
     provider = provider_of(model)
+
+    missing = [var for var in _REQUIRED_ENV.get(provider, ()) if not os.getenv(var)]
+    if missing:
+        raise ModelError(
+            f"{flag}={model} needs {' and '.join(missing)} set for the '{provider}' provider."
+        )
 
     # Vertex needs both settings named explicitly. Unset, litellm falls back to
     # the credentials' project and to us-central1, so the first call 404s naming

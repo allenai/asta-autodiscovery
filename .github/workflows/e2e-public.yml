@@ -45,7 +45,12 @@ jobs:
           # dangling in CI, so replace it with an empty file. All config the stack
           # needs comes from the compose `environment:` block + this job's env.
           rm -f .env
-          : > .env
+          # The API refuses to start without a chosen model (there is no default);
+          # the @public tests never submit a run, so any provider-qualified name
+          # and a placeholder key satisfy the startup check.
+          printf '%s\n' \
+            'AUTODISCOVERY_MODEL=openai/gpt-5.4-mini' \
+            'OPENAI_API_KEY=ci-e2e-placeholder-not-a-real-key' > .env
           # Mount source for AUTH_PASSWORD_DIR must exist for both providers.
           mkdir -p secrets
 

@@ -18,8 +18,10 @@ services:
       - .env
     volumes:
       - ./api:/api
+      # Defaults to /dev/null when unset (no Google-hosted models, no GCS): compose
+      # would otherwise resolve the empty source to the project directory.
       - type: bind
-        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        source: ${GOOGLE_APPLICATION_CREDENTIALS:-/dev/null}
         target: /secrets/gcp-key.json
         read_only: true
         bind:
@@ -49,6 +51,13 @@ services:
       # makes debugging easier.
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      # The model every run uses, as litellm's <provider>/<model>. Required: there
+      # is no default, and the API refuses to start without it. The per-role
+      # overrides are optional. See docs/quickstart.md for each provider's variables.
+      - AUTODISCOVERY_MODEL=${AUTODISCOVERY_MODEL}
+      - AUTODISCOVERY_BELIEF_MODEL=${AUTODISCOVERY_BELIEF_MODEL}
+      - AUTODISCOVERY_VISION_MODEL=${AUTODISCOVERY_VISION_MODEL}
+      - AUTODISCOVERY_EMBEDDING_MODEL=${AUTODISCOVERY_EMBEDDING_MODEL}
       # Active auth provider: none (default — zero-config, unauthenticated local user)
       # | auth0 | password_file. Set explicitly for any real/multi-user deployment.
       - AUTH_PROVIDER=${AUTH_PROVIDER:-none}
@@ -95,6 +104,10 @@ services:
       # path, unusable as a host bind source). Requires GOOGLE_APPLICATION_CREDENTIALS
       # to be an absolute path. Optional when jobs use no Google models.
       - GCP_KEY_HOST_PATH=${GOOGLE_APPLICATION_CREDENTIALS}
+      # Host path of the GitHub Copilot token directory, for github_copilot/ models:
+      # the docker backend bind-mounts it read-only into each job container. Must
+      # be an absolute path (no ~). Optional when jobs use no Copilot models.
+      - GITHUB_COPILOT_TOKEN_HOST_DIR=${GITHUB_COPILOT_TOKEN_DIR}
       # Asta context service (artifact storage + metadata)
       - ASTA_CONTEXT_SERVICE_URL=${ASTA_CONTEXT_SERVICE_URL}
       - ASTA_CONTEXT_SERVICE_API_KEY=${ASTA_CONTEXT_SERVICE_API_KEY}

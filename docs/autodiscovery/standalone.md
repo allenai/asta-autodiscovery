@@ -15,13 +15,21 @@ This pulls in `asta-autodiscovery-modal` (sandboxed code execution) and
 
 ## Selecting models
 
-Every model flag — `--model`, `--belief_model`, `--vision_model`,
-`--embedding_model` — accepts [litellm's](https://docs.litellm.ai/docs/providers)
+There is **no default model**. Choose one with `--model`, or set
+`AUTODISCOVERY_MODEL` in the environment; a run with neither stops at startup
+with `No model chosen`. `--belief_model` and `--vision_model` default to
+`--model` (environment: `AUTODISCOVERY_BELIEF_MODEL`, `AUTODISCOVERY_VISION_MODEL`).
+`--embedding_model` (`AUTODISCOVERY_EMBEDDING_MODEL`) has no fallback and is
+required only with `--dedupe`.
+
+Every model flag accepts [litellm's](https://docs.litellm.ai/docs/providers)
 `<provider>/<model>` naming, with snake_case provider slugs:
 
 ```sh
+--model openai/gpt-5.4-mini
+--model anthropic/claude-sonnet-5
+--model azure/gpt-5.4-mini            # your Azure OpenAI deployment name
 --model vertex_ai/gemini-3.7-flash
---model openai/o4-mini
 --model github_copilot/claude-haiku-4.5
 ```
 
@@ -39,10 +47,10 @@ as <provider>/<model>, e.g. vertex_ai/gemini-3.7-flash or openai/gemini-3.7-flas
 never a litellm provider. Use `vertex_ai/<model>`.
 
 Any of litellm's [~149 providers](https://docs.litellm.ai/docs/providers) can be
-named — there is no allow-list. The three documented below (`vertex_ai`,
-`openai`, `github_copilot`) are the ones this project configures credentials for
-and tests; using another means supplying its credentials yourself, per litellm's
-env-var conventions.
+named — there is no allow-list. The five documented below (`openai`,
+`anthropic`, `azure`, `vertex_ai`, `github_copilot`) are the ones this project
+checks credentials for at startup and tests; using another means supplying its
+credentials yourself, per litellm's env-var conventions.
 
 Because the provider travels with each flag, roles can use different providers
 in one run — Copilot for chat, Vertex for plot analysis:
@@ -71,12 +79,25 @@ validation falls back to the registry with a warning.
 All model traffic goes through [litellm](https://docs.litellm.ai/), so
 credentials follow litellm's conventions per provider.
 
-**Vertex AI** (the default model `vertex_ai/gemini-3.7-flash`) uses Application
-Default Credentials:
+**OpenAI** uses `OPENAI_API_KEY`, checked at startup. Pass `--model openai/gpt-...`.
+
+**Anthropic** uses `ANTHROPIC_API_KEY`, checked at startup. Pass
+`--model anthropic/claude-...`. Anthropic's API has no `n` parameter, so
+multi-sample calls (belief elicitation) are issued one sample per request; and
+it has no embedding models, so `--dedupe` needs `--embedding_model` from another
+provider (with that provider's key).
+
+**Azure OpenAI** uses `AZURE_API_KEY` and `AZURE_API_BASE`
+(`https://<resource>.openai.azure.com`), both checked at startup, plus litellm's
+optional `AZURE_API_VERSION`. The model is `azure/<deployment name>`; name
+deployments after the model they serve so the reasoning-model handling
+(temperature, per-request sample cap) resolves from litellm's registry.
+
+**Vertex AI** uses Application Default Credentials:
 
 ```sh
 export VERTEXAI_PROJECT=your-gcp-project
-export VERTEXAI_LOCATION=global          # `global` serves the default models
+export VERTEXAI_LOCATION=global          # `global` serves current Gemini models
 
 # Either a service-account key...
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
@@ -90,11 +111,9 @@ without them stops at startup naming the ones that are missing, because
 litellm's fallback for each is worse than an error. An unset project takes
 whatever project your Application Default Credentials carry, which is
 frequently not the one you meant; an unset location takes `us-central1`, which
-does not serve the Gemini models this package defaults to. Either way the first
-model call 404s mid-run, and the 404 reads as if the model does not exist. Set
+does not serve current Gemini models. Either way the first model call 404s
+mid-run, and the 404 reads as if the model does not exist. Set
 `VERTEXAI_LOCATION=global` unless you have a specific region in mind.
-
-**OpenAI** uses `OPENAI_API_KEY`. Pass `--model openai/gpt-...`.
 
 ### GitHub Copilot
 
@@ -134,8 +153,8 @@ Copilot honors `--temperature` and
 modes constrain temperature at the provider.
 
 `github_copilot/text-embedding-3-small` at 1536 dimensions is not numerically
-identical to the OpenAI `text-embedding-3-large` default, so keep the OpenAI
-embedding model when exact embedding geometry must be preserved. Copilot works
+identical to OpenAI's `text-embedding-3-large`, so use the OpenAI embedding model
+when exact embedding geometry must be preserved. Copilot works
 with every execution backend, including `local`: figures are interpreted in the
 CLI's own process, so `--vision_model` is never resolved inside the sandbox.
 
@@ -143,6 +162,7 @@ CLI's own process, so `--vision_model` is never resolved inside the sandbox.
 
 ```sh
 auto-discovery \
+    --model openai/gpt-5.4-mini \
     --name "Plant growth study" \
     --description "Field trial measurements of plant height under varying fertilizer" \
     --intent "Focus on dose-response relationships" \

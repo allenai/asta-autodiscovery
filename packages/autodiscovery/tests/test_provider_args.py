@@ -18,14 +18,28 @@ from autodiscovery.run import resolve_model_args
 
 
 @pytest.fixture(autouse=True)
-def _unconfigured_vertex_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Start every test from an unconfigured Vertex environment.
+def _controlled_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Start every test from a known provider environment.
 
     Validation reads these, so a developer's own exports would otherwise decide
-    whether a test here passes. Tests that need Vertex configure them.
+    whether a test here passes. Vertex, Anthropic and Azure start unconfigured
+    (tests that need them configure them); OpenAI starts configured, since most
+    tests here name an OpenAI model incidentally. No model is chosen via the
+    environment -- there is no default, and tests of that path set it.
     """
-    for env_var in ("VERTEXAI_PROJECT", "VERTEXAI_LOCATION"):
+    for env_var in (
+        "VERTEXAI_PROJECT",
+        "VERTEXAI_LOCATION",
+        "ANTHROPIC_API_KEY",
+        "AZURE_API_KEY",
+        "AZURE_API_BASE",
+        "AUTODISCOVERY_MODEL",
+        "AUTODISCOVERY_BELIEF_MODEL",
+        "AUTODISCOVERY_VISION_MODEL",
+        "AUTODISCOVERY_EMBEDDING_MODEL",
+    ):
         monkeypatch.delenv(env_var, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
 
 def configure_vertex(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,6 +137,10 @@ def test_accepts_temperature_only_excludes_openai_reasoning_models() -> None:
     assert not accepts_temperature("openai/o4-mini")
     assert not accepts_temperature("openai/gpt-5-mini")
     assert accepts_temperature("openai/gpt-4o")
+    # The same models behind Azure OpenAI behave the same way.
+    assert not accepts_temperature("azure/gpt-5.4-mini")
+    assert accepts_temperature("azure/gpt-4o")
+    assert accepts_temperature("anthropic/claude-sonnet-5")
     # Gemini reasoning models do take a temperature.
     assert accepts_temperature("vertex_ai/gemini-3.1-pro-preview")
     assert accepts_temperature("github_copilot/claude-haiku-4.5")
@@ -132,7 +150,11 @@ def test_max_n_is_capped_per_provider() -> None:
     """litellm's registry has no field for a per-request sample cap."""
     assert max_n("vertex_ai/gemini-3.1-pro-preview") == 5
     assert max_n("openai/o4-mini") == 8
+    assert max_n("azure/gpt-5.4-mini") == 8
     assert max_n("openai/gpt-4o") is None
+    # Anthropic's Messages API has no n at all; litellm would drop it silently
+    # and a five-sample belief request would come back as one sample.
+    assert max_n("anthropic/claude-sonnet-5") == 1
     # Copilot rejects n > 8 outright; batching must kick in instead. Without a
     # cap, dedupe's 10 merge votes error rather than splitting into 8 + 2.
     assert max_n("github_copilot/gpt-5.4") == 8
@@ -258,24 +280,71 @@ def test_validation_never_triggers_copilot_device_flow(monkeypatch) -> None:
 # --- CLI boundary ----------------------------------------------------------
 
 
-def test_engine_defaults_are_litellm_qualified(monkeypatch) -> None:
-    configure_vertex(monkeypatch)
+def test_there_is_no_default_model() -> None:
+    """Choosing a model is the one required configuration step."""
     args = engine_args()
+    assert args.model is None
 
-    assert args.model == "vertex_ai/gemini-3.7-flash"
-    assert args.belief_model == "vertex_ai/gemini-3.7-flash"
-    assert args.vision_model == "vertex_ai/gemini-3.7-flash"
-    assert args.embedding_model == "openai/text-embedding-3-large"
+    with pytest.raises(ModelError, match="No model chosen"):
+        resolve_model_args(args)
+
+
+def test_the_model_can_be_chosen_via_the_environment(monkeypatch) -> None:
+    monkeypatch.setenv("AUTODISCOVERY_MODEL", "openai/gpt-4o")
+    args = engine_args()
     resolve_model_args(args)
 
+    assert args.model == "openai/gpt-4o"
+    # The other chat roles follow the main model unless overridden.
+    assert args.belief_model == "openai/gpt-4o"
+    assert args.vision_model == "openai/gpt-4o"
 
-def test_easy_cli_shares_the_engine_model_defaults() -> None:
+
+def test_the_flag_wins_over_the_environment(monkeypatch) -> None:
+    monkeypatch.setenv("AUTODISCOVERY_MODEL", "openai/gpt-4o")
+    args = engine_args("--model", "openai/gpt-4.1")
+
+    assert args.model == "openai/gpt-4.1"
+
+
+def test_role_overrides_come_from_flags_or_the_environment(monkeypatch) -> None:
+    monkeypatch.setenv("AUTODISCOVERY_MODEL", "openai/gpt-4o")
+    monkeypatch.setenv("AUTODISCOVERY_BELIEF_MODEL", "openai/gpt-4.1")
+    args = engine_args("--vision_model", "openai/gpt-4o-mini")
+    resolve_model_args(args)
+
+    assert args.belief_model == "openai/gpt-4.1"
+    assert args.vision_model == "openai/gpt-4o-mini"
+
+
+def test_an_embedding_model_is_only_needed_for_dedupe() -> None:
+    """Chat-only providers (Anthropic) must not be blocked by a role they never use."""
+    args = engine_args("--model", "openai/gpt-4o")
+    resolve_model_args(args)
+    assert args.embedding_model is None
+
+    with pytest.raises(ModelError, match="--dedupe needs an embedding model"):
+        resolve_model_args(engine_args("--model", "openai/gpt-4o", "--dedupe"))
+
+    resolve_model_args(
+        engine_args(
+            "--model",
+            "openai/gpt-4o",
+            "--dedupe",
+            "--embedding_model",
+            "openai/text-embedding-3-large",
+        )
+    )
+
+
+def test_easy_cli_shares_the_engine_model_flags(monkeypatch) -> None:
+    monkeypatch.setenv("AUTODISCOVERY_MODEL", "openai/gpt-4o")
     args = build_parser().parse_args(["--out_dir", "results", "--n_experiments", "1", "data.csv"])
 
-    assert args.model == "vertex_ai/gemini-3.7-flash"
-    assert args.belief_model == "vertex_ai/gemini-3.7-flash"
-    assert args.vision_model == "vertex_ai/gemini-3.7-flash"
-    assert args.embedding_model == "openai/text-embedding-3-large"
+    assert args.model == "openai/gpt-4o"
+    assert args.belief_model is None
+    assert args.vision_model is None
+    assert args.embedding_model is None
 
 
 @pytest.mark.parametrize("flag", ["--llm_provider", "--embedding_provider"])
@@ -351,7 +420,35 @@ def test_litellms_short_aliases_do_not_satisfy_the_check(alias: str, monkeypatch
 
 def test_a_missing_vertex_setting_stops_a_run_before_any_model_call() -> None:
     with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
-        resolve_model_args(engine_args())
+        resolve_model_args(engine_args("--model", "vertex_ai/gemini-3.7-flash"))
+
+
+# --- Provider credentials ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("model", "variables"),
+    [
+        ("openai/gpt-4o", ["OPENAI_API_KEY"]),
+        ("anthropic/claude-sonnet-5", ["ANTHROPIC_API_KEY"]),
+        ("azure/gpt-4o", ["AZURE_API_KEY", "AZURE_API_BASE"]),
+    ],
+)
+def test_a_provider_without_its_credentials_fails_at_startup(
+    model: str, variables: list[str], monkeypatch
+) -> None:
+    """A missing key is a named startup error, not an auth failure mid-run."""
+    for var in variables:
+        monkeypatch.delenv(var, raising=False)
+
+    with pytest.raises(ModelError) as excinfo:
+        validate(model, flag="--model")
+    for var in variables:
+        assert var in str(excinfo.value)
+
+    for var in variables:
+        monkeypatch.setenv(var, "something")
+    validate(model, flag="--model")
 
 
 def test_a_run_naming_no_vertex_model_needs_no_vertex_settings() -> None:
@@ -371,9 +468,10 @@ def test_a_run_naming_no_vertex_model_needs_no_vertex_settings() -> None:
 @pytest.mark.parametrize(
     ("extra", "expected"),
     [
-        # The default models are Vertex, so an unconfigured project is the most
+        # There is no default model, so forgetting to choose one is the most
         # likely first-run failure of all.
-        ([], "VERTEXAI_PROJECT"),
+        ([], "No model chosen"),
+        (["--model", "vertex_ai/gemini-3.7-flash"], "VERTEXAI_PROJECT"),
         # Every 0.2.x user hits this one on upgrade.
         (["--model", "gemini-3.7-flash"], "missing a provider"),
     ],

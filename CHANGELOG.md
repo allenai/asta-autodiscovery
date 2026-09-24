@@ -9,6 +9,35 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
+### There is no default model; choosing one is required
+
+`--model` no longer defaults to `vertex_ai/gemini-3.7-flash`. Choose a model on
+the command line or with the new `AUTODISCOVERY_MODEL` environment variable; a
+run with neither stops at startup with `No model chosen`, before any directory
+is created or model called.
+
+- `--belief_model` and `--vision_model` default to `--model` instead of to a
+  fixed Gemini model (environment: `AUTODISCOVERY_BELIEF_MODEL`,
+  `AUTODISCOVERY_VISION_MODEL`).
+- `--embedding_model` no longer defaults to `openai/text-embedding-3-large`. It
+  is required, and validated, only with `--dedupe` (environment:
+  `AUTODISCOVERY_EMBEDDING_MODEL`), so chat-only providers such as Anthropic no
+  longer need an OpenAI key they never use.
+- `openai`, `anthropic` and `azure` (Azure OpenAI) credentials are checked at
+  startup the way Vertex's settings already were: a missing `OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY`, or `AZURE_API_KEY`/`AZURE_API_BASE` is a named flag error
+  rather than an auth failure on the first call.
+- `anthropic/` models are issued one sample per request. Anthropic's Messages
+  API has no `n`; litellm dropped it silently, so a five-sample belief request
+  came back as a single sample.
+- `azure/<deployment>` gets the same reasoning-model handling as `openai/`
+  (no temperature, eight samples per request) when the deployment is named
+  after the model it serves.
+
+**Upgrading:** add `--model <provider>/<model>` to existing invocations, or
+export `AUTODISCOVERY_MODEL`. The previous behaviour is
+`--model vertex_ai/gemini-3.7-flash --embedding_model openai/text-embedding-3-large`.
+
 ### Plot interpretation always happens outside the execution environment ([#74])
 
 Every `--backend` now returns figures as structured outputs, and the CLI process

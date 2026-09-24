@@ -2,6 +2,7 @@ import logging
 import os
 
 from auth import auth_api
+from autodiscovery_jobs.model_config import check_model_config
 from flask import Flask
 from metrics import metrics_api
 from root import root_api
@@ -19,6 +20,10 @@ def create_app() -> ProxyFix:
     level = os.environ.get("LOG_LEVEL", default=logging.INFO)
     logging.basicConfig(level=level, handlers=handlers, force=True)
     logging.root.setLevel(level)
+
+    # Refuse to start without a chosen model. There is no default, and without
+    # this the stack would come up only to fail on the first submitted run.
+    check_model_config()
 
     app = Flask("api")
     userid_logging.instrument(app, logging.root)

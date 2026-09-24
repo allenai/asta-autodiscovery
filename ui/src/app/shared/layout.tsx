@@ -1,4 +1,3 @@
-'use client';
 
 import RunsLayout from '@/runs/layout';
 

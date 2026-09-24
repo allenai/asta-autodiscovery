@@ -1,7 +1,7 @@
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import { Button, CircularProgress, Typography, styled } from '@mui/material';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/router';
 
 import { getRunFromApi } from '@/types/Run';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';

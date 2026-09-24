@@ -1,7 +1,5 @@
-'use client';
 
 import { Box, CircularProgress, styled, Typography } from '@mui/material';
-import Image from 'next/image';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { TEST_ID_AI2_LOGO_LINK, TEST_ID_ASTA_LOGO_LINK } from '@/testIds';
@@ -44,7 +42,7 @@ export default function RunsPage() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 data-test-id={TEST_ID_AI2_LOGO_LINK}>
-                                <Image
+                                <img
                                     src="/ai2-logo.svg"
                                     alt="Ai2"
                                     width={50}
@@ -58,7 +56,7 @@ export default function RunsPage() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 data-test-id={TEST_ID_ASTA_LOGO_LINK}>
-                                <Image
+                                <img
                                     src="/asta-logo.svg"
                                     alt="Asta"
                                     width={71}

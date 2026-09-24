@@ -1,4 +1,3 @@
-'use client';
 
 import { useEffect, useState } from 'react';
 import { Box, Typography, Avatar, CircularProgress, Alert } from '@mui/material';

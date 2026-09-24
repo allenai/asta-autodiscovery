@@ -1,4 +1,3 @@
-'use client';
 
 import { Box, TextField, styled, Button } from '@mui/material';
 

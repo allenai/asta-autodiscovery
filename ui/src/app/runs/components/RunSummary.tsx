@@ -1,7 +1,7 @@
 import { styled, Typography } from '@mui/material';
 import IconHub from '@mui/icons-material/HubOutlined';
 import IconError from '@mui/icons-material/Error';
-import Link from 'next/link';
+import { Link } from '@/router';
 
 import { Run, RunStatus } from '@/types/Run';
 import { RunPills } from '@/runs/components/RunPills';
@@ -24,7 +24,7 @@ export const RunSummary = ({ run }: RunSummaryProps) => {
     const href = isSharedRun ? `/shared/${userid}/${id}` : `/runs/${id}`;
 
     return (
-        <LayoutLink href={href} passHref>
+        <LayoutLink href={href}>
             <Layout>
                 <LayoutIcon>
                     <IconWrapper>

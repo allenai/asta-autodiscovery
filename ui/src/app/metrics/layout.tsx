@@ -1,7 +1,6 @@
-'use client';
 
 import { Box, CircularProgress, Tab, Tabs, Typography, styled } from '@mui/material';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from '@/router';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import AuthButton from '@/components/AuthButton';

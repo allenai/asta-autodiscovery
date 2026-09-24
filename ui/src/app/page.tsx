@@ -1,15 +1,19 @@
-'use client';
-
 import { styled } from '@mui/material';
-import { useRouter } from 'next/dist/client/components/navigation';
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+
+import { useRouter } from '@/router';
 
 export default function HomePage() {
     const router = useRouter();
+    const { search, hash } = useLocation();
 
     useEffect(() => {
-        router.replace('/runs');
-    }, [router]);
+        // Keep the query string. Auth0 redirects back to `/` with `code` and `state`,
+        // and the auth provider only reads them once its runtime config has loaded.
+        // Dropping them here would silently abandon the login.
+        router.replace(`/runs${search}${hash}`);
+    }, [router, search, hash]);
 
     return <LoadingScreen />;
 }

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
@@ -39,6 +38,9 @@ export default function HeapAnalyticsLoader() {
 
     useEffect(() => {
         if (document.getElementById('heap-analytics')) {
+            if (window.heap) {
+                setScriptLoaded(true);
+            }
             return;
         }
         const script = document.createElement('script');

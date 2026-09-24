@@ -1,11 +1,9 @@
-'use client';
 
 import { useState, useEffect } from 'react';
 import { Box, Typography, IconButton } from '@mui/material';
 import { lighten } from '@mui/material/styles';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CloseIcon from '@mui/icons-material/Close';
-import Image from 'next/image';
 
 type AstaAdBannerProps = {
     isFullWidth?: boolean;
@@ -90,7 +88,7 @@ export const AstaAdBanner = ({ isFullWidth = false }: AstaAdBannerProps) => {
                     <CloseIcon sx={{ fontSize: '20px' }} />
                 </IconButton>
                 <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                    <Image src="/asta-logo.svg" alt="Asta" width={75} height={18} />
+                    <img src="/asta-logo.svg" alt="Asta" width={75} height={18} />
                 </Box>
             </Box>
             <Typography

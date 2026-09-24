@@ -32,7 +32,7 @@ AUTH0_CLIENT_ID=your-spa-client-id   # served to the UI via /api/auth/config
 ```
 
 `AUTH0_CLIENT_ID` is a public SPA client id (safe to expose). See
-[Configuration](configuration.md#authentication) for details and the `NEXT_PUBLIC_AUTH0_*`
+[Configuration](configuration.md#authentication) for details and the `VITE_AUTH0_*`
 build-time fallbacks.
 
 ## `password_file`

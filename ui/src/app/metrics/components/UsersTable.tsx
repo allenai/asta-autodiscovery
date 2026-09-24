@@ -1,8 +1,7 @@
-'use client';
 
 import { useState } from 'react';
 import { Box, Typography, styled } from '@mui/material';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/router';
 
 import type { UserMetricsSummary } from '@/types/Metrics';
 import { scrollbarStyles } from '@/utils/scrollbar';

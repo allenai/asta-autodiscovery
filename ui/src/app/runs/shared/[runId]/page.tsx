@@ -1,6 +1,6 @@
-'use client';
 
-import { use, useState, useEffect } from 'react';
+import { useParams } from '@/router';
+import { useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
@@ -9,11 +9,6 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import RunView from '@/runs/components/RunView';
 import { getRunsApi } from '@/api/RunsApi';
 
-interface SharedRunPageProps {
-    params: Promise<{
-        runId: string;
-    }>;
-}
 
 interface OwnerResult {
     runId: string;
@@ -25,10 +20,10 @@ interface OwnerResult {
  * Page for viewing shared runs via /runs/shared/[runId].
  * Fetches the run owner and displays in read-only mode.
  */
-export default function SharedRunPage({ params }: SharedRunPageProps) {
+export default function SharedRunPage() {
     const api = getRunsApi();
     const { isLoading: authLoading } = useAuth0();
-    const { runId } = use(params);
+    const { runId } = useParams() as Record<string, string>;
     const [ownerResult, setOwnerResult] = useState<OwnerResult | null>(null);
 
     useEffect(() => {

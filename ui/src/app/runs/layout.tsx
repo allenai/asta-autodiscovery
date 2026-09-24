@@ -1,7 +1,6 @@
-'use client';
 
 import { Box, styled } from '@mui/material';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from '@/router';
 
 import RunsList from './components/RunsList';
 import { IconAutoDSLogo } from '@/icons/Logo';

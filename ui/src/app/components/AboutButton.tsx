@@ -1,5 +1,5 @@
 import { Button, styled } from '@mui/material';
-import Link from 'next/link';
+import { Link } from '@/router';
 
 import { TEST_ID_ABOUT_BUTTON } from '@/testIds';
 
@@ -7,7 +7,6 @@ export const AboutButton = () => {
     return (
         <Link
             href="https://allenai.org/blog/autodiscovery"
-            passHref
             target="_blank"
             rel="noopener noreferrer"
             data-test-id={TEST_ID_ABOUT_BUTTON}>

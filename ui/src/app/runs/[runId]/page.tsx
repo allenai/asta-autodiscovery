@@ -1,8 +1,7 @@
-'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert, Button } from '@mui/material';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from '@/router';
 
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
@@ -13,21 +12,16 @@ import RunView from '@/runs/components/RunView';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
 
-interface RunPageProps {
-    params: Promise<{
-        runId: string;
-    }>;
-}
 
 /**
  * Individual run page - shows RunSetup or RunView based on run state.
  * This page is for the current user's own runs only.
  * For viewing shared/public runs, use /shared/{userid}/{runid} instead.
  */
-export default function RunPage({ params }: RunPageProps) {
+export default function RunPage() {
     const { isAuthenticated, isLoading, getAccessToken, loginWithRedirect } = useAuth0();
     const router = useRouter();
-    const { runId } = use(params);
+    const { runId } = useParams() as Record<string, string>;
     const api = getRunsApi();
 
     const [checkingRun, setCheckingRun] = useState(true);

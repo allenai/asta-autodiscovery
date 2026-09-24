@@ -1,8 +1,7 @@
-'use client';
 
 import { useRef, useState } from 'react';
 import { Chip, Popover, styled } from '@mui/material';
-import Link from 'next/link';
+import { Link } from '@/router';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { mkCreditsBtnTrackAttrs } from '@/analytics/run';

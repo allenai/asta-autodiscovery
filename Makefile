@@ -1,4 +1,4 @@
-.PHONY: help dev test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
+.PHONY: help dev dev-fast test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
@@ -59,6 +59,10 @@ sync: ## Install all workspace packages and extras
 dev: ## Build the job image and start the local stack
 	docker compose build autodiscovery
 	docker compose up --build
+
+dev-fast: ## Reuse built images; keep the stack running after exiting the logs
+	docker compose up --no-build -d
+	docker compose logs --follow --tail=20
 
 # Development server targets
 adk-web: ## Serve Google ADK Web against packages/devtools/adk

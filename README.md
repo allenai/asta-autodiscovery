@@ -40,6 +40,12 @@ whatever was last built. See
 [docs/configuration.md](docs/configuration.md#docker-backend-default) for the job backends and the
 environment they need.
 
+For UI/API-only edits after running `make dev` once, use `make dev-fast`. It skips
+image builds and leaves the containers running when you stop following logs with
+Ctrl-C, so hot reload continues and a later `make dev-fast` does not restart the
+UI or recompile its routes. Run `make dev` again after changing dependencies,
+Dockerfiles, or job code; use `docker compose down` to stop the background stack.
+
 ## Running Tests
 
 ```sh

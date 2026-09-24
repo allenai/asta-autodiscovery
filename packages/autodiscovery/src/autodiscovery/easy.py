@@ -28,7 +28,7 @@ import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
-from autodiscovery.args import MODEL_FLAG_HELP
+from autodiscovery.args import add_model_arguments
 from autodiscovery.llm import ModelError
 
 
@@ -195,30 +195,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -- Advanced (mirrors ArgParser defaults) -------------------------------
     adv = parser.add_argument_group("advanced")
-    adv.add_argument(
-        "--model",
-        type=str,
-        default="vertex_ai/gemini-3.7-flash",
-        help=MODEL_FLAG_HELP.format(role="all agents (except the belief agent)"),
-    )
-    adv.add_argument(
-        "--belief_model",
-        type=str,
-        default="vertex_ai/gemini-3.7-flash",
-        help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
-    )
-    adv.add_argument(
-        "--vision_model",
-        type=str,
-        default="vertex_ai/gemini-3.7-flash",
-        help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
-    )
-    adv.add_argument(
-        "--embedding_model",
-        type=str,
-        default="openai/text-embedding-3-large",
-        help=MODEL_FLAG_HELP.format(role="deduplication embeddings"),
-    )
+    add_model_arguments(adv)
     adv.add_argument("--embedding_dimensions", type=int)
     adv.add_argument("--temperature", type=float, default=1.0)
     adv.add_argument("--belief_temperature", type=float, default=1.0)

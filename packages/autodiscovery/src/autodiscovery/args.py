@@ -1,11 +1,82 @@
 import argparse
+import os
+
+#: Environment variables read when a model flag is not given on the command line.
+#: ``AUTODISCOVERY_MODEL`` is the one required choice -- there is no built-in
+#: default model. The per-role variables are optional overrides; the belief and
+#: vision roles fall back to the main model, and the embedding role is only
+#: needed for ``--dedupe``.
+MODEL_ENV = "AUTODISCOVERY_MODEL"
+BELIEF_MODEL_ENV = "AUTODISCOVERY_BELIEF_MODEL"
+VISION_MODEL_ENV = "AUTODISCOVERY_VISION_MODEL"
+EMBEDDING_MODEL_ENV = "AUTODISCOVERY_EMBEDDING_MODEL"
 
 #: Shared help text so every model flag documents the same litellm convention.
 MODEL_FLAG_HELP = (
     "Model to use for {role}, as litellm's <provider>/<model> "
-    "(e.g. vertex_ai/gemini-3.7-flash, openai/o4-mini, "
-    "github_copilot/claude-haiku-4.5). The provider prefix is required."
+    "(e.g. openai/gpt-5.4-mini, anthropic/claude-sonnet-5, vertex_ai/gemini-3.7-flash, "
+    "github_copilot/claude-haiku-4.5). The provider prefix is required. "
+    "Defaults to ${env}{fallback}."
 )
+
+
+def model_from_env(var: str) -> str | None:
+    """Return the model named by an environment variable, or None if unset/blank."""
+    value = os.environ.get(var, "").strip()
+    return value or None
+
+
+def add_model_arguments(target: argparse._ActionsContainer) -> None:
+    """Add the model flags, with their environment fallbacks, to a parser or group.
+
+    Shared by the engine's :class:`ArgParser` and the ``auto-discovery`` CLI so
+    both resolve models identically. None of the flags has a built-in default;
+    ``run.resolve_model_args`` enforces that a main model was chosen and fills
+    the belief and vision roles from it.
+
+    Args:
+        target: An ``argparse`` parser or argument group.
+    """
+    target.add_argument(
+        "--model",
+        type=str,
+        default=model_from_env(MODEL_ENV),
+        help=MODEL_FLAG_HELP.format(
+            role="all agents (except the belief distribution agent)",
+            env=MODEL_ENV,
+            fallback="; one of the two is required",
+        ),
+    )
+    target.add_argument(
+        "--belief_model",
+        type=str,
+        default=model_from_env(BELIEF_MODEL_ENV),
+        help=MODEL_FLAG_HELP.format(
+            role="the belief distribution agent",
+            env=BELIEF_MODEL_ENV,
+            fallback=", else to --model",
+        ),
+    )
+    target.add_argument(
+        "--vision_model",
+        type=str,
+        default=model_from_env(VISION_MODEL_ENV),
+        help=MODEL_FLAG_HELP.format(
+            role="image analysis during code execution",
+            env=VISION_MODEL_ENV,
+            fallback=", else to --model",
+        ),
+    )
+    target.add_argument(
+        "--embedding_model",
+        type=str,
+        default=model_from_env(EMBEDDING_MODEL_ENV),
+        help=MODEL_FLAG_HELP.format(
+            role="deduplication embeddings",
+            env=EMBEDDING_MODEL_ENV,
+            fallback="; required only with --dedupe",
+        ),
+    )
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -16,32 +87,7 @@ class ArgParser(argparse.ArgumentParser):
             "--dataset_metadata", type=str, required=True, help="Path to dataset metadata."
         )
         self.add_argument("--out_dir", type=str, required=True, help="Output directory for logs.")
-        self.add_argument(
-            "--model",
-            type=str,
-            default="vertex_ai/gemini-3.7-flash",
-            help=MODEL_FLAG_HELP.format(
-                role="all agents (except belief distribution agent)",
-            ),
-        )
-        self.add_argument(
-            "--belief_model",
-            type=str,
-            default="vertex_ai/gemini-3.7-flash",
-            help=MODEL_FLAG_HELP.format(role="the belief distribution agent"),
-        )
-        self.add_argument(
-            "--vision_model",
-            type=str,
-            default="vertex_ai/gemini-3.7-flash",
-            help=MODEL_FLAG_HELP.format(role="image analysis during code execution"),
-        )
-        self.add_argument(
-            "--embedding_model",
-            type=str,
-            default="openai/text-embedding-3-large",
-            help=MODEL_FLAG_HELP.format(role="deduplication embeddings"),
-        )
+        add_model_arguments(self)
         self.add_argument(
             "--embedding_dimensions",
             type=int,

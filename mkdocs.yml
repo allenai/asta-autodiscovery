@@ -35,6 +35,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Quick start: quickstart.md
   - Configuration: configuration.md
   - Authentication: authentication.md
   - Autodiscovery:

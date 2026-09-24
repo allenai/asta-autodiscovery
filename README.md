@@ -25,7 +25,16 @@ make sync
 
 ## Running the Local Stack
 
-Requires [Docker](https://www.docker.com/get-started).
+Requires [Docker](https://www.docker.com/get-started) and a `.env` file naming the model to
+use -- there is no default model, and `make dev` refuses to start without one. The
+[quick start](docs/quickstart.md) has a copy-paste `.env` for OpenAI, Anthropic, Azure OpenAI,
+Google Vertex AI, and GitHub Copilot. For example:
+
+```sh
+# .env
+AUTODISCOVERY_MODEL=openai/gpt-5.4-mini
+OPENAI_API_KEY=sk-...
+```
 
 ```sh
 make dev

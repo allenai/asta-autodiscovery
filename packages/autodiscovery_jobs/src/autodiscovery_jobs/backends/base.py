@@ -16,8 +16,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..config import JobConfig
-from ..exceptions import JobBackendError
+from ..exceptions import JobBackendError, ModelConfigError
 from ..keys import job_dir
+from ..model_config import MODEL_ENV, chosen_model
 
 # Code-execution backends the AD job understands (its --backend choices). "modal"
 # runs code in a remote Modal sandbox with a scoped, read-only per-job data mount;
@@ -39,6 +40,8 @@ def build_job_args(
     n_experiments: int | None = None,
     model: str | None = None,
     belief_model: str | None = None,
+    vision_model: str | None = None,
+    embedding_model: str | None = None,
     temperature: float | None = None,
     belief_temperature: float | None = None,
     k_experiments: int | None = None,
@@ -61,8 +64,14 @@ def build_job_args(
         jobid: Job identifier
         config: Job configuration
         n_experiments: Number of experiments to run (required)
-        model: Model to use (e.g., "openai/gpt-4o"); uses args.py default when omitted
-        belief_model: Model for belief distribution (optional)
+        model: Model to use (e.g., "openai/gpt-5.4-mini"); falls back to
+            ``AUTODISCOVERY_MODEL``. There is no default model.
+        belief_model: Model for belief distribution; falls back to
+            ``AUTODISCOVERY_BELIEF_MODEL``, else the job uses ``model``
+        vision_model: Model for plot analysis; falls back to
+            ``AUTODISCOVERY_VISION_MODEL``, else the job uses ``model``
+        embedding_model: Model for dedupe embeddings; falls back to
+            ``AUTODISCOVERY_EMBEDDING_MODEL`` (only used with ``--dedupe``)
         temperature: Temperature for agents (optional)
         belief_temperature: Temperature for belief agent (optional)
         k_experiments: Branching factor for experiments (optional)
@@ -79,9 +88,25 @@ def build_job_args(
     Raises:
         JobBackendError: If ``n_experiments`` is not provided, or the configured
             code-execution backend is not one of ``process``/``local``/``modal``.
+        ModelConfigError: If no model is given and ``AUTODISCOVERY_MODEL`` is unset.
     """
     if n_experiments is None:
         raise JobBackendError("n_experiments is required to run a job")
+
+    # Model selection: explicit arguments win, else the operator's environment
+    # choice. Always passed as explicit flags so the job image needs no model
+    # configuration of its own, on any job backend.
+    model = model or chosen_model()
+    if model is None:
+        raise ModelConfigError(
+            f"No model chosen for the job. Set {MODEL_ENV}=<provider>/<model> in the "
+            "API's environment (see docs/quickstart.md)."
+        )
+    role_models = {
+        "belief_model": belief_model or chosen_model("belief_model"),
+        "vision_model": vision_model or chosen_model("vision_model"),
+        "embedding_model": embedding_model or chosen_model("embedding_model"),
+    }
 
     code_backend = config.code_execution_backend
     if code_backend not in _CODE_EXECUTION_BACKENDS:
@@ -112,11 +137,12 @@ def build_job_args(
     if code_backend == "modal":
         args.append(f"--bucket_path=gs://{config.bucket}/{job_base}/data")
 
+    args.append(f"--model={model}")
+    for role, role_model in role_models.items():
+        if role_model:
+            args.append(f"--{role}={role_model}")
+
     # Add optional explicit parameters if provided
-    if belief_model is not None:
-        args.append(f"--belief_model={belief_model}")
-    if model is not None:
-        args.append(f"--model={model}")
     if temperature is not None:
         args.append(f"--temperature={temperature}")
     if belief_temperature is not None:

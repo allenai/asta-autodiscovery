@@ -1,4 +1,4 @@
-FROM node:24-slim
+FROM node:24-slim AS build
 
 WORKDIR /ui
 
@@ -13,5 +13,8 @@ RUN yarn install --frozen-lockfile
 COPY . .
 RUN yarn build
 
-ENTRYPOINT [ "yarn" ]
-CMD [ "start" ]
+# Vite emits a static SPA; nginx serves it with an index.html fallback for client-side routes.
+FROM nginx:1.27-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /ui/dist /usr/share/nginx/html
+EXPOSE 3000

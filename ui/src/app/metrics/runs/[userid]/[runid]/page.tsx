@@ -1,8 +1,7 @@
-'use client';
 
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Typography, styled, Button, Chip } from '@mui/material';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter } from '@/router';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import { getMetricsApi } from '@/api/MetricsApi';

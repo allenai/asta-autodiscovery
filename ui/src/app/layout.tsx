@@ -1,6 +1,4 @@
 import { VarnishApp } from '@allenai/varnish2/components';
-import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
-import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import '@fontsource/lato/300-italic.css';
@@ -18,36 +16,25 @@ import ClickTrackingListener from '@/components/ClickTrackingListener';
 import HeapAnalyticsLoader from '@/components/HeapAnalyticsLoader';
 import { Toasts } from '@/components/Toasts';
 
-export const metadata: Metadata = {
-    title: 'Asta AutoDiscovery',
-};
-
-// This layout will be applied to every page in the app.
-// To learn more about layouts in NextJS, see their docs: https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts#layouts
+// Applied to every page in the app.
 export default function RootLayout({ children }: { children: ReactNode }) {
     return (
-        <html lang="en">
-            <body>
-                <AppRouterCacheProvider>
-                    <ClientProviders>
-                        <HeapAnalyticsLoader />
-                        <ClickTrackingListener />
-                        <VarnishApp>
-                            <div
-                                style={{
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    minHeight: '100vh',
-                                    position: 'relative',
-                                }}>
-                                <Toasts />
-                                {children}
-                            </div>
-                        </VarnishApp>
-                        <AuthErrorDialog />
-                    </ClientProviders>
-                </AppRouterCacheProvider>
-            </body>
-        </html>
+        <ClientProviders>
+            <HeapAnalyticsLoader />
+            <ClickTrackingListener />
+            <VarnishApp>
+                <div
+                    style={{
+                        overflow: 'hidden',
+                        height: '100%',
+                        minHeight: '100vh',
+                        position: 'relative',
+                    }}>
+                    <Toasts />
+                    {children}
+                </div>
+            </VarnishApp>
+            <AuthErrorDialog />
+        </ClientProviders>
     );
 }

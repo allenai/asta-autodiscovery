@@ -1,7 +1,6 @@
-'use client';
 
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/router';
 import {
     Box,
     Button,

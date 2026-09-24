@@ -12,8 +12,8 @@ required and its default.
   subset is also passed explicitly in `docker-compose.yaml`.
 - **Deployed services**: variables (and secrets) are injected into the container environment by
   the deployment platform.
-- **The frontend** (`ui`, Next.js) reads its own set of variables at build/run time. Variables
-  prefixed with `NEXT_PUBLIC_` are embedded in the browser bundle and are therefore **not
+- **The frontend** (`ui`, Vite) reads its own set of variables at build time. Variables
+  prefixed with `VITE_` are embedded in the browser bundle and are therefore **not
   secret**.
 
 Unless noted otherwise, "Default" is the value used by the code when the variable is unset. A
@@ -281,19 +281,17 @@ the API returns `503` from the handoff endpoint. The rest of the app is unaffect
 
 ## Frontend (UI)
 
-Read by the Next.js frontend. `NEXT_PUBLIC_*` variables are compiled into the browser bundle and
+Read by the Vite frontend. `VITE_*` variables are compiled into the browser bundle and
 are **not secret**.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_AUTH_PROVIDER` | No | `auth0` | Build-time fallback for the active auth provider (`auth0` / `password_file` / `none`) if `/api/auth/config` is unreachable. |
-| `NEXT_PUBLIC_AUTH0_DOMAIN` | No | `auth0.allenai.org` | Auth0 tenant domain for the browser login flow. |
-| `NEXT_PUBLIC_AUTH0_CLIENT_ID` | No | *(built-in public client id)* | Public Auth0 application (client) id for the SPA. Public by design. |
-| `NEXT_PUBLIC_AUTH0_AUDIENCE` | No | `https://asta-core.allen.ai` | Auth0 API audience requested by the browser. |
-| `API_ORIGIN` | No | `http://api:8000` | Origin the UI's server-side actions use to reach the API. |
-| `NODE_ENV` | No | `development` | Standard Node environment (`development` / `production`); influences build behavior and analytics loading. |
+| `VITE_AUTH_PROVIDER` | No | `none` | Build-time fallback for the active auth provider (`auth0` / `password_file` / `none`) if `/api/auth/config` is unreachable. |
+| `VITE_AUTH0_DOMAIN` | No | `auth0.allenai.org` | Auth0 tenant domain for the browser login flow. |
+| `VITE_AUTH0_CLIENT_ID` | No | *(built-in public client id)* | Public Auth0 application (client) id for the SPA. Public by design. |
+| `VITE_AUTH0_AUDIENCE` | No | `https://asta-core.allen.ai` | Auth0 API audience requested by the browser. |
 
-The `NEXT_PUBLIC_AUTH*` values are build-time fallbacks; at runtime the UI prefers the
+The `VITE_AUTH*` values are build-time fallbacks; at runtime the UI prefers the
 provider and settings served by `GET /api/auth/config`.
 
 ### Testing / CI (UI)

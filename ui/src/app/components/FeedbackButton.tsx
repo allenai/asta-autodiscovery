@@ -1,5 +1,5 @@
 import { Button, styled } from '@mui/material';
-import Link from 'next/link';
+import { Link } from '@/router';
 
 import { mkFeedbackBtnTrackAttrs } from '@/analytics/run';
 import { TEST_ID_FEEDBACK_BUTTON } from '@/testIds';
@@ -8,7 +8,6 @@ export const FeedbackButton = () => {
     return (
         <Link
             href="https://docs.google.com/forms/d/e/1FAIpQLScmKqOj9EuOrfNlO0ySm_5ITPH80anDgC3FDBuSEeesgztv1Q/viewform"
-            passHref
             target="_blank"
             rel="noopener noreferrer"
             data-test-id={TEST_ID_FEEDBACK_BUTTON}

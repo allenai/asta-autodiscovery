@@ -1,4 +1,3 @@
-'use client';
 import { Header } from '@allenai/varnish2/components';
 import { PropsWithChildren } from 'react';
 

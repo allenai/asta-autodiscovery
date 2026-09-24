@@ -1,4 +1,3 @@
-'use client';
 
 import { createContext, PropsWithChildren, useCallback, useContext, useMemo } from 'react';
 

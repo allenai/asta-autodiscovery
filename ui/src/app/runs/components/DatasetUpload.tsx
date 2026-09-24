@@ -1,4 +1,3 @@
-'use client';
 
 import { useState, useRef, DragEvent } from 'react';
 import {

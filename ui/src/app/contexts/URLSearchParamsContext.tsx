@@ -1,4 +1,3 @@
-'use client';
 
 import {
     createContext,
@@ -8,10 +7,10 @@ import {
     useRef,
     useEffect,
 } from 'react';
-import { useRouter, usePathname, useSearchParams, ReadonlyURLSearchParams } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from '@/router';
 
 interface URLSearchParamsContextValue {
-    searchParams: ReadonlyURLSearchParams;
+    searchParams: URLSearchParams;
     setSearchParam: (key: string, value: string) => void;
     deleteSearchParam: (key: string) => void;
     getSearchParam: (key: string) => string | null;

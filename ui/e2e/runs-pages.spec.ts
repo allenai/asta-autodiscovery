@@ -173,18 +173,20 @@ for (const url of RUN_URLS) {
 
         test('table can sort by surprisal ascending then descending', async ({ page }) => {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
-
-            // Default sort is surprisal descending after job completes; click to change to ascending
             const surprisalHeader = table.locator(
                 '.MuiDataGrid-columnHeader[data-field="surprisal"]'
             );
+            await expect(surprisalHeader).toHaveAttribute('aria-sort', 'descending', {
+                timeout: 30000,
+            });
+
             await surprisalHeader.click();
-            await page.waitForTimeout(300);
+            await expect(surprisalHeader).toHaveAttribute('aria-sort', 'none');
+
+            await surprisalHeader.click();
             await expect(surprisalHeader).toHaveAttribute('aria-sort', 'ascending');
 
-            // Click again for descending
             await surprisalHeader.click();
-            await page.waitForTimeout(300);
             await expect(surprisalHeader).toHaveAttribute('aria-sort', 'descending');
 
             // Verify rows still exist after sorting

@@ -266,11 +266,13 @@ def select_nodes(selection_method, root, nodes_by_level, n_warmstart=0, return_n
         return_n: Number of nodes to return.
 
     Returns:
-        List of selected MCTSNode instances for expansion.
+        List of selected MCTSNode instances for expansion. Empty when nothing is left to expand.
     """
     # If the data loader node hasn't been executed, return the root. This is not run in batch mode.
+    # Once the root has nothing left to try (its data-loader expansion failed), return nothing so
+    # the caller stops instead of selecting the root forever.
     if len(nodes_by_level[1]) == 0:
-        return [root]
+        return [root] if root.has_untried_experiments() else []
 
     # If there are warmstart experiments left to run, select the data loader node.
     n_children_at_data_loader = len(nodes_by_level[2])

@@ -40,6 +40,14 @@ the CLI's own Python environment, rather than as a script through AG2's
 
 [#74]: https://github.com/allenai/asta-autodiscovery/issues/74
 
+### Fixed: a failed data-loader step no longer spins forever ([#79])
+
+If the data-loader experiment failed — e.g. a missing Vertex AI variable — the
+root was re-selected forever with nothing left to run, writing the same log
+lines at full speed. Exploration now stops after that failure.
+
+[#79]: https://github.com/allenai/asta-autodiscovery/issues/79
+
 ## 1.0.1
 
 ### Breaking: Vertex AI is configured with litellm's own variables ([#78])

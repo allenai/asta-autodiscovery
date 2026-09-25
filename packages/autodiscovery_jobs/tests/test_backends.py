@@ -48,8 +48,8 @@ def test_build_job_args_required(mock_config):
     # mock_config leaves code_execution_backend at its default ("process").
     args = build_job_args("testuser", "job1", mock_config, n_experiments=4, model="gpt-4o")
 
-    assert "--dataset_metadata=/mnt/gcs/users/testuser/jobs/job1/metadata.json" in args
-    assert "--out_dir=/mnt/gcs/users/testuser/jobs/job1/output" in args
+    assert "--dataset_metadata=/mnt/data/users/testuser/jobs/job1/metadata.json" in args
+    assert "--out_dir=/mnt/data/users/testuser/jobs/job1/output" in args
     assert "--n_experiments=4" in args
     assert "--backend=process" in args
     assert "--no-timestamp_dir" in args
@@ -97,15 +97,18 @@ def test_build_job_args_boolean_kwargs(mock_config):
 
 @pytest.fixture
 def docker_config():
+    """Docker job backend over the local store (the only store it supports)."""
     return JobConfig(
         backend="docker",
-        bucket="test-bucket",
+        storage_backend="local",
+        storage_dir="/mnt/data",
         job_name="autodiscovery-job",
         job_image="autodiscovery:dev",
     )
 
 
 def test_docker_run_job_launches_container(docker_config, monkeypatch):
+    monkeypatch.setenv("STORAGE_HOST_DIR", "/host/ad-data")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("MODAL_TOKEN_ID", "tok")
     monkeypatch.setenv("GCP_KEY_HOST_PATH", "/host/secrets/gcp-key.json")
@@ -123,18 +126,66 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     assert kwargs["detach"] is True
     assert "--n_experiments=4" in kwargs["command"]
     assert "--model=gpt-4o" in kwargs["command"]
-    # gcsfuse trigger + credentials forwarded
-    assert kwargs["environment"]["GCSFUSE_BUCKET"] == "test-bucket"
-    # mount is scoped to this job's own prefix (keeps other users' data out)
-    assert kwargs["environment"]["GCSFUSE_ONLY_DIR"] == "users/testuser/jobs/job1"
     assert kwargs["environment"]["OPENAI_API_KEY"] == "sk-test"
     assert kwargs["environment"]["MODAL_TOKEN_ID"] == "tok"
+
+    # The run's own host subtree is bind-mounted where the job args expect it, at
+    # the same in-container path Cloud Run's GCS volume uses.
+    assert kwargs["volumes"]["/host/ad-data/users/testuser/jobs/job1"] == {
+        "bind": "/mnt/data/users/testuser/jobs/job1",
+        "mode": "rw",
+    }
+    assert "--dataset_metadata=/mnt/data/users/testuser/jobs/job1/metadata.json" in kwargs[
+        "command"
+    ]
+
+    # GCP credentials are forwarded (for Google-hosted models) as a read-only bind
+    # of the *host* key path, with the in-container path exported to the job.
+    assert kwargs["volumes"]["/host/secrets/gcp-key.json"] == {
+        "bind": "/secrets/gcp-key.json",
+        "mode": "ro",
+    }
     assert kwargs["environment"]["GOOGLE_APPLICATION_CREDENTIALS"] == "/secrets/gcp-key.json"
-    # fuse device + capability for gcsfuse
-    assert "/dev/fuse" in kwargs["devices"]
-    assert "SYS_ADMIN" in kwargs["cap_add"]
-    # host credentials bind-mounted into the job container
-    assert "/host/secrets/gcp-key.json" in kwargs["volumes"]
+
+    # A plain bind mount needs no elevated privileges.
+    for privileged in ("devices", "cap_add", "security_opt", "privileged"):
+        assert privileged not in kwargs
+
+
+def test_docker_run_job_without_gcp_key(docker_config, monkeypatch):
+    """No GCP key configured: the job just doesn't get one, nothing else changes."""
+    monkeypatch.setenv("STORAGE_HOST_DIR", "/host/ad-data")
+    monkeypatch.delenv("GCP_KEY_HOST_PATH", raising=False)
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        DockerBackend(docker_config).run_job("testuser", "job1", n_experiments=1)
+
+    kwargs = client.containers.run.call_args.kwargs
+    assert list(kwargs["volumes"]) == ["/host/ad-data/users/testuser/jobs/job1"]
+    assert "GOOGLE_APPLICATION_CREDENTIALS" not in kwargs["environment"]
+
+
+def test_docker_local_store_falls_back_to_storage_dir(docker_config, monkeypatch):
+    """Without STORAGE_HOST_DIR the API isn't containerized, so storage_dir is a host path."""
+    monkeypatch.delenv("STORAGE_HOST_DIR", raising=False)
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        DockerBackend(docker_config).run_job("testuser", "job1", n_experiments=1)
+
+    volumes = client.containers.run.call_args.kwargs["volumes"]
+    assert "/mnt/data/users/testuser/jobs/job1" in volumes
+
+
+def test_docker_local_store_requires_absolute_host_dir(monkeypatch):
+    monkeypatch.setenv("STORAGE_HOST_DIR", "./data")
+    config = JobConfig(backend="docker", storage_backend="local", job_image="ad:dev")
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        with pytest.raises(DockerBackendError, match="absolute"):
+            DockerBackend(config).run_job("u", "j", n_experiments=1)
 
 
 def test_docker_run_job_requires_image(monkeypatch):

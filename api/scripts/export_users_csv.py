@@ -41,7 +41,7 @@ from autodiscovery_jobs import (
     JobConfig,
     get_user,
 )
-from autodiscovery_jobs.gcs import (
+from autodiscovery_jobs.persistence import (
     count_experiment_results,
     list_user_ids,
     list_user_jobs,

@@ -4,17 +4,13 @@ This module provides authenticated endpoints for users to create and manage
 their own autodiscovery experiment runs.
 """
 
+import logging
 import os
-import tempfile
 import uuid
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from google.cloud import storage
 from urllib.parse import urlparse
-import logging
 
-
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, url_for
 from utils.asta_context_client import is_configured as asta_integration_enabled
 from utils.auth import (
     PermissionType,
@@ -80,11 +76,12 @@ try:
     from autodiscovery_jobs.exceptions import (
         CloudRunError,
         DatasetExpiredError,
-        GCSError,
+        StorageError,
         JobAlreadyExistsError,
         JobNotFoundError,
     )
-    from autodiscovery_jobs.gcs import (
+    from autodiscovery_jobs.persistence import (
+        dataset_key,
         get_shared_run_index,
         get_userid_for_job,
         read_rich_outputs,
@@ -96,6 +93,7 @@ try:
         refresh_run_status,
         update_run_details,
     )
+    from autodiscovery_jobs.storage import get_store
 
     JOBS_AVAILABLE = True
 except ImportError:
@@ -116,33 +114,22 @@ PUBLIC_USERS = {"samples"}
 # source experiment when handing a user off to Asta.
 AUTODISCOVERY_BASE_URL = os.environ.get("AUTODISCOVERY_BASE_URL", "https://autodiscovery.allen.ai")
 
-def sync_preloaded_dataset(source_gs_url, dest_bucket_name, dest_path):
-    """Efficiently copies a file between GCS buckets."""
-    storage_client = storage.Client()
+def sync_preloaded_dataset(source_gs_url, config, dest_key):
+    """Copy a preloaded ``gs://`` dataset into a run's data prefix.
 
-    # Parse the source URL (gs://source-bucket/path/to/file)
-    parsed_url = urlparse(source_gs_url)
-    source_bucket_name = parsed_url.netloc
-    source_blob_name = parsed_url.path.lstrip('/')
+    Preloaded datasets are Ai2-curated and always live in GCS, whatever store
+    holds run data; the store does the transfer the best way it can (server-side
+    when it is itself GCS).
 
-    source_bucket = storage_client.bucket(source_bucket_name)
-    source_blob = source_bucket.blob(source_blob_name)
-
-    dest_bucket = storage_client.bucket(dest_bucket_name)
-    dest_blob = dest_bucket.blob(dest_path)
-
-    logging.debug(f"GCS SYNC: {source_gs_url} -> gs://{dest_bucket_name}/{dest_path}")
-
-    # Use rewrite instead of download/upload for maximum speed
-    rewrite_token = None
-    while True:
-        rewrite_token, bytes_rewritten, total_bytes = dest_blob.rewrite(
-            source_blob, token=rewrite_token
-        )
-        if rewrite_token is None:
-            break
-
-    logging.debug(f"GCS SYNC COMPLETE: {dest_path}")
+    Args:
+        source_gs_url: Source object as ``gs://bucket/path/to/file``.
+        config: AD JobConfig selecting the destination store.
+        dest_key: Destination object key in that store.
+    """
+    dest_store = get_store(config)
+    logging.debug(f"DATASET SYNC: {source_gs_url} -> {dest_store.uri(dest_key)}")
+    dest_store.import_from_gs(source_gs_url, dest_key)
+    logging.debug(f"DATASET SYNC COMPLETE: {dest_key}")
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -320,7 +307,7 @@ def create() -> Blueprint:
             )
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
-        except GCSError as e:
+        except StorageError as e:
             current_app.logger.error(f"GCS error forking run: {e}")
             return jsonify({"error": str(e)}), 500
         except Exception as e:
@@ -679,9 +666,13 @@ def create() -> Blueprint:
             return jsonify({"error": str(e)}), 500
 
     @api.route("/upload-dataset", methods=["POST"])
-    @requires_auth()
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def upload_dataset():
-        """Upload a dataset file for a run.
+        """Upload a dataset file for a run, through this API.
+
+        This is the upload path for storage backends that cannot issue direct-upload
+        URLs — `generate-upload-url` returns a null ``upload_url`` and the client
+        posts the file here instead. It is also usable directly by scripts.
 
         Expects multipart/form-data with:
         - file: Dataset file
@@ -702,36 +693,50 @@ def create() -> Blueprint:
             raise BadRequest("No file provided")
 
         file = request.files["file"]
-        if file.filename == "":
+        if not file.filename:
             raise BadRequest("No file selected")
 
         runid = request.form.get("runid")
         if not runid:
             raise BadRequest("runid is required")
 
+        # The filename is stored verbatim, because run metadata records dataset names
+        # and the job looks the files up by them — normalizing here would desync the
+        # two. So reject anything that could point outside the run's data prefix
+        # rather than rewriting it. (The filesystem store also refuses to escape its
+        # root, but that would surface as a 500.)
+        if "/" in file.filename or "\\" in file.filename or file.filename in (".", ".."):
+            raise BadRequest("Invalid filename")
+
+        # Enforce the size cap where the bytes actually arrive. The check in
+        # generate-upload-url is on a client-asserted size, so it cannot be the only
+        # one — and for backends without direct uploads every byte comes through here.
+        has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+        max_file_size = (
+            UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
+            if has_higher_limit
+            else UPLOAD_MAX_FILE_SIZE_BYTES
+        )
+        if request.content_length is not None and request.content_length > max_file_size:
+            return jsonify({"error": "File too large."}), 413
+
         try:
             manager = get_job_manager()
+            if not manager.job_exists(userid, runid):
+                return jsonify({"error": f"Run {runid} not found"}), 404
 
-            # Save file temporarily
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=Path(file.filename).suffix
-            ) as tmp:
-                file.save(tmp.name)
-                tmp_path = Path(tmp.name)
+            # Stream straight into the store. Buffering to a temp file first would put
+            # a second full copy of a multi-GB upload on this container's disk.
+            key = dataset_key(userid, runid, file.filename)
+            store = get_store(manager.config)
+            store.write_stream(key, file.stream, content_type=file.content_type)
 
-            try:
-                # Upload to GCS with original filename
-                path = manager.upload_dataset(userid, runid, tmp_path, remote_name=file.filename)
-                resp = UploadDatasetResponseModel(
-                    path=path,
-                    filename=file.filename,
-                    message="Dataset uploaded successfully",
-                )
-                return jsonify(resp.model_dump()), 200
-            finally:
-                # Clean up temp file
-                if tmp_path.exists():
-                    os.unlink(tmp_path)
+            resp = UploadDatasetResponseModel(
+                path=store.uri(key),
+                filename=file.filename,
+                message="Dataset uploaded successfully",
+            )
+            return jsonify(resp.model_dump()), 200
 
         except Exception as e:
             current_app.logger.error(f"Failed to upload dataset: {e}")
@@ -740,10 +745,16 @@ def create() -> Blueprint:
     @api.route("/<runid>/generate-upload-url", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
     def generate_upload_url(runid: str):
-        """Generate a presigned URL for direct GCS upload.
+        """Describe how to upload a dataset file.
 
-        This endpoint creates a signed URL that allows the browser to upload
-        files directly to GCS without routing through the Flask server.
+        Always returns a complete upload request — url, method, and any form fields —
+        so the client does not need to know which storage backend is configured. When
+        the backend can issue capability URLs (GCS presigned URLs) that request goes
+        straight to storage and never touches this API; otherwise it points at this
+        API's own `upload-dataset` endpoint.
+
+        Either way this call is where the run is checked to exist and the requested
+        size is screened, so clients should keep calling it before uploading.
 
         Args:
             runid: Run identifier (from URL path)
@@ -754,7 +765,8 @@ def create() -> Blueprint:
             file_size_bytes: Size of file in bytes
 
         Returns:
-            JSON with upload_url, gcs_path, filename, and expires_at_unix (Unix timestamp)
+            JSON with upload_url, upload_method, upload_fields, storage_path, filename,
+            and expires_at_unix (Unix timestamp)
 
         Raises:
             BadRequest: If required fields are missing or validation fails
@@ -787,7 +799,6 @@ def create() -> Blueprint:
 
             manager = get_job_manager()
 
-            # Generate presigned URL using gcs module
             result = manager.generate_upload_url(
                 userid=req.userid,
                 jobid=req.runid,
@@ -800,10 +811,25 @@ def create() -> Blueprint:
             expires_at = datetime.now(UTC) + timedelta(seconds=UPLOAD_URL_EXPIRATION_SECONDS)
             expires_at_unix = int(expires_at.timestamp())
 
-            # Return response using Pydantic model
+            # Always describe a complete upload request, so the client is a generic
+            # uploader rather than something that knows which storage backend is
+            # configured. A presigned URL takes the raw body; our own endpoint takes
+            # multipart with the run id, so the fields travel with the URL instead of
+            # being knowledge the client has to carry.
+            if result["upload_url"]:
+                upload_url = result["upload_url"]
+                upload_method = "PUT"
+                upload_fields = None
+            else:
+                upload_url = url_for(".upload_dataset")
+                upload_method = "POST"
+                upload_fields = {"runid": req.runid}
+
             resp = GenerateUploadUrlResponseModel(
-                upload_url=result["upload_url"],
-                gcs_path=result["gcs_path"],
+                upload_url=upload_url,
+                upload_method=upload_method,
+                upload_fields=upload_fields,
+                storage_path=result["storage_path"],
                 filename=req.filename,
                 expires_at_unix=expires_at_unix,
             )
@@ -811,7 +837,7 @@ def create() -> Blueprint:
 
         except JobNotFoundError as e:
             return jsonify({"error": str(e)}), 404
-        except GCSError as e:
+        except StorageError as e:
             current_app.logger.error(f"Failed to generate upload URL: {e}")
             return jsonify({"error": str(e)}), 400
         except Exception as e:
@@ -960,12 +986,11 @@ def create() -> Blueprint:
                     filename = ds.get("name")
                     source_url = ds.get("url")
 
-                    gcs_dest_path = f"users/{req.userid}/jobs/{req.runid}/data/{filename}"
                     try:
                         sync_preloaded_dataset(
                             source_gs_url=source_url,
-                            dest_bucket_name=manager.config.bucket,
-                            dest_path=gcs_dest_path
+                            config=manager.config,
+                            dest_key=dataset_key(req.userid, req.runid, filename),
                         )
                     except Exception as e:
                         current_app.logger.error(f"Failed to sync preloaded dataset {filename}: {e}")
@@ -1475,7 +1500,6 @@ def create() -> Blueprint:
         Returns the Asta chat URL and the GCS URI of the saved manifest.
         """
         import requests as _requests
-
         import utils.asta_client as asta_client
         import utils.asta_context_client as asta_context_client
         from autodiscovery_jobs import asta_gcs

@@ -17,11 +17,19 @@ from typing import Any
 
 from ..config import JobConfig
 from ..exceptions import JobBackendError
+from ..keys import job_dir
 
 # Code-execution backends the AD job understands (its --backend choices). "modal"
 # runs code in a remote Modal sandbox with a scoped, read-only per-job data mount;
 # "process"/"local" run it inside the job container (subprocess / in-process).
 _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
+
+#: In-container path where the store root appears to the job, so a run's data is
+#: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every job backend mounts at this path
+#: (Cloud Run as a GCS volume, docker as a host bind mount) so the job arguments
+#: are backend-agnostic. The deployed Cloud Run job definition must agree
+#: (``--add-volume-mount`` in ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
+JOB_MOUNT_ROOT = "/mnt/data"
 
 
 def build_job_args(
@@ -43,10 +51,10 @@ def build_job_args(
 ) -> list[str]:
     """Build the CLI argument list passed to the AD job container.
 
-    These arguments are identical across backends. Paths use the ``/mnt/gcs``
-    layout (the GCS bucket mounted into the job container) and the ``gs://``
-    bucket path (consumed by the Modal sandbox), so a container launched by any
-    backend behaves the same way.
+    These arguments are identical across backends. Paths use the
+    :data:`JOB_MOUNT_ROOT` layout (the run's data mounted into the job container,
+    from GCS or a host directory) plus, for the Modal sandbox only, the ``gs://``
+    bucket path — so a container launched by any backend behaves the same way.
 
     Args:
         userid: User identifier
@@ -83,9 +91,9 @@ def build_job_args(
         )
 
     # Construct paths
-    job_base = f"users/{userid}/jobs/{jobid}"
-    metadata_path = f"/mnt/gcs/{job_base}/metadata.json"
-    output_path = f"/mnt/gcs/{job_base}/output"
+    job_base = job_dir(userid, jobid)
+    metadata_path = f"{JOB_MOUNT_ROOT}/{job_base}/metadata.json"
+    output_path = f"{JOB_MOUNT_ROOT}/{job_base}/output"
 
     # Build arguments - required ones first
     args = [
@@ -98,8 +106,9 @@ def build_job_args(
     ]
 
     # --bucket_path is only consumed by the modal sandbox (it mounts gs://.../data
-    # read-only as the code-execution data source). The process/local backends read
-    # the dataset straight from the /mnt/gcs job mount, so it is omitted for them.
+    # read-only as the code-execution data source), which is why modal requires
+    # STORAGE_BACKEND=gcs. The process/local backends read the dataset straight from
+    # the job mount, so it is omitted for them.
     if code_backend == "modal":
         args.append(f"--bucket_path=gs://{config.bucket}/{job_base}/data")
 

@@ -1,25 +1,59 @@
-"""GCS operations for managing job data and results."""
+"""Job data persistence — the functional API over the configured object store.
+
+Keys follow the layout in :mod:`autodiscovery_jobs.keys`. Reads and writes go through a swappable :class:`~autodiscovery_jobs.storage.ObjectStore`
+(:mod:`autodiscovery_jobs.storage`), so the same layout lives in a GCS bucket or
+in a host directory depending on ``STORAGE_BACKEND``. The AD job container sees
+the ``users/<userid>/jobs/<jobid>/`` subtree as a filesystem mount either way.
+"""
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from google.cloud import storage
-from google.cloud.exceptions import NotFound
-
-from .client import get_storage_client
+from . import keys
 from .config import JobConfig
-from .exceptions import GCSError, JobAlreadyExistsError, JobNotFoundError
+from .exceptions import (
+    JobAlreadyExistsError,
+    JobNotFoundError,
+    ObjectNotFoundError,
+    StorageError,
+)
+from .storage import ObjectStore, get_store
+
+logger = logging.getLogger(__name__)
 
 # Root node filename - excluded from experiment counts and lists
 # This is the initialization node that doesn't represent a real experiment
 ROOT_NODE_FILENAME = "mcts_node_1_0.json"
 
+# Experiment result files written by the MCTS search.
+_EXPERIMENT_NODE_PATTERN = re.compile(r"mcts_node_\d+_\d+\.json$")
+
+# Marker object used to materialize data/ and output/ for a new job. Object
+# stores have no directories, so an empty placeholder is what makes the prefix
+# (and therefore the job) exist. Excluded from every listing that callers see.
+PLACEHOLDER_NAME = ".placeholder"
+
+
+def _store(config: JobConfig | None) -> tuple[ObjectStore, JobConfig]:
+    """Return the configured store alongside the config it came from.
+
+    Falls back to the environment rather than bare dataclass defaults: with a
+    swappable backend, defaulting silently would send writes to the local
+    filesystem in a deployment configured for GCS.
+    """
+    config = config or JobConfig.from_env()
+    return get_store(config), config
+
 
 def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
-    """Parse GCS path into bucket and prefix.
+    """Parse a GCS URI into bucket and prefix.
+
+    Retained for callers that handle ``gs://`` URIs directly (e.g. Ai2-preloaded
+    dataset sources), which stay GCS-specific regardless of the active backend.
 
     Args:
         gcs_path: Path like "gs://bucket-name/path/to/prefix/"
@@ -47,21 +81,21 @@ def parse_gcs_path(gcs_path: str) -> tuple[str, str]:
 
 
 def get_user_path(userid: str, config: JobConfig | None = None) -> str:
-    """Get GCS path for a user.
+    """Get the storage URI for a user.
 
     Args:
         userid: User identifier
         config: Configuration (uses default if None)
 
     Returns:
-        GCS path like "gs://bucket/users/{userid}/"
+        URI like "gs://bucket/users/{userid}/" or "file:///data/users/{userid}/"
     """
-    config = config or JobConfig()
-    return f"gs://{config.bucket}/users/{userid}/"
+    store, _ = _store(config)
+    return store.uri(keys.user_prefix(userid))
 
 
 def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> str:
-    """Get GCS path for a specific job.
+    """Get the storage URI for a specific job.
 
     Args:
         userid: User identifier
@@ -69,10 +103,10 @@ def get_job_path(userid: str, jobid: str, config: JobConfig | None = None) -> st
         config: Configuration (uses default if None)
 
     Returns:
-        GCS path like "gs://bucket/users/{userid}/jobs/{jobid}/"
+        URI like "gs://bucket/users/{userid}/jobs/{jobid}/"
     """
-    config = config or JobConfig()
-    return f"gs://{config.bucket}/users/{userid}/jobs/{jobid}/"
+    store, _ = _store(config)
+    return store.uri(keys.job_prefix(userid, jobid))
 
 
 def list_user_ids(config: JobConfig | None = None) -> list[str]:
@@ -85,30 +119,15 @@ def list_user_ids(config: JobConfig | None = None) -> list[str]:
         List of user IDs
 
     Raises:
-        GCSError: If listing fails
+        StorageError: If listing fails
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = "users/"
-
+    store, _ = _store(config)
     try:
-        # List all "directories" (common prefixes) under the users prefix
-        blobs = bucket.list_blobs(prefix=prefix, delimiter="/")
-        # Consume the iterator to get prefixes
-        list(blobs)
-
-        # Extract user IDs from prefixes
-        users = []
-        for prefix_path in blobs.prefixes:
-            # prefix looks like: "users/{userid}/"
-            userid = prefix_path.rstrip("/").split("/")[-1]
-            users.append(userid)
-
-        return sorted(users)
+        return store.list_dirs("users/")
+    except StorageError:
+        raise
     except Exception as e:
-        raise GCSError(f"Failed to list users: {e}")
+        raise StorageError(f"Failed to list users: {e}")
 
 
 def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
@@ -122,30 +141,16 @@ def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
         List of job IDs
 
     Raises:
-        GCSError: If listing fails
+        StorageError: If listing fails
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = f"users/{userid}/jobs/"
-
+    store, _ = _store(config)
     try:
-        # List all "directories" (common prefixes) under the jobs prefix
-        blobs = bucket.list_blobs(prefix=prefix, delimiter="/")
-        # Consume the iterator to get prefixes
-        list(blobs)
-
-        # Extract job IDs from prefixes
-        jobs = []
-        for prefix_path in blobs.prefixes:
-            # prefix looks like: "users/{userid}/jobs/{jobid}/"
-            jobid = prefix_path.rstrip("/").split("/")[-1]
-            jobs.append(jobid)
-
-        return sorted(jobs)
+        return store.list_dirs(f"{keys.user_prefix(userid)}jobs/")
+    except StorageError:
+        raise
     except Exception as e:
-        raise GCSError(f"Failed to list jobs for user {userid}: {e}")
+        raise StorageError(f"Failed to list jobs for user {userid}: {e}")
+
 
 def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | None:
     """Find the user ID that owns a given job ID.
@@ -158,37 +163,24 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
         User ID if found, or None if not found
 
     Raises:
-        GCSError: If listing fails
+        StorageError: If listing fails
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store, _ = _store(config)
 
+    # The glob is pushed to the service where possible (GCS matchGlob), so this
+    # returns at most one object rather than listing the whole bucket. The key is
+    # still re-checked because jobid comes from a URL and could contain glob chars.
     try:
-        # List all "directories" (common prefixes) under the users prefix
-        match_glob = f"users/*/jobs/{jobid}/metadata.json"
-        blobs = bucket.list_blobs(prefix="users/", match_glob=match_glob)
-
-        # Check each user for the job ID
-        for blob in list(blobs):
-            # blob.name looks like: "users/{userid}/jobs/{jobid}/metadata.json"
-            parts = blob.name.split("/")
-            if len(parts) >= 4:
-                userid = parts[1]
-                user_jobs = list_user_jobs(userid, config)
-                if jobid in user_jobs:
-                    return userid
-
+        for info in store.list("users/", match_glob=f"users/*/jobs/{jobid}/metadata.json"):
+            # key looks like: "users/{userid}/jobs/{jobid}/metadata.json"
+            parts = info.key.split("/")
+            if len(parts) == 5 and parts[3] == jobid and parts[4] == "metadata.json":
+                return parts[1]
         return None  # Not found
+    except StorageError:
+        raise
     except Exception as e:
-        raise GCSError(f"Failed to find user for job {jobid}: {e}")
-
-
-def _shared_run_index_blob(jobid: str, config: JobConfig) -> storage.Blob:
-    """Return the GCS blob for a shared run index entry."""
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-    return bucket.blob(f"index/shared-runs/{jobid}")
+        raise StorageError(f"Failed to find user for job {jobid}: {e}")
 
 
 def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | None:
@@ -201,10 +193,9 @@ def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | N
     Returns:
         User ID if an index entry exists, None otherwise
     """
-    config = config or JobConfig()
-    blob = _shared_run_index_blob(jobid, config)
+    store, _ = _store(config)
     try:
-        data = json.loads(blob.download_as_text())
+        data = json.loads(store.read_text(keys.shared_run_index_key(jobid)))
         return data["userid"]
     except Exception:
         return None
@@ -218,10 +209,11 @@ def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = N
         userid: User ID of the run owner
         config: Configuration (uses default if None)
     """
-    config = config or JobConfig()
-    blob = _shared_run_index_blob(jobid, config)
+    store, _ = _store(config)
     try:
-        blob.upload_from_string(json.dumps({"runid": jobid, "userid": userid}))
+        store.write_text(
+            keys.shared_run_index_key(jobid), json.dumps({"runid": jobid, "userid": userid})
+        )
     except Exception:
         pass  # Best-effort; the glob fallback covers misses
 
@@ -233,10 +225,9 @@ def delete_shared_run_index(jobid: str, config: JobConfig | None = None) -> None
         jobid: Job identifier
         config: Configuration (uses default if None)
     """
-    config = config or JobConfig()
-    blob = _shared_run_index_blob(jobid, config)
+    store, _ = _store(config)
     try:
-        blob.delete()
+        store.delete(keys.shared_run_index_key(jobid))
     except Exception:
         pass  # Best-effort; entry may not exist
 
@@ -252,16 +243,9 @@ def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool
     Returns:
         True if job exists, False otherwise
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = f"users/{userid}/jobs/{jobid}/"
-
+    store, _ = _store(config)
     try:
-        # Check if any blobs exist with this prefix
-        blobs = bucket.list_blobs(prefix=prefix, max_results=1)
-        return any(True for _ in blobs)
+        return any(store.list(keys.job_prefix(userid, jobid), limit=1))
     except Exception:
         return False
 
@@ -269,11 +253,11 @@ def job_exists(userid: str, jobid: str, config: JobConfig | None = None) -> bool
 def create_job_directory(
     userid: str, jobid: str, config: JobConfig | None = None, overwrite: bool = False
 ) -> str:
-    """Create a new job directory structure in GCS.
+    """Create a new job directory structure.
 
     Creates:
-        gs://bucket/users/{userid}/jobs/{jobid}/data/
-        gs://bucket/users/{userid}/jobs/{jobid}/output/
+        users/{userid}/jobs/{jobid}/data/
+        users/{userid}/jobs/{jobid}/output/
 
     Args:
         userid: User identifier
@@ -282,31 +266,27 @@ def create_job_directory(
         overwrite: If True, don't raise error if job exists
 
     Returns:
-        GCS path to the created job directory
+        Storage URI of the created job directory
 
     Raises:
         JobAlreadyExistsError: If job exists and overwrite=False
-        GCSError: If creation fails
+        StorageError: If creation fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not overwrite and job_exists(userid, jobid, config):
         raise JobAlreadyExistsError(f"Job {jobid} already exists for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    base_path = f"users/{userid}/jobs/{jobid}"
+    base = keys.job_prefix(userid, jobid)
 
     try:
         # Create placeholder files to establish directory structure
-        for subdir in ["data/", "output/"]:
-            blob = bucket.blob(f"{base_path}/{subdir}.placeholder")
-            blob.upload_from_string("")
+        for subdir in ["data", "output"]:
+            store.write_bytes(f"{base}{subdir}/{PLACEHOLDER_NAME}", b"")
 
-        return get_job_path(userid, jobid, config)
+        return store.uri(base)
     except Exception as e:
-        raise GCSError(f"Failed to create job directory: {e}")
+        raise StorageError(f"Failed to create job directory: {e}")
 
 
 def copy_job_data_files(
@@ -318,7 +298,8 @@ def copy_job_data_files(
 ) -> list[str]:
     """Copy dataset files from one job's data/ directory to another.
 
-    Uses server-side GCS copy (no data flows through the API server).
+    Copies within the store, so on GCS the data never flows through the API
+    server.
 
     Args:
         source_userid: User who owns the source job
@@ -331,30 +312,26 @@ def copy_job_data_files(
         List of copied filenames
 
     Raises:
-        GCSError: If copy fails
+        StorageError: If copy fails
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store, _ = _store(config)
 
-    source_prefix = f"users/{source_userid}/jobs/{source_jobid}/data/"
-    dest_prefix = f"users/{dest_userid}/jobs/{dest_jobid}/data/"
+    source_prefix = f"{keys.job_prefix(source_userid, source_jobid)}data/"
+    dest_prefix = f"{keys.job_prefix(dest_userid, dest_jobid)}data/"
 
     copied_files: list[str] = []
 
     try:
-        blobs = bucket.list_blobs(prefix=source_prefix)
-        for blob in blobs:
-            filename = blob.name[len(source_prefix):]
-            if not filename or filename == ".placeholder":
+        for info in store.list(source_prefix):
+            filename = info.key[len(source_prefix):]
+            if not filename or filename == PLACEHOLDER_NAME:
                 continue
-            dest_blob_name = f"{dest_prefix}{filename}"
-            bucket.copy_blob(blob, bucket, dest_blob_name)
+            store.copy(info.key, f"{dest_prefix}{filename}")
             copied_files.append(filename)
 
         return copied_files
     except Exception as e:
-        raise GCSError(f"Failed to copy job data files: {e}")
+        raise StorageError(f"Failed to copy job data files: {e}")
 
 
 def has_data_files(
@@ -372,15 +349,12 @@ def has_data_files(
     Returns:
         True if the job's data/ directory contains at least one real file
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-    prefix = f"users/{userid}/jobs/{jobid}/data/"
+    store, _ = _store(config)
+    prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
-    blobs = bucket.list_blobs(prefix=prefix, max_results=10)
-    for blob in blobs:
-        filename = blob.name[len(prefix):]
-        if filename and filename != ".placeholder":
+    for info in store.list(prefix, limit=10):
+        filename = info.key[len(prefix):]
+        if filename and filename != PLACEHOLDER_NAME:
             return True
     return False
 
@@ -395,25 +369,21 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If deletion fails
+        StorageError: If deletion fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = f"users/{userid}/jobs/{jobid}/"
+    prefix = keys.job_prefix(userid, jobid)
 
     try:
-        # Delete all blobs with this prefix
-        blobs = bucket.list_blobs(prefix=prefix)
-        for blob in blobs:
-            blob.delete()
+        # Materialize the listing before deleting, so mutation can't disturb it.
+        for key in [info.key for info in store.list(prefix)]:
+            store.delete(key)
     except Exception as e:
-        raise GCSError(f"Failed to delete job directory: {e}")
+        raise StorageError(f"Failed to delete job directory: {e}")
 
 
 def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
@@ -433,44 +403,37 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
 
     Returns:
         Dictionary with keys:
-        - deleted_files: List of GCS paths that were deleted
+        - deleted_files: List of storage URIs that were deleted
         - preserved_files: Count of preserved files
         - status: "DELETED"
         - deleted_at: ISO timestamp
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If deletion or status update fails
+        StorageError: If deletion or status update fails
     """
     from datetime import UTC, datetime
 
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    # Delete all files in data/ directory except .placeholder
-    data_prefix = f"users/{userid}/jobs/{jobid}/data/"
+    job_prefix = keys.job_prefix(userid, jobid)
+    data_prefix = f"{job_prefix}data/"
     deleted_files = []
 
     try:
-        blobs = bucket.list_blobs(prefix=data_prefix)
-        for blob in blobs:
+        for key in [info.key for info in store.list(data_prefix)]:
             # Skip placeholder files
-            if blob.name.endswith(".placeholder"):
+            if key.endswith(PLACEHOLDER_NAME):
                 continue
 
-            gcs_path = f"gs://{config.bucket}/{blob.name}"
-            deleted_files.append(gcs_path)
-            blob.delete()
+            deleted_files.append(store.uri(key))
+            store.delete(key)
 
         # Count preserved files (metadata.json, run_details.json, output/*)
-        job_prefix = f"users/{userid}/jobs/{jobid}/"
-        all_blobs = bucket.list_blobs(prefix=job_prefix)
-        preserved_count = sum(1 for _ in all_blobs)
+        preserved_count = sum(1 for _ in store.list(job_prefix))
 
         # Update run_details.json to mark as DELETED
         from .run_details import update_run_details
@@ -494,7 +457,7 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
         }
 
     except Exception as e:
-        raise GCSError(f"Failed to soft delete job: {e}")
+        raise StorageError(f"Failed to soft delete job: {e}")
 
 
 def upload_dataset(
@@ -514,42 +477,37 @@ def upload_dataset(
         remote_name: Optional remote filename (only for single files)
 
     Returns:
-        GCS path where data was uploaded
+        Storage URI of the data directory
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If upload fails
+        StorageError: If upload fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
     local_path = Path(local_path)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    base_path = f"users/{userid}/jobs/{jobid}/data"
+    data_prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
     try:
         if local_path.is_file():
             # Upload single file
             filename = remote_name or local_path.name
-            blob = bucket.blob(f"{base_path}/{filename}")
-            blob.upload_from_filename(str(local_path))
+            store.upload_file(f"{data_prefix}{filename}", local_path)
         elif local_path.is_dir():
             # Upload directory contents
             for file_path in local_path.rglob("*"):
                 if file_path.is_file():
                     relative_path = file_path.relative_to(local_path)
-                    blob = bucket.blob(f"{base_path}/{relative_path}")
-                    blob.upload_from_filename(str(file_path))
+                    store.upload_file(f"{data_prefix}{relative_path.as_posix()}", file_path)
         else:
-            raise GCSError(f"Path not found: {local_path}")
+            raise StorageError(f"Path not found: {local_path}")
 
-        return f"gs://{config.bucket}/{base_path}/"
+        return store.uri(data_prefix)
     except Exception as e:
-        raise GCSError(f"Failed to upload dataset: {e}")
+        raise StorageError(f"Failed to upload dataset: {e}")
 
 
 def expire_datasets(
@@ -572,51 +530,47 @@ def expire_datasets(
         config: Configuration (uses default if None)
 
     Returns:
-        List of GCS paths that were deleted (or would be deleted if dry_run=True)
+        List of storage URIs that were deleted (or would be deleted if dry_run=True)
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If deletion fails
+        StorageError: If deletion fails
     """
     from datetime import UTC, datetime, timedelta
 
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-    prefix = f"users/{userid}/jobs/{jobid}/data/"
+    prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
     # Calculate cutoff time
     cutoff_time = datetime.now(UTC) - timedelta(days=max_age_days)
 
     try:
-        blobs = bucket.list_blobs(prefix=prefix)
         expired_paths = []
 
-        for blob in blobs:
+        for info in list(store.list(prefix)):
             # Skip placeholder files
-            if blob.name.endswith(".placeholder"):
+            if info.key.endswith(PLACEHOLDER_NAME):
                 continue
 
             # Check age
-            if not blob.time_created or blob.time_created >= cutoff_time:
+            if not info.created_at or info.created_at >= cutoff_time:
                 continue
 
             # Record the path
-            gcs_path = f"gs://{config.bucket}/{blob.name}"
-            expired_paths.append(gcs_path)
+            expired_paths.append(store.uri(info.key))
 
             # Delete if not dry run
             if not dry_run:
-                print(f"Deleting dataset file: {gcs_path}")
-                blob.delete()
+                logger.info("Deleting dataset file: %s", store.uri(info.key))
+                store.delete(info.key)
 
         return expired_paths
     except Exception as e:
-        raise GCSError(f"Failed to expire datasets: {e}")
+        raise StorageError(f"Failed to expire datasets: {e}")
 
 
 def upload_metadata(
@@ -631,28 +585,24 @@ def upload_metadata(
         config: Configuration (uses default if None)
 
     Returns:
-        GCS path to uploaded metadata
+        Storage URI of the uploaded metadata
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If upload fails
+        StorageError: If upload fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
+    key = f"{keys.job_prefix(userid, jobid)}metadata.json"
 
     try:
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(json.dumps(metadata, indent=2))
-        return f"gs://{config.bucket}/{blob_path}"
+        store.write_text(key, json.dumps(metadata, indent=2), content_type="application/json")
+        return store.uri(key)
     except Exception as e:
-        raise GCSError(f"Failed to upload metadata: {e}")
+        raise StorageError(f"Failed to upload metadata: {e}")
 
 
 def upload_job_args(
@@ -667,50 +617,54 @@ def upload_job_args(
         config: Configuration (uses default if None)
 
     Returns:
-        GCS path to saved args file
+        Storage URI of the saved args file
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If upload fails
+        StorageError: If upload fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    blob_path = f"users/{userid}/jobs/{jobid}/output/args.json"
+    key = f"{keys.job_prefix(userid, jobid)}output/args.json"
 
     try:
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(json.dumps(args, indent=2))
-        return f"gs://{config.bucket}/{blob_path}"
+        store.write_text(key, json.dumps(args, indent=2), content_type="application/json")
+        return store.uri(key)
     except Exception as e:
-        raise GCSError(f"Failed to save job args: {e}")
+        raise StorageError(f"Failed to save job args: {e}")
 
 
 def get_metadata_or_none(
     userid: str, jobid: str, config: JobConfig | None = None
 ) -> dict[str, Any] | None:
-    """Download metadata.json, returning ``None`` when it is absent.
+    """Read metadata.json, returning ``None`` when it is absent.
 
     This is the single-round-trip form for callers, such as credit
     aggregation, where a job prefix without metadata is expected to be
     skipped rather than distinguished from an entirely absent job.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        config: Configuration (uses default if None)
+
+    Returns:
+        Metadata dictionary, or None if metadata.json does not exist
+
+    Raises:
+        StorageError: If the read fails for any reason other than absence
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-    blob_path = f"users/{userid}/jobs/{jobid}/metadata.json"
+    store, _ = _store(config)
 
     try:
-        return json.loads(bucket.blob(blob_path).download_as_text())
-    except NotFound:
+        return json.loads(store.read_text(f"{keys.job_prefix(userid, jobid)}metadata.json"))
+    except ObjectNotFoundError:
         return None
     except Exception as e:
-        raise GCSError(f"Failed to download metadata: {e}") from e
+        raise StorageError(f"Failed to download metadata: {e}") from e
 
 
 def get_metadata(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
@@ -726,20 +680,20 @@ def get_metadata(userid: str, jobid: str, config: JobConfig | None = None) -> di
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If download fails
+        StorageError: If download fails
     """
-    config = config or JobConfig()
+    config = config or JobConfig.from_env()
 
-    # Download directly instead of pre-checking existence with a separate list
+    # Read directly instead of pre-checking existence with a separate list
     # request. On a miss we fall back to job_exists() only to preserve the
-    # historical exception contract (JobNotFoundError vs GCSError); the common
+    # historical exception contract (JobNotFoundError vs StorageError); the common
     # case where metadata.json exists costs a single round-trip.
     metadata = get_metadata_or_none(userid, jobid, config)
     if metadata is not None:
         return metadata
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
-    raise GCSError(f"Failed to download metadata: metadata.json not found for job {jobid}")
+    raise StorageError(f"Failed to download metadata: metadata.json not found for job {jobid}")
 
 
 def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) -> list[str]:
@@ -751,32 +705,27 @@ def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) ->
         config: Configuration (uses default if None)
 
     Returns:
-        List of GCS paths to result files
+        List of storage URIs of result files
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If listing fails
+        StorageError: If listing fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = f"users/{userid}/jobs/{jobid}/output/"
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
-        blobs = bucket.list_blobs(prefix=prefix)
-        results = []
-        for blob in blobs:
-            # Skip placeholder files
-            if not blob.name.endswith(".placeholder"):
-                results.append(f"gs://{config.bucket}/{blob.name}")
-        return results
+        return [
+            store.uri(info.key)
+            for info in store.list(prefix)
+            if not info.key.endswith(PLACEHOLDER_NAME)
+        ]
     except Exception as e:
-        raise GCSError(f"Failed to list job results: {e}")
+        raise StorageError(f"Failed to list job results: {e}")
 
 
 def download_job_results(
@@ -795,43 +744,37 @@ def download_job_results(
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If download fails
+        StorageError: If download fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
     local_dir = Path(local_dir)
     local_dir.mkdir(parents=True, exist_ok=True)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = f"users/{userid}/jobs/{jobid}/output/"
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
-        blobs = bucket.list_blobs(prefix=prefix)
         downloaded = []
 
-        for blob in blobs:
+        for info in store.list(prefix):
             # Skip placeholder files
-            if blob.name.endswith(".placeholder"):
+            if info.key.endswith(PLACEHOLDER_NAME):
                 continue
 
             # Get relative path from output/ directory
-            relative_path = blob.name[len(prefix) :]
-            local_path = local_dir / relative_path
+            local_path = local_dir / info.key[len(prefix):]
 
             # Create parent directories
             local_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Download file
-            blob.download_to_filename(str(local_path))
+            store.download_file(info.key, local_path)
             downloaded.append(local_path)
 
         return downloaded
     except Exception as e:
-        raise GCSError(f"Failed to download job results: {e}")
+        raise StorageError(f"Failed to download job results: {e}")
 
 
 def count_experiment_results(userid: str, jobid: str, config: JobConfig | None = None) -> int:
@@ -851,25 +794,19 @@ def count_experiment_results(userid: str, jobid: str, config: JobConfig | None =
         >>> count_experiment_results("user123", "job456")
         5
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store, _ = _store(config)
 
-    prefix = f"users/{userid}/jobs/{jobid}/output/"
-    pattern = re.compile(r"mcts_node_\d+_\d+\.json$")
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
-        blobs = bucket.list_blobs(prefix=prefix, max_results=10000)
         count = 0
-        for blob in blobs:
-            filename = blob.name.split("/")[-1]
-            if pattern.match(filename) and filename != ROOT_NODE_FILENAME:
+        for info in store.list(prefix, limit=10000):
+            filename = info.key.split("/")[-1]
+            if _EXPERIMENT_NODE_PATTERN.match(filename) and filename != ROOT_NODE_FILENAME:
                 count += 1
         return count
     except Exception as e:
         # Log error but return 0 to allow graceful degradation
-        import logging
-
         logging.error(f"Failed to count experiment results for job {jobid}: {e}")
         return 0
 
@@ -890,31 +827,21 @@ def get_job_args(userid: str, jobid: str, config: JobConfig | None = None) -> di
         >>> args.get("n_experiments", 0)
         10
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store, _ = _store(config)
 
-    blob_path = f"users/{userid}/jobs/{jobid}/output/args.json"
+    key = f"{keys.job_prefix(userid, jobid)}output/args.json"
 
-    # Download directly rather than pre-checking existence with a separate
-    # request; a miss surfaces as NotFound and is handled like before.
+    # Read directly rather than pre-checking existence with a separate
+    # request; a miss surfaces as ObjectNotFoundError and is handled like before.
     try:
-        blob = bucket.blob(blob_path)
-        content = blob.download_as_text()
-        return json.loads(content)
-    except NotFound:
-        import logging
-
+        return json.loads(store.read_text(key))
+    except ObjectNotFoundError:
         logging.warning(f"args.json not found for job {jobid}")
         return None
     except json.JSONDecodeError as e:
-        import logging
-
         logging.warning(f"Invalid JSON in args.json for job {jobid}: {e}")
         return None
     except Exception as e:
-        import logging
-
         logging.error(f"Failed to read args.json for job {jobid}: {e}")
         return None
 
@@ -934,29 +861,24 @@ def list_experiment_files(userid: str, jobid: str, config: JobConfig | None = No
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If listing fails
+        StorageError: If listing fails
     """
-    config = config or JobConfig()
+    store, config = _store(config)
 
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    prefix = f"users/{userid}/jobs/{jobid}/output/"
-    pattern = re.compile(r"mcts_node_\d+_\d+\.json$")
+    prefix = f"{keys.job_prefix(userid, jobid)}output/"
 
     try:
-        blobs = bucket.list_blobs(prefix=prefix)
         filenames = []
-        for blob in blobs:
-            filename = blob.name.split("/")[-1]
-            if pattern.match(filename) and filename != ROOT_NODE_FILENAME:
+        for info in store.list(prefix):
+            filename = info.key.split("/")[-1]
+            if _EXPERIMENT_NODE_PATTERN.match(filename) and filename != ROOT_NODE_FILENAME:
                 filenames.append(filename)
         return sorted(filenames)
     except Exception as e:
-        raise GCSError(f"Failed to list experiment files for job {jobid}: {e}")
+        raise StorageError(f"Failed to list experiment files for job {jobid}: {e}")
 
 
 def read_experiment_node(
@@ -978,30 +900,19 @@ def read_experiment_node(
         >>> node.get("id")
         "node_0_0"
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store, _ = _store(config)
 
-    blob_path = f"users/{userid}/jobs/{jobid}/output/{filename}"
+    key = f"{keys.job_prefix(userid, jobid)}output/{filename}"
 
     try:
-        blob = bucket.blob(blob_path)
-        if not blob.exists():
-            import logging
-
-            logging.warning(f"Experiment node file not found: {filename} for job {jobid}")
-            return None
-
-        content = blob.download_as_text()
-        return json.loads(content)
+        return json.loads(store.read_text(key))
+    except ObjectNotFoundError:
+        logging.warning(f"Experiment node file not found: {filename} for job {jobid}")
+        return None
     except json.JSONDecodeError as e:
-        import logging
-
         logging.warning(f"Invalid JSON in {filename} for job {jobid}: {e}")
         return None
     except Exception as e:
-        import logging
-
         logging.error(f"Failed to read experiment node {filename} for job {jobid}: {e}")
         return None
 
@@ -1026,26 +937,14 @@ def read_rich_outputs(
         List of rich output bundles (each bundle is a MIME-type keyed dict).
         Returns an empty list when no rich outputs are found or parsing fails.
     """
-    config = config or JobConfig()
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
+    store, _ = _store(config)
 
     filename = f"ro_{level}_{index}.json"
-    blob_path = f"users/{userid}/jobs/{jobid}/output/rich_outputs/{filename}"
+    key = f"{keys.job_prefix(userid, jobid)}output/rich_outputs/{filename}"
 
     try:
-        blob = bucket.blob(blob_path)
-        if not blob.exists():
-            import logging
-
-            logging.warning("Rich output file not found: %s for job %s", filename, jobid)
-            return []
-
-        content = blob.download_as_text()
-        parsed = json.loads(content)
+        parsed = json.loads(store.read_text(key))
         if not isinstance(parsed, list):
-            import logging
-
             logging.warning(
                 "Invalid rich output payload in %s for job %s: expected list",
                 filename,
@@ -1053,16 +952,32 @@ def read_rich_outputs(
             )
             return []
         return parsed
+    except ObjectNotFoundError:
+        logging.warning("Rich output file not found: %s for job %s", filename, jobid)
+        return []
     except json.JSONDecodeError as e:
-        import logging
-
         logging.warning(f"Invalid JSON in {filename} for job {jobid}: {e}")
         return []
     except Exception as e:
-        import logging
-
         logging.error(f"Failed to read rich outputs {filename} for job {jobid}: {e}")
         return []
+
+
+def dataset_key(userid: str, jobid: str, filename: str) -> str:
+    """Return the object key an uploaded dataset file lands at.
+
+    Exposed so the API can accept a browser upload itself (for backends without
+    presigned URLs) and write it to exactly the same key.
+
+    Args:
+        userid: User identifier
+        jobid: Job identifier
+        filename: Uploaded file's name
+
+    Returns:
+        Object key under the job's data/ prefix.
+    """
+    return f"{keys.job_prefix(userid, jobid)}data/{filename}"
 
 
 def generate_upload_url(
@@ -1072,11 +987,13 @@ def generate_upload_url(
     content_type: str = "application/octet-stream",
     expiration_seconds: int = 3600,  # 1 hour default
     config: JobConfig | None = None,
-) -> dict[str, str]:
-    """Generate a presigned URL for direct upload to GCS.
+) -> dict[str, Any]:
+    """Generate a URL the browser can upload a dataset file directly to.
 
-    Creates a signed URL that allows clients to upload files directly to GCS
-    without routing through the application server.
+    Backends that support capability URLs (GCS presigned URLs) return one, so the
+    bytes never touch the application server. Backends without that notion (the
+    filesystem store) return ``upload_url=None``, and the caller is responsible
+    for receiving the upload itself and writing it to ``storage_path``.
 
     Args:
         userid: User identifier
@@ -1087,51 +1004,40 @@ def generate_upload_url(
         config: Configuration (uses default if None)
 
     Returns:
-        Dictionary with 'upload_url' and 'gcs_path' keys
+        Dictionary with:
+        - upload_url: Direct-upload URL, or None if the backend has none
+        - storage_path: URI the file will be stored at
+        - key: Object key the file will be stored at
 
     Raises:
         JobNotFoundError: If job doesn't exist
-        GCSError: If URL generation fails
+        StorageError: If URL generation fails
 
     Example:
         >>> result = generate_upload_url("user123", "job456", "data.csv", "text/csv")
         >>> result['upload_url']
         'https://storage.googleapis.com/...'
-        >>> result['gcs_path']
+        >>> result['storage_path']
         'gs://example-bucket/users/user123/jobs/job456/data/data.csv'
     """
-    from datetime import timedelta
-
-    config = config or JobConfig()
+    store, config = _store(config)
 
     # Verify job exists
     if not job_exists(userid, jobid, config):
         raise JobNotFoundError(f"Job {jobid} not found for user {userid}")
 
+    key = dataset_key(userid, jobid, filename)
+
     try:
-        client = get_storage_client(config.project_id)
-        bucket = client.bucket(config.bucket)
-
-        # Construct blob path (matches existing pattern: users/{userid}/jobs/{jobid}/data/{filename})
-        blob_path = f"users/{userid}/jobs/{jobid}/data/{filename}"
-        blob = bucket.blob(blob_path)
-
-        # Generate signed URL for PUT operation
-        upload_url = blob.generate_signed_url(
-            version="v4",
-            expiration=timedelta(seconds=expiration_seconds),
-            method="PUT",
-            content_type=content_type,
-        )
-
-        gcs_path = f"gs://{config.bucket}/{blob_path}"
-
-        return {
-            "upload_url": upload_url,
-            "gcs_path": gcs_path,
-        }
+        upload_url = store.signed_upload_url(key, content_type, expiration_seconds)
     except Exception as e:
-        raise GCSError(f"Failed to generate upload URL: {e}")
+        raise StorageError(f"Failed to generate upload URL: {e}")
+
+    return {
+        "upload_url": upload_url,
+        "storage_path": store.uri(key),
+        "key": key,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1146,25 +1052,26 @@ def generate_upload_url(
 
 @dataclass
 class UserDataSummary:
-    """Inventory of everything stored for one user in the primary bucket.
+    """Inventory of everything stored for one user in the configured store.
 
     Attributes:
         userid: The subject the inventory was taken for.
-        bucket: Bucket the objects live in.
+        location: Root URI of the store the objects live in (``gs://bucket`` or
+            ``file:///path``), for display in maintainer output.
         object_count: Number of objects under ``users/{userid}/``.
         total_bytes: Combined size of those objects.
         job_ids: Job identifiers found under the user prefix.
         active_job_ids: Jobs whose run_details.json shows a non-terminal status.
-            These can still write to GCS, so they must be cancelled before a
-            purge to make the erasure final.
+            These can still write to the store, so they must be cancelled before
+            a purge to make the erasure final.
         shared_run_ids: Jobs with an ``index/shared-runs/`` entry naming the user.
             The entry itself stores the userid, so it is in scope for erasure.
         has_user_profile: Whether ``users/{userid}/user.json`` (credits) exists.
-        object_paths: Every object path under the user prefix, sorted.
+        object_paths: Every object key under the user prefix, sorted.
     """
 
     userid: str
-    bucket: str
+    location: str
     object_count: int
     total_bytes: int
     job_ids: list[str]
@@ -1198,28 +1105,28 @@ def _validate_userid(userid: str) -> str:
     return userid
 
 
-def _shared_run_ids_for_user(bucket: storage.Bucket, userid: str) -> list[str]:
+def _shared_run_ids_for_user(store: ObjectStore, userid: str) -> list[str]:
     """List shared-run index entries owned by a user.
 
     Scans the whole index rather than deriving entries from the user's job
     directories: an entry can outlive its job directory, and the entry body
     stores the userid, so a stale one would leave the subject named in the
-    bucket after a purge.
+    store after a purge.
 
     Args:
-        bucket: Bucket holding the index.
+        store: Store holding the index.
         userid: User identifier to match.
 
     Returns:
         Sorted job IDs whose index entry names this user.
     """
     matches: list[str] = []
-    for blob in bucket.list_blobs(prefix="index/shared-runs/"):
-        jobid = blob.name.rsplit("/", 1)[-1]
+    for info in store.list("index/shared-runs/"):
+        jobid = info.key.rsplit("/", 1)[-1]
         if not jobid:
             continue
         try:
-            entry = json.loads(blob.download_as_text())
+            entry = json.loads(store.read_text(info.key))
         except Exception:
             continue
         if isinstance(entry, dict) and entry.get("userid") == userid:
@@ -1242,19 +1149,16 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
 
     Raises:
         ValueError: If ``userid`` is empty or contains a path separator.
-        GCSError: If the bucket cannot be listed.
+        StorageError: If the store cannot be listed.
     """
     from .run_details import TERMINAL_STATUSES, get_run_details
 
     _validate_userid(userid)
-    config = config or JobConfig()
+    store, config = _store(config)
 
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-
-    user_prefix = f"users/{userid}/"
+    user_prefix = keys.user_prefix(userid)
     jobs_prefix = f"{user_prefix}jobs/"
-    profile_path = f"{user_prefix}user.json"
+    profile_key = f"{user_prefix}user.json"
 
     try:
         object_paths: list[str] = []
@@ -1262,20 +1166,20 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
         job_ids: set[str] = set()
         has_user_profile = False
 
-        for blob in bucket.list_blobs(prefix=user_prefix):
-            object_paths.append(blob.name)
-            total_bytes += blob.size or 0
-            if blob.name == profile_path:
+        for info in store.list(user_prefix):
+            object_paths.append(info.key)
+            total_bytes += info.size or 0
+            if info.key == profile_key:
                 has_user_profile = True
-            if blob.name.startswith(jobs_prefix):
-                remainder = blob.name[len(jobs_prefix) :]
+            if info.key.startswith(jobs_prefix):
+                remainder = info.key[len(jobs_prefix) :]
                 jobid = remainder.split("/", 1)[0]
                 if jobid:
                     job_ids.add(jobid)
 
-        shared_run_ids = _shared_run_ids_for_user(bucket, userid)
+        shared_run_ids = _shared_run_ids_for_user(store, userid)
     except Exception as e:
-        raise GCSError(f"Failed to summarize data for user {userid}: {e}")
+        raise StorageError(f"Failed to summarize data for user {userid}: {e}")
 
     active_job_ids = []
     for jobid in sorted(job_ids):
@@ -1285,7 +1189,7 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
 
     return UserDataSummary(
         userid=userid,
-        bucket=config.bucket,
+        location=store.root_uri,
         object_count=len(object_paths),
         total_bytes=total_bytes,
         job_ids=sorted(job_ids),
@@ -1301,7 +1205,7 @@ def purge_user_data(
     config: JobConfig | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Permanently erase every object stored for a user in the primary bucket.
+    """Permanently erase every object stored for a user in the configured store.
 
     Unlike :func:`soft_delete_job`, this preserves nothing: uploaded datasets,
     results, metadata, run details and the credits profile under
@@ -1313,7 +1217,7 @@ def purge_user_data(
     scripts/purge_user_data.py, which gates it behind an interactive
     confirmation.
 
-    This covers the primary ``autodiscovery`` bucket only. Two nearby surfaces
+    This covers the store ``STORAGE_BACKEND`` selects only. Two nearby surfaces
     are deliberately out of scope: dataset copies handed to the Asta workspaces
     bucket by :func:`asta_gcs.copy_dataset_to_asta_workspace` belong to Asta
     once the session there has been started, and the metrics dashboard's
@@ -1329,43 +1233,43 @@ def purge_user_data(
     Returns:
         Dictionary with keys:
         - userid: The subject purged
-        - bucket: Bucket operated on
+        - location: Root URI of the store operated on
         - dry_run: Whether this was a rehearsal
-        - deleted_objects: Object paths deleted (or that would be)
+        - deleted_objects: Object keys deleted (or that would be)
         - deleted_bytes: Combined size of those objects
         - deleted_shared_run_ids: Shared-run index entries removed
 
     Raises:
         ValueError: If ``userid`` is empty or contains a path separator.
-        GCSError: If deletion fails.
+        StorageError: If deletion fails.
     """
     _validate_userid(userid)
-    config = config or JobConfig()
-
-    client = get_storage_client(config.project_id)
-    bucket = client.bucket(config.bucket)
-    user_prefix = f"users/{userid}/"
+    store, config = _store(config)
+    user_prefix = keys.user_prefix(userid)
 
     deleted_objects: list[str] = []
     deleted_bytes = 0
 
     try:
-        for blob in bucket.list_blobs(prefix=user_prefix):
-            deleted_objects.append(blob.name)
-            deleted_bytes += blob.size or 0
+        # Materialize the listing before deleting: a store is free to stream its
+        # listing, and deleting out from under an open iterator is undefined.
+        doomed = [(info.key, info.size or 0) for info in store.list(user_prefix)]
+        for key, size in doomed:
+            deleted_objects.append(key)
+            deleted_bytes += size
             if not dry_run:
-                blob.delete()
+                store.delete(key)
 
-        shared_run_ids = _shared_run_ids_for_user(bucket, userid)
+        shared_run_ids = _shared_run_ids_for_user(store, userid)
         if not dry_run:
             for jobid in shared_run_ids:
                 delete_shared_run_index(jobid, config)
     except Exception as e:
-        raise GCSError(f"Failed to purge data for user {userid}: {e}")
+        raise StorageError(f"Failed to purge data for user {userid}: {e}")
 
     return {
         "userid": userid,
-        "bucket": config.bucket,
+        "location": store.root_uri,
         "dry_run": dry_run,
         "deleted_objects": sorted(deleted_objects),
         "deleted_bytes": deleted_bytes,

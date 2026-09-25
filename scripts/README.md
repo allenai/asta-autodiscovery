@@ -68,13 +68,16 @@ Unlike `soft_delete_job` (which keeps results and metadata) and
 `cleanup_old_datasets.py` (which only expires uploads past the retention
 window), this preserves nothing and cannot be undone.
 
-**What it erases:**
+**What it erases**, in whichever object store `STORAGE_BACKEND` selects (the
+keys are the same in a GCS bucket and a local data directory, and the script
+prints the store's root URI so you can confirm which one you are about to
+erase from):
 
-| Surface | Location |
+| Surface | Key |
 |---|---|
-| Uploaded datasets, results, run metadata | `gs://{bucket}/users/{sub}/**` |
-| Credits profile | `gs://{bucket}/users/{sub}/user.json` |
-| Shared-run index entries naming the user | `gs://{bucket}/index/shared-runs/*` |
+| Uploaded datasets, results, run metadata | `users/{sub}/**` |
+| Credits profile | `users/{sub}/user.json` |
+| Shared-run index entries naming the user | `index/shared-runs/*` |
 
 **What it does not erase** — each needs its own request, and the script prints
 this list on every run: the dataset copies AutoDiscovery hands to the Asta

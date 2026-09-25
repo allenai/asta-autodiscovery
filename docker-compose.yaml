@@ -38,6 +38,12 @@ services:
       # the host daemon (docker-out-of-docker). Set JOB_BACKEND=gcp to run jobs on
       # Cloud Run instead; this socket mount is then unused.
       - /var/run/docker.sock:/var/run/docker.sock
+      # Run data directory for the default STORAGE_BACKEND=local: all run metadata,
+      # datasets, and results live here. Short syntax so the host dir is created on
+      # first up. The docker job backend bind-mounts each run's subtree from the
+      # same host path (forwarded below as STORAGE_HOST_DIR). Unused when
+      # STORAGE_BACKEND=gcs.
+      - ${STORAGE_DIR:-$PWD/data}:/mnt/data
     environment:
       # This ensures that errors are printed as they occur, which
       # makes debugging easier.
@@ -55,6 +61,17 @@ services:
       - AUTH_PASSWORD_DIR=/secrets/auth
       - AUTH_SESSION_SECRET=${AUTH_SESSION_SECRET}
       - AUTH_SESSION_TTL=${AUTH_SESSION_TTL}
+      # Persistence backend: local (default — the host data directory mounted at
+      # /mnt/data above) | gcs (a Cloud Storage bucket). Deployments that keep run
+      # data in GCS must set this explicitly. Each job backend needs one store:
+      # JOB_BACKEND=docker requires local, JOB_BACKEND=gcp requires gcs.
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-local}
+      # Where the host data directory is mounted inside this container.
+      - STORAGE_DIR=/mnt/data
+      # Host path of that same directory, so the docker job backend can bind-mount
+      # each run's subtree into its job container (the in-container STORAGE_DIR above
+      # is unusable as a host bind source). Mirrors GCP_KEY_HOST_PATH below.
+      - STORAGE_HOST_DIR=${STORAGE_DIR:-$PWD/data}
       # GCS and Google Cloud credentials
       - GCS_BUCKET=${GCS_BUCKET}
       - GCP_PROJECT=${GCP_PROJECT}
@@ -73,9 +90,10 @@ services:
       # scoped sandbox). See docs/configuration.md for the safe-combination matrix.
       - CODE_EXECUTION_BACKEND=${CODE_EXECUTION_BACKEND:-process}
       # Host path of the GCP key, derived from GOOGLE_APPLICATION_CREDENTIALS so the
-      # docker backend can bind-mount it into each job container (the in-container
-      # GOOGLE_APPLICATION_CREDENTIALS above is a container path, unusable as a host
-      # bind source). Requires GOOGLE_APPLICATION_CREDENTIALS to be an absolute path.
+      # docker backend can bind-mount it into each job container for Google-hosted
+      # models (the in-container GOOGLE_APPLICATION_CREDENTIALS above is a container
+      # path, unusable as a host bind source). Requires GOOGLE_APPLICATION_CREDENTIALS
+      # to be an absolute path. Optional when jobs use no Google models.
       - GCP_KEY_HOST_PATH=${GOOGLE_APPLICATION_CREDENTIALS}
       # Asta context service (artifact storage + metadata)
       - ASTA_CONTEXT_SERVICE_URL=${ASTA_CONTEXT_SERVICE_URL}

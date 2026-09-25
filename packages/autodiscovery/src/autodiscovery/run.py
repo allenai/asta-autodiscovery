@@ -11,7 +11,7 @@ from time import time
 
 from autodiscovery import llm
 from autodiscovery.agents import get_agents
-from autodiscovery.args import ArgParser
+from autodiscovery.args import EMBEDDING_MODEL_ENV, MODEL_ENV, ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
 from autodiscovery.dataset import (
     get_datasets_fpaths,
@@ -859,23 +859,47 @@ def run_mcts(
 
 
 def resolve_model_args(args) -> None:
-    """Validate every model flag before any model call.
+    """Resolve and validate every model flag before any model call.
 
-    Checks each flag against litellm's offline registry and fails fast on a
-    model that cannot do its job: a vision model without image support, an
-    embedding model passed as a chat model, a Copilot model absent from
-    Copilot's catalog.
+    There is no built-in default model. ``--model`` must be chosen, on the
+    command line or via ``AUTODISCOVERY_MODEL``; ``--belief_model`` and
+    ``--vision_model`` fall back to it. ``--embedding_model`` is only required,
+    and only checked, when ``--dedupe`` is on -- it is the one role that needs a
+    second provider for chat-only providers such as Anthropic.
+
+    Each resolved flag is then checked against litellm's offline registry, and
+    against the provider's own configuration, so a run fails fast on a model
+    that cannot do its job: a vision model without image support, an embedding
+    model passed as a chat model, a Copilot model absent from Copilot's catalog,
+    a provider whose credentials are not set.
 
     Args:
         args: Parsed argument namespace.
 
     Raises:
-        ModelError: If a model flag cannot serve its role.
+        ModelError: If no model was chosen, or a model flag cannot serve its role.
     """
+    if not args.model:
+        raise llm.ModelError(
+            f"No model chosen. Pass --model <provider>/<model> or set {MODEL_ENV}; "
+            "see the quick start for the variables each provider needs."
+        )
+    if not args.belief_model:
+        args.belief_model = args.model
+    if not args.vision_model:
+        args.vision_model = args.model
+
     llm.validate(args.model, flag="--model")
     llm.validate(args.belief_model, flag="--belief_model")
     llm.validate(args.vision_model, flag="--vision_model", require_vision=True)
-    llm.validate(args.embedding_model, flag="--embedding_model", mode="embedding")
+
+    if getattr(args, "dedupe", False):
+        if not args.embedding_model:
+            raise llm.ModelError(
+                "--dedupe needs an embedding model. Pass --embedding_model "
+                f"<provider>/<model> or set {EMBEDDING_MODEL_ENV}."
+            )
+        llm.validate(args.embedding_model, flag="--embedding_model", mode="embedding")
 
 
 def main(args):

@@ -7,7 +7,7 @@ from autodiscovery_jobs.backends import build_job_args, get_backend
 from autodiscovery_jobs.backends.docker import DockerBackend, _phase_from_state
 from autodiscovery_jobs.backends.gcp import CloudRunBackend
 from autodiscovery_jobs.config import JobConfig
-from autodiscovery_jobs.exceptions import DockerBackendError, JobBackendError
+from autodiscovery_jobs.exceptions import DockerBackendError, JobBackendError, ModelConfigError
 
 # ---------------------------------------------------------------------------
 # Factory
@@ -91,6 +91,59 @@ def test_build_job_args_boolean_kwargs(mock_config):
 
 
 # ---------------------------------------------------------------------------
+# Model selection: no default, the operator's environment choice is always
+# passed as explicit flags so the job image needs no model configuration.
+# ---------------------------------------------------------------------------
+
+
+def test_build_job_args_model_comes_from_the_environment(mock_config):
+    args = build_job_args("u", "j", mock_config, n_experiments=1)
+
+    assert "--model=openai/test-model" in args
+    # Roles left unset are left to the job, which falls back to --model.
+    roles = ("--belief_model=", "--vision_model=", "--embedding_model=")
+    assert not any(a.startswith(roles) for a in args)
+
+
+def test_build_job_args_role_overrides_come_from_the_environment(mock_config, monkeypatch):
+    monkeypatch.setenv("AUTODISCOVERY_BELIEF_MODEL", "openai/belief")
+    monkeypatch.setenv("AUTODISCOVERY_VISION_MODEL", "openai/vision")
+    monkeypatch.setenv("AUTODISCOVERY_EMBEDDING_MODEL", "openai/embed")
+
+    args = build_job_args("u", "j", mock_config, n_experiments=1)
+
+    assert "--belief_model=openai/belief" in args
+    assert "--vision_model=openai/vision" in args
+    assert "--embedding_model=openai/embed" in args
+
+
+def test_build_job_args_explicit_models_win_over_the_environment(mock_config, monkeypatch):
+    monkeypatch.setenv("AUTODISCOVERY_BELIEF_MODEL", "openai/belief")
+
+    args = build_job_args(
+        "u", "j", mock_config, n_experiments=1, model="openai/explicit", belief_model="openai/b2"
+    )
+
+    assert "--model=openai/explicit" in args
+    assert "--belief_model=openai/b2" in args
+    assert "--model=openai/test-model" not in args
+
+
+def test_build_job_args_without_any_model_is_an_error(mock_config, monkeypatch):
+    monkeypatch.delenv("AUTODISCOVERY_MODEL")
+
+    with pytest.raises(ModelConfigError, match="AUTODISCOVERY_MODEL"):
+        build_job_args("u", "j", mock_config, n_experiments=1)
+
+
+def test_build_job_args_ignores_a_blank_model_variable(mock_config, monkeypatch):
+    monkeypatch.setenv("AUTODISCOVERY_MODEL", "   ")
+
+    with pytest.raises(ModelConfigError):
+        build_job_args("u", "j", mock_config, n_experiments=1)
+
+
+# ---------------------------------------------------------------------------
 # Docker backend
 # ---------------------------------------------------------------------------
 
@@ -135,9 +188,9 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
         "bind": "/mnt/data/users/testuser/jobs/job1",
         "mode": "rw",
     }
-    assert "--dataset_metadata=/mnt/data/users/testuser/jobs/job1/metadata.json" in kwargs[
-        "command"
-    ]
+    assert (
+        "--dataset_metadata=/mnt/data/users/testuser/jobs/job1/metadata.json" in kwargs["command"]
+    )
 
     # GCP credentials are forwarded (for Google-hosted models) as a read-only bind
     # of the *host* key path, with the in-container path exported to the job.
@@ -150,6 +203,48 @@ def test_docker_run_job_launches_container(docker_config, monkeypatch):
     # A plain bind mount needs no elevated privileges.
     for privileged in ("devices", "cap_add", "security_opt", "privileged"):
         assert privileged not in kwargs
+
+
+def test_docker_run_job_forwards_every_documented_provider(docker_config, monkeypatch):
+    """Each provider's credentials reach the job; unset ones are simply absent."""
+    monkeypatch.setenv("STORAGE_HOST_DIR", "/host/ad-data")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-test")
+    monkeypatch.setenv("AZURE_API_KEY", "az-test")
+    monkeypatch.setenv("AZURE_API_BASE", "https://example.openai.azure.com")
+    monkeypatch.delenv("AZURE_API_VERSION", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        DockerBackend(docker_config).run_job("testuser", "job1", n_experiments=1)
+
+    env = client.containers.run.call_args.kwargs["environment"]
+    assert env["ANTHROPIC_API_KEY"] == "ant-test"
+    assert env["AZURE_API_KEY"] == "az-test"
+    assert env["AZURE_API_BASE"] == "https://example.openai.azure.com"
+    assert "AZURE_API_VERSION" not in env
+    assert "OPENAI_API_KEY" not in env
+
+
+def test_docker_run_job_mounts_the_copilot_token_dir(docker_config, monkeypatch):
+    """github_copilot/ models need litellm's token directory inside the job.
+
+    Mounted read-write: litellm must write the derived api-key.json beside the
+    access token, and treats a failed write as a hard error.
+    """
+    monkeypatch.setenv("STORAGE_HOST_DIR", "/host/ad-data")
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN_HOST_DIR", "/host/home/.config/litellm/github_copilot")
+
+    client = Mock()
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+        DockerBackend(docker_config).run_job("testuser", "job1", n_experiments=1)
+
+    kwargs = client.containers.run.call_args.kwargs
+    assert kwargs["volumes"]["/host/home/.config/litellm/github_copilot"] == {
+        "bind": "/secrets/github_copilot",
+        "mode": "rw",
+    }
+    assert kwargs["environment"]["GITHUB_COPILOT_TOKEN_DIR"] == "/secrets/github_copilot"
 
 
 def test_docker_run_job_without_gcp_key(docker_config, monkeypatch):

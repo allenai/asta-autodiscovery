@@ -1,4 +1,4 @@
-.PHONY: help dev test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
+.PHONY: help dev check-model test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
@@ -56,7 +56,21 @@ sync: ## Install all workspace packages and extras
 # built or started by `docker compose up --build` -- only by naming it. Building
 # it here is the point of this target: without it the API launches whatever
 # `autodiscovery:dev` was last built, which silently runs stale job code.
-dev: ## Build the job image and start the local stack
+#
+# There is no default model, so `make dev` refuses to start until one is chosen
+# -- otherwise the stack comes up only to fail on the first run. The variable is
+# accepted from the shell or from .env (the file compose reads); the API repeats
+# the check at startup, including the chosen provider's own variables.
+check-model: ## Fail unless a model is chosen (AUTODISCOVERY_MODEL in the shell or .env)
+	@if [ -z "$$AUTODISCOVERY_MODEL" ] \
+	    && ! grep -qE '^AUTODISCOVERY_MODEL=[^[:space:]#]' .env 2>/dev/null; then \
+		echo "error: no model chosen. Set AUTODISCOVERY_MODEL=<provider>/<model> in .env" >&2; \
+		echo "       (for example openai/gpt-5.4-mini) plus that provider's variables." >&2; \
+		echo "       See docs/quickstart.md." >&2; \
+		exit 1; \
+	fi
+
+dev: check-model ## Build the job image and start the local stack
 	docker compose build autodiscovery
 	docker compose up --build
 

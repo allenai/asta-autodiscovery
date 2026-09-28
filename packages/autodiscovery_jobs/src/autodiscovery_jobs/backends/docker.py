@@ -30,6 +30,10 @@ from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args
 # actually set on the API container are forwarded.
 _JOB_ENV_PASSTHROUGH = (
     "OPENAI_API_KEY",
+    "AZURE_API_KEY",
+    "AZURE_API_BASE",
+    "AZURE_API_VERSION",
+    "ANTHROPIC_API_KEY",
     "MODAL_TOKEN_ID",
     "MODAL_TOKEN_SECRET",
     "MODAL_ENVIRONMENT",
@@ -46,6 +50,12 @@ _JOB_ENV_PASSTHROUGH = (
 # Google-hosted models (Vertex AI). Matches the API container's
 # GOOGLE_APPLICATION_CREDENTIALS convention in docker-compose.
 _CONTAINER_GCP_KEY_PATH = "/secrets/gcp-key.json"
+
+# In-container path where the GitHub Copilot token directory is mounted, for jobs
+# that use ``github_copilot/`` models. Mounted read-write: litellm reads
+# ``access-token`` from it and *must* write the derived, short-lived
+# ``api-key.json`` beside it -- a failed write is a hard error, not a warning.
+_CONTAINER_COPILOT_TOKEN_DIR = "/secrets/github_copilot"
 
 
 def _docker_client():
@@ -111,6 +121,13 @@ class DockerBackend(JobBackend):
         if host_key_path:
             volumes[host_key_path] = {"bind": _CONTAINER_GCP_KEY_PATH, "mode": "ro"}
             environment["GOOGLE_APPLICATION_CREDENTIALS"] = _CONTAINER_GCP_KEY_PATH
+
+        # Likewise the GitHub Copilot token directory, for github_copilot/ models:
+        # compose forwards the host path as GITHUB_COPILOT_TOKEN_HOST_DIR.
+        host_token_dir = os.environ.get("GITHUB_COPILOT_TOKEN_HOST_DIR")
+        if host_token_dir:
+            volumes[host_token_dir] = {"bind": _CONTAINER_COPILOT_TOKEN_DIR, "mode": "rw"}
+            environment["GITHUB_COPILOT_TOKEN_DIR"] = _CONTAINER_COPILOT_TOKEN_DIR
 
         client = _docker_client()
         try:

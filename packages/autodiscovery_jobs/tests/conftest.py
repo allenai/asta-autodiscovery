@@ -6,6 +6,25 @@ import pytest
 from autodiscovery_jobs.config import JobConfig
 
 
+@pytest.fixture(autouse=True)
+def _chosen_model(monkeypatch):
+    """Every test starts with a model chosen and no per-role or mount overrides.
+
+    There is no default model, so ``build_job_args`` needs ``AUTODISCOVERY_MODEL``
+    (or an explicit ``model=``) to launch anything. Tests of the unset case
+    delete it again.
+    """
+    monkeypatch.setenv("AUTODISCOVERY_MODEL", "openai/test-model")
+    for var in (
+        "AUTODISCOVERY_BELIEF_MODEL",
+        "AUTODISCOVERY_VISION_MODEL",
+        "AUTODISCOVERY_EMBEDDING_MODEL",
+        "GCP_KEY_HOST_PATH",
+        "GITHUB_COPILOT_TOKEN_HOST_DIR",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def mock_config():
     """Create a test configuration for the cloud path.

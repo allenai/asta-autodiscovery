@@ -25,7 +25,6 @@ class StorageError(AutodiscoveryJobError):
     pass
 
 
-
 class ObjectNotFoundError(StorageError):
     """Raised when a specific object/key does not exist in the store."""
 
@@ -40,6 +39,12 @@ class StorageBackendError(AutodiscoveryJobError):
 
 class JobBackendError(AutodiscoveryJobError):
     """Raised when a job backend (Cloud Run, Docker, ...) operation fails."""
+
+    pass
+
+
+class ModelConfigError(AutodiscoveryJobError):
+    """Raised when no usable model is configured (see ``model_config``)."""
 
     pass
 

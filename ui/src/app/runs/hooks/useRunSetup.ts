@@ -6,7 +6,7 @@ import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
-import { uploadToGCS as uploadFileToGCS } from '@/api/gcsUpload';
+import { uploadDatasetFile, type UploadTarget } from '@/api/datasetUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
 export const MCTS_SELECTION = {
@@ -73,7 +73,7 @@ export interface FileUploadState {
     secondsRemaining: number | null; // seconds, null while calculating
     uploadStartTime: number | null;
     uploadUrl: string | null;
-    gcsPath: string | null;
+    storagePath: string | null;
     error: string | null;
     abortController: AbortController | null;
 }
@@ -192,7 +192,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                                 secondsRemaining: 0,
                                 uploadStartTime: null,
                                 uploadUrl: null,
-                                gcsPath: null, // Could reconstruct from userid/runid/filename if needed
+                                storagePath: null, // Could reconstruct from userid/runid/filename if needed
                                 error: null,
                                 abortController: null,
                             };
@@ -360,18 +360,18 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         }
     }, [api, runid]);
 
-    const uploadToGCS = async (
+    const uploadFile = async (
         index: number,
-        uploadUrl: string,
+        target: UploadTarget,
         file: File,
         uploadStartTime: number
     ): Promise<void> => {
         const abortController = new AbortController();
         updateUploadState(index, { abortController });
 
-        await uploadFileToGCS({
+        await uploadDatasetFile({
             file,
-            uploadUrl,
+            target,
             uploadStartTime,
             onProgress: (progressEvent) => {
                 updateUploadState(index, {
@@ -434,11 +434,19 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
                 updateUploadState(index, {
                     uploadUrl: data.upload_url,
-                    gcsPath: data.gcs_path,
+                    storagePath: data.storage_path,
                 });
 
-                // Upload directly to GCS
-                await uploadToGCS(index, data.upload_url, file, uploadStartTime);
+                await uploadFile(
+                    index,
+                    {
+                        url: data.upload_url,
+                        method: data.upload_method,
+                        fields: data.upload_fields,
+                    },
+                    file,
+                    uploadStartTime
+                );
             } catch (err) {
                 console.error('Upload failed:', err);
                 const errorMessage = err instanceof Error ? err.message : 'Upload failed';
@@ -465,7 +473,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 secondsRemaining: null,
                 uploadStartTime: null,
                 uploadUrl: null,
-                gcsPath: null,
+                storagePath: null,
                 error: null,
                 abortController: null,
             };

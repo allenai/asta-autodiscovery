@@ -33,7 +33,7 @@ from time import monotonic
 from typing import Any, NamedTuple
 
 from autodiscovery_jobs import JobConfig
-from autodiscovery_jobs.gcs import (
+from autodiscovery_jobs.persistence import (
     count_experiment_results,
     get_job_args,
     get_metadata_or_none,
@@ -209,7 +209,7 @@ def calculate_job_credits(
 ) -> tuple[int, int]:
     """Calculate consumed and pending credits for a single job.
 
-    This function is migrated from autodiscovery_jobs.gcs module to
+    This function is migrated from autodiscovery_jobs.persistence module to
     centralize credit logic in the API layer.
 
     Args:

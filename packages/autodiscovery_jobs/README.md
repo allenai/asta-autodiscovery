@@ -1,16 +1,22 @@
 # autodiscovery_jobs
 
-Python package for managing Cloud Run jobs with GCS integration for the autodiscovery system.
+Python package for managing AutoDiscovery jobs and the data they read and write.
 
 ## Features
 
-- **GCS Operations**: Create job directories, upload datasets, download results
-- **Cloud Run Integration**: Execute jobs, monitor status, retrieve logs
+- **Persistence**: Create job directories, upload datasets, download results — through a
+  swappable object store (`STORAGE_BACKEND`: a host directory or a GCS bucket)
+- **Job Execution**: Launch jobs, monitor status, retrieve logs — through a swappable job
+  backend (`JOB_BACKEND`: local Docker containers or Cloud Run)
 
 ### Environment Variables
 
 ```bash
-# GCS and GCP Configuration
+# Persistence: "local" (default, a host directory) or "gcs" (a Cloud Storage bucket)
+export STORAGE_BACKEND="local"
+export STORAGE_DIR="/absolute/path/to/data"   # local backend only
+
+# GCS and GCP Configuration (STORAGE_BACKEND=gcs and/or JOB_BACKEND=gcp)
 export AUTODISCOVERY_BUCKET="your-bucket"  # or GCS_BUCKET
 export GCP_PROJECT="your-project-id"
 export GCP_REGION="us-west1"
@@ -34,6 +40,7 @@ manager = JobManager()
 
 # Or customize
 config = JobConfig(
+    storage_backend="gcs",
     bucket="my-custom-bucket",
     region="us-central1",
     project_id="my-project"
@@ -245,7 +252,7 @@ from autodiscovery_jobs import (
     JobManager,
     JobNotFoundError,
     JobAlreadyExistsError,
-    GCSError,
+    StorageError,
     CloudRunError
 )
 
@@ -264,8 +271,8 @@ except JobNotFoundError as e:
 
 try:
     manager.upload_dataset("user123", "job1", Path("./data.csv"))
-except GCSError as e:
-    print(f"GCS operation failed: {e}")
+except StorageError as e:
+    print(f"Storage operation failed: {e}")
 
 try:
     execution_id = manager.run_job("user123", "job1", n_experiments=4)
@@ -314,12 +321,13 @@ manager.run_job(
 )
 ```
 
-## GCS Directory Structure
+## Object Layout
 
-The package creates and manages the following structure:
+The package creates and manages the following key layout, identically in a GCS bucket or a
+host directory (so the two are interchangeable):
 
 ```
-gs://example-bucket/
+<gs://example-bucket | /path/to/data>/
 └── users/
     └── {userid}/
         └── jobs/
@@ -328,7 +336,7 @@ gs://example-bucket/
                 │   ├── file1.csv
                 │   └── file2.csv
                 ├── metadata.json      # Dataset metadata
-                └── output/            # Job results (written by Cloud Run)
+                └── output/            # Job results (written by the job)
                     ├── mcts_nodes.json
                     ├── results.csv
                     └── ...
@@ -336,7 +344,9 @@ gs://example-bucket/
 
 ## Authentication
 
-The `autodiscovery_jobs` package uses Google Cloud client libraries which rely on [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) for authentication.
+Only needed for the Google-backed options (`STORAGE_BACKEND=gcs`, `JOB_BACKEND=gcp`,
+`CODE_EXECUTION_BACKEND=modal`); the defaults require no credentials. For those, the
+package uses Google Cloud client libraries which rely on [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) for authentication.
 
 ### Service Account Key
 

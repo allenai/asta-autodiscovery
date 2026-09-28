@@ -1,5 +1,6 @@
 """Tests for the metrics cache's configuration loading and failure handling."""
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -33,18 +34,16 @@ def test_cache_accepts_legacy_bucket_env_alias(monkeypatch):
     assert cache._config.bucket == "bucket-from-alias"
 
 
-def test_scan_all_jobs_propagates_discovery_failure():
-    """A failed bucket listing must raise, not masquerade as an empty dataset."""
-    config = aggregator.JobConfig(bucket="unreadable-bucket")
-
-    discovery_failed = patch.object(
-        aggregator, "_discover_jobs_via_glob", side_effect=RuntimeError("404 bucket missing")
-    )
+def test_scan_all_jobs_propagates_discovery_failure(tmp_path):
+    """A failed listing must raise, not masquerade as an empty dataset."""
+    config = aggregator.JobConfig(storage_backend="local", storage_dir=str(tmp_path))
 
     with (
-        patch.object(aggregator.storage, "Client"),
-        discovery_failed,
-        pytest.raises(RuntimeError, match="unreadable-bucket"),
+        patch.object(
+            aggregator, "_discover_jobs", side_effect=RuntimeError("404 store unreadable")
+        ),
+        # The message names the store that failed, whichever backend it is.
+        pytest.raises(RuntimeError, match=re.escape(tmp_path.as_uri())),
     ):
         aggregator._scan_all_jobs(config)
 
@@ -69,7 +68,7 @@ def test_cold_start_returns_empty_data_while_background_refresh_runs():
     cache = MetricsCache()
 
     with (
-        patch.object(aggregator.storage, "Client", side_effect=RuntimeError("no cache")),
+        patch.object(aggregator, "get_store", side_effect=RuntimeError("no cache")),
         patch.object(aggregator.threading, "Thread"),
     ):
         data = cache.get_data()
@@ -127,7 +126,8 @@ def test_successful_refresh_clears_recorded_error():
 
     with (
         patch.object(aggregator, "_scan_all_jobs", return_value=fresh),
-        patch.object(aggregator.storage, "Client", side_effect=RuntimeError("no credentials")),
+        # Persisting the snapshot fails; a successful scan must still clear the error.
+        patch.object(aggregator, "get_store", side_effect=RuntimeError("no credentials")),
     ):
         cache._do_refresh()
 

@@ -26,6 +26,9 @@ wheels/
 secrets/
 .env
 
+# Default STORAGE_DIR for the local persistence backend (run data)
+/data/
+
 # Claude Code local files
 CLAUDE.local.md
 CLAUDE.md

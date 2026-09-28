@@ -63,8 +63,8 @@ BUCKET="autodiscovery"
 
 # Construct paths
 JOB_BASE="users/${USERID}/jobs/${JOBID}"
-METADATA_PATH="/mnt/gcs/${JOB_BASE}/metadata.json"
-OUTPUT_PATH="/mnt/gcs/${JOB_BASE}/output"
+METADATA_PATH="/mnt/data/${JOB_BASE}/metadata.json"
+OUTPUT_PATH="/mnt/data/${JOB_BASE}/output"
 BUCKET_PATH="gs://${BUCKET}/${JOB_BASE}/data"
 
 echo "========================================="

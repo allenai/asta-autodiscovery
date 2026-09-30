@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any
 
 from ..exceptions import DockerBackendError
-from ..keys import job_dir
-from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args
+from ..keys import datalib_dir, job_dir
+from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args, datalib_mount_path
 
 # Environment variables forwarded from the API container to each job container.
 # These mirror the secrets/env the Cloud Run job receives (see
@@ -113,6 +113,15 @@ class DockerBackend(JobBackend):
             "mode": "rw",
         }
 
+        # Each selected data-library directory, read-only, at its store-shaped
+        # path (build_job_args names the same paths). Sibling of the run's own
+        # mount, so neither shadows the other.
+        for dirname in kwargs.get("datalib_dirs") or []:
+            volumes[self._host_run_dir(datalib_dir(userid, dirname))] = {
+                "bind": datalib_mount_path(userid, dirname),
+                "mode": "ro",
+            }
+
         # Forward GCP credentials when available, for Google-hosted models. In
         # docker-out-of-docker the bind source must be a *host* path, so it is
         # provided out-of-band via GCP_KEY_HOST_PATH (the same file docker-compose
@@ -145,7 +154,9 @@ class DockerBackend(JobBackend):
         return execution_id
 
     def _host_run_dir(self, prefix: str) -> str:
-        """Return the **host** path of a run's data directory for a bind mount.
+        """Return the **host** path of a store prefix, for a bind mount.
+
+        The prefix is a run's directory or a data-library directory.
 
         ``config.storage_dir`` is where the data directory is mounted inside *this*
         (API) container, which is unusable as a bind source for the host daemon in

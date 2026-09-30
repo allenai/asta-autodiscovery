@@ -9,6 +9,19 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
+### Read-only data-library directories
+
+`auto-discovery` accepts `--datalib_dir <path>`, repeatable: a directory the run
+reads in place, alongside or instead of the datasets in `--dataset_metadata`.
+A directory may hold any number of datasets in any layout; its `README.md`, if
+present, describes it. The agents are shown each directory's README and a
+bounded view of its file tree, the first experiment surveys it, and the manifest
+is saved to `datalib_manifest.json` in the output directory. With
+`--backend modal`, `--store_root` and `--store_uri` say which `gs://` location a
+local path mirrors, so the sandbox mounts it read-only at the same path.
+
+Without `--datalib_dir`, prompts and the first experiment are unchanged.
+
 ### There is no default model; choosing one is required
 
 `--model` no longer defaults to `vertex_ai/gemini-3.7-flash`. Choose a model on

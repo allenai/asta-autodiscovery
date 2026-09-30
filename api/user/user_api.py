@@ -71,4 +71,25 @@ def create() -> Blueprint:
             current_app.logger.error(f"Failed to fetch credits for user {user_id}: {str(e)}")
             return jsonify({"error": f"Failed to fetch credits: {str(e)}"}), 500
 
+    @api.route("/me/datalib", methods=["GET"])
+    @requires_auth()
+    def get_viewer_datalib():
+        """List the authenticated user's data-library directories.
+
+        These are the top-level directories under ``users/<uid>/datalib/`` that a
+        run can mount read-only instead of uploading a dataset. Each carries the
+        contents of its ``README.md`` (truncated) as its description, or ``null``.
+        """
+        user_id = request.user.get("sub")
+
+        try:
+            job_manager = get_job_manager()
+            dirs = job_manager.list_datalib_dirs(user_id)
+            return jsonify(
+                {"dirs": [{"name": d.name, "description": d.description} for d in dirs]}
+            ), 200
+        except Exception as e:
+            current_app.logger.error(f"Failed to list data library for user {user_id}: {str(e)}")
+            return jsonify({"error": f"Failed to list data library: {str(e)}"}), 500
+
     return api

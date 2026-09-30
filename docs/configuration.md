@@ -83,6 +83,12 @@ interchangeable (`gsutil rsync` moves data either way). See
 > streamed through the API (`POST /api/runs/upload-dataset`) — which is why the proxy's
 > `client_max_body_size` for `/api` matters for this backend.
 
+> **Data library.** Datasets too large to upload per run can be placed in the store at
+> `users/<userid>/datalib/<dirname>/`, with an optional `README.md` describing each
+> directory. The user can then select those directories when setting up a run, and they are
+> mounted into it read-only rather than copied. No configuration is needed on either
+> backend. See [Data Library](design/data-library.md).
+
 ### Google Cloud
 
 Required when `STORAGE_BACKEND=gcs`, `JOB_BACKEND=gcp`, or `CODE_EXECUTION_BACKEND=modal`.

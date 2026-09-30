@@ -292,6 +292,31 @@ class ArgParser(argparse.ArgumentParser):
             help="GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/)",
         )
         self.add_argument(
+            "--datalib_dir",
+            type=str,
+            action="append",
+            default=[],
+            help=(
+                "A read-only data-library directory available to the run, in addition to "
+                "(or instead of) the datasets in --dataset_metadata. Repeatable. Its "
+                "README.md, if any, describes it to the agents."
+            ),
+        )
+        self.add_argument(
+            "--store_root",
+            type=str,
+            help=(
+                "Local path at which the object store's root is mounted (e.g. /mnt/data). "
+                "With --store_uri, lets the modal backend mount each --datalib_dir from "
+                "the store at the same path."
+            ),
+        )
+        self.add_argument(
+            "--store_uri",
+            type=str,
+            help="gs:// URI of the store root that --store_root mirrors (modal backend only).",
+        )
+        self.add_argument(
             "--run_eda",
             action=argparse.BooleanOptionalAction,
             default=False,

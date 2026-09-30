@@ -299,7 +299,10 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         <HelperText>
                             Select directories from your data library. They are mounted read-only
                             into the session as-is, so no upload is needed — useful for large
-                            datasets. A directory can be used on its own, without source files.
+                            datasets. Unlike source files, which are each described individually, a
+                            directory is described to AutoDiscovery as a whole: by its README.md and
+                            an overview of the files it contains, from which AutoDiscovery works out
+                            which data to use.
                         </HelperText>
                         <DatalibPicker
                             available={availableDatalibDirs}

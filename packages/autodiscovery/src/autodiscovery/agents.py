@@ -10,7 +10,7 @@ from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
 from autogen.coding import CodeBlock, CodeExecutor, CodeResult
 
-from autodiscovery import llm
+from autodiscovery import datalib, llm
 from autodiscovery.llm_usage import UsageTracker, record_ag2_response_usage
 from autodiscovery.structured_outputs import (
     Experiment,
@@ -540,6 +540,9 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
+    datalib_dirs=None,
+    store_root=None,
+    store_uri=None,
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
@@ -557,6 +560,11 @@ def get_agents(
         backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
+        datalib_dirs: Read-only data-library directories the code may read, as
+            absolute paths. The modal backend mounts each at the same path.
+        store_root: Local mount point of the store ``datalib_dirs`` are under
+            (required for modal when ``datalib_dirs`` is set).
+        store_uri: ``gs://`` URI that ``store_root`` mirrors (likewise).
         vision_model: Vision model for plot analysis, as litellm's
             ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
@@ -584,6 +592,9 @@ def get_agents(
 
     # Experiment Generator
     _user_query_or_empty = f"{user_query}\n\n" if user_query is not None else ""
+    datalib_dirs = list(datalib_dirs or [])
+    # Empty without a data library, so those prompts are unchanged.
+    _datalib_note = datalib.prompt_note(datalib_dirs)
 
     experiment_generator = ConversableAgent(
         name="experiment_generator",
@@ -598,6 +609,7 @@ def get_agents(
             "The hypothesis should be a falsifiable statement that can be sufficiently tested by an experiment using the provided data. "
             "Explain in natural language what this experiment plan is so that a programmer can implement it (do not provide the code yourself). "
             "Remember, you are interested in open-ended research, so your proposals may be exploratory in nature and may have only an indirect connection to the previous explorations provided. "
+            f"{_datalib_note}"
             "Here are some instructions that you must follow:\n"
             "1. Strictly use only the dataset(s) provided and do not simulate dummy/synthetic data or columns that cannot be derived from the existing columns.\n"
             "2. Each hypothesis (and experiment plan) should be creative, independent, and self-contained.\n"
@@ -637,7 +649,9 @@ def install(package):
             "Your code will be included in a python file that is executed and any relevant results should be printed to standard out or presented using plt.show appropriately. "
             "Make sure you provide python code in the proper format to execute. "
             "Ensure your code is clean and concise, and include debug statements only when they are absolutely necessary. "
-            "Use only the dataset given and do not assume any other files are available. The state is not preserved between code blocks, so do not assume any variables or imports from previous code blocks. "
+            "Use only the dataset given and do not assume any other files are available. "
+            f"{_datalib_note}"
+            "The state is not preserved between code blocks, so do not assume any variables or imports from previous code blocks. "
             "Import any libraries you need to use. Always attempt to import a library before installing it (it may already be installed). "
             "If you need to install a library, use the following code example:"
             f"{install_snippet}"
@@ -697,6 +711,7 @@ def install(package):
             "The revised experiment plan should still aim to validate the most recent hypothesis. "
             "Do not provide the code yourself but explain in natural language what the experiment should do for a programmer. "
             "Strictly use only the dataset provided and do not create synthetic data or columns that cannot be derived from the given columns. "
+            f"{_datalib_note}"
             "The experiment should be creative, independent, and self-contained. "
             "Generally, in typical data-driven research, you will need to explore and visualize the data for possible high-level insights, clean, transform, or derive new variables from the dataset to be suited for the investigation, deep-dive into specific parts of the data for fine-grained analysis, perform data modeling, and run statistical tests."
         ),
@@ -759,7 +774,27 @@ def install(package):
             environment={"DATASET_ROOT": modal_mount_path},
             sandbox_timeout_s=code_timeout + _SANDBOX_OVERHEAD_S,
         )
-        _run_async(modal_executor.add_shares(cloud_share))
+        # Each data-library directory, read-only, at the same path it has in the
+        # job container, so the paths the agents were given work here too.
+        datalib_shares = []
+        for path in datalib_dirs:
+            if not (store_root and store_uri):
+                raise ValueError(
+                    "store_root and store_uri are required with datalib_dirs "
+                    "when backend is 'modal'"
+                )
+            dl_bucket, dl_prefix = datalib.gs_source(path, store_root, store_uri)
+            datalib_shares.append(
+                CloudShare(
+                    dest=path,
+                    bucket=dl_bucket,
+                    key_prefix=dl_prefix,
+                    read_only=True,
+                    bucket_endpoint_url=bucket_endpoint_url,
+                    modal_secret=modal.Secret.from_name(secret_name),
+                )
+            )
+        _run_async(modal_executor.add_shares(cloud_share, *datalib_shares))
 
         executor = SandboxCodeExecutor(
             modal_executor,

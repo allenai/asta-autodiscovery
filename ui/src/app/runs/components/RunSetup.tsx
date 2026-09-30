@@ -1,4 +1,4 @@
-
+import { useState } from 'react';
 import {
     Box,
     TextField,
@@ -27,6 +27,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
 import DatasetUpload, {
@@ -40,6 +41,7 @@ import DatasetUpload, {
 } from '@/runs/components/DatasetUpload';
 import { mkExpandAdvancedSettingsTrackAttrs, mkSubmitRunBtnTrackAttrs } from '@/analytics/runSetup';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
+import type { DatalibDirFromApi } from '@/api/UserApi';
 
 const DEBOUNCE_SAVE_MS = 3000;
 
@@ -80,6 +82,9 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         selectedDatasetIds,
         togglePreloadedDataset,
         updatePreloadedDescription,
+        availableDatalibDirs,
+        selectedDatalibDirs,
+        toggleDatalibDir,
     } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
 
     const isFormDisabled = isSubmitting || isLoading;
@@ -285,6 +290,25 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         error={datasetErrors}
                     />
                 </FormControl>
+
+                {(availableDatalibDirs.length > 0 || selectedDatalibDirs.size > 0) && (
+                    <FormControl fullWidth>
+                        <StyledFormLabel error={!!datasetErrors}>
+                            Data library <OptionalText>(Optional)</OptionalText>
+                        </StyledFormLabel>
+                        <HelperText>
+                            Select directories from your data library. They are mounted read-only
+                            into the session as-is, so no upload is needed — useful for large
+                            datasets. A directory can be used on its own, without source files.
+                        </HelperText>
+                        <DatalibPicker
+                            available={availableDatalibDirs}
+                            selected={selectedDatalibDirs}
+                            onToggle={toggleDatalibDir}
+                            disabled={isFormDisabled}
+                        />
+                    </FormControl>
+                )}
             </ConfigurationBox>
 
             <SectionHeader sx={{ mt: 3 }}>
@@ -464,6 +488,157 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         </Box>
     );
 }
+
+// Descriptions longer than this (or spanning several lines) get a show more/less toggle.
+const DATALIB_DESCRIPTION_PREVIEW_CHARS = 160;
+
+interface DatalibPickerProps {
+    available: DatalibDirFromApi[];
+    selected: Set<string>;
+    onToggle: (name: string) => void;
+    disabled: boolean;
+}
+
+/**
+ * Multi-select list of the user's data library directories. Each row shows the
+ * directory name and, when present, its README.md as a description. Names that are
+ * selected but no longer available (e.g. restored from a draft or duplicated
+ * session) are listed too, flagged, so the user can deselect them.
+ */
+function DatalibPicker({ available, selected, onToggle, disabled }: DatalibPickerProps) {
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const availableNames = new Set(available.map((d) => d.name));
+    const missing = Array.from(selected)
+        .filter((name) => !availableNames.has(name))
+        .sort()
+        .map((name) => ({ name, description: null, isMissing: true }));
+    const rows = [...available.map((d) => ({ ...d, isMissing: false })), ...missing];
+
+    const toggleExpanded = (name: string) =>
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {rows.map(({ name, description, isMissing }) => {
+                const isSelected = selected.has(name);
+                const isExpanded = expanded.has(name);
+                const text = description?.trim() ?? '';
+                const isLong =
+                    text.length > DATALIB_DESCRIPTION_PREVIEW_CHARS || text.includes('\n');
+                return (
+                    <DatalibRow key={name} selected={isSelected}>
+                        <DatalibRowLabel>
+                            <Checkbox
+                                checked={isSelected}
+                                onChange={() => onToggle(name)}
+                                disabled={disabled}
+                                size="small"
+                                icon={<CheckBoxOutlineBlankIcon fontSize="small" />}
+                                checkedIcon={<CheckedIcon />}
+                                sx={{ p: 0 }}
+                            />
+                            <FolderOutlinedIcon fontSize="small" />
+                            <DatalibName>{name}</DatalibName>
+                            {isMissing && <DatalibMissing>No longer available</DatalibMissing>}
+                        </DatalibRowLabel>
+                        {text && (
+                            <DatalibDescription className={isExpanded ? 'expanded' : ''}>
+                                {text}
+                            </DatalibDescription>
+                        )}
+                        {isLong && (
+                            <DatalibMoreLink
+                                component="button"
+                                type="button"
+                                underline="hover"
+                                onClick={() => toggleExpanded(name)}
+                                aria-expanded={isExpanded}>
+                                {isExpanded ? 'Show less' : 'Show more'}
+                            </DatalibMoreLink>
+                        )}
+                    </DatalibRow>
+                );
+            })}
+        </Box>
+    );
+}
+
+const DatalibRow = styled(Box)<{ selected: boolean }>(({ theme, selected }) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(0.5),
+    padding: theme.spacing(1, 1.5),
+    borderRadius: theme.shape.borderRadius + 'px',
+    border:
+        '1px solid ' +
+        (selected ? theme.color['green-100'].hex : theme.color['cream-20'].rgba.toString()),
+    backgroundColor: selected ? theme.color['cream-4'].rgba.toString() : 'transparent',
+    transition: 'all 200ms ease-in-out',
+
+    '&:hover': {
+        borderColor: theme.color['green-100'].hex,
+    },
+
+    '& .MuiCheckbox-root': {
+        color: theme.color['cream-20'].rgba.toString(),
+    },
+}));
+
+const DatalibRowLabel = styled('label')(({ theme }) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    color: theme.color['cream-100'].hex,
+    cursor: 'pointer',
+    userSelect: 'none',
+
+    '& > .MuiSvgIcon-root': {
+        color: theme.color['cream-60'].rgba.toString(),
+    },
+}));
+
+const DatalibName = styled('span')({
+    fontWeight: 600,
+    fontSize: '0.875rem',
+    overflowWrap: 'anywhere',
+});
+
+const DatalibMissing = styled('span')(({ theme }) => ({
+    color: theme.color['error-red-100'].hex,
+    fontSize: '0.8rem',
+    marginLeft: 'auto',
+}));
+
+const DatalibDescription = styled(Typography)(({ theme }) => ({
+    color: theme.color['cream-80'].rgba.toString(),
+    fontSize: '0.8rem',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    // Align with the directory name (checkbox + icon + gaps)
+    paddingLeft: theme.spacing(7),
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+
+    '&.expanded': {
+        display: 'block',
+        maxHeight: '240px',
+        overflowY: 'auto',
+    },
+}));
+
+const DatalibMoreLink = styled(Link)(({ theme }) => ({
+    alignSelf: 'flex-start',
+    color: theme.color['green-40'].rgba.toString(),
+    fontSize: '0.8rem',
+    marginLeft: theme.spacing(7),
+})) as typeof Link;
 
 const SectionHeader = styled(Box)(({ theme }) => ({
     color: theme.color['cream-100'].hex,

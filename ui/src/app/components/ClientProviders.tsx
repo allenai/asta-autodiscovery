@@ -1,4 +1,3 @@
-
 import { ReactNode } from 'react';
 
 import { Auth0Provider } from '@/contexts/Auth0Context';

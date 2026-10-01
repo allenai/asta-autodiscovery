@@ -33,9 +33,20 @@ export function useSearchParams(): URLSearchParams {
 type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { href: string };
 
 // External and new-tab links stay plain anchors; in-app links use client-side navigation.
-export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link({ href, ...rest }, ref) {
+export const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link(
+    { href, children, ...rest }: LinkProps,
+    ref
+) {
     if (/^[a-z]+:/i.test(href) || rest.target === '_blank') {
-        return <a ref={ref} href={href} {...rest} />;
+        return (
+            <a ref={ref} href={href} {...rest}>
+                {children}
+            </a>
+        );
     }
-    return <RouterLink ref={ref} to={href} {...rest} />;
+    return (
+        <RouterLink ref={ref} to={href} {...rest}>
+            {children}
+        </RouterLink>
+    );
 });

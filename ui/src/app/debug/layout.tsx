@@ -1,4 +1,3 @@
-
 import { Box, styled } from '@mui/material';
 
 import { scrollbarStyles } from '@/utils/scrollbar';

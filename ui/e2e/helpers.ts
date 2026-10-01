@@ -35,10 +35,7 @@ export async function expectExternalLink(
     locator: ReturnType<Page['locator']>,
     domain: string
 ) {
-    const [newPage] = await Promise.all([
-        context.waitForEvent('page'),
-        locator.click(),
-    ]);
+    const [newPage] = await Promise.all([context.waitForEvent('page'), locator.click()]);
     await newPage.waitForLoadState('domcontentloaded');
     expect(newPage.url()).toContain(domain);
     await newPage.close();

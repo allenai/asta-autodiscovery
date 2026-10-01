@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+
 import { expectExternalLink, waitForExperimentsLoaded, AUTH_DOMAIN } from './helpers';
 import {
     TEST_ID_SIGN_IN_BUTTON,
@@ -19,10 +20,7 @@ import {
     TEST_ID_EXPERIMENT_DETAILS_PANEL,
 } from '../src/app/testIds';
 
-const RUN_URLS = [
-    '/shared/samples/nls_bmi',
-    '/runs/shared/353800d1-9e6e-40c1-a241-2169ed1a9b7d',
-];
+const RUN_URLS = ['/shared/samples/nls_bmi', '/runs/shared/353800d1-9e6e-40c1-a241-2169ed1a9b7d'];
 
 for (const url of RUN_URLS) {
     test.describe(`Runs page: ${url}`, () => {
@@ -77,10 +75,9 @@ for (const url of RUN_URLS) {
             const signInBtn = page.locator(`[data-test-id="${TEST_ID_SIGN_IN_BUTTON}"]`);
             await expect(signInBtn).toBeVisible();
 
-            const requestPromise = page.waitForRequest(
-                (req) => req.url().includes(AUTH_DOMAIN),
-                { timeout: 10000 }
-            );
+            const requestPromise = page.waitForRequest((req) => req.url().includes(AUTH_DOMAIN), {
+                timeout: 10000,
+            });
             await signInBtn.click();
             const request = await requestPromise;
             expect(request.url()).toContain(AUTH_DOMAIN);
@@ -199,7 +196,9 @@ for (const url of RUN_URLS) {
             await expect(downloadBtn).toHaveCount(0);
         });
 
-        test('table search for "significant" returns between 1 and total rows', async ({ page }) => {
+        test('table search for "significant" returns between 1 and total rows', async ({
+            page,
+        }) => {
             const table = page.locator(`[data-test-id="${TEST_ID_EXPERIMENTS_TABLE}"]`);
 
             // Wait for job completion — same signal used by the sort test. Without this the

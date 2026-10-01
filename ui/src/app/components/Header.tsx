@@ -1,6 +1,6 @@
-
 import { Box, Button, styled } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
 import { useRouter, usePathname } from '@/router';
 
 import AuthButton from '@/components/AuthButton';

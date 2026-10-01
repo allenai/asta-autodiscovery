@@ -1,6 +1,6 @@
-
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Alert, Button } from '@mui/material';
+
 import { useParams, useRouter } from '@/router';
 
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -11,7 +11,6 @@ import RunSetup from '@/runs/components/RunSetup';
 import RunView from '@/runs/components/RunView';
 import { getRunsApi } from '@/api/RunsApi';
 import { getRunFromApi } from '@/types/Run';
-
 
 /**
  * Individual run page - shows RunSetup or RunView based on run state.

@@ -1,14 +1,13 @@
-
-import { useParams } from '@/router';
 import { useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
+
+import { useParams } from '@/router';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import RunView from '@/runs/components/RunView';
 import { getRunsApi } from '@/api/RunsApi';
-
 
 interface OwnerResult {
     runId: string;

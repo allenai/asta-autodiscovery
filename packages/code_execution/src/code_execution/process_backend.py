@@ -77,9 +77,7 @@ def _find_uv() -> str:
     """Return path to the ``uv`` binary, or raise if not found."""
     uv = shutil.which("uv")
     if uv is None:
-        raise RuntimeError(
-            "uv is required for ProcessIPythonBackend but was not found on PATH"
-        )
+        raise RuntimeError("uv is required for ProcessIPythonBackend but was not found on PATH")
     return uv
 
 

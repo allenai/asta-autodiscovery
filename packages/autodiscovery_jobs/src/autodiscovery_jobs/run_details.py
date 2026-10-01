@@ -17,7 +17,6 @@ from . import keys
 from .config import JobConfig
 from .storage import get_store
 
-
 # Terminal statuses that indicate job completion
 TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "DELETED"}
 
@@ -245,13 +244,11 @@ def refresh_run_status(
         if not run_details.is_finished:  # If already terminal, keep existing status to preserve terminal state (i.e. deleted, cancelled)
             updates["status"] = phase
 
-
         if created_at:
             if isinstance(created_at, datetime):
                 updates["created_at"] = created_at.isoformat()
             else:
                 updates["created_at"] = created_at
-
 
         # Only include finished_at if present and ensure it's formatted correctly
         if finished_at:
@@ -259,7 +256,6 @@ def refresh_run_status(
                 updates["finished_at"] = finished_at.isoformat()
             else:
                 updates["finished_at"] = finished_at
-
 
         # Update run details with new status
         run_details = update_run_details(

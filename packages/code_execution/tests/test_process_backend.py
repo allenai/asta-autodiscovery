@@ -83,11 +83,7 @@ def test_pip_install_does_not_affect_subsequent_cells(tmp_path: Path) -> None:
 
     # Next cell should NOT see the package (per-process temp dir was cleaned up)
     result2 = backend.run_cell(
-        "try:\n"
-        "    import six\n"
-        "    print('FOUND')\n"
-        "except ImportError:\n"
-        "    print('NOT_FOUND')\n"
+        "try:\n    import six\n    print('FOUND')\nexcept ImportError:\n    print('NOT_FOUND')\n"
     )
     assert result2["success"] is True
     assert "NOT_FOUND" in result2["stdout"]

@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 
 from flask import Blueprint, jsonify, request
-
 from utils.auth import PermissionType, requires_auth
 
 from .aggregator import (
@@ -47,10 +46,12 @@ def create() -> Blueprint:
         users = compute_users_list(start_date, end_date)
         cache = get_metrics_cache()
         data = cache.get_data()
-        return jsonify({
-            "users": [u.model_dump() for u in users],
-            "cache_refreshed_at": data.refreshed_at,
-        })
+        return jsonify(
+            {
+                "users": [u.model_dump() for u in users],
+                "cache_refreshed_at": data.refreshed_at,
+            }
+        )
 
     @api.route("/users/<userid>")
     @requires_auth(required_permission=PermissionType.ADMIN.value)
@@ -80,14 +81,16 @@ def create() -> Blueprint:
         cache = get_metrics_cache()
         data = cache.get_data()
         unique_users = len({j.userid for j in data.jobs})
-        return jsonify({
-            "refreshed_at": data.refreshed_at,
-            "job_count": len(data.jobs),
-            "user_count": unique_users,
-            "scan_duration_seconds": data.scan_duration_seconds,
-            "is_refreshing": cache.is_refreshing,
-            "last_error": cache.last_error,
-        })
+        return jsonify(
+            {
+                "refreshed_at": data.refreshed_at,
+                "job_count": len(data.jobs),
+                "user_count": unique_users,
+                "scan_duration_seconds": data.scan_duration_seconds,
+                "is_refreshing": cache.is_refreshing,
+                "last_error": cache.last_error,
+            }
+        )
 
     @api.route("/cache/refresh", methods=["POST"])
     @requires_auth(required_permission=PermissionType.ADMIN.value)

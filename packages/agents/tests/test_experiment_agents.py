@@ -136,7 +136,9 @@ def test_extract_code_handles_payload_types() -> None:
     assert workflow._extract_code("not-json") is None
 
 
-def test_create_code_executor_agent_uses_inprocess_executor(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_code_executor_agent_uses_inprocess_executor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """create_code_executor_agent wires up the InProcessExecutor."""
     monkeypatch.setattr(experiment_agents, "InProcessExecutor", DummyExecutor)
 

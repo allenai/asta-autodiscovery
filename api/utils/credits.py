@@ -119,9 +119,7 @@ class InvalidExperimentCountError(Exception):
 
     def __init__(self, requested: int):
         self.requested = requested
-        self.message = (
-            f"Invalid experiment count: {requested}. Must be greater than 0."
-        )
+        self.message = f"Invalid experiment count: {requested}. Must be greater than 0."
         super().__init__(self.message)
 
 
@@ -272,7 +270,9 @@ def get_user_credits(userid: str, config: JobConfig | None = None) -> UserCredit
                 pending = 0
             return (consumed, pending)
         except Exception as e:
-            logger.warning(f"Failed to get credit contribution for job {job_id} (user {userid}): {e}")
+            logger.warning(
+                f"Failed to get credit contribution for job {job_id} (user {userid}): {e}"
+            )
             return None
 
     # Aggregate credits across all jobs in parallel
@@ -400,10 +400,7 @@ def check_experiment_limits(
 
     # Validation 2: Check n_experiments <= DEFAULT_EXPERIMENT_LIMIT
     if n_experiments > DEFAULT_EXPERIMENT_LIMIT:
-        raise ExperimentLimitExceededError(
-            requested=n_experiments,
-            limit=DEFAULT_EXPERIMENT_LIMIT
-        )
+        raise ExperimentLimitExceededError(requested=n_experiments, limit=DEFAULT_EXPERIMENT_LIMIT)
 
     # Validation 3: Check sufficient credits (existing logic)
     credits = get_user_credits(userid=userid, config=config)

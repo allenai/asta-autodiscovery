@@ -56,7 +56,7 @@ def copy_dataset_to_asta_workspace(
 
     uris: list[str] = []
     for info in source_store.list(source_prefix):
-        filename = info.key[len(source_prefix):]
+        filename = info.key[len(source_prefix) :]
         if not filename or filename == ".placeholder":
             continue
 

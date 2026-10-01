@@ -12,6 +12,7 @@ Required environment variables:
 The client credentials must have the `read:users` scope.
 """
 
+import contextlib
 import json
 import os
 from functools import lru_cache
@@ -38,7 +39,7 @@ def _require_env(name: str) -> str:
     try:
         return os.environ[name]
     except KeyError as e:
-        raise Auth0Error(f"Missing required environment variable: {e}")
+        raise Auth0Error(f"Missing required environment variable: {e}") from e
 
 
 @lru_cache(maxsize=1)
@@ -71,15 +72,13 @@ def _get_management_token() -> str:
     except HTTPError as e:
         # Read response body for more details
         body = ""
-        try:
+        with contextlib.suppress(Exception):
             body = e.read().decode("utf-8")
-        except Exception:
-            pass
         raise Auth0Error(
             f"Failed to get Auth0 management token: {e.code} {e.reason} - {body}"
-        )
+        ) from e
     except Exception as e:
-        raise Auth0Error(f"Failed to get Auth0 management token: {e}")
+        raise Auth0Error(f"Failed to get Auth0 management token: {e}") from e
 
 
 def get_user(userid: str) -> dict[str, Any]:

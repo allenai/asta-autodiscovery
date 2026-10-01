@@ -81,7 +81,7 @@ def should_retry_llm_error(exc: Exception) -> bool:
     return "5xx" in message or "server error" in message
 
 
-def call_with_backoff(
+def call_with_backoff[T](
     func: Callable[[], T],
     *,
     label: str = "LLM request",
@@ -209,14 +209,10 @@ def _is_openai_retryable_error(exc: Exception) -> bool:
         return True
     if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) == 429:
         return True
-    if isinstance(exc, APIStatusError) and getattr(exc, "status_code", None) in {
-        500,
-        502,
-        503,
-        504,
-    }:
-        return True
-    return False
+    return bool(
+        isinstance(exc, APIStatusError)
+        and getattr(exc, "status_code", None) in {500, 502, 503, 504}
+    )
 
 
 def _is_requests_retryable_error(exc: Exception) -> bool:

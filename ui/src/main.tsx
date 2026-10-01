@@ -1,6 +1,7 @@
 import { StrictMode, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Outlet } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 
 import RootLayout from '@/layout';
 import HomePage from '@/page';

@@ -5,7 +5,7 @@ import {
     useNavigate,
     useParams,
     useSearchParams as useRouterSearchParams,
-} from 'react-router-dom';
+} from 'react-router';
 
 export { useParams };
 

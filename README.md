@@ -2,6 +2,8 @@
 
 > AutoDiscovery for Asta
 
+**Live app:** https://autodiscovery.allen.ai — a public deployment of this repo; nearly all the code behind it lives here.
+
 **Documentation:** https://allenai.github.io/asta-autodiscovery
 
 ## Changelog

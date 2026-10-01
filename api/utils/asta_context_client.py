@@ -108,3 +108,34 @@ def upload_json_artifact(
         )
     resp.raise_for_status()
     return resp.json()["path"]
+
+
+def list_owner_artifacts(owner_id: str) -> list[dict]:
+    """List the artifacts recorded under an Asta user (GET /owners/{owner_id}/artifacts)."""
+    resp = requests.get(f"{_base()}/owners/{owner_id}/artifacts", headers=_headers(), timeout=30)
+    resp.raise_for_status()
+    body = resp.json()
+    return body.get("artifacts", []) if isinstance(body, dict) else body
+
+
+def find_owned_artifact(owner_id: str, artifact_id: str) -> dict | None:
+    """Return the artifact only if it belongs to ``owner_id``.
+
+    The service authenticates callers with one shared key and does not check
+    ownership, so resolving an artifact from the owner's own listing is what
+    stops a user importing someone else's artifact by guessing its ID.
+    """
+    for artifact in list_owner_artifacts(owner_id):
+        if str(artifact.get("id")) == artifact_id:
+            return artifact
+    return None
+
+
+def get_download_url(artifact_id: str) -> str:
+    """Return a short-lived download URL for an artifact (GET /artifacts/{id}/download-url)."""
+    resp = requests.get(
+        f"{_base()}/artifacts/{artifact_id}/download-url", headers=_headers(), timeout=30
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    return body.get("download_url") or body["url"]

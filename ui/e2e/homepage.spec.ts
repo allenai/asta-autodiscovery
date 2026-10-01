@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+
 import { expectExternalLink, AUTH_DOMAIN } from './helpers';
 import {
     TEST_ID_SIGN_IN_BUTTON,
@@ -37,10 +38,9 @@ test.describe('Homepage (/runs)', () => {
         await expect(signInBtn).toBeVisible();
 
         // Intercept navigation to auth0 before it completes
-        const requestPromise = page.waitForRequest(
-            (req) => req.url().includes(AUTH_DOMAIN),
-            { timeout: 10000 }
-        );
+        const requestPromise = page.waitForRequest((req) => req.url().includes(AUTH_DOMAIN), {
+            timeout: 10000,
+        });
         await signInBtn.click();
         const request = await requestPromise;
         expect(request.url()).toContain(AUTH_DOMAIN);
@@ -80,10 +80,7 @@ test.describe('Homepage (/runs)', () => {
 
         // Click the link inside it and wait for navigation to a run page
         const link = firstItem.locator('a').first();
-        await Promise.all([
-            page.waitForLoadState('networkidle'),
-            link.click(),
-        ]);
+        await Promise.all([page.waitForLoadState('networkidle'), link.click()]);
         await expect(page).not.toHaveURL('/runs');
         await expect(page.locator('body')).toBeVisible();
     });

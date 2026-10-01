@@ -94,6 +94,7 @@ class AggregatedData:
 # Store helpers
 # ---------------------------------------------------------------------------
 
+
 def _read_json(store: ObjectStore, key: str) -> dict | None:
     """Read and parse a JSON object from the store. Returns None on any error."""
     try:
@@ -132,9 +133,7 @@ def _save_persisted_cache(store: ObjectStore, data: AggregatedData) -> None:
             "scan_duration_seconds": data.scan_duration_seconds,
             "jobs": [dataclasses.asdict(j) for j in data.jobs],
         }
-        store.write_text(
-            PERSIST_BLOB_PATH, json.dumps(payload), content_type="application/json"
-        )
+        store.write_text(PERSIST_BLOB_PATH, json.dumps(payload), content_type="application/json")
         logger.warning(
             f"Persisted metrics cache: {len(data.jobs)} jobs to {store.uri(PERSIST_BLOB_PATH)}"
         )
@@ -186,7 +185,9 @@ def _coerce_nonnegative_int(value: object) -> int:
         return 0
 
 
-def _lookup_bucket_cost_by_type(model_name: str, bucket: dict[str, Any]) -> tuple[float, float, float]:
+def _lookup_bucket_cost_by_type(
+    model_name: str, bucket: dict[str, Any]
+) -> tuple[float, float, float]:
     """Calculate prompt/completion/reasoning costs for one usage bucket."""
     pricing = _lookup_pricing(model_name)
 
@@ -316,6 +317,7 @@ def _derive_requested_experiments(
 # ---------------------------------------------------------------------------
 # Job scanning
 # ---------------------------------------------------------------------------
+
 
 def _count_experiments_inline(
     store: ObjectStore,
@@ -535,6 +537,7 @@ def _scan_all_jobs(
 # Cache
 # ---------------------------------------------------------------------------
 
+
 class MetricsCache:
     """In-memory cache for aggregated metrics data with background refresh."""
 
@@ -669,7 +672,7 @@ class MetricsCache:
         lock_file = None
         try:
             try:
-                lock_file = open(SCAN_LOCK_PATH, "w")
+                lock_file = open(SCAN_LOCK_PATH, "w")  # noqa: SIM115 - held for the scan, closed in finally
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
                 logger.warning(
@@ -736,6 +739,7 @@ def get_metrics_cache() -> MetricsCache:
 # Query helpers
 # ---------------------------------------------------------------------------
 
+
 def _filter_jobs(
     jobs: list[JobSnapshot],
     start_date: str | None = None,
@@ -786,9 +790,7 @@ def compute_overview(
     total_experiments = sum(j.n_experiments_completed for j in jobs)
     total_experiments_requested = sum(j.n_experiments_requested for j in jobs)
     exp_completion_rate = (
-        total_experiments / total_experiments_requested
-        if total_experiments_requested > 0
-        else 0.0
+        total_experiments / total_experiments_requested if total_experiments_requested > 0 else 0.0
     )
 
     # LLM costs
@@ -799,9 +801,7 @@ def compute_overview(
     hypotheses_with_usage = sum(j.n_experiments_completed for j in jobs_with_usage)
     llm_cost_for_hypotheses = sum(j.llm_cost_usd for j in jobs_with_usage)
     cost_per_hypothesis = (
-        llm_cost_for_hypotheses / hypotheses_with_usage
-        if hypotheses_with_usage > 0
-        else None
+        llm_cost_for_hypotheses / hypotheses_with_usage if hypotheses_with_usage > 0 else None
     )
 
     # Share rate
@@ -852,7 +852,9 @@ def compute_overview(
         experiment_completion_rate=round(exp_completion_rate, 4),
         llm_cost_usd=round(total_llm, 4),
         hypotheses_with_usage=hypotheses_with_usage,
-        cost_per_hypothesis_usd=round(cost_per_hypothesis, 4) if cost_per_hypothesis is not None else None,
+        cost_per_hypothesis_usd=round(cost_per_hypothesis, 4)
+        if cost_per_hypothesis is not None
+        else None,
         share_rate=round(share_rate, 4),
         runs_by_status=dict(status_counts),
         time_series=time_series,
@@ -1107,10 +1109,17 @@ def compute_aggregated_usage(
         totals_per_run_costs.append(run_total_cost)
 
     totals_bucket = _build_aggregated_bucket(
-        totals_per_run_tokens, totals_per_run_costs,
-        totals_calls, totals_prompt, totals_completion,
-        totals_reasoning, totals_tokens, totals_cost,
-        totals_prompt_cost, totals_completion_cost, totals_reasoning_cost,
+        totals_per_run_tokens,
+        totals_per_run_costs,
+        totals_calls,
+        totals_prompt,
+        totals_completion,
+        totals_reasoning,
+        totals_tokens,
+        totals_cost,
+        totals_prompt_cost,
+        totals_completion_cost,
+        totals_reasoning_cost,
     )
 
     # --- Breakdown dimensions ---
@@ -1119,16 +1128,21 @@ def compute_aggregated_usage(
         cost_mode: str = "none",
     ) -> dict[str, AggregatedUsageBucket]:
         # Accumulate per-key data across runs
-        key_data: dict[str, dict] = defaultdict(lambda: {
-            "calls": 0, "prompt": 0, "completion": 0, "reasoning": 0,
-            "tokens": 0,
-            "cost": 0.0,
-            "prompt_cost": 0.0,
-            "completion_cost": 0.0,
-            "reasoning_cost": 0.0,
-            "per_run_tokens": [],
-            "per_run_costs": [],
-        })
+        key_data: dict[str, dict] = defaultdict(
+            lambda: {
+                "calls": 0,
+                "prompt": 0,
+                "completion": 0,
+                "reasoning": 0,
+                "tokens": 0,
+                "cost": 0.0,
+                "prompt_cost": 0.0,
+                "completion_cost": 0.0,
+                "reasoning_cost": 0.0,
+                "per_run_tokens": [],
+                "per_run_costs": [],
+            }
+        )
 
         for j in jobs_with_usage:
             dim = j.llm_usage_summary.get(dim_key, {})  # type: ignore[union-attr]
@@ -1180,10 +1194,17 @@ def compute_aggregated_usage(
         result = {}
         for key, d in key_data.items():
             result[key] = _build_aggregated_bucket(
-                d["per_run_tokens"], d["per_run_costs"],
-                d["calls"], d["prompt"], d["completion"],
-                d["reasoning"], d["tokens"], d["cost"],
-                d["prompt_cost"], d["completion_cost"], d["reasoning_cost"],
+                d["per_run_tokens"],
+                d["per_run_costs"],
+                d["calls"],
+                d["prompt"],
+                d["completion"],
+                d["reasoning"],
+                d["tokens"],
+                d["cost"],
+                d["prompt_cost"],
+                d["completion_cost"],
+                d["reasoning_cost"],
             )
         return result
 

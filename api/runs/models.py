@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -103,7 +103,7 @@ class MetadataDatasetModel(BaseModel):
     description: str | None = Field(None, description="Description of the dataset")
     content_type: str | None = Field(None, description="MIME type of the dataset file")
     file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
-    url: Optional[str] = None
+    url: str | None = None
     is_preloaded: bool = Field(False, description="Whether this is a preloaded dataset")
 
 
@@ -157,13 +157,12 @@ class MetadataModel(BaseModel):
 
     # Sharing
     is_shared: bool | None = Field(
-        None, description="Whether the run is shared (viewable by anyone). Missing means not shared."
+        None,
+        description="Whether the run is shared (viewable by anyone). Missing means not shared.",
     )
 
     # Lineage (nested under "lineage" key in metadata.json)
-    parent_run_id: str | None = Field(
-        None, description="ID of the parent run this was forked from"
-    )
+    parent_run_id: str | None = Field(None, description="ID of the parent run this was forked from")
     parent_run_name: str | None = Field(
         None, description="Name of the parent run (denormalized at fork time)"
     )
@@ -188,8 +187,7 @@ class MetadataModel(BaseModel):
                 content_type=ds.get("content_type"),
                 file_size_bytes=ds.get("file_size_bytes"),
                 url=ds.get("url", None),
-                is_preloaded=ds.get("is_preloaded", False)
-
+                is_preloaded=ds.get("is_preloaded", False),
             )
             for ds in datasets_data
         ]
@@ -203,12 +201,10 @@ class MetadataModel(BaseModel):
             is_bookmarked=data.get("is_bookmarked"),
             bookmarked_experiment_ids=data.get("bookmarked_experiment_ids"),
             parent_run_id=(
-                (data.get("lineage") or {}).get("parent_run_id")
-                or data.get("parent_run_id")
+                (data.get("lineage") or {}).get("parent_run_id") or data.get("parent_run_id")
             ),
             parent_run_name=(
-                (data.get("lineage") or {}).get("parent_run_name")
-                or data.get("parent_run_name")
+                (data.get("lineage") or {}).get("parent_run_name") or data.get("parent_run_name")
             ),
             n_experiments=data.get("n_experiments"),
             exploration_weight=data.get("exploration_weight"),
@@ -249,9 +245,15 @@ class RunModel(BaseModel):
     )
     execution_status: dict[str, Any] | None = Field(None, description="Execution status of the run")
     run_metadata: MetadataModel | None = Field(None, description="Metadata associated with the run")
-    max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
-    can_view_datasets: bool = Field(False, description="Bool flag determining if AI1 datasets are visible")
-    can_explore_with_asta: bool = Field(False, description="Bool flag determining if Asta exploration features are visible")
+    max_file_size: str | None = Field(
+        None, description="Maximum file size limit for uploads, if applicable"
+    )
+    can_view_datasets: bool = Field(
+        False, description="Bool flag determining if AI1 datasets are visible"
+    )
+    can_explore_with_asta: bool = Field(
+        False, description="Bool flag determining if Asta exploration features are visible"
+    )
     parent_run_id: str | None = Field(None, description="ID of the parent run this was forked from")
     parent_run_name: str | None = Field(None, description="Name of the parent run")
     dataset_expires_at: str | None = Field(
@@ -294,8 +296,7 @@ class GetRunExperimentsRequestModel(BaseModel):
     """Model for the request to get experiments within a run"""
 
     known_experiment_ids: list[str] = Field(
-        default_factory=list,
-        description="List of experiment IDs the client already has"
+        default_factory=list, description="List of experiment IDs the client already has"
     )
 
 
@@ -346,9 +347,7 @@ class GenerateUploadUrlResponseModel(BaseModel):
             "issue presigned URLs. Clients should not care which."
         ),
     )
-    upload_method: str = Field(
-        "PUT", description="HTTP method to use for the upload request."
-    )
+    upload_method: str = Field("PUT", description="HTTP method to use for the upload request.")
     upload_fields: dict[str, str] | None = Field(
         None,
         description=(
@@ -372,7 +371,9 @@ class CreateRunResponseModel(BaseModel):
     path: str = Field(..., description="GCS path where the run is stored")
     message: str = Field(..., description="Success message")
     run_details: RunDetailsModel = Field(..., description="Initial run details")
-    max_file_size: str | None = Field(None, description="Maximum file size limit for uploads, if applicable")
+    max_file_size: str | None = Field(
+        None, description="Maximum file size limit for uploads, if applicable"
+    )
 
 
 class ForkRunRequestModel(BaseModel):
@@ -482,12 +483,16 @@ class CancelRunResponseModel(BaseModel):
 
     message: str = Field(..., description="Success message confirming cancellation")
 
+
 class BookmarkRunRequestModel(BaseModel):
     """Model for the request to bookmark or unbookmark a run"""
 
     runid: str = Field(..., description="Identifier of the run to bookmark/unbookmark")
     userid: str = Field(..., description="User identifier who owns the run")
-    is_bookmarked: bool = Field(..., description="Whether to bookmark (true) or unbookmark (false) the run")
+    is_bookmarked: bool = Field(
+        ..., description="Whether to bookmark (true) or unbookmark (false) the run"
+    )
+
 
 class BookmarkRunResponseModel(BaseModel):
     """Model for the response when bookmarking/unbookmarking a run"""
@@ -501,8 +506,12 @@ class BookmarkExperimentRequestModel(BaseModel):
 
     runid: str = Field(..., description="Identifier of the run containing the experiment")
     userid: str = Field(..., description="User identifier who owns the run")
-    experiment_id: str = Field(..., description="Identifier of the experiment to bookmark/unbookmark")
-    is_bookmarked: bool = Field(..., description="Whether to bookmark (true) or unbookmark (false) the experiment")
+    experiment_id: str = Field(
+        ..., description="Identifier of the experiment to bookmark/unbookmark"
+    )
+    is_bookmarked: bool = Field(
+        ..., description="Whether to bookmark (true) or unbookmark (false) the experiment"
+    )
 
 
 class BookmarkExperimentResponseModel(BaseModel):
@@ -544,11 +553,15 @@ class AutoDiscoveryContextModel(BaseModel):
     """Context from an AutoDiscovery MCTS node passed to Asta."""
 
     hypothesis: str | None = Field(None, description="Hypothesis generated by the AD agent")
-    experiment_plan: dict[str, Any] | None = Field(None, description="Experiment plan with objective, steps, and deliverables")
+    experiment_plan: dict[str, Any] | None = Field(
+        None, description="Experiment plan with objective, steps, and deliverables"
+    )
     analysis: str | None = Field(None, description="AD agent's interpretation of the result")
     source_code: str | None = Field(None, description="Python code from the selected node")
     stdout: str | None = Field(None, description="Code execution output from the selected node")
-    figure_descriptions: list[str] = Field(default_factory=list, description="Text descriptions of figures produced")
+    figure_descriptions: list[str] = Field(
+        default_factory=list, description="Text descriptions of figures produced"
+    )
 
 
 class ManifestModel(BaseModel):
@@ -556,8 +569,12 @@ class ManifestModel(BaseModel):
 
     query: str = Field(..., description="User's follow-up question")
     description: str | None = Field(None, description="Run description from metadata.json")
-    dataset_description: str | None = Field(None, description="Dataset description from metadata.json")
-    autodiscovery_context: AutoDiscoveryContextModel = Field(..., description="AutoDiscovery experiment context")
+    dataset_description: str | None = Field(
+        None, description="Dataset description from metadata.json"
+    )
+    autodiscovery_context: AutoDiscoveryContextModel = Field(
+        ..., description="AutoDiscovery experiment context"
+    )
 
 
 class DigDeeperRequestModel(BaseModel):

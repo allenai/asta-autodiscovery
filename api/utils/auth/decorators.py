@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from functools import wraps
 
 from flask import g, jsonify, request
@@ -21,7 +22,7 @@ def _establish_user(user: AuthenticatedUser) -> dict:
 
 def requires_auth(
     required_permission=None,
-    check_permissions: list[PermissionType] = [],
+    check_permissions: Sequence[PermissionType] = (),
 ):
     """Require authentication and optionally check specific permissions.
 

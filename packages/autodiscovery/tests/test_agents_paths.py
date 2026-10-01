@@ -48,7 +48,5 @@ def test_transform_and_working_dir_compose_to_absolute() -> None:
     # so it never stacks relative to the subprocess's own cwd.
     working_dir = code_transform_working_dir("process", "work", None)
     transform = SimpleCodeBlockTransform(working_dir=working_dir)
-    content = transform.apply_transform([{"content": json.dumps({"code": "pass"})}])[-1][
-        "content"
-    ]
+    content = transform.apply_transform([{"content": json.dumps({"code": "pass"})}])[-1]["content"]
     assert f"os.chdir('{os.path.abspath('work')}')" in content

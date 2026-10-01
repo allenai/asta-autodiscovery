@@ -1433,7 +1433,7 @@ if __name__ == "__main__":
     root, nodes_by_level = load_mcts_from_json(path)
     belief_kl = []
     prior_posterior = []
-    for level, nodes in nodes_by_level.items():
+    for nodes in nodes_by_level.values():
         for node in nodes:
             if node.prior is not None:
                 belief_cls = BELIEF_MODE_TO_CLS[node.prior.to_dict()["_type"]]
@@ -1463,7 +1463,7 @@ if __name__ == "__main__":
     print(
         f"{'Belief Change':<20} {'KL Divergence':<20} {'Prior Params':<50} {'Posterior Params':<50}"
     )
-    sorted_tuples = sorted(zip(belief_kl, prior_posterior), key=lambda x: x[0][1])
+    sorted_tuples = sorted(zip(belief_kl, prior_posterior, strict=True), key=lambda x: x[0][1])
     for (belief_change, kl_div), (prior_params, posterior_params) in sorted_tuples:
         prior_params_str = ", ".join(f"{p:.2f}" for p in prior_params)
         posterior_params_str = ", ".join(f"{p:.2f}" for p in posterior_params)
@@ -1473,7 +1473,7 @@ if __name__ == "__main__":
 
     print("\n\n")
 
-    sorted_tuples = sorted(zip(belief_kl, prior_posterior), key=lambda x: abs(x[0][0]))
+    sorted_tuples = sorted(zip(belief_kl, prior_posterior, strict=True), key=lambda x: abs(x[0][0]))
     for (belief_change, kl_div), (prior_params, posterior_params) in sorted_tuples:
         prior_params_str = ", ".join(f"{p:.2f}" for p in prior_params)
         posterior_params_str = ", ".join(f"{p:.2f}" for p in posterior_params)

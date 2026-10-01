@@ -1,4 +1,4 @@
-.PHONY: help dev check-model test test-modal test-all lint format type-check sync adk-web serve-docs deploy-docs \
+.PHONY: help dev check-model test test-modal test-all lint lint-fix format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
@@ -31,8 +31,13 @@ test-all: ## Run every test
 	uv run --all-packages pytest $(PYTEST_ARGS)
 
 # Code quality targets
-lint: ## Run Ruff lint with autofix
+lint: ## Run Ruff lint + format checks (no changes)
+	uv run ruff check
+	uv run ruff format --check
+
+lint-fix: ## Apply Ruff autofixes and formatting
 	uv run ruff check --fix
+	uv run ruff format
 
 format: ## Run the Ruff formatter
 	uv run ruff format

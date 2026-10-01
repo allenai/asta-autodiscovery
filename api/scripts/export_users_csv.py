@@ -194,7 +194,7 @@ def generate_user_csv(
         fieldnames += [f"experiments_{d}" for d in sorted_dates]
 
     # Write CSV
-    out = open(output_file, "w", newline="") if output_file else sys.stdout
+    out = open(output_file, "w", newline="") if output_file else sys.stdout  # noqa: SIM115
     try:
         writer = csv.DictWriter(out, fieldnames=fieldnames)
         writer.writeheader()
@@ -219,9 +219,7 @@ def generate_user_csv(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Generate a CSV of all users in the system"
-    )
+    parser = argparse.ArgumentParser(description="Generate a CSV of all users in the system")
     parser.add_argument(
         "--output",
         "-o",

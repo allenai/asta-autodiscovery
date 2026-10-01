@@ -1,5 +1,4 @@
-"""
-User ID instrumentation for logging.
+"""User ID instrumentation for logging.
 
 Injects the authenticated userid into every log record emitted during a request,
 including logs from thread pool workers spawned during that request.

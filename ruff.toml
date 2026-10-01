@@ -3,6 +3,11 @@ line-length = 100
 
 [lint]
 select = ["D", "E", "F", "UP", "B", "SIM", "I", "W", "Q", "ASYNC", "T20", "FA"]
+# Policy (issue #120): `ruff format` owns line length, so E501 only flags long
+# strings/comments it cannot wrap. Docstrings are encouraged but full coverage is
+# not a goal, so missing-docstring (D1) and docstring-shape rules are off; the
+# rest of pydocstyle still applies to docstrings that exist.
+ignore = ["E501", "D1", "D205", "D415", "D417"]
 
 [lint.pydocstyle]
 convention = "google"
@@ -11,3 +16,7 @@ convention = "google"
 "**/tests/*.py" = ["D"]
 "**/report.py" = ["E501", "T20"]
 "scripts/*.py" = ["D", "T20"]
+# CLI entry points and the research loop report progress on stdout by design.
+"api/scripts/*.py" = ["T20"]
+"sonar/*.py" = ["T20"]
+"packages/autodiscovery/src/autodiscovery/*.py" = ["T20"]

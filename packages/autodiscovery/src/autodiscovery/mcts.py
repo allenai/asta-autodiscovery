@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import os
@@ -180,10 +181,8 @@ class MCTSNode:
                     self.tried_experiments.append(new_experiment)
 
             if new_experiment is not None:
-                try:
+                with contextlib.suppress(Exception):
                     new_query = get_query_from_experiment(new_experiment)
-                except:
-                    pass
             if new_query is None:
                 return self.get_next_experiment(
                     experiment_generator=experiment_generator, n_retry=n_retry - 1

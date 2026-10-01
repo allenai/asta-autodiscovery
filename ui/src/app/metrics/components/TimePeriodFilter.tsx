@@ -1,4 +1,3 @@
-
 import { Box, TextField, styled, Button } from '@mui/material';
 
 interface TimePeriodFilterProps {

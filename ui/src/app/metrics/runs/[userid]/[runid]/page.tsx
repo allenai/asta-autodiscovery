@@ -1,8 +1,9 @@
-
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Typography, styled, Button, Chip } from '@mui/material';
-import { useParams, useRouter } from '@/router';
+
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
+import { useParams, useRouter } from '@/router';
 
 import { getMetricsApi } from '@/api/MetricsApi';
 import type { RunMetrics } from '@/types/Metrics';

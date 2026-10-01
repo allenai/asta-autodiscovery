@@ -1,4 +1,3 @@
-
 import { styled } from '@mui/material';
 
 export const SimpleLogo = styled('div')`

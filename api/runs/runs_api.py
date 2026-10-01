@@ -8,7 +8,6 @@ import logging
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, jsonify, request, url_for
 from utils.asta_context_client import is_configured as asta_integration_enabled
@@ -74,11 +73,10 @@ from runs.models import (
 try:
     from autodiscovery_jobs import DATASET_EXPIRY_DAYS, JobConfig, JobManager
     from autodiscovery_jobs.exceptions import (
-        CloudRunError,
         DatasetExpiredError,
-        StorageError,
         JobAlreadyExistsError,
         JobNotFoundError,
+        StorageError,
     )
     from autodiscovery_jobs.persistence import (
         dataset_key,
@@ -101,7 +99,9 @@ except ImportError:
 
 # Max size of files that can be uploaded
 UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
-UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = 100 * 1024 * 1024 * 1024  # 100GB for users with higher upload limit permission
+UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = (
+    100 * 1024 * 1024 * 1024
+)  # 100GB for users with higher upload limit permission
 UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR = "100GB"
 
 # Expiration time for presigned upload URLs
@@ -113,6 +113,7 @@ PUBLIC_USERS = {"samples"}
 # AutoDiscovery's own frontend base URL, used to build a link back to the
 # source experiment when handing a user off to Asta.
 AUTODISCOVERY_BASE_URL = os.environ.get("AUTODISCOVERY_BASE_URL", "https://autodiscovery.allen.ai")
+
 
 def sync_preloaded_dataset(source_gs_url, config, dest_key):
     """Copy a preloaded ``gs://`` dataset into a run's data prefix.
@@ -130,6 +131,7 @@ def sync_preloaded_dataset(source_gs_url, config, dest_key):
     logging.debug(f"DATASET SYNC: {source_gs_url} -> {dest_store.uri(dest_key)}")
     dest_store.import_from_gs(source_gs_url, dest_key)
     logging.debug(f"DATASET SYNC COMPLETE: {dest_key}")
+
 
 def create() -> Blueprint:
     """Create the runs API blueprint.
@@ -183,8 +185,12 @@ def create() -> Blueprint:
             run_details = create_run_details(userid, runid)
 
             # Check if user has HIGHER_UPLOAD_LIMIT permission and return the actual limit
-            has_higher_upload_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
-            max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+            has_higher_upload_limit = getattr(
+                request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False
+            )
+            max_file_size = (
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+            )
 
             resp = CreateRunResponseModel(
                 runid=runid,
@@ -235,20 +241,14 @@ def create() -> Blueprint:
             if manager.job_exists(userid, req.parent_run_id):
                 parent_userid = userid
             else:
-                parent_userid = get_shared_run_index(
-                    req.parent_run_id, manager.config
-                )
+                parent_userid = get_shared_run_index(req.parent_run_id, manager.config)
                 if not parent_userid:
-                    parent_userid = get_userid_for_job(
-                        req.parent_run_id, manager.config
-                    )
+                    parent_userid = get_userid_for_job(req.parent_run_id, manager.config)
             if not parent_userid:
                 return jsonify({"error": "Parent run not found"}), 404
 
             # Read parent metadata once — reused for permission check AND fork
-            parent_metadata = manager.get_metadata(
-                parent_userid, req.parent_run_id
-            )
+            parent_metadata = manager.get_metadata(parent_userid, req.parent_run_id)
             if not parent_metadata:
                 return jsonify({"error": "Parent run not found"}), 404
 
@@ -265,9 +265,7 @@ def create() -> Blueprint:
                 )
 
             # Check parent is not deleted
-            error_resp, status_code = _check_run_not_deleted(
-                parent_userid, req.parent_run_id
-            )
+            error_resp, status_code = _check_run_not_deleted(parent_userid, req.parent_run_id)
             if error_resp:
                 return error_resp, status_code
 
@@ -284,18 +282,14 @@ def create() -> Blueprint:
                 request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False
             )
             max_file_size = (
-                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR
-                if has_higher_upload_limit
-                else None
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
             )
 
             resp = CreateRunResponseModel(
                 runid=result.new_run_id,
                 path=result.path,
                 message="Run forked successfully",
-                run_details=RunDetailsModel(
-                    **result.run_details.to_dict()
-                ),
+                run_details=RunDetailsModel(**result.run_details.to_dict()),
                 max_file_size=max_file_size,
             )
             return jsonify(resp.model_dump()), 200
@@ -451,12 +445,16 @@ def create() -> Blueprint:
                 status_checked_at=run_details.status_checked_at if run_details else None,
                 finished_at=run_details.finished_at_raw if run_details else None,
             )
-            run_stats_model = RunStatsModel(
-                requested_experiments=job_stats.num_experiments_requested,
-                completed_experiments=job_stats.num_experiments_completed,
-                pending_experiments=job_stats.num_experiments_pending,
-                num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
-            ) if job_stats else None
+            run_stats_model = (
+                RunStatsModel(
+                    requested_experiments=job_stats.num_experiments_requested,
+                    completed_experiments=job_stats.num_experiments_completed,
+                    pending_experiments=job_stats.num_experiments_pending,
+                    num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
+                )
+                if job_stats
+                else None
+            )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
 
             # Compute dataset expiry
@@ -476,9 +474,7 @@ def create() -> Blueprint:
                 run_metadata=run_metadata_model,
                 execution_status={},
                 max_file_size=max_file_size,
-                parent_run_id=(
-                    run_metadata_model.parent_run_id if run_metadata_model else None
-                ),
+                parent_run_id=(run_metadata_model.parent_run_id if run_metadata_model else None),
                 parent_run_name=(
                     run_metadata_model.parent_run_name if run_metadata_model else None
                 ),
@@ -500,7 +496,9 @@ def create() -> Blueprint:
                 # First sort key: bookmarked status (True > False with reverse=True)
                 bool(r.run_metadata and r.run_metadata.is_bookmarked),
                 # Second sort key: most recent activity (newer > older with reverse=True)
-                r.run_details.status_checked_at or r.run_details.created_at if r.run_details else "",
+                r.run_details.status_checked_at or r.run_details.created_at
+                if r.run_details
+                else "",
             ),
             reverse=True,
         )
@@ -570,18 +568,24 @@ def create() -> Blueprint:
                 status_checked_at=run_details.status_checked_at if run_details else None,
                 finished_at=run_details.finished_at_raw if run_details else None,
             )
-            run_stats_model = RunStatsModel(
-                requested_experiments=job_stats.num_experiments_requested,
-                completed_experiments=job_stats.num_experiments_completed,
-                pending_experiments=job_stats.num_experiments_pending,
-                num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
-            ) if job_stats else None
+            run_stats_model = (
+                RunStatsModel(
+                    requested_experiments=job_stats.num_experiments_requested,
+                    completed_experiments=job_stats.num_experiments_completed,
+                    pending_experiments=job_stats.num_experiments_pending,
+                    num_surprising_experiments=0,  # TODO: Update when surprising experiments are tracked
+                )
+                if job_stats
+                else None
+            )
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
 
             # Check if user has HIGHER_UPLOAD_LIMIT permission
             permissions = request.user.get("permissions", [])
             has_higher_upload_limit = PermissionType.HIGHER_UPLOAD_LIMIT.value in permissions
-            max_file_size = UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+            max_file_size = (
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR if has_higher_upload_limit else None
+            )
 
             # Check if user has permission for access in the UI
             has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
@@ -605,9 +609,7 @@ def create() -> Blueprint:
                 # Not permission-gated; gated only on whether this deployment
                 # has an Asta context service configured.
                 can_explore_with_asta=asta_integration_enabled(),
-                parent_run_id=(
-                    run_metadata_model.parent_run_id if run_metadata_model else None
-                ),
+                parent_run_id=(run_metadata_model.parent_run_id if run_metadata_model else None),
                 parent_run_name=(
                     run_metadata_model.parent_run_name if run_metadata_model else None
                 ),
@@ -783,13 +785,15 @@ def create() -> Blueprint:
         try:
             req = GenerateUploadUrlRequestModel(runid=runid, userid=userid, **data)
         except Exception as e:
-            raise BadRequest(f"Invalid request body: {e}")
+            raise BadRequest(f"Invalid request body: {e}") from e
 
         try:
             # Validate file size - use higher limit for users with permission
             has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
             max_file_size = (
-                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES if has_higher_limit else UPLOAD_MAX_FILE_SIZE_BYTES
+                UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
+                if has_higher_limit
+                else UPLOAD_MAX_FILE_SIZE_BYTES
             )
 
             if req.file_size_bytes < 0:
@@ -881,7 +885,7 @@ def create() -> Blueprint:
                 metadata=MetadataModel.from_dict(metadata_data),
             )
         except Exception as e:
-            raise BadRequest(f"Invalid request body: {e}")
+            raise BadRequest(f"Invalid request body: {e}") from e
 
         try:
             manager = get_job_manager()
@@ -993,8 +997,12 @@ def create() -> Blueprint:
                             dest_key=dataset_key(req.userid, req.runid, filename),
                         )
                     except Exception as e:
-                        current_app.logger.error(f"Failed to sync preloaded dataset {filename}: {e}")
-                        return jsonify({"error": f"Failed to prepare preloaded dataset: {str(e)}"}), 500
+                        current_app.logger.error(
+                            f"Failed to sync preloaded dataset {filename}: {e}"
+                        )
+                        return jsonify(
+                            {"error": f"Failed to prepare preloaded dataset: {str(e)}"}
+                        ), 500
 
             intent = metadata.get("intent", "")
             n_experiments = metadata.get("n_experiments")
@@ -1058,9 +1066,7 @@ def create() -> Blueprint:
             return jsonify(resp.model_dump()), 200
 
         except InvalidExperimentCountError as e:
-            return jsonify(
-                {"error": e.message, "requested": e.requested}
-            ), 400  # Bad Request
+            return jsonify({"error": e.message, "requested": e.requested}), 400  # Bad Request
 
         except ExperimentLimitExceededError as e:
             return jsonify(
@@ -1162,7 +1168,9 @@ def create() -> Blueprint:
 
         # Load experiment tree and convert to models
         tree = ExperimentTree.load(userid=userid, jobid=runid, config=job_manager.config)
-        experiment_nodes = tree.to_experiment_models(exclude_experiment_ids=req.known_experiment_ids)
+        experiment_nodes = tree.to_experiment_models(
+            exclude_experiment_ids=req.known_experiment_ids
+        )
         experiment_models = [ExperimentModel(**node) for node in experiment_nodes]
 
         resp = GetRunExperimentsResponseModel(
@@ -1196,7 +1204,9 @@ def create() -> Blueprint:
             return error_response, status_code
 
         job_manager = get_job_manager()
-        node = ExperimentTree.load_node(userid=userid, jobid=runid, experiment_id=experiment_id, config=job_manager.config)
+        node = ExperimentTree.load_node(
+            userid=userid, jobid=runid, experiment_id=experiment_id, config=job_manager.config
+        )
 
         experiment_node = node.to_dict(include_code=True) if node else None
         if experiment_node and node:
@@ -1310,7 +1320,7 @@ def create() -> Blueprint:
                 runid=runid, userid=userid, is_bookmarked=data["is_bookmarked"]
             )
         except Exception as e:
-            raise BadRequest(f"Invalid request body: {e}")
+            raise BadRequest(f"Invalid request body: {e}") from e
 
         try:
             manager = get_job_manager()
@@ -1328,7 +1338,9 @@ def create() -> Blueprint:
 
             resp = BookmarkRunResponseModel(
                 is_bookmarked=req.is_bookmarked,
-                message="Run bookmarked successfully" if req.is_bookmarked else "Run unbookmarked successfully",
+                message="Run bookmarked successfully"
+                if req.is_bookmarked
+                else "Run unbookmarked successfully",
             )
             return jsonify(resp.model_dump()), 200
 
@@ -1371,7 +1383,7 @@ def create() -> Blueprint:
                 is_bookmarked=data["is_bookmarked"],
             )
         except Exception as e:
-            raise BadRequest(f"Invalid request body: {e}")
+            raise BadRequest(f"Invalid request body: {e}") from e
 
         try:
             manager = get_job_manager()
@@ -1427,11 +1439,9 @@ def create() -> Blueprint:
             raise BadRequest("is_shared is required")
 
         try:
-            req = ShareRunRequestModel(
-                runid=runid, userid=userid, is_shared=data["is_shared"]
-            )
+            req = ShareRunRequestModel(runid=runid, userid=userid, is_shared=data["is_shared"])
         except Exception as e:
-            raise BadRequest(f"Invalid request body: {e}")
+            raise BadRequest(f"Invalid request body: {e}") from e
 
         try:
             manager = get_job_manager()
@@ -1479,10 +1489,7 @@ def create() -> Blueprint:
                 # Return 404 in both cases to prevent information leakage
                 return jsonify({"error": "Shared run not found"}), 404
 
-            resp = GetSharedRunOwnerResponseModel(
-                runid=req.runid,
-                userid=userid
-            )
+            resp = GetSharedRunOwnerResponseModel(runid=req.runid, userid=userid)
             return jsonify(resp.model_dump()), 200
 
         except Exception as e:
@@ -1546,7 +1553,9 @@ def create() -> Blueprint:
         # Extract figure descriptions from rich outputs on the target node
         figure_descriptions: list[str] = []
         try:
-            rich_outputs = read_rich_outputs(userid, runid, target_node.level, target_node.index, config)
+            rich_outputs = read_rich_outputs(
+                userid, runid, target_node.level, target_node.index, config
+            )
             for i, bundle in enumerate(rich_outputs):
                 text = bundle.get("text/plain") or bundle.get("text/markdown")
                 figure_descriptions.append(text.strip() if text else f"Figure {i + 1}")
@@ -1597,9 +1606,7 @@ def create() -> Blueprint:
                     )
 
         if userinfo is None:
-            current_app.logger.error(
-                "Could not fetch Auth0 userinfo for user %s", auth0_user_id
-            )
+            current_app.logger.error("Could not fetch Auth0 userinfo for user %s", auth0_user_id)
             return jsonify({"error": "Failed to fetch user profile from Auth0"}), 502
 
         email = userinfo.get("email", "")
@@ -1617,7 +1624,9 @@ def create() -> Blueprint:
             current_app.logger.error("Asta login failed: %s", e)
             return jsonify({"error": "Failed to authenticate with Asta"}), 502
 
-        autodiscovery_link = f"{AUTODISCOVERY_BASE_URL}/runs/{runid}?exp={target_node.creation_idx - 1}"
+        autodiscovery_link = (
+            f"{AUTODISCOVERY_BASE_URL}/runs/{runid}?exp={target_node.creation_idx - 1}"
+        )
 
         try:
             thread_id = asta_client.create_thread(token, autodiscovery_link=autodiscovery_link)
@@ -1646,8 +1655,12 @@ def create() -> Blueprint:
 
         # Copy dataset files — required for Asta to load the data.
         try:
-            dataset_uris = asta_gcs.copy_dataset_to_asta_workspace(userid, runid, user_uuid, thread_id, config)
-            current_app.logger.info("Copied %d dataset file(s) to Asta workspace", len(dataset_uris))
+            dataset_uris = asta_gcs.copy_dataset_to_asta_workspace(
+                userid, runid, user_uuid, thread_id, config
+            )
+            current_app.logger.info(
+                "Copied %d dataset file(s) to Asta workspace", len(dataset_uris)
+            )
         except Exception as e:
             current_app.logger.error("Dataset copy failed: %s", e)
             return jsonify({"error": "Failed to copy dataset to Asta workspace"}), 500
@@ -1671,7 +1684,9 @@ def create() -> Blueprint:
             current_app.logger.error("A2A message failed (non-fatal): %s", e)
 
         return jsonify(
-            DigDeeperResponseModel(asta_url=asta_url, manifest_gcs_uri=manifest_gcs_uri).model_dump()
+            DigDeeperResponseModel(
+                asta_url=asta_url, manifest_gcs_uri=manifest_gcs_uri
+            ).model_dump()
         ), 200
 
     return api

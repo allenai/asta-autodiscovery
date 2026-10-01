@@ -12,9 +12,8 @@ import asyncio
 import json
 from types import SimpleNamespace
 
-import pytest
-
 import autodiscovery.agents as agents_module
+import pytest
 from autodiscovery.agents import (
     SandboxCodeExecutor,
     SimpleCodeBlockTransform,

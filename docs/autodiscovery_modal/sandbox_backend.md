@@ -34,6 +34,12 @@ asyncio.run(main())
 
 ### Execution with a GCS bucket mount
 
+Mount a store prefix at its store-shaped path: key `users/<uid>/...` at
+`/mnt/data/users/<uid>/...`, the same path the job containers see it at. AutoDiscovery's
+modal backend mounts the run's `users/<uid>/jobs/<jid>/data/` prefix this way, sets
+`DATASET_ROOT` to it, and `chdir`s into it before each cell so generated code can open
+datasets by bare filename.
+
 ```python
 import asyncio
 import modal
@@ -42,9 +48,9 @@ from autodiscovery_modal import ModalEphemeralExecutor, CloudShare, build_sandbo
 image = build_sandbox_image(extra_packages=["pandas"])
 
 cloud_share = CloudShare(
-    dest="/data",
+    dest="/mnt/data/users/u1/jobs/j1/data",
     bucket="my-bucket",
-    key_prefix="datasets/my-dataset/",
+    key_prefix="users/u1/jobs/j1/data/",
     read_only=True,
     bucket_endpoint_url="https://storage.googleapis.com",
     modal_secret=modal.Secret.from_name("gcs-my-bucket"),
@@ -53,7 +59,7 @@ cloud_share = CloudShare(
 executor = ModalEphemeralExecutor(
     app_name="my-app",
     image=image,
-    environment={"DATASET_ROOT": "/data"},
+    environment={"DATASET_ROOT": "/mnt/data/users/u1/jobs/j1/data"},
 )
 
 async def main():

@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 
-import pytest
 from autodiscovery.agents import (
     STORE_MOUNT_ROOT,
     SimpleCodeBlockTransform,
@@ -31,8 +30,9 @@ def test_store_mount_path_root_prefix() -> None:
 
 
 def test_store_mount_root_matches_job_backends() -> None:
-    base = pytest.importorskip("autodiscovery_jobs.backends.base")
-    assert STORE_MOUNT_ROOT == base.JOB_MOUNT_ROOT
+    from autodiscovery_jobs.backends.base import JOB_MOUNT_ROOT
+
+    assert STORE_MOUNT_ROOT == JOB_MOUNT_ROOT
 
 
 def test_working_dir_modal_uses_mount_path() -> None:

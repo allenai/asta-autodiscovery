@@ -17,7 +17,7 @@ Usage:
     uv run python api/scripts/grant_credits.py --dry-run
     uv run python api/scripts/grant_credits.py --userid "google-oauth2|123"
 
-Requires GCS_BUCKET, GCP_PROJECT and GCS credentials.
+Requires STORAGE_BACKEND=gcs, GCS_BUCKET, GCP_PROJECT and GCS credentials.
 """
 
 import argparse
@@ -29,7 +29,7 @@ from typing import Any
 
 from autodiscovery_jobs import JobConfig
 from autodiscovery_jobs.client import get_storage_client
-from autodiscovery_jobs.gcs import list_user_ids
+from autodiscovery_jobs.persistence import list_user_ids
 from autodiscovery_jobs.user_profile import get_user_profile_path
 from google.api_core.exceptions import PreconditionFailed
 from google.cloud.storage import Bucket
@@ -190,6 +190,11 @@ def main() -> int:
     args = parser.parse_args()
 
     config = JobConfig.from_env()
+    # Profiles are read and written in GCS directly, so the user listing must
+    # come from the same bucket rather than the default local store.
+    if config.storage_backend != "gcs":
+        logger.error(f"STORAGE_BACKEND must be gcs, got {config.storage_backend!r}")
+        return 1
 
     logger.info("=" * 60)
     logger.info("Credit Grant")

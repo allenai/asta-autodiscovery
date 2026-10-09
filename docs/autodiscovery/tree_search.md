@@ -73,7 +73,7 @@ Candidates are ranked with the standard **UCB1** formula:
 
 $$
 \text{UCB1}(n) = \underbrace{\frac{\text{value}_n}{\text{visits}_n}}_{\text{average surprise}}
-\; + \; c \cdot \underbrace{\sqrt{\frac{2 \ln \text{visits}_{\text{parent}}}{\text{visits}_n}}}_{\text{bonus for being under-explored}}
++ c \cdot \underbrace{\sqrt{\frac{2 \ln(\text{visits}_{\text{parent}})}{\text{visits}_n}}}_{\text{bonus for being under-explored}}
 $$
 
 - The first term rewards branches that have been surprising so far.

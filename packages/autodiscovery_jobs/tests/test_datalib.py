@@ -88,18 +88,17 @@ def test_build_job_args_datalib_dirs_at_store_paths(code_backend):
 
     assert "--datalib_dir=/mnt/data/users/u1/datalib/census" in args
     assert "--datalib_dir=/mnt/data/users/u1/datalib/atlas" in args
-    assert not any(a.startswith("--store_") for a in args)
     assert not any(a.startswith("--datalib_dirs") for a in args)
 
 
-def test_build_job_args_datalib_dirs_modal_gets_store_mapping():
+def test_build_job_args_datalib_dirs_modal():
     config = JobConfig(bucket="test-bucket", code_execution_backend="modal")
 
     args = build_job_args("u1", "j1", config, n_experiments=3, datalib_dirs=["census"])
 
+    # The job derives each directory's gs:// source from --bucket_path's bucket.
     assert "--datalib_dir=/mnt/data/users/u1/datalib/census" in args
-    assert "--store_root=/mnt/data" in args
-    assert "--store_uri=gs://test-bucket" in args
+    assert "--bucket_path=gs://test-bucket/users/u1/jobs/j1/data" in args
 
 
 def test_build_job_args_without_datalib_is_unchanged():

@@ -80,36 +80,21 @@ def test_manifest_requires_a_directory(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Store path -> gs:// source
+# Store path -> object key
 # ---------------------------------------------------------------------------
 
 
-def test_gs_source_maps_the_path_by_key():
-    assert datalib.gs_source("/mnt/data/users/u1/datalib/census", "/mnt/data", "gs://bucket") == (
-        "bucket",
-        "users/u1/datalib/census/",
+def test_store_key_prefix_maps_the_path_by_key():
+    assert (
+        datalib.store_key_prefix("/mnt/data/users/u1/datalib/census", "/mnt/data/")
+        == "users/u1/datalib/census/"
     )
 
 
-def test_gs_source_with_a_prefixed_store_uri():
-    assert datalib.gs_source("/mnt/data/users/u1/datalib/x", "/mnt/data/", "gs://b/root/") == (
-        "b",
-        "root/users/u1/datalib/x/",
-    )
-
-
-@pytest.mark.parametrize(
-    "path,root,uri",
-    [
-        ("/elsewhere/x", "/mnt/data", "gs://b"),
-        ("/mnt/data/../etc", "/mnt/data", "gs://b"),
-        ("/mnt/data", "/mnt/data", "gs://b"),
-        ("/mnt/data/x", "/mnt/data", "s3://b"),
-    ],
-)
-def test_gs_source_rejects_paths_outside_the_store(path, root, uri):
+@pytest.mark.parametrize("path", ["/elsewhere/x", "/mnt/data/../etc", "/mnt/data"])
+def test_store_key_prefix_rejects_paths_outside_the_store(path):
     with pytest.raises(ValueError):
-        datalib.gs_source(path, root, uri)
+        datalib.store_key_prefix(path, "/mnt/data")
 
 
 # ---------------------------------------------------------------------------
@@ -249,25 +234,11 @@ def test_modal_mounts_datalib_dirs_read_only_at_the_same_path(tmp_path, fake_mod
         backend="modal",
         bucket_path="gs://bucket/users/u1/jobs/j1/data",
         datalib_dirs=[path],
-        store_root="/mnt/data",
-        store_uri="gs://bucket",
     )
 
     uploads, library_share = fake_modal[0].shares
-    assert uploads.dest == "/data"  # unchanged
+    assert uploads.dest == "/mnt/data/users/u1/jobs/j1/data"
     assert library_share.dest == path
     assert library_share.bucket == "bucket"
     assert library_share.key_prefix == "users/u1/datalib/census/"
     assert library_share.read_only is True
-
-
-def test_modal_datalib_requires_the_store_mapping(tmp_path, fake_modal):
-    with pytest.raises(ValueError, match="store_root and store_uri"):
-        get_agents(
-            str(tmp_path),
-            model_name=_MODEL,
-            vision_model=_MODEL,
-            backend="modal",
-            bucket_path="gs://bucket/users/u1/jobs/j1/data",
-            datalib_dirs=["/mnt/data/users/u1/datalib/census"],
-        )

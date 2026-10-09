@@ -151,14 +151,10 @@ def build_job_args(
         args.append(f"--bucket_path=gs://{config.bucket}/{job_base}/data")
 
     # Data-library directories, as store-shaped paths under the mount root. The
-    # job backend is responsible for making them readable there; for the modal
-    # sandbox, --store_root/--store_uri let the job derive each directory's
-    # gs:// source by the same key.
+    # job backend makes them readable there; the modal sandbox mounts each from
+    # the bucket by the key its path implies, like the run's own data.
     for dirname in datalib_dirs or []:
         args.append(f"--datalib_dir={datalib_mount_path(userid, dirname)}")
-    if datalib_dirs and code_backend == "modal":
-        args.append(f"--store_root={JOB_MOUNT_ROOT}")
-        args.append(f"--store_uri=gs://{config.bucket}")
 
     args.append(f"--model={model}")
     for role, role_model in role_models.items():

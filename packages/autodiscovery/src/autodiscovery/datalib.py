@@ -196,24 +196,17 @@ def prompt_note(paths: list[str]) -> str:
     )
 
 
-def gs_source(path: str, store_root: str, store_uri: str) -> tuple[str, str]:
-    """Map a store-shaped local path to the ``(bucket, key_prefix)`` it mirrors.
+def store_key_prefix(path: str, store_root: str) -> str:
+    """Return the object-key prefix a store-shaped local path mirrors.
 
-    ``store_root`` is where the store is mounted (e.g. ``/mnt/data``) and
-    ``store_uri`` the ``gs://bucket`` it mirrors, so ``/mnt/data/users/u/datalib/x``
-    maps to ``("bucket", "users/u/datalib/x/")``.
+    The inverse of mounting a key at ``<store_root>/<key>``: with the store at
+    ``/mnt/data``, ``/mnt/data/users/u/datalib/x`` is ``users/u/datalib/x/``.
 
     Raises:
-        ValueError: If ``path`` is not under ``store_root`` or ``store_uri`` is
-            not a ``gs://`` URI.
+        ValueError: If ``path`` is not strictly under ``store_root``.
     """
-    if not store_uri.startswith("gs://"):
-        raise ValueError(f"--store_uri must be a gs:// URI, got {store_uri!r}")
     root = os.path.normpath(store_root)
     norm = os.path.normpath(path)
     if os.path.commonpath([root, norm]) != root or norm == root:
-        raise ValueError(f"Data library directory {path!r} is not under --store_root {root!r}")
-    bucket, _, base = store_uri[len("gs://") :].partition("/")
-    rel = os.path.relpath(norm, root)
-    key_prefix = f"{base.strip('/')}/{rel}/" if base.strip("/") else f"{rel}/"
-    return bucket, key_prefix
+        raise ValueError(f"Data library directory {path!r} is not under {root!r}")
+    return f"{os.path.relpath(norm, root)}/"

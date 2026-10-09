@@ -45,8 +45,8 @@ scoped to the user. That is an existing property of the Cloud Run job definition
 something this feature introduces; code running in a Modal sandbox sees only its
 read-only shares.
 
-The Modal sandbox still mounts a run's *uploads* at `/data`, the one place the layout
-rule is not yet followed; aligning it is tracked separately.
+The Modal sandbox mounts a run's uploads by the same rule (#117), so every path a run
+sees, in every environment, is the store key under `/mnt/data`.
 
 ## How a run describes the library to the agents
 
@@ -89,7 +89,7 @@ in place and can change between runs, so this records what a given run was shown
 | Persistence / `JobManager` | `list_datalib_dirs(userid)` → `DatalibDir(name, description)`; `missing_datalib_dirs(userid, names)`. |
 | API | `GET /api/user/me/datalib` → `{"dirs": [{"name", "description"}]}`. Run metadata gains `datalib_dirs: [name, ...]`. |
 | Submit | Checks every selected directory exists in the **submitting user's** library (400 otherwise), and that the run has at least one dataset or directory. |
-| Job args | `--datalib_dir=/mnt/data/users/<uid>/datalib/<dir>`, repeatable. With `modal`, also `--store_root=/mnt/data --store_uri=gs://<bucket>`, from which the job derives each directory's `gs://` source by the same key. |
+| Job args | `--datalib_dir=/mnt/data/users/<uid>/datalib/<dir>`, repeatable. With `modal`, the job mounts each from the `--bucket_path` bucket under the key its path implies, as it does the run's own data. |
 | Fork | Keeps `datalib_dirs` when the owner forks their own run; drops them when another user forks a shared run, since the names refer to the owner's library. A run with only data-library directories has no uploads to copy, so it can be forked without them. |
 | Dataset expiry | Expiry deletes a run's own uploads only, so a run with only data-library directories reports no expiry. |
 | UI | A "Data library" multi-select in run setup (shown when the user has any directories), with each README as secondary text; the run's parameters view lists the selection. |

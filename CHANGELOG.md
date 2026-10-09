@@ -17,8 +17,9 @@ A directory may hold any number of datasets in any layout; its `README.md`, if
 present, describes it. The agents are shown each directory's README and a
 bounded view of its file tree, the first experiment surveys it, and the manifest
 is saved to `datalib_manifest.json` in the output directory. With
-`--backend modal`, `--store_root` and `--store_uri` say which `gs://` location a
-local path mirrors, so the sandbox mounts it read-only at the same path.
+`--backend modal`, a directory under `/mnt/data` is mounted read-only in the
+sandbox at the same path, from the `--bucket_path` bucket by the key its path
+implies.
 
 Without `--datalib_dir`, prompts and the first experiment are unchanged.
 

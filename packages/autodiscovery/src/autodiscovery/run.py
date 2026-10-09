@@ -327,8 +327,6 @@ def run_mcts(
     backend="process",
     bucket_path=None,
     datalib_dirs=None,
-    store_root=None,
-    store_uri=None,
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
@@ -374,8 +372,6 @@ def run_mcts(
         backend: Code execution backend (local, process, or modal).
         bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/).
         datalib_dirs: Read-only data-library directories available to the run's code.
-        store_root: Local mount point of the store the datalib paths are under (modal only).
-        store_uri: gs:// URI that ``store_root`` mirrors (modal only).
         vision_model: Model used for image analysis in code execution.
         batch_size: Number of nodes to select and expand per iteration.
         n_threads: Number of threads to use for parallel node expansion.
@@ -459,8 +455,6 @@ def run_mcts(
                 bucket_path=bucket_path,
                 dataset_paths=dataset_paths,
                 datalib_dirs=datalib_dirs,
-                store_root=store_root,
-                store_uri=store_uri,
                 vision_model=vision_model,
                 usage_tracker=usage_tracker,
             )
@@ -756,8 +750,6 @@ def run_mcts(
                             bucket_path=bucket_path,
                             dataset_paths=dataset_paths,
                             datalib_dirs=datalib_dirs,
-                            store_root=store_root,
-                            store_uri=store_uri,
                             vision_model=vision_model,
                             usage_tracker=usage_tracker,
                         )
@@ -811,8 +803,6 @@ def run_mcts(
                         bucket_path=bucket_path,
                         dataset_paths=dataset_paths,
                         datalib_dirs=datalib_dirs,
-                        store_root=store_root,
-                        store_uri=store_uri,
                         vision_model=vision_model,
                         usage_tracker=usage_tracker,
                     )
@@ -1104,8 +1094,6 @@ def main(args):
         backend=args.backend,
         bucket_path=args.bucket_path,
         datalib_dirs=args.datalib_dir,
-        store_root=args.store_root,
-        store_uri=args.store_uri,
         vision_model=args.vision_model,
         batch_size=args.batch_size,
         n_threads=args.n_threads,

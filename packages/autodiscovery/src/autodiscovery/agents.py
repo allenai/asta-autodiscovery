@@ -554,8 +554,6 @@ def get_agents(
     bucket_path=None,
     dataset_paths=None,
     datalib_dirs=None,
-    store_root=None,
-    store_uri=None,
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
@@ -575,9 +573,6 @@ def get_agents(
         dataset_paths: Optional dataset paths (reserved for future use).
         datalib_dirs: Read-only data-library directories the code may read, as
             absolute paths. The modal backend mounts each at the same path.
-        store_root: Local mount point of the store ``datalib_dirs`` are under
-            (required for modal when ``datalib_dirs`` is set).
-        store_uri: ``gs://`` URI that ``store_root`` mirrors (likewise).
         vision_model: Vision model for plot analysis, as litellm's
             ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
@@ -790,25 +785,19 @@ def install(package):
             sandbox_timeout_s=code_timeout + _SANDBOX_OVERHEAD_S,
         )
         # Each data-library directory, read-only, at the same path it has in the
-        # job container, so the paths the agents were given work here too.
-        datalib_shares = []
-        for path in datalib_dirs:
-            if not (store_root and store_uri):
-                raise ValueError(
-                    "store_root and store_uri are required with datalib_dirs "
-                    "when backend is 'modal'"
-                )
-            dl_bucket, dl_prefix = datalib.gs_source(path, store_root, store_uri)
-            datalib_shares.append(
-                CloudShare(
-                    dest=path,
-                    bucket=dl_bucket,
-                    key_prefix=dl_prefix,
-                    read_only=True,
-                    bucket_endpoint_url=bucket_endpoint_url,
-                    modal_secret=modal.Secret.from_name(secret_name),
-                )
+        # job container, so the paths the agents were given work here too. Like
+        # the run's data, it is in the bucket under the key its path implies.
+        datalib_shares = [
+            CloudShare(
+                dest=path,
+                bucket=bucket_name,
+                key_prefix=datalib.store_key_prefix(path, STORE_MOUNT_ROOT),
+                read_only=True,
+                bucket_endpoint_url=bucket_endpoint_url,
+                modal_secret=modal.Secret.from_name(secret_name),
             )
+            for path in datalib_dirs
+        ]
         _run_async(modal_executor.add_shares(cloud_share, *datalib_shares))
 
         executor = SandboxCodeExecutor(

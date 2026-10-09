@@ -217,9 +217,7 @@ def test_list_by_prefix(store):
     assert keys == {"users/u1/jobs/j1/metadata.json", "users/u1/jobs/j1/output/a.json"}
 
     # A prefix that is not a directory boundary still filters correctly.
-    assert {i.key for i in store.list("users/u1/jobs/j1/met")} == {
-        "users/u1/jobs/j1/metadata.json"
-    }
+    assert {i.key for i in store.list("users/u1/jobs/j1/met")} == {"users/u1/jobs/j1/metadata.json"}
 
 
 def test_list_empty_prefix_lists_everything(store):

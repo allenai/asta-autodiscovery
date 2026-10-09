@@ -89,6 +89,7 @@ def compute_and_store_reward(
     belief_mode,
     use_binary_reward,
     all_surprisals=None,
+    nodes_by_level=None,
     use_online_beliefs=False,
     evidence_weight=1.0,
     kl_scale=20.0,
@@ -108,7 +109,9 @@ def compute_and_store_reward(
         surprisal_width: Width threshold for binary surprisal.
         belief_mode: Belief elicitation mode.
         use_binary_reward: Whether to compute binary reward.
-        all_surprisals: Running list of surprising nodes.
+        all_surprisals: Running list of (level, node_idx) tuples of surprising nodes.
+        nodes_by_level: Tree nodes keyed by level, used to resolve ``all_surprisals``.
+            Required when ``use_online_beliefs`` is set and ``all_surprisals`` is non-empty.
         use_online_beliefs: Whether to condition prior on prior surprising nodes.
         evidence_weight: Weight for current evidence in posterior update.
         kl_scale: Scale factor for KL reward normalization.
@@ -122,19 +125,22 @@ def compute_and_store_reward(
     # If there are past surprisal, computed the s-conditioned prior
     if all_surprisals is not None and len(all_surprisals) > 0 and use_online_beliefs:
         # Build evidence message for prior belief elicitation
+        if nodes_by_level is None:
+            raise ValueError("nodes_by_level is required to condition on prior surprisals")
+        prior_nodes = [nodes_by_level[level][idx] for level, idx in all_surprisals]
         evidence_msg = [
             {
                 "role": "user",
                 "content": "Previous study:\n\n"
                 + get_context_string(
-                    hyp_exp_query=f"Hypothesis: {nodes_by_level[level_index[0]][level_index[1]].hypothesis}",
-                    analysis=nodes_by_level[level_index[0]][level_index[1]].analysis,
-                    review=nodes_by_level[level_index[0]][level_index[1]].review,
-                    belief_mean=nodes_by_level[level_index[0]][level_index[1]].posterior.mean,
+                    hyp_exp_query=f"Hypothesis: {prior.hypothesis}",
+                    analysis=prior.analysis,
+                    review=prior.review,
+                    belief_mean=prior.posterior.mean,
                     include_code_output=False,
                 ),
             }
-            for level_index in all_surprisals
+            for prior in prior_nodes
         ]
         try:
             pt_prior, s_conditioned_prior, _, _ = calculate_prior_and_posterior_beliefs(
@@ -526,7 +532,7 @@ def run_mcts(
                 is_threaded=False,
             ):
                 print(
-                    f"({inbatch_idx + 1}/{len(next_nodes)}): "
+                    f"({inbatch_idx + 1}/{len(next_nodes)}): "  # noqa: B023
                     f"EXPANDING NODE {node.level}_{node.node_idx}\n"
                     "==========================\n"
                 )
@@ -649,9 +655,9 @@ def run_mcts(
                     # Get messages starting from the current query and update the node
                     node.messages = get_msgs_from_latest_query(groupchat.messages)
                     node.read_experiment_from_messages(
-                        store_new_experiments=False
-                        if node.level == 1 and _warmstart_experiments is not None
-                        else True
+                        store_new_experiments=not (
+                            node.level == 1 and _warmstart_experiments is not None
+                        )
                     )
                     rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
                     _write_rich_outputs(node.level, node.node_idx, rich_outputs)
@@ -669,6 +675,7 @@ def run_mcts(
                             belief_mode,
                             use_binary_reward,
                             all_surprisals,
+                            nodes_by_level=nodes_by_level,
                             use_online_beliefs=use_online_beliefs,
                             evidence_weight=evidence_weight,
                             kl_scale=kl_scale,
@@ -726,17 +733,17 @@ def run_mcts(
                 thread_local = threading.local()
 
                 def _get_node_idx(new_level):
-                    with index_lock:
-                        new_node_idx = next_node_idx_by_level[new_level]
-                        next_node_idx_by_level[new_level] += 1
+                    with index_lock:  # noqa: B023
+                        new_node_idx = next_node_idx_by_level[new_level]  # noqa: B023
+                        next_node_idx_by_level[new_level] += 1  # noqa: B023
                     return new_node_idx
 
                 def _get_thread_agents():
-                    if not hasattr(thread_local, "agent_objs"):
+                    if not hasattr(thread_local, "agent_objs"):  # noqa: B023
                         thread_id = threading.get_ident()
                         thread_work_dir = os.path.join(work_dir, f"thread_{thread_id}")
                         os.makedirs(thread_work_dir, exist_ok=True)
-                        thread_local.agent_objs = get_agents(
+                        thread_local.agent_objs = get_agents(  # noqa: B023
                             thread_work_dir,
                             model_name=model_name,
                             temperature=temperature,
@@ -754,7 +761,7 @@ def run_mcts(
                             vision_model=vision_model,
                             usage_tracker=usage_tracker,
                         )
-                    return thread_local.agent_objs
+                    return thread_local.agent_objs  # noqa: B023
 
                 def _expand_node_parallel(inbatch_idx, node):
                     return _expand_node(
@@ -763,7 +770,7 @@ def run_mcts(
                         _get_thread_agents(),
                         TreeLogger(log_dirname),
                         _get_node_idx,
-                        update_mcts_lock=update_mcts_lock,
+                        update_mcts_lock=update_mcts_lock,  # noqa: B023
                         is_threaded=True,
                     )
 
@@ -815,8 +822,8 @@ def run_mcts(
                 )
 
                 def _get_node_idx(new_level):
-                    new_node_idx = next_node_idx_by_level[new_level]
-                    next_node_idx_by_level[new_level] += 1
+                    new_node_idx = next_node_idx_by_level[new_level]  # noqa: B023
+                    next_node_idx_by_level[new_level] += 1  # noqa: B023
                     return new_node_idx
 
                 expanded_nodes = []
@@ -943,7 +950,7 @@ def main(args):
     work_dirname = os.path.join(args.work_dir, timestamp) if args.timestamp_dir else args.work_dir
 
     # Setup logger
-    logger = TreeLogger(log_dirname)
+    TreeLogger(log_dirname)  # creates log_dirname
 
     # Save args
     args_file = os.path.join(log_dirname, "args.json")

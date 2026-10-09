@@ -2,6 +2,10 @@
 
 > AutoDiscovery for Asta
 
+**Live app:** https://autodiscovery.allen.ai — a public deployment of this repo; nearly all the code behind it lives here.
+
+**Documentation:** https://allenai.github.io/asta-autodiscovery
+
 ## Changelog
 
 Release notes for the published packages, including breaking changes, are in
@@ -9,7 +13,7 @@ Release notes for the published packages, including breaking changes, are in
 
 ## Standalone CLI
 
-To run AutoDiscovery against a local dataset without the full Skiff stack, see
+To run AutoDiscovery against a local dataset without the full web stack, see
 [docs/autodiscovery/standalone.md](docs/autodiscovery/standalone.md) for `pip install` and release
 instructions.
 
@@ -82,6 +86,8 @@ cd ui && yarn install --frozen-lockfile
 End-to-end tests are documented in [ui/e2e/README.md](ui/e2e/README.md).
 
 ## Documentation
+
+Published at **https://allenai.github.io/asta-autodiscovery**. Build locally:
 
 ```sh
 make serve-docs     # serve locally

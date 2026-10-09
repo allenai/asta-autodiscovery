@@ -113,7 +113,9 @@ def set_version(new_version: str) -> bool:
     print()
     print(f"{YELLOW}Next steps:{NC}")
     print("  1. Review changes: git diff")
-    print(f"  2. Commit changes: git add -A && git commit -m 'chore: bump version to {new_version}'")
+    print(
+        f"  2. Commit changes: git add -A && git commit -m 'chore: bump version to {new_version}'"
+    )
     print("  3. Push tag: make push-version-tag")
     return True
 

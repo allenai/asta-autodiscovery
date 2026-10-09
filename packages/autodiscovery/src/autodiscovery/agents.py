@@ -46,6 +46,11 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 # fraction of a future model request.
 MAX_CODE_OUTPUT_CHARS = 20_000
 
+#: Where the store is mounted in every code environment: key ``users/<uid>/...`` is
+#: visible at ``/mnt/data/users/<uid>/...``. Mirrors ``autodiscovery_jobs.backends.base.
+#: JOB_MOUNT_ROOT`` (not imported: this package does not depend on autodiscovery_jobs).
+STORE_MOUNT_ROOT = "/mnt/data"
+
 
 def _truncate_output_parts(parts: list[str]) -> str:
     """Assemble and clip code-output sections to the fixed cap, keeping both ends.
@@ -389,14 +394,22 @@ def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
     return bucket_name, key_prefix
 
 
+def store_mount_path(key_prefix: str) -> str:
+    """Return the absolute path a store key prefix is mounted at.
+
+    E.g. ``users/u/jobs/j/data/`` -> ``/mnt/data/users/u/jobs/j/data``.
+    """
+    return f"{STORE_MOUNT_ROOT}/{key_prefix.strip('/')}".rstrip("/")
+
+
 def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: str | None) -> str:
     """Return the directory the code transform should ``os.chdir`` into per cell.
 
     For the process/local backends this must be **absolute**: their subprocess
     already starts with ``cwd=work_dir``, so a relative path injected by
     :class:`SimpleCodeBlockTransform` would stack (``work_dir/work_dir``) and
-    raise ``FileNotFoundError``. modal uses its absolute mount path (``/data``),
-    which is idempotent regardless of the sandbox's starting directory.
+    raise ``FileNotFoundError``. modal uses its absolute mount path
+    (:func:`store_mount_path`), which is idempotent regardless of the sandbox's starting directory.
     """
     if backend == "modal":
         return modal_working_dir
@@ -406,7 +419,7 @@ def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: s
 class SimpleCodeBlockTransform(transforms.MessageTransform):
     """Simple transform that extracts code from JSON and wraps it in markdown code blocks."""
 
-    def __init__(self, working_dir="/data"):
+    def __init__(self, working_dir=None):
         """Initialize with optional working directory to change to before executing code."""
         self.working_dir = working_dir
 
@@ -734,7 +747,9 @@ def install(package):
         # Parse bucket path
         bucket_name, key_prefix = parse_bucket_path(bucket_path)
 
-        modal_mount_path = "/data"
+        # Same path the run's data has in the job container, so the sandbox shows the
+        # store's layout unchanged.
+        modal_mount_path = store_mount_path(key_prefix)
         modal_working_dir = modal_mount_path
 
         # Get Modal configuration from environment

@@ -11,11 +11,33 @@ from __future__ import annotations
 import json
 import os
 
-from autodiscovery.agents import SimpleCodeBlockTransform, code_transform_working_dir
+from autodiscovery.agents import (
+    STORE_MOUNT_ROOT,
+    SimpleCodeBlockTransform,
+    code_transform_working_dir,
+    parse_bucket_path,
+    store_mount_path,
+)
+
+
+def test_store_mount_path_matches_job_container_layout() -> None:
+    _, key_prefix = parse_bucket_path("gs://bucket/users/u/jobs/j/data")
+    assert store_mount_path(key_prefix) == "/mnt/data/users/u/jobs/j/data"
+
+
+def test_store_mount_path_root_prefix() -> None:
+    assert store_mount_path("") == "/mnt/data"
+
+
+def test_store_mount_root_matches_job_backends() -> None:
+    from autodiscovery_jobs.backends.base import JOB_MOUNT_ROOT
+
+    assert STORE_MOUNT_ROOT == JOB_MOUNT_ROOT
 
 
 def test_working_dir_modal_uses_mount_path() -> None:
-    assert code_transform_working_dir("modal", "work", "/data") == "/data"
+    mount = "/mnt/data/users/u/jobs/j/data"
+    assert code_transform_working_dir("modal", "work", mount) == mount
 
 
 def test_working_dir_process_is_absolute() -> None:
@@ -48,7 +70,5 @@ def test_transform_and_working_dir_compose_to_absolute() -> None:
     # so it never stacks relative to the subprocess's own cwd.
     working_dir = code_transform_working_dir("process", "work", None)
     transform = SimpleCodeBlockTransform(working_dir=working_dir)
-    content = transform.apply_transform([{"content": json.dumps({"code": "pass"})}])[-1][
-        "content"
-    ]
+    content = transform.apply_transform([{"content": json.dumps({"code": "pass"})}])[-1]["content"]
     assert f"os.chdir('{os.path.abspath('work')}')" in content

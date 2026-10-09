@@ -50,6 +50,7 @@ nav:
       - AutoDiscovery Modal: api/autodiscovery_modal.md
       - Code Execution: api/code_execution.md
   - Design:
+      - System Architecture: design/architecture.md
       - Swappable Auth Providers: design/auth-providers.md
       - Swappable Persistence Backends: design/storage-backends.md
       - Data Library: design/data-library.md
@@ -59,7 +60,11 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.arithmatex:
       generic: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra_css:
   - assets/styles/asta.css

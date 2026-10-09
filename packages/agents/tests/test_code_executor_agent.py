@@ -7,10 +7,9 @@ from typing import Any, cast
 import pytest
 from agents import experiment_agents
 from asta_sandbox import ExecutionResult
+from conftest import DummyExecutor
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.sessions import InMemorySessionService
-
-from conftest import DummyExecutor
 
 
 @pytest.mark.asyncio
@@ -19,7 +18,9 @@ async def test_code_executor_agent_local(monkeypatch: pytest.MonkeyPatch) -> Non
     captured: dict[str, Any] = {}
 
     class CapturingExecutor(DummyExecutor):
-        async def run_code(self, code_str: str, timeout_seconds: float | None = None) -> ExecutionResult:
+        async def run_code(
+            self, code_str: str, timeout_seconds: float | None = None
+        ) -> ExecutionResult:
             captured["code"] = code_str
             return ExecutionResult(stdout="hello\n", stderr="", success=True)
 
@@ -52,5 +53,3 @@ async def test_code_executor_agent_local(monkeypatch: pytest.MonkeyPatch) -> Non
     await session_service.append_event(session=session, event=event)
     assert session.state["execution_summary"].startswith("success: True")
     assert session.state["execution_result_raw"].success is True
-
-

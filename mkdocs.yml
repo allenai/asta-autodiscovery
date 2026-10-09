@@ -53,6 +53,7 @@ nav:
       - System Architecture: design/architecture.md
       - Swappable Auth Providers: design/auth-providers.md
       - Swappable Persistence Backends: design/storage-backends.md
+      - Data Library: design/data-library.md
 
 markdown_extensions:
   - pymdownx.highlight:

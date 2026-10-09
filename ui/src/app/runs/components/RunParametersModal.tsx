@@ -155,6 +155,20 @@ export function RunParametersModal({
                             </DatasetList>
                         </FieldRow>
                     )}
+
+                    {metadata?.datalibDirs && metadata.datalibDirs.length > 0 && (
+                        <FieldRow>
+                            <FieldLabel>Data library</FieldLabel>
+                            <DatasetList>
+                                {metadata.datalibDirs.map((dir) => (
+                                    <DatasetItem key={dir}>
+                                        <DatasetName>{dir}</DatasetName>
+                                        <DatasetSize>Mounted read-only</DatasetSize>
+                                    </DatasetItem>
+                                ))}
+                            </DatasetList>
+                        </FieldRow>
+                    )}
                 </Section>
 
                 <Divider sx={{ my: 2 }} />

@@ -17,7 +17,7 @@ from typing import Any
 
 from ..config import JobConfig
 from ..exceptions import JobBackendError, ModelConfigError
-from ..keys import job_dir
+from ..keys import datalib_dir, job_dir, validate_datalib_dirname
 from ..model_config import MODEL_ENV, chosen_model
 
 # Code-execution backends the AD job understands (its --backend choices). "modal"
@@ -31,6 +31,16 @@ _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
 #: are backend-agnostic. The deployed Cloud Run job definition must agree
 #: (``--add-volume-mount`` in ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
 JOB_MOUNT_ROOT = "/mnt/data"
+
+
+def datalib_mount_path(userid: str, dirname: str) -> str:
+    """In-container path of a data-library directory: its key under the mount root.
+
+    The data library is mounted at the same store-shaped path in every
+    environment — job container and Modal sandbox alike — so there is no
+    per-environment path mapping.
+    """
+    return f"{JOB_MOUNT_ROOT}/{datalib_dir(userid, validate_datalib_dirname(dirname))}"
 
 
 def build_job_args(
@@ -50,6 +60,7 @@ def build_job_args(
     exploration_weight: float | None = None,
     code_timeout: int | None = None,
     n_warmstart: int | None = None,
+    datalib_dirs: list[str] | None = None,
     **kwargs: Any,
 ) -> list[str]:
     """Build the CLI argument list passed to the AD job container.
@@ -80,6 +91,8 @@ def build_job_args(
         exploration_weight: Exploration weight for UCB1 (optional)
         code_timeout: Timeout for code execution in seconds (optional)
         n_warmstart: Number of warmstart experiments (optional)
+        datalib_dirs: Names of the user's data-library directories to expose to
+            the job, read-only, at :func:`datalib_mount_path` (optional)
         **kwargs: Additional arguments to pass to the job
 
     Returns:
@@ -136,6 +149,12 @@ def build_job_args(
     # the job mount, so it is omitted for them.
     if code_backend == "modal":
         args.append(f"--bucket_path=gs://{config.bucket}/{job_base}/data")
+
+    # Data-library directories, as store-shaped paths under the mount root. The
+    # job backend makes them readable there; the modal sandbox mounts each from
+    # the bucket by the key its path implies, like the run's own data.
+    for dirname in datalib_dirs or []:
+        args.append(f"--datalib_dir={datalib_mount_path(userid, dirname)}")
 
     args.append(f"--model={model}")
     for role, role_model in role_models.items():

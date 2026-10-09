@@ -292,6 +292,17 @@ class ArgParser(argparse.ArgumentParser):
             help="GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/)",
         )
         self.add_argument(
+            "--datalib_dir",
+            type=str,
+            action="append",
+            default=[],
+            help=(
+                "A read-only data-library directory available to the run, in addition to "
+                "(or instead of) the datasets in --dataset_metadata. Repeatable. Its "
+                "README.md, if any, describes it to the agents."
+            ),
+        )
+        self.add_argument(
             "--run_eda",
             action=argparse.BooleanOptionalAction,
             default=False,

@@ -356,14 +356,21 @@ def create() -> Blueprint:
             pass
         return None, None
 
-    def _compute_dataset_expires_at(run_details: RunDetails | None) -> str | None:
+    def _compute_dataset_expires_at(
+        run_details: RunDetails | None, metadata: dict | None = None
+    ) -> str | None:
         """Compute dataset expiry timestamp (created_at + DATASET_EXPIRY_DAYS).
 
         This is an estimate — the actual cleanup cron may run slightly later,
         but using the shared DATASET_EXPIRY_DAYS constant keeps the prediction
         consistent with the deletion threshold.
+
+        Expiry deletes only a run's own uploads, so a run that reads solely from
+        the data library never expires.
         """
         if not run_details or not run_details.created_at:
+            return None
+        if metadata and not metadata.get("datasets") and metadata.get("datalib_dirs"):
             return None
         try:
             created = datetime.fromisoformat(run_details.created_at)
@@ -458,7 +465,7 @@ def create() -> Blueprint:
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
 
             # Compute dataset expiry
-            dataset_expires_at = _compute_dataset_expires_at(run_details)
+            dataset_expires_at = _compute_dataset_expires_at(run_details, metadata_dict)
 
             return RunModel(
                 runid=run_id,
@@ -591,7 +598,7 @@ def create() -> Blueprint:
             has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
 
             # Compute dataset expiry
-            dataset_expires_at = _compute_dataset_expires_at(run_details)
+            dataset_expires_at = _compute_dataset_expires_at(run_details, metadata_dict)
 
             run_model = RunModel(
                 runid=req.runid,
@@ -1004,6 +1011,26 @@ def create() -> Blueprint:
                             {"error": f"Failed to prepare preloaded dataset: {str(e)}"}
                         ), 500
 
+            # Data-library directories are mounted, not copied, so they must still
+            # exist in the submitting user's own library at launch.
+            datalib_dirs = metadata.get("datalib_dirs") or []
+            if datalib_dirs:
+                # Returned directly: a BadRequest raised in this block would be
+                # caught by the catch-all below and reported as a 500.
+                try:
+                    missing = manager.missing_datalib_dirs(req.userid, datalib_dirs)
+                except ValueError as e:
+                    return jsonify({"error": str(e)}), 400
+                if missing:
+                    noun = "directory" if len(missing) == 1 else "directories"
+                    return jsonify(
+                        {"error": f"Data library {noun} not found: {', '.join(missing)}"}
+                    ), 400
+            if not datasets and not datalib_dirs:
+                return jsonify(
+                    {"error": "Select at least one dataset or data library directory."}
+                ), 400
+
             intent = metadata.get("intent", "")
             n_experiments = metadata.get("n_experiments")
 
@@ -1019,6 +1046,7 @@ def create() -> Blueprint:
             job_params = {
                 "n_experiments": n_experiments,
                 "user_query": intent,
+                "datalib_dirs": datalib_dirs,
             }
 
             # Add optional parameters if present in metadata

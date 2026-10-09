@@ -980,6 +980,88 @@ def dataset_key(userid: str, jobid: str, filename: str) -> str:
     return f"{keys.job_prefix(userid, jobid)}data/{filename}"
 
 
+#: Name of the file at the top of a data-library directory that describes it —
+#: the data library's equivalent of the description paired with an upload.
+DATALIB_README_NAME = "README.md"
+
+
+@dataclass(frozen=True)
+class DatalibDir:
+    """One selectable top-level data-library directory."""
+
+    name: str
+    description: str | None
+
+
+def list_datalib_dirs(
+    userid: str,
+    config: JobConfig | None = None,
+    *,
+    max_description_chars: int = 4000,
+) -> list[DatalibDir]:
+    """List a user's top-level data-library directories, with their READMEs.
+
+    Args:
+        userid: User identifier
+        config: Configuration (uses default if None)
+        max_description_chars: Truncate each README to this many characters.
+
+    Returns:
+        The directories sorted by name; ``description`` is ``None`` when a
+        directory has no README.
+
+    Raises:
+        StorageError: If listing fails
+    """
+    store, _ = _store(config)
+    prefix = keys.datalib_prefix(userid)
+    try:
+        names = sorted(store.list_dirs(prefix))
+    except StorageError:
+        raise
+    except Exception as e:
+        raise StorageError(f"Failed to list data library for user {userid}: {e}") from e
+
+    dirs = []
+    for name in names:
+        try:
+            keys.validate_datalib_dirname(name)
+        except ValueError:
+            # Not selectable (e.g. a dot-directory), so not listed either.
+            continue
+        readme_key = f"{keys.datalib_dir(userid, name)}/{DATALIB_README_NAME}"
+        try:
+            description = store.read_text(readme_key)[:max_description_chars]
+        except ObjectNotFoundError:
+            description = None
+        except Exception as e:
+            logger.warning("Failed to read %s: %s", readme_key, e)
+            description = None
+        dirs.append(DatalibDir(name=name, description=description))
+    return dirs
+
+
+def missing_datalib_dirs(
+    userid: str, dirnames: list[str], config: JobConfig | None = None
+) -> list[str]:
+    """Return which of ``dirnames`` are not in the user's data library.
+
+    Raises:
+        ValueError: If any name is not a valid top-level directory name.
+        StorageError: If listing fails
+    """
+    for name in dirnames:
+        keys.validate_datalib_dirname(name)
+    store, _ = _store(config)
+    try:
+        present = set(store.list_dirs(keys.datalib_prefix(userid)))
+    except StorageError:
+        raise
+    except Exception as e:
+        raise StorageError(f"Failed to list data library for user {userid}: {e}") from e
+    return [name for name in dirnames if name not in present]
+
+
 def generate_upload_url(
     userid: str,
     jobid: str,

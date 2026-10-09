@@ -32,6 +32,10 @@ plugins:
             - packages/autodiscovery/src
             - packages/autodiscovery_modal/src
             - packages/autodiscovery_jobs/src
+          options:
+            docstring_options:
+              # Much of the code is unannotated; don't fail strict builds on it.
+              warn_missing_types: false
 
 nav:
   - Home: index.md
@@ -39,14 +43,19 @@ nav:
   - Configuration: configuration.md
   - Authentication: authentication.md
   - Autodiscovery:
+      - How It Works: autodiscovery/overview.md
+      - Hypothesis Generation: autodiscovery/hypothesis_generation.md
+      - Tree Search: autodiscovery/tree_search.md
+      - Surprisal: autodiscovery/surprisal.md
+      - Surprisal Normalization (derivation): autodiscovery/surprisal_normalization.md
       - Standalone CLI: autodiscovery/standalone.md
-      - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md
       - IPython Executor: code_execution/ipython_executor.md
   - Modal:
       - Sandbox Backend: autodiscovery_modal/sandbox_backend.md
   - API Reference:
+      - AutoDiscovery: api/autodiscovery.md
       - AutoDiscovery Modal: api/autodiscovery_modal.md
       - Code Execution: api/code_execution.md
   - Design:

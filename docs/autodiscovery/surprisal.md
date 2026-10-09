@@ -98,7 +98,7 @@ flagged **surprising** when its reward is at least 1, i.e. the belief moved by
 | Option | Effect |
 |---|---|
 | `--use_binary_reward` | Reward is 1 if surprising, else 0, instead of the continuous ratio |
-| `--reward_mode kl` | Use $\text{KL} / \texttt{kl\_scale}$ instead (`--kl_scale`, default 5.0) |
+| `--reward_mode kl` | Use KL divergence ÷ `--kl_scale` (default 5.0) instead |
 | `--reward_mode belief_and_kl` | Use whichever of the two is larger; surprising if either one is |
 
 ## A worked example

@@ -92,11 +92,11 @@ very shallow. **Progressive widening** caps a node's children based on how
 often its branch has been visited:
 
 $$
-\text{a node may get another child only if}\quad \#\text{children} < k \cdot \text{visits}^{\alpha}
+\text{a node may get another child only if}\quad \text{children} \lt k \cdot \text{visits}^{\alpha}
 $$
 
 With the defaults `--pw_k 1.0` and `--pw_alpha 0.5`, this is
-$\#\text{children} < \sqrt{\text{visits}}$:
+$\text{children} \lt \sqrt{\text{visits}}$:
 
 | visits to the branch | children allowed |
 |---|---|

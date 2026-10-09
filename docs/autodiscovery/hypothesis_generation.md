@@ -38,21 +38,39 @@ proposals at a time, returned as structured JSON:
 }
 ```
 
-Its instructions push it toward proposals that are:
+### What makes a good proposal
 
-- **Falsifiable** and testable with the data provided, with no invented data
-  or columns.
-- **Creative and self-contained**: each proposal stands alone, and earlier
+Following the [AutoDiscovery paper](overview.md#background), a hypothesis is a
+statement of a **relationship** among **variables** under a **context**. For
+example, "*among patients over 65* (context), *higher X* is associated with
+*lower Y* (relationship between variables)". The goal is hypotheses that are
+**surprising but verifiable** using the dataset.
+
+The generator's instructions are built around that structure. It is told to:
+
+- pick a **context**: a subset of the data to focus on, such as one value of a
+  categorical column,
+- choose interesting **variables**, including new ones derived from existing
+  columns, and
+- propose **relationships** between them that a robust statistical test can
+  check. When there are several datasets, it is encouraged to join across them.
+
+It also has a few ground rules:
+
+- **Testable with the data provided.** Each hypothesis must be a falsifiable
+  statement that the experiment can test, using only the given datasets. No
+  synthetic data or invented columns.
+- **Creative and self-contained.** Each proposal stands alone. Earlier
   proposals are inspiration, not something to repeat.
-- **Built from contexts, variables and relationships.** The generator is told
-  to pick a subset of the data to focus on (for example, one value of a
-  categorical column), choose interesting or derived variables, and propose
-  relationships between them that can be checked with a robust statistical
-  test. When there are several datasets, it is encouraged to join across them.
 
 If you pass `--user_query`, it is added to the generator's instructions so
-proposals stay on the topic you care about. With `--experiment_first`, the
-generator writes the experiment plan first and derives the hypothesis from it.
+proposals stay on the topic you care about.
+
+> **Note:** The paper describes two separate agents: an experiment generator
+> that proposes a plan, and a hypothesis generator that predicts its outcome.
+> Here a single `experiment_generator` writes both, hypothesis first by
+> default. `--experiment_first` reverses the order to match the paper: the
+> experiment plan is written first and the hypothesis is derived from it.
 
 ### Proposals come from the parent's results
 

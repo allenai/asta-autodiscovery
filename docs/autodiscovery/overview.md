@@ -45,6 +45,14 @@ expect** favors results worth a second look: an expected effect that turns out
 to be absent, or an effect nobody would have predicted. AutoDiscovery uses an
 LLM as a stand-in for that well-read scientist.
 
+## Background
+
+AutoDiscovery is described in the NeurIPS 2025 paper
+[*AutoDiscovery: Open-ended Scientific Discovery via Bayesian Surprise*](https://arxiv.org/abs/2507.00310)
+(Agarwal et al., [OpenReview](https://openreview.net/forum?id=kJqTkj2HhF)).
+These pages describe the current implementation, whose defaults and agent
+setup can differ from the paper's experiments.
+
 ## In the code
 
 | What | Where |

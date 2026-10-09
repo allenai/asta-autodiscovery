@@ -35,7 +35,10 @@ surprising. Surprising nodes are highlighted in the HTML report.
 | [Tree Search](tree_search.md) | How the tree is structured and which node gets explored next |
 | [Surprisal](surprisal.md) | How beliefs are measured and turned into a reward |
 | [Surprisal Normalization](surprisal_normalization.md) | The math behind the normalized surprisal score |
-| [Standalone CLI](standalone.md) | Installing and running the `auto-discovery` command |
+
+The `--flags` mentioned on these pages are options of the `auto-discovery`
+command; see [Standalone CLI](standalone.md) to run it on your own data. To run
+the full web app instead, see [Quick start](../quickstart.md).
 
 ## Why surprise?
 

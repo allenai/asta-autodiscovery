@@ -1,0 +1,2014 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://allenai.github.io/asta-autodiscovery/design/storage-backends/">
+      
+      
+        <link rel="prev" href="../auth-providers/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Swappable Persistence Backends - AutoDiscovery</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Manrope:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Manrope";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/styles/asta.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="asta-light" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#swappable-persistence-backends-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="AutoDiscovery" class="md-header__button md-logo" aria-label="AutoDiscovery" data-md-component="logo">
+      
+  <img src="../../assets/images/asta-logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AutoDiscovery
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Swappable Persistence Backends
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="asta-light" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="asta-dark" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quick start
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../authentication/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Authentication
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../autodiscovery/standalone/" class="md-tabs__link">
+          
+  
+  
+  Autodiscovery
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../code_execution/ipython_session/" class="md-tabs__link">
+          
+  
+  
+  Code Execution
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../autodiscovery_modal/sandbox_backend/" class="md-tabs__link">
+          
+  
+  
+  Modal
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/autodiscovery/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="AutoDiscovery" class="md-nav__button md-logo" aria-label="AutoDiscovery" data-md-component="logo">
+      
+  <img src="../../assets/images/asta-logo.svg" alt="logo">
+
+    </a>
+    AutoDiscovery
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Autodiscovery
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Autodiscovery
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standalone CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How It Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery/hypothesis_generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hypothesis Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery/tree_search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tree Search
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery/surprisal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Surprisal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery/surprisal_normalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Surprisal Normalization (derivation)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Code Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_execution/ipython_session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IPython Session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_execution/ipython_executor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IPython Executor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modal
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modal
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../autodiscovery_modal/sandbox_backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/autodiscovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AutoDiscovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/autodiscovery_modal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AutoDiscovery Modal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/code_execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swappable Auth Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swappable Persistence Backends
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swappable Persistence Backends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-state-what-were-abstracting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current state (what we're abstracting)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-abstraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The abstraction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The abstraction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#making-a-filesystem-behave-like-an-object-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making a filesystem behave like an object store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-browser-uploads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct browser uploads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-one-backend-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The one backend check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combinations-that-cannot-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combinations that cannot work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scoping-the-job-containers-mount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoping the job container's mount
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#as-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        As built
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="As built">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-other-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using other storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deltas-from-the-proposal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deltas from the proposal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-state-what-were-abstracting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current state (what we're abstracting)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-abstraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The abstraction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The abstraction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#making-a-filesystem-behave-like-an-object-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making a filesystem behave like an object store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-browser-uploads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct browser uploads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-one-backend-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The one backend check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combinations-that-cannot-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combinations that cannot work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scoping-the-job-containers-mount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoping the job container's mount
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#as-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        As built
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="As built">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-other-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using other storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deltas-from-the-proposal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deltas from the proposal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="swappable-persistence-backends-design">Swappable Persistence Backends — Design</h1>
+<p>Status: <strong>Implemented</strong> · Branch: <code>swappable-persistence-backends</code> · Part of
+<a href="https://github.com/allenai/asta-autodiscovery/issues/34">#34</a></p>
+<blockquote>
+<p>See <a href="#as-built">As built</a> at the end for the concrete file layout and operator notes.</p>
+</blockquote>
+<h2 id="goal">Goal</h2>
+<p>Make AutoDiscovery's persistence pluggable, with two interchangeable backends selected by
+configuration:</p>
+<ol>
+<li><strong><code>local</code></strong> (new default) — a directory on the host, bind-mounted into the containers.
+   No cloud account, bucket, or credentials; <code>docker compose up</code> persists real run data
+   out of the box.</li>
+<li><strong><code>gcs</code></strong> — the existing Google Cloud Storage bucket, unchanged behavior when selected.</li>
+</ol>
+<p>This follows the pattern already established for
+<a href="../auth-providers/">auth providers</a> (<code>AUTH_PROVIDER</code>), job execution (<code>JOB_BACKEND</code>), and
+code execution (<code>CODE_EXECUTION_BACKEND</code>).</p>
+<hr />
+<h2 id="current-state-what-were-abstracting">Current state (what we're abstracting)</h2>
+<p>Everything the app persists lived directly on <code>google-cloud-storage</code>:</p>
+<ul>
+<li><code>autodiscovery_jobs/gcs.py</code> (~1100 lines) — job directories, dataset upload/expiry,
+  metadata, results, experiment nodes, presigned upload URLs.</li>
+<li><code>autodiscovery_jobs/{run_details,user_profile,email_state}.py</code> — small JSON documents,
+  each building its own <code>bucket.blob(...)</code>.</li>
+<li><code>api/metrics/aggregator.py</code> — threads a <code>storage.Bucket</code> through its job scan and
+  persists its cache snapshot as a blob.</li>
+<li><code>scripts/send_completion_emails.py</code> — a cross-process lock built on
+  <code>upload_from_string(..., if_generation_match=0)</code>.</li>
+<li><code>api/runs/runs_api.py</code> — presigned upload URLs, plus a <code>gs://</code>→bucket rewrite for
+  Ai2-preloaded datasets.</li>
+</ul>
+<p>The <strong>job side is already storage-agnostic</strong>: the AD job reads <code>metadata.json</code> and writes
+<code>output/</code> as ordinary files under a mount point, which Cloud Run supplies as a GCS volume
+(and which the docker job backend, at the time, supplied via gcsfuse). Only the webstack
+talked to GCS directly.</p>
+<h2 id="the-abstraction">The abstraction</h2>
+<p>One interface — a flat, keyed blob namespace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ObjectStore
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  root_uri / uri(key)                     display + logging
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  read_bytes / read_text / exists         reads
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  download_file(key, local_path)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  write_bytes / write_text / write_stream  writes
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  upload_file(key, local_path)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  delete(key)                             idempotent
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  copy(source_key, dest_key)               within the store
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  create_exclusive(key, data) -&gt; bool     atomic create-if-absent (locks)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  list(prefix, *, match_glob, limit)      -&gt; Iterator[ObjectInfo]
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  list_dirs(prefix)                       -&gt; immediate child names
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  import_from_gs(uri, key)                 transfers to/from GCS, which two
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  export_to_gs(key, uri)                   neighbouring systems always are
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  signed_upload_url(...) -&gt; str | None    None when unsupported
+</code></pre></div>
+<p>Keys are the existing GCS blob names, unchanged, so <strong>the on-disk layout is the same
+layout as the bucket</strong> and one can be copied to the other with <code>gsutil rsync</code>.</p>
+<p><code>read_text</code>, <code>write_text</code>, <code>uri</code>, and <code>signed_upload_url</code> (default <code>None</code>) are derived;
+everything else each backend implements. Keys are built in one place,
+<code>autodiscovery_jobs/keys.py</code>, so the layout is spelled out once.</p>
+<h3 id="making-a-filesystem-behave-like-an-object-store">Making a filesystem behave like an object store</h3>
+<p>Four GCS behaviors the rest of the code already depended on had to be reproduced:</p>
+<table>
+<thead>
+<tr>
+<th>GCS behavior</th>
+<th><code>FilesystemStore</code> implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No directories — a prefix stops existing once its last object is deleted</td>
+<td>Deletes prune the directories they empty; <code>list_dirs</code> skips directories with no objects beneath them. Otherwise deleted users/runs would linger in listings.</td>
+</tr>
+<tr>
+<td><code>matchGlob</code> on listings, where <code>*</code> does not cross <code>/</code></td>
+<td><code>glob_to_regex()</code> (<code>*</code> → <code>[^/]*</code>, <code>**</code> → <code>.*</code>), applied while walking. Deliberately <strong>not</strong> <code>fnmatch</code>, whose <code>*</code> crosses <code>/</code> and would make <code>users/*/jobs/*/x.json</code> match arbitrarily deep keys. On GCS the glob is pushed to the API, so the metrics scan and the shared-run owner lookup return one object per run instead of listing the whole bucket.</td>
+</tr>
+<tr>
+<td>Object writes are atomic; a reader never sees a partial object</td>
+<td>Writes stage into a uniquely-named <code>.ad-staging.*</code> file in the destination directory and <code>os.replace</code> into place; listings skip staging files. This matters because the API polls run files <em>while the job container writes them</em>.</td>
+</tr>
+<tr>
+<td>Create-if-absent via <code>if_generation_match=0</code></td>
+<td><code>os.open(..., O_CREAT \| O_EXCL)</code>, bypassing the staging path (a rename would clobber). Backs the completion-email job's <code>--acquire-lock</code>, which therefore works on either backend.</td>
+</tr>
+</tbody>
+</table>
+<p><code>created_at</code> comes from <code>st_mtime</code> (POSIX has no portable creation time); these objects are
+written once, so it is the same instant in practice. Dataset expiry depends on it.</p>
+<p>Two systems next to AutoDiscovery are GCS whatever the run store is: the Ai2-curated
+preloaded datasets a run can start from, and the Asta workspace bucket a run's dataset is
+handed to. Rather than have those callers <code>isinstance</code>-check the store and reach for the
+GCS client themselves, the interface carries <code>import_from_gs</code> / <code>export_to_gs</code>. <code>GcsStore</code>
+does both as a server-side rewrite; <code>FilesystemStore</code> streams through the process. The
+methods are named for GCS honestly, because that is what the other side is.</p>
+<p>Keys can originate in user-supplied filenames, so <code>FilesystemStore</code> rejects any key that
+resolves outside its root rather than normalizing it away.</p>
+<h3 id="direct-browser-uploads">Direct browser uploads</h3>
+<p>GCS lets the browser <code>PUT</code> a dataset straight to a presigned URL, bypassing the API. A
+filesystem has no equivalent capability URL, so <code>signed_upload_url()</code> returns <code>None</code> and the
+upload has to come through the API instead. Those two requests differ in more than their
+URL — method, body encoding, and whether credentials are attached — so
+<code>generate-upload-url</code> returns the <strong>whole request</strong> rather than a URL the client has to
+interpret:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>POST /api/runs/&lt;runid&gt;/generate-upload-url
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  { upload_url: "https://storage.googleapis.com/…?X-Goog-Signature=…",   # gcs
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    upload_method: "PUT", upload_fields: null }
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  { upload_url: "/api/runs/upload-dataset",                              # local
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    upload_method: "POST", upload_fields: { runid: "…" } }
+</code></pre></div>
+<p>The client performs what it is handed: <code>fields</code> present means multipart with the file
+appended, absent means the raw body. So it holds no per-backend knowledge and no endpoint
+path, and there is no sentinel value to interpret. The second case targets the <strong>existing</strong>
+authenticated <code>POST /api/runs/upload-dataset</code>, so no upload route was added.</p>
+<p>This shape is also what a presigned-POST backend needs — S3's <code>generate_presigned_post</code>
+returns exactly a url plus form fields — so a future store fits without changing the client.</p>
+<p>The one thing the client decides for itself is credentials: it attaches its bearer token
+only when the URL resolves to its own origin. That rule stays client-side deliberately. An
+earlier draft had the server send a <code>same_origin: true</code> flag, which amounts to the server
+telling the client where its bearer token may be sent — if that value were ever wrong, the
+token would go to a third party. All of this lives in one module
+(<code>ui/src/app/api/datasetUpload.ts</code>).</p>
+<p>Clients should still call <code>generate-upload-url</code> first in both cases, because that is where
+the run is checked to exist and the requested size is screened.</p>
+<p>Two things were fixed on <code>upload-dataset</code> when it became the default backend's real upload
+path: it enforced <strong>no size limit at all</strong> (the check in <code>generate-upload-url</code> is on a
+client-asserted size, so it cannot be the only one), and it buffered the whole file to a
+temp file before storing it — a second full copy of a multi-GB upload on the API
+container's disk. It now streams <code>file.stream</code> into the store. This is also why the proxy's
+<code>client_max_body_size</code> for <code>/api</code> is load-bearing again.</p>
+<h3 id="the-one-backend-check">The one backend check</h3>
+<p>Exactly one place outside the store needs to know which backend is active: the startup
+validator (can Cloud Run, Modal, or a local job container reach this data?). It calls
+<code>get_store(config)</code> and <code>isinstance</code>s the result against <code>GcsStore</code>. Constructing a store is
+side-effect-free — <code>FilesystemStore</code> creates its root on first write, not in <code>__init__</code> —
+so validating configuration never touches the filesystem. Everything else talks to the
+store through its interface.</p>
+<h3 id="combinations-that-cannot-work">Combinations that cannot work</h3>
+<p>Each job backend is tied to one store, and Modal needs <code>gs://</code>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>STORAGE_BACKEND=local</code></th>
+<th><code>STORAGE_BACKEND=gcs</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JOB_BACKEND=docker</code></td>
+<td>✅ job container bind-mounts the run's host directory</td>
+<td>❌ local job containers bind-mount a host directory, not a bucket</td>
+</tr>
+<tr>
+<td><code>JOB_BACKEND=gcp</code></td>
+<td>❌ Cloud Run cannot mount a host directory</td>
+<td>✅ Cloud Run mounts the bucket</td>
+</tr>
+<tr>
+<td><code>CODE_EXECUTION_BACKEND=process</code>/<code>local</code></td>
+<td>✅ reads the job's own mount</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>CODE_EXECUTION_BACKEND=modal</code></td>
+<td>❌ the sandbox mounts the dataset from <code>gs://</code></td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<p>Every ❌ cell <strong>raises at startup</strong> rather than warning. The likeliest way to hit the first
+is a GCS deployment that never sets <code>STORAGE_BACKEND</code>: silently defaulting to local disk
+there would look like every run and dataset had vanished, which is worse than failing to
+boot. (Contrast <code>_warn_if_unsafe_code_execution</code>, which only warns — that configuration
+<em>works</em>, it is just unsafe.)</p>
+<h3 id="scoping-the-job-containers-mount">Scoping the job container's mount</h3>
+<p>The docker job backend scopes the job container's data mount to that run's own prefix, so
+a container never sees another user's data even when untrusted generated code runs
+in-process. It mounts at the same in-container path Cloud Run uses, so the job's CLI
+arguments are byte-identical across job backends:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bind  $STORAGE_HOST_DIR/users/&lt;uid&gt;/jobs/&lt;jid&gt;  →  /mnt/data/users/&lt;uid&gt;/jobs/&lt;jid&gt;
+</code></pre></div>
+<p>A bind mount needs no FUSE device, no extra capabilities, and no credentials. The only
+credential a docker job container receives is the GCP key, bind-mounted when
+<code>GCP_KEY_HOST_PATH</code> is set, for Google-hosted models.</p>
+<p><code>STORAGE_HOST_DIR</code> exists for the same reason as <code>GCP_KEY_HOST_PATH</code>: in
+docker-out-of-docker, the API's own container path is not a valid bind source for the host
+daemon, so the host path is passed out-of-band by compose.</p>
+<p>Before this change the docker backend gcsfuse-mounted the bucket into the job container,
+which needed gcsfuse in the job image, <code>/dev/fuse</code>, <code>CAP_SYS_ADMIN</code>, and an unconfined
+AppArmor profile. That was the only way to run jobs locally when GCS was the only store. It
+is gone: <code>docker</code> + <code>gcs</code> is rejected at startup, and the job image no longer installs
+gcsfuse or carries an entrypoint wrapper.</p>
+<hr />
+<h2 id="as-built">As built</h2>
+<h3 id="file-layout">File layout</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>packages/autodiscovery_jobs/src/autodiscovery_jobs/
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  storage/
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    __init__.py        # get_store(config) factory, STORAGE_BACKENDS
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    base.py            # ObjectStore ABC, ObjectInfo, glob_to_regex
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    gcs.py             # GcsStore (google-cloud-storage)
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    local.py           # FilesystemStore (atomic writes, prefix pruning)
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  keys.py              # the key layout, built in one place
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  persistence.py       # functional job-data API (was gcs.py)
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  client.py            # cached storage.Client, now only used by GcsStore
+</code></pre></div>
+<p><code>autodiscovery_jobs.gcs</code> is gone; imports point at <code>persistence</code>.</p>
+<h3 id="using-other-storage">Using other storage</h3>
+<p><code>FilesystemStore</code> is a POSIX-tree implementation, not a "local disk only" one, so anything
+the operator can mount works with no code: NFS, s3fs, Azure Files, JuiceFS, a SAN. Point
+<code>STORAGE_DIR</code> at the mount and the whole application runs, job containers included.</p>
+<p>What a mount gives up, all of it a consequence of a filesystem not being an object store:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Cost on a mount</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Presigned uploads</td>
+<td>Gone. Every dataset upload streams through the API instead of going browser→storage.</td>
+</tr>
+<tr>
+<td>Prefix and glob listings</td>
+<td>A directory walk rather than one paginated request.</td>
+</tr>
+<tr>
+<td><code>copy</code></td>
+<td>No server-side copy, so forking a run reads the dataset and writes it back through the API.</td>
+</tr>
+<tr>
+<td>Atomic replace</td>
+<td><code>os.replace</code> is atomic on a real filesystem; over a FUSE object-store adapter a rename is typically copy+delete, so a reader can observe a partial object.</td>
+</tr>
+</tbody>
+</table>
+<p>For a single-operator or on-prem deployment none of those usually bite. If they do, a native
+backend is a subclass of <code>ObjectStore</code> plus a branch in <code>get_store()</code>, and the validator
+above is where it would need to say how job containers reach its data. There is no
+registry or plugin mechanism, on purpose: one can be added when a third backend exists to
+justify its shape.</p>
+<h3 id="configuration">Configuration</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STORAGE_BACKEND</code></td>
+<td><code>local</code></td>
+<td><code>local</code> or <code>gcs</code>.</td>
+</tr>
+<tr>
+<td><code>STORAGE_DIR</code></td>
+<td><code>/mnt/data</code></td>
+<td>Root of the local store, as seen by the process. Compose mounts the host dir here.</td>
+</tr>
+<tr>
+<td><code>STORAGE_HOST_DIR</code></td>
+<td><em>(unset)</em></td>
+<td>Host path of that directory, for the docker job backend's bind mounts. Compose sets it; unset means this process is not containerized and <code>STORAGE_DIR</code> is already a host path.</td>
+</tr>
+</tbody>
+</table>
+<p><code>.env</code> sets <code>STORAGE_DIR</code> to a <strong>host</strong> path (defaulting to <code>$PWD/data</code>); compose mounts it
+at <code>/mnt/data</code> and forwards the host path as <code>STORAGE_HOST_DIR</code>. Use an absolute path — the
+host daemon has no working directory to resolve a relative bind source against, and the
+backend raises a clear error if it is relative.</p>
+<blockquote>
+<p><strong>Deployments that keep data in GCS must now set <code>STORAGE_BACKEND=gcs</code> explicitly.</strong>
+Together with <code>JOB_BACKEND=gcp</code> that is enforced, not silent.</p>
+</blockquote>
+<h3 id="deltas-from-the-proposal">Deltas from the proposal</h3>
+<ul>
+<li><code>LocalStore</code> was renamed <code>FilesystemStore</code>, because the story above is "any POSIX tree you
+  can mount", not "local dev only". The configured name stays <code>local</code>, which remains
+  accurate about the constraint that matters (the data is only reachable from this host,
+  which is what rules out Cloud Run and Modal).</li>
+<li>An intermediate draft replaced the backend-name checks with declared capabilities on the
+  store class (<code>job_data_mount</code>, <code>gs_addressable</code>) and a name→class registry, and dropped
+  <code>match_glob</code> from the interface. Both were reverted in review: the capabilities were
+  machinery for a third backend that does not exist, and removing <code>match_glob</code> turned the
+  shared-run owner lookup and the metrics discovery into full-bucket listings on GCS.</li>
+<li><code>create_exclusive</code> was dropped from an intermediate draft, which kept the completion-email
+  lock on the GCS client directly and refused to run on other backends. Review put it back
+  on the interface, implemented per backend, so the lock works everywhere.</li>
+<li><code>import_from_gs</code> / <code>export_to_gs</code> were added in review in place of two <code>isinstance</code>
+  checks (the preloaded-dataset sync and the Asta handoff) that reached for the GCS client
+  when the store happened to be GCS.</li>
+<li>The <code>docker</code> + <code>gcs</code> pairing was dropped. The intermediate draft kept the docker backend's
+  gcsfuse path alongside the new bind mount so local job containers could still run against
+  the bucket, but that exercised a mount mechanism production never uses (Cloud Run supplies
+  a platform volume), at the cost of gcsfuse in the job image and <code>SYS_ADMIN</code> on the
+  container. Each job backend now maps to exactly one store.</li>
+<li><code>GCSError</code> is renamed <code>StorageError</code> outright; an intermediate draft kept an alias, which
+  review dropped along with the <code>autodiscovery_jobs.gcs</code> re-export shim.</li>
+<li>The <code>generate-upload-url</code> response field <code>gcs_path</code> is renamed <code>storage_path</code> (it carries
+  a <code>file://</code> URI under the local backend); the UI is updated to match. The response also
+  gained <code>upload_method</code> / <code>upload_fields</code> so it describes a complete request. Two
+  earlier drafts — a dedicated streaming route, then a <code>same_origin</code> boolean, then a
+  nullable <code>upload_url</code> — were dropped in review: <code>upload-dataset</code> already did the job, and
+  a sentinel still left the client interpreting instead of just executing.</li>
+<li>The in-container mount point is renamed from <code>/mnt/gcs</code> to <code>/mnt/data</code>
+  (<code>backends.base.JOB_MOUNT_ROOT</code>), since it is a GCS volume only on Cloud Run. <strong>The
+  deployed Cloud Run job definition pins that path</strong>, so <code>rebuild_and_deploy.sh</code> (updated
+  here) must be run when this lands; until it is, Cloud Run jobs launched by the new API
+  will look for their data at a path the old job definition does not mount.</li>
+<li>The Asta workspace handoff (<code>asta_gcs.py</code>) still writes to a GCS bucket — that bucket is
+  Asta's, not ours — but does so through <code>export_to_gs</code>, so it is server-side when the run
+  store is GCS and streamed otherwise.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

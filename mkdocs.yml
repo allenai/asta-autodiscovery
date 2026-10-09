@@ -39,6 +39,10 @@ nav:
   - Configuration: configuration.md
   - Authentication: authentication.md
   - Autodiscovery:
+      - How It Works: autodiscovery/overview.md
+      - Hypothesis Generation: autodiscovery/hypothesis_generation.md
+      - Tree Search: autodiscovery/tree_search.md
+      - Surprisal: autodiscovery/surprisal.md
       - Standalone CLI: autodiscovery/standalone.md
       - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:

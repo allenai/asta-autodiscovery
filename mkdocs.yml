@@ -43,8 +43,8 @@ nav:
       - Hypothesis Generation: autodiscovery/hypothesis_generation.md
       - Tree Search: autodiscovery/tree_search.md
       - Surprisal: autodiscovery/surprisal.md
+      - Surprisal Normalization (derivation): autodiscovery/surprisal_normalization.md
       - Standalone CLI: autodiscovery/standalone.md
-      - Surprisal Normalization: autodiscovery/surprisal_normalization.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md
       - IPython Executor: code_execution/ipython_executor.md

@@ -142,8 +142,12 @@ mildly expected counts too.
   `normalized_surprisal`: the *signed* change divided by the largest change
   possible under the current settings. It ranges from −1 to 1 and makes runs
   with different settings comparable. It is recorded for reporting and does
-  not affect the search. The math is on
-  [Surprisal Normalization](surprisal_normalization.md).
+  not affect the search. The derivation is on
+  [Surprisal Normalization](surprisal_normalization.md). In its notation,
+  $N$ is `--n_belief_samples`, $w$ is `--evidence_weight`, $(\alpha, \beta)$
+  are the starting half-votes, $n$ and $x$ are the prior round's usable
+  samples and true votes, and $m$ and $y$ are the same for the evidence
+  round.
 
 ## Optional: surprise relative to earlier discoveries
 

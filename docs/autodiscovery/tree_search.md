@@ -128,3 +128,18 @@ branches end up both deeper and wider.
 `--continue_from_dir` (or `--continue_from_json`) reloads a previous tree,
 replays its visit counts and values, and keeps searching until the total
 reaches `--n_experiments`.
+
+## In the code
+
+| What | Where |
+|---|---|
+| Node fields, including `visits` and `value` | [`mcts.MCTSNode`][autodiscovery.mcts.MCTSNode] |
+| Backpropagation | [`mcts.MCTSNode.update_counts`][autodiscovery.mcts.MCTSNode.update_counts] |
+| UCB1 score | [`mcts.ucb1`][autodiscovery.mcts.ucb1] |
+| `pw` policy (progressive widening) | [`mcts.progressive_widening`][autodiscovery.mcts.progressive_widening] |
+| `pw_all` policy | [`mcts.progressive_widening_all`][autodiscovery.mcts.progressive_widening_all] |
+| `ucb1` policy | [`mcts.default_mcts_selection`][autodiscovery.mcts.default_mcts_selection] |
+| `ucb1_recursive` policy | [`mcts.ucb1_recursive`][autodiscovery.mcts.ucb1_recursive] |
+| `beam_search` policy | [`mcts.beam_search`][autodiscovery.mcts.beam_search] |
+| Data-loading node, warmstart, and filling a batch | [`mcts_utils.select_nodes`][autodiscovery.mcts_utils.select_nodes] |
+| Reloading a previous run | [`mcts_utils.load_mcts_from_json`][autodiscovery.mcts_utils.load_mcts_from_json] |

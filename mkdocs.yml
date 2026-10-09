@@ -32,6 +32,10 @@ plugins:
             - packages/autodiscovery/src
             - packages/autodiscovery_modal/src
             - packages/autodiscovery_jobs/src
+          options:
+            docstring_options:
+              # Much of the code is unannotated; don't fail strict builds on it.
+              warn_missing_types: false
 
 nav:
   - Home: index.md
@@ -51,6 +55,7 @@ nav:
   - Modal:
       - Sandbox Backend: autodiscovery_modal/sandbox_backend.md
   - API Reference:
+      - AutoDiscovery: api/autodiscovery.md
       - AutoDiscovery Modal: api/autodiscovery_modal.md
       - Code Execution: api/code_execution.md
   - Design:

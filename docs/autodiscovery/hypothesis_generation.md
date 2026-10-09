@@ -115,3 +115,15 @@ Separate branches of the tree often arrive at near-identical hypotheses. With
 (`--embedding_model`), and an LLM decides which hypotheses in a cluster are
 really the same. The search itself is unaffected; this only cleans up the
 output.
+
+## In the code
+
+| What | Where |
+|---|---|
+| The agent team and the generator's instructions | [`agents.get_agents`][autodiscovery.agents.get_agents] |
+| Proposal format | [`structured_outputs.ExperimentList`][autodiscovery.structured_outputs.ExperimentList] |
+| Picking an untried proposal, or asking for more | [`mcts.MCTSNode.get_next_experiment`][autodiscovery.mcts.MCTSNode.get_next_experiment] |
+| Order in which agents take turns, and the retry limits | [`transitions.SpeakerSelector.select_next_speaker`][autodiscovery.transitions.SpeakerSelector.select_next_speaker] |
+| Reading results and new proposals back onto the node | [`mcts.MCTSNode.read_experiment_from_messages`][autodiscovery.mcts.MCTSNode.read_experiment_from_messages] |
+| Ancestor context given to the agents | [`mcts.MCTSNode.get_path_context`][autodiscovery.mcts.MCTSNode.get_path_context] |
+| Post-run deduplication | [`deduplication.dedupe`][autodiscovery.deduplication.dedupe] |

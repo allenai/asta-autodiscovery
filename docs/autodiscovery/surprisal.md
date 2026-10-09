@@ -170,3 +170,15 @@ prior → posterior → change pattern:
 | `categorical` | The same five labels, scored 0.1 / 0.3 / 0.5 / 0.7 / 0.9 instead of 0 to 1 |
 | `categorical_numeric` | Probability ranges ("0-0.2" … "0.8-1.0"), scored at their midpoints |
 | `gaussian` | A probability between 0 and 1 plus a standard deviation for uncertainty |
+
+## In the code
+
+| What | Where |
+|---|---|
+| Prompts and sampling for one round of beliefs | [`beliefs.get_belief`][autodiscovery.beliefs.get_belief] |
+| Prior, posterior, belief change and KL | [`beliefs.calculate_prior_and_posterior_beliefs`][autodiscovery.beliefs.calculate_prior_and_posterior_beliefs] |
+| Answer labels, votes and the Beta distribution | [`beliefs.BeliefTrueFalseCat`][autodiscovery.beliefs.BeliefTrueFalseCat] |
+| Label scores | [`beliefs.BeliefTrueFalseCat.get_beta_params_from_cat_samples`][autodiscovery.beliefs.BeliefTrueFalseCat.get_beta_params_from_cat_samples] |
+| Reward and the surprising flag | [`mcts_utils.get_self_value`][autodiscovery.mcts_utils.get_self_value] |
+| Online beliefs and normalized surprisal | [`run.compute_and_store_reward`][autodiscovery.run.compute_and_store_reward] |
+| Largest possible belief shift | [`run._theoretical_max_boolean_cat`][autodiscovery.run._theoretical_max_boolean_cat] |

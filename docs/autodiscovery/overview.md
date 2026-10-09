@@ -44,3 +44,11 @@ Ranking findings by how much they **change what a well-read scientist would
 expect** favors results worth a second look: an expected effect that turns out
 to be absent, or an effect nobody would have predicted. AutoDiscovery uses an
 LLM as a stand-in for that well-read scientist.
+
+## In the code
+
+| What | Where |
+|---|---|
+| The main loop: select, expand, run, score, backpropagate | [`run.run_mcts`][autodiscovery.run.run_mcts] |
+| A tree node: hypothesis, results, beliefs, visits and value | [`mcts.MCTSNode`][autodiscovery.mcts.MCTSNode] |
+| Scoring a finished experiment | [`run.compute_and_store_reward`][autodiscovery.run.compute_and_store_reward] |

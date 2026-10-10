@@ -422,6 +422,15 @@ class UploadDatasetResponseModel(BaseModel):
     message: str = Field(..., description="Success message")
 
 
+class ImportContextArtifactRequestModel(BaseModel):
+    """Model for the request to import an Asta context-service artifact as a dataset"""
+
+    artifact_id: str = Field(..., description="Context-service artifact ID to import")
+    filename: str | None = Field(
+        None, description="Name to store the dataset under; defaults to the artifact's filename"
+    )
+
+
 class SaveMetadataRequestModel(BaseModel):
     """Model for the request to save or update run metadata"""
 

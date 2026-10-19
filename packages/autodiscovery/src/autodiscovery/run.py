@@ -1099,7 +1099,7 @@ def run_and_report(args) -> None:
 
     Every way of launching the engine goes through here -- the job image's
     entry point (``python -m autodiscovery.run``) on any job backend, and
-    ``autodiscovery-easy`` -- so a run leaves the same artifacts however it was
+    the ``auto-discovery`` CLI -- so a run leaves the same artifacts however it was
     started. A report failure is logged, not raised: the run's results stand.
     """
     results_dir = main(args)

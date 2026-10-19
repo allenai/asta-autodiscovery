@@ -29,8 +29,9 @@ _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
 #: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every container job backend mounts at
 #: this path (Cloud Run as a GCS volume, docker as a host bind mount) so the job
 #: arguments are backend-agnostic. The process backend has no container to mount
-#: into and passes the store's own root instead (``mount_root``). The deployed Cloud Run job definition must agree
-#: (``--add-volume-mount`` in ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
+#: into and passes the store's own root instead (``mount_root``). The deployed
+#: Cloud Run job definition must agree (``--add-volume-mount`` in
+#: ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
 JOB_MOUNT_ROOT = "/mnt/data"
 
 

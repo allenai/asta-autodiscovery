@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 # Pricing per 1M tokens (USD) — Vertex AI standard pricing
-# Source: https://cloud.google.com/vertex-ai/generative-ai/pricing
+# Source: https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing
 LLM_PRICING: dict[str, dict[str, float]] = {
     # Google Gemini models
-    "gemini-3.8-flash": {"input": 0.75, "output": 3.75},
+    "gemini-3.8-flash": {"input": 1.50, "output": 7.50},
     "gemini-3.5-flash": {"input": 1.50, "output": 9.00},
-    "gemini-3.7-flash": {"input": 0.75, "output": 3.75},
+    "gemini-3.7-flash": {"input": 1.50, "output": 7.50},
     "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00},
     "gemini-3-pro-preview": {"input": 2.00, "output": 12.00},
     "gemini-3-flash-preview": {"input": 0.50, "output": 3.00},
@@ -32,25 +32,40 @@ LLM_PRICING: dict[str, dict[str, float]] = {
 # Fallback pricing for unknown models (conservative: uses gemini-3.1-pro rates)
 _FALLBACK_PRICING = {"input": 2.00, "output": 12.00}
 
+# Global standard estimates, net of Google's 50% promotional credits through 2026.
+_FLASH_PROMO_END = datetime(2027, 1, 1, tzinfo=UTC)
+_FLASH_PROMO_PRICING = {"input": 0.75, "output": 3.75}
 
-def _lookup_pricing(model_name: str) -> dict[str, float]:
-    """Look up pricing for a model name, stripping provider prefixes."""
-    if model_name in LLM_PRICING:
-        return LLM_PRICING[model_name]
 
+def _lookup_pricing(model_name: str, *, usage_at: str | None = None) -> dict[str, float]:
+    """Look up global standard pricing at an ISO timestamp, stripping provider prefixes.
+
+    Missing or invalid timestamps use the current time. Naive timestamps are UTC.
+    """
     # Strip provider prefix (e.g., "google/gemini-3.1-pro-preview" -> "gemini-3.1-pro-preview")
     stripped = model_name.split("/")[-1] if "/" in model_name else model_name
-    if stripped in LLM_PRICING:
-        return LLM_PRICING[stripped]
+    if stripped in {"gemini-3.7-flash", "gemini-3.8-flash"}:
+        try:
+            when = datetime.fromisoformat(usage_at) if usage_at else datetime.now(UTC)
+        except (ValueError, TypeError):
+            when = datetime.now(UTC)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        if when < _FLASH_PROMO_END:
+            return _FLASH_PROMO_PRICING
 
-    return _FALLBACK_PRICING
+    return LLM_PRICING.get(stripped, _FALLBACK_PRICING)
 
 
-def calculate_llm_cost(usage_summary: dict) -> tuple[float, dict[str, float]]:
+def calculate_llm_cost(
+    usage_summary: dict, *, usage_at: str | None = None
+) -> tuple[float, dict[str, float]]:
     """Calculate LLM cost from a usage summary.
 
     Args:
         usage_summary: The llm_usage_summary.json data with by_model breakdown.
+        usage_at: Run creation time for historical pricing. All usage in a run
+            is estimated at this rate, including runs spanning a price change.
 
     Returns:
         Tuple of (total_cost_usd, {model_name: cost_usd}).
@@ -60,7 +75,7 @@ def calculate_llm_cost(usage_summary: dict) -> tuple[float, dict[str, float]]:
     cost_by_model: dict[str, float] = {}
 
     for model_name, usage in by_model.items():
-        pricing = _lookup_pricing(model_name)
+        pricing = _lookup_pricing(model_name, usage_at=usage_at)
         prompt_tokens = usage.get("prompt_tokens", 0)
         total_tokens = usage.get("total_tokens", 0)
         # Use total - prompt to capture all output tokens including reasoning

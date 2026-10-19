@@ -1,5 +1,6 @@
 """Tests for the metrics cache's configuration loading and failure handling."""
 
+import json
 import re
 from unittest.mock import patch
 
@@ -133,3 +134,72 @@ def test_successful_refresh_clears_recorded_error():
 
     assert cache._data is fresh
     assert cache.last_error is None
+
+
+@pytest.mark.parametrize(("created_at", "expected"), [("2026-12-31", 4.5), ("2027-01-01", 9.0)])
+def test_gemini_pricing_date_reaches_all_dashboard_views(tmp_path, created_at, expected):
+    """Rescanning old runs must not reprice them using the dashboard's current date."""
+    config = aggregator.JobConfig(storage_backend="local", storage_dir=str(tmp_path))
+    store = aggregator.get_store(config)
+    base = "users/u1/jobs/j1"
+    model = "vertex_ai/gemini-3.8-flash"
+    bucket = {
+        "calls": 1,
+        "prompt_tokens": 1_000_000,
+        "completion_tokens": 800_000,
+        "reasoning_tokens": 200_000,
+        "total_tokens": 2_000_000,
+    }
+    summary = {
+        "totals": bucket,
+        "by_model": {model: bucket},
+        "by_agent": {"programmer": bucket},
+        "by_component": {"chat": bucket},
+        "by_node": {"1": bucket},
+    }
+    store.write_text(
+        f"{base}/run_details.json", json.dumps({"status": "SUCCEEDED", "created_at": created_at})
+    )
+    store.write_text(f"{base}/output/llm_usage_summary.json", json.dumps(summary))
+    store.write_text(
+        f"{base}/output/llm_usage_events.jsonl",
+        json.dumps(
+            {
+                "model": model,
+                "agent_name": "programmer",
+                "component": "chat",
+                "node_id": "1",
+                "usage": bucket,
+            }
+        ),
+    )
+
+    job = aggregator._scan_job("u1", "j1", store)
+    assert job is not None
+    assert job.llm_cost_usd == expected
+    cache = MetricsCache()
+    cache._data = AggregatedData(jobs=[job], refreshed_at="2099-01-01T00:00:00Z")
+    with patch.object(aggregator, "get_metrics_cache", return_value=cache):
+        detail = aggregator.compute_run_metrics("u1", "j1")
+        assert detail["llm_cost_by_model"] == {model: expected}
+        assert detail["llm_cost_usd"] == expected
+        usage = aggregator.compute_aggregated_usage()
+
+    assert usage.totals.total_cost_usd == expected
+    for breakdown in (usage.by_model, usage.by_agent, usage.by_component, usage.by_node):
+        cost = next(iter(breakdown.values()))
+        assert cost.total_cost_usd == expected
+        assert cost.total_prompt_cost_usd == pytest.approx(expected / 6)
+        assert cost.total_completion_cost_usd == pytest.approx(expected * 2 / 3)
+        assert cost.total_reasoning_cost_usd == pytest.approx(expected / 6)
+
+
+def test_persisted_costs_from_before_dated_pricing_are_rebuilt(tmp_path):
+    config = aggregator.JobConfig(storage_backend="local", storage_dir=str(tmp_path))
+    store = aggregator.get_store(config)
+    store.write_text(
+        aggregator.PERSIST_BLOB_PATH,
+        json.dumps({"schema_version": 1, "jobs": [{"llm_cost_usd": 4.5}]}),
+    )
+
+    assert aggregator._load_persisted_cache(store) is None

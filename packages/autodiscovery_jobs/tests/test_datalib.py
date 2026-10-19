@@ -101,6 +101,15 @@ def test_build_job_args_datalib_dirs_modal():
     assert "--bucket_path=gs://test-bucket/users/u1/jobs/j1/data" in args
 
 
+def test_build_job_args_datalib_dirs_follow_the_mount_root():
+    """The process backend reads the store in place, under its own directory."""
+    args = build_job_args(
+        "u1", "j1", JobConfig(), n_experiments=3, datalib_dirs=["census"], mount_root="/srv/ad"
+    )
+
+    assert "--datalib_dir=/srv/ad/users/u1/datalib/census" in args
+
+
 def test_build_job_args_without_datalib_is_unchanged():
     config = JobConfig(bucket="test-bucket", code_execution_backend="modal")
 

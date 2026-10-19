@@ -1011,31 +1011,25 @@ def create() -> Blueprint:
                             {"error": f"Failed to prepare preloaded dataset: {str(e)}"}
                         ), 500
 
-            # Data-library directories are mounted, not copied, so they must still
-            # exist in the submitting user's own library at launch.
-            datalib_dirs = metadata.get("datalib_dirs") or []
-            if datalib_dirs:
-                # Returned directly: a BadRequest raised in this block would be
-                # caught by the catch-all below and reported as a 500.
-                try:
-                    missing = manager.missing_datalib_dirs(req.userid, datalib_dirs)
-                except ValueError as e:
-                    return jsonify({"error": str(e)}), 400
-                if missing:
-                    noun = "directory" if len(missing) == 1 else "directories"
-                    return jsonify(
-                        {"error": f"Data library {noun} not found: {', '.join(missing)}"}
-                    ), 400
-            if not datasets and not datalib_dirs:
-                return jsonify(
-                    {"error": "Select at least one dataset or data library directory."}
-                ), 400
-
             intent = metadata.get("intent", "")
             n_experiments = metadata.get("n_experiments")
 
             if n_experiments is None:
                 raise BadRequest("Number of Experiments is required in metadata")
+
+            # Data-library directories are mounted, not copied, so they must still
+            # exist in the submitting user's own library at launch.
+            datalib_dirs = metadata.get("datalib_dirs") or []
+            if datalib_dirs:
+                try:
+                    missing = manager.missing_datalib_dirs(req.userid, datalib_dirs)
+                except ValueError as e:
+                    raise BadRequest(str(e)) from e
+                if missing:
+                    noun = "directory" if len(missing) == 1 else "directories"
+                    raise BadRequest(f"Data library {noun} not found: {', '.join(missing)}")
+            if not datasets and not datalib_dirs:
+                raise BadRequest("Select at least one dataset or data library directory.")
 
             # Validate experiment count and sufficient credits before submission
             check_experiment_limits(
@@ -1105,6 +1099,9 @@ def create() -> Blueprint:
             return jsonify(
                 {"error": e.message, "requested": e.requested, "available": e.available}
             ), 402  # Payment Required
+
+        except BadRequest as e:
+            return jsonify({"error": e.description}), 400
 
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")

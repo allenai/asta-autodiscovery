@@ -37,6 +37,7 @@ inventing its own mapping.
 | --- | --- |
 | Docker job container (`JOB_BACKEND=docker`) | A read-only bind of `$STORAGE_HOST_DIR/users/<uid>/datalib/<dir>`, beside the run's own read-write bind. |
 | Cloud Run job container (`JOB_BACKEND=gcp`) | Already there: the job definition mounts the whole bucket at `/mnt/data`. |
+| Host process (`JOB_BACKEND=process`) | Already there: the job reads the local store in place, so the path is `$STORAGE_DIR/users/<uid>/datalib/<dir>` (the store's directory stands in for `/mnt/data`). Not read-only, like the rest of the store for this backend. |
 | Modal sandbox (`CODE_EXECUTION_BACKEND=modal`) | A read-only `CloudShare` of `gs://<bucket>/users/<uid>/datalib/<dir>/` at the same path. |
 | `process` / `local` code execution | Runs in the job container, so reads the container's path directly. |
 

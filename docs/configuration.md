@@ -112,12 +112,18 @@ Each AutoDiscovery run is launched by a swappable **job backend**, selected with
   single-user/on-prem deployments.
 - `gcp` — runs the job as a Google Cloud Run job execution. Deployments that run jobs on Cloud
   Run must set `JOB_BACKEND=gcp` explicitly.
+- `process` — runs the job as a subprocess on the API's own host, with no container runtime.
+  For single-user use on your own machine when the API itself runs outside a container; see
+  [Process backend](#process-backend).
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `JOB_BACKEND` | No | `docker` | Job backend: `docker` (local containers) or `gcp` (Cloud Run). |
+| `JOB_BACKEND` | No | `docker` | Job backend: `docker` (local containers), `gcp` (Cloud Run), or `process` (host subprocesses). |
 | `AUTODISCOVERY_IMAGE` | docker | `autodiscovery:dev` | **docker backend.** Image the backend launches per job. Build it locally with `docker compose build autodiscovery`. |
 | `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | **gcp backend.** Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+| `PROCESS_JOB_PYTHON` | No | *(the API's interpreter)* | **process backend.** Python interpreter that runs the engine (`python -m autodiscovery.run`). It must have the `asta-autodiscovery` package installed, e.g. the repository's `.venv/bin/python` after `make sync`. |
+| `PROCESS_JOB_DIR` | No | `~/.autodiscovery/jobs` | **process backend.** Directory holding one subdirectory per job execution: its state, its output log (`job.log`), and the job's working directory (`work/`). |
+| `PROCESS_MAX_CONCURRENT_JOBS` | No | `1` | **process backend.** How many jobs may run at once; submitting another while that many are running is an error. `0` removes the cap. |
 
 When `GOOGLE_APPLICATION_CREDENTIALS` is set, the docker backend bind-mounts that key into each
 job container so Google-hosted models (Vertex AI) can authenticate. It uses the **host** path
@@ -157,6 +163,41 @@ your host.
 > multi-user deployment (e.g. `AUTH_PROVIDER=password_file`) prefer `JOB_BACKEND=gcp`, where the
 > API only holds scoped cloud credentials.
 
+### Process backend
+
+`JOB_BACKEND=process` launches each run as a subprocess of the API, on the API's host:
+`$PROCESS_JOB_PYTHON -m autodiscovery.run` with the same arguments the container backends
+pass. It suits a single-user setup on your own machine where the API runs directly on the
+host rather than in compose, and needs no container runtime.
+
+`make dev-host` runs the whole stack that way, with no Docker: the API under gunicorn and the
+UI under Vite's dev server, which forwards `/api` to the API as nginx does under compose. It
+sets `JOB_BACKEND=process`, `STORAGE_BACKEND=local` and `AUTH_PROVIDER=none`, keeps both
+servers on `127.0.0.1`, and otherwise reads `.env` the way compose does (shell values win).
+`STORAGE_DIR` is taken from the shell and defaults to `./data`, the same directory `make dev`
+uses. The UI is at http://localhost:3000 (`DEV_HOST_UI_PORT`, `DEV_HOST_API_PORT` to move
+them). Stopping it leaves a run in progress running; the API reports its outcome once
+restarted.
+
+There is no mount. The job reads and writes the run's directory in the local store in place,
+so the backend requires `STORAGE_BACKEND=local`, and its arguments name `STORAGE_DIR` (made
+absolute) where the container backends name `/mnt/data`. The job inherits the API's whole
+environment, so provider credentials need no forwarding: whatever lets the API's own process
+reach the model (keys, `gcloud auth application-default login`, a cached Copilot token) works
+for the job too.
+
+Each execution gets a directory under `PROCESS_JOB_DIR`; the run's execution ID names it. Its
+`job.log` is what the run's logs view shows, and the job records its own exit status there,
+so status stays correct when the API restarts, or a different API worker answers, while a
+run is in progress. Cancelling a run stops the job's whole process group.
+
+> **Security note.** Nothing scopes what a process job can reach. The job, and the generated
+> code it runs under `CODE_EXECUTION_BACKEND=process` or `local`, run as the API's user and
+> can read every user's data in the store and every credential in the API's environment —
+> the same trust model as the [standalone CLI](autodiscovery/standalone.md). Use it only
+> with `AUTH_PROVIDER=none`; the API warns at startup when it is paired with a multi-user
+> auth provider.
+
 ## Code-execution backend
 
 The AD job runs the LLM-generated experiment code through a configurable executor, selected with
@@ -190,6 +231,7 @@ rather than running against data the job or sandbox cannot see:
 | --- | --- | --- |
 | `JOB_BACKEND=docker` | ✅ | ❌ local job containers bind-mount a host directory, not a bucket |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
+| `JOB_BACKEND=process` | ✅ | ❌ a host job process reads the run's directory in place, which a bucket cannot provide |
 | `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
@@ -205,6 +247,7 @@ job backend (how the mount is scoped) and on whether the deployment is multi-use
 | `docker` | `process` / `local` | ✅ safe | ✅ safe — mount is scoped to the job's own prefix |
 | `gcp` | `process` / `local` | ✅ safe | ⚠️ **unsafe** — Cloud Run mounts the whole bucket; executed code can read every user's data |
 | `gcp` | `modal` | ✅ safe | ✅ safe — scoped, read-only per-job data mount |
+| `process` | `process` / `local` | ✅ safe | ⚠️ **unsafe** — the job runs on the API's host, with every user's data and the API's credentials in reach |
 
 The unsafe combination arises because Cloud Run's GCS mount is fixed per job (it cannot be scoped
 per execution), while the docker backend re-mounts only the current job's prefix each run. The API

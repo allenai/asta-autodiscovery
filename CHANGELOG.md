@@ -91,6 +91,13 @@ lines at full speed. Exploration now stops after that failure.
 
 [#79]: https://github.com/allenai/asta-autodiscovery/issues/79
 
+### Added: every run writes the static HTML report
+
+`python -m autodiscovery.run` now writes `report/index.html` into the run's
+results directory when it finishes, as `auto-discovery` already did. A run
+leaves the same artifacts whichever way it is launched, including as a webapp
+job. A report that cannot be generated is a warning; the run's results stand.
+
 ## 1.0.1
 
 ### Breaking: Vertex AI is configured with litellm's own variables ([#78])

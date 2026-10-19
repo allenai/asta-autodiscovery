@@ -26,21 +26,24 @@ from ..model_config import MODEL_ENV, chosen_model
 _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
 
 #: In-container path where the store root appears to the job, so a run's data is
-#: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every job backend mounts at this path
-#: (Cloud Run as a GCS volume, docker as a host bind mount) so the job arguments
-#: are backend-agnostic. The deployed Cloud Run job definition must agree
-#: (``--add-volume-mount`` in ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
+#: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every container job backend mounts at
+#: this path (Cloud Run as a GCS volume, docker as a host bind mount) so the job
+#: arguments are backend-agnostic. The process backend has no container to mount
+#: into and passes the store's own root instead (``mount_root``). The deployed
+#: Cloud Run job definition must agree (``--add-volume-mount`` in
+#: ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
 JOB_MOUNT_ROOT = "/mnt/data"
 
 
-def datalib_mount_path(userid: str, dirname: str) -> str:
-    """In-container path of a data-library directory: its key under the mount root.
+def datalib_mount_path(userid: str, dirname: str, mount_root: str = JOB_MOUNT_ROOT) -> str:
+    """Path of a data-library directory as the job sees it: its key under the mount root.
 
-    The data library is mounted at the same store-shaped path in every
-    environment — job container and Modal sandbox alike — so there is no
-    per-environment path mapping.
+    The data library appears at the same store-shaped path in every environment
+    — job container and Modal sandbox alike — so there is no per-environment
+    path mapping. The process backend, which reads the store in place, passes
+    the store's own directory as ``mount_root``.
     """
-    return f"{JOB_MOUNT_ROOT}/{datalib_dir(userid, validate_datalib_dirname(dirname))}"
+    return f"{mount_root}/{datalib_dir(userid, validate_datalib_dirname(dirname))}"
 
 
 def build_job_args(
@@ -61,6 +64,8 @@ def build_job_args(
     code_timeout: int | None = None,
     n_warmstart: int | None = None,
     datalib_dirs: list[str] | None = None,
+    *,
+    mount_root: str = JOB_MOUNT_ROOT,
     **kwargs: Any,
 ) -> list[str]:
     """Build the CLI argument list passed to the AD job container.
@@ -92,7 +97,10 @@ def build_job_args(
         code_timeout: Timeout for code execution in seconds (optional)
         n_warmstart: Number of warmstart experiments (optional)
         datalib_dirs: Names of the user's data-library directories to expose to
-            the job, read-only, at :func:`datalib_mount_path` (optional)
+            the job at :func:`datalib_mount_path` under ``mount_root`` (optional)
+        mount_root: Where the store root appears to the job. Container backends
+            keep the default, :data:`JOB_MOUNT_ROOT`; the process backend passes
+            the local store's directory.
         **kwargs: Additional arguments to pass to the job
 
     Returns:
@@ -130,8 +138,8 @@ def build_job_args(
 
     # Construct paths
     job_base = job_dir(userid, jobid)
-    metadata_path = f"{JOB_MOUNT_ROOT}/{job_base}/metadata.json"
-    output_path = f"{JOB_MOUNT_ROOT}/{job_base}/output"
+    metadata_path = f"{mount_root}/{job_base}/metadata.json"
+    output_path = f"{mount_root}/{job_base}/output"
 
     # Build arguments - required ones first
     args = [
@@ -154,7 +162,7 @@ def build_job_args(
     # job backend makes them readable there; the modal sandbox mounts each from
     # the bucket by the key its path implies, like the run's own data.
     for dirname in datalib_dirs or []:
-        args.append(f"--datalib_dir={datalib_mount_path(userid, dirname)}")
+        args.append(f"--datalib_dir={datalib_mount_path(userid, dirname, mount_root)}")
 
     args.append(f"--model={model}")
     for role, role_model in role_models.items():

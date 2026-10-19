@@ -15,6 +15,9 @@ export default defineConfig({
         hmr: process.env.VITE_HMR_CLIENT_PORT
             ? { clientPort: Number(process.env.VITE_HMR_CLIENT_PORT) }
             : undefined,
+        // `make dev-host` runs the API on this host with no nginx in front, so the
+        // dev server forwards /api to it instead.
+        proxy: process.env.API_PROXY_TARGET ? { '/api': process.env.API_PROXY_TARGET } : undefined,
     },
     preview: { host: true, port: 3000 },
 });

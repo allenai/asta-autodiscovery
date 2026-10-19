@@ -164,6 +164,15 @@ your host.
 pass. It suits a single-user setup on your own machine where the API runs directly on the
 host rather than in compose, and needs no container runtime.
 
+`make dev-host` runs the whole stack that way, with no Docker: the API under gunicorn and the
+UI under Vite's dev server, which forwards `/api` to the API as nginx does under compose. It
+sets `JOB_BACKEND=process`, `STORAGE_BACKEND=local` and `AUTH_PROVIDER=none`, keeps both
+servers on `127.0.0.1`, and otherwise reads `.env` the way compose does (shell values win).
+`STORAGE_DIR` is taken from the shell and defaults to `./data`, the same directory `make dev`
+uses. The UI is at http://localhost:3000 (`DEV_HOST_UI_PORT`, `DEV_HOST_API_PORT` to move
+them). Stopping it leaves a run in progress running; the API reports its outcome once
+restarted.
+
 There is no mount. The job reads and writes the run's directory in the local store in place,
 so the backend requires `STORAGE_BACKEND=local`, and its arguments name `STORAGE_DIR` (made
 absolute) where the container backends name `/mnt/data`. The job inherits the API's whole

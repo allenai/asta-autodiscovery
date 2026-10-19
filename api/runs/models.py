@@ -146,6 +146,14 @@ class MetadataModel(BaseModel):
     datasets: list[MetadataDatasetModel] | None = Field(
         None, description="List of datasets associated with the run"
     )
+    datalib_dirs: list[str] | None = Field(
+        None,
+        description="Names of the user's data-library directories mounted read-only into the run",
+    )
+    global_datalib_dirs: list[str] | None = Field(
+        None,
+        description="Names of global data-library directories mounted read-only into the run",
+    )
 
     # Bookmarking
     is_bookmarked: bool | None = Field(
@@ -197,6 +205,8 @@ class MetadataModel(BaseModel):
             domain=data.get("domain"),
             intent=data.get("intent"),
             datasets=datasets,
+            datalib_dirs=data.get("datalib_dirs"),
+            global_datalib_dirs=data.get("global_datalib_dirs"),
             is_shared=data.get("is_shared"),
             is_bookmarked=data.get("is_bookmarked"),
             bookmarked_experiment_ids=data.get("bookmarked_experiment_ids"),

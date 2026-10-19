@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from time import time
 
-from autodiscovery import llm
+from autodiscovery import datalib, llm
 from autodiscovery.agents import get_agents
 from autodiscovery.args import EMBEDDING_MODEL_ENV, MODEL_ENV, ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
@@ -327,6 +327,7 @@ def run_mcts(
     warmstart_experiments=None,
     backend="process",
     bucket_path=None,
+    datalib_dirs=None,
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
@@ -371,6 +372,7 @@ def run_mcts(
         warmstart_experiments: Path to JSON file with warmstart experiments to run after data loading but before MCTS selection.
         backend: Code execution backend (local, process, or modal).
         bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/).
+        datalib_dirs: Read-only data-library directories available to the run's code.
         vision_model: Model used for image analysis in code execution.
         batch_size: Number of nodes to select and expand per iteration.
         n_threads: Number of threads to use for parallel node expansion.
@@ -453,6 +455,7 @@ def run_mcts(
                 backend=backend,
                 bucket_path=bucket_path,
                 dataset_paths=dataset_paths,
+                datalib_dirs=datalib_dirs,
                 vision_model=vision_model,
                 usage_tracker=usage_tracker,
             )
@@ -747,6 +750,7 @@ def run_mcts(
                             backend=backend,
                             bucket_path=bucket_path,
                             dataset_paths=dataset_paths,
+                            datalib_dirs=datalib_dirs,
                             vision_model=vision_model,
                             usage_tracker=usage_tracker,
                         )
@@ -799,6 +803,7 @@ def run_mcts(
                         backend=backend,
                         bucket_path=bucket_path,
                         dataset_paths=dataset_paths,
+                        datalib_dirs=datalib_dirs,
                         vision_model=vision_model,
                         usage_tracker=usage_tracker,
                     )
@@ -953,11 +958,19 @@ def main(args) -> str:
     dataset_paths, dataset_metadata = get_datasets_fpaths(
         args.dataset_metadata, is_blade=args.dataset_metadata_type == "blade"
     )
+    # Describe the data-library directories once, and keep what the agents were
+    # told alongside the results: the directories are read in place, so their
+    # contents can change between runs.
+    datalib_manifests = datalib.build_manifests(args.datalib_dir)
+    if datalib_manifests:
+        with open(os.path.join(log_dirname, "datalib_manifest.json"), "w") as f:
+            json.dump([m.to_dict() for m in datalib_manifests], f, indent=2)
     load_dataset_experiment = get_load_dataset_experiment(
         dataset_paths,
         dataset_metadata,
         run_eda=args.run_eda,
         dataset_metadata_type=args.dataset_metadata_type,
+        datalib_manifests=datalib_manifests,
     )
 
     if args.continue_from_dir or args.continue_from_json:
@@ -1086,6 +1099,7 @@ def main(args) -> str:
         warmstart_experiments=args.warmstart_experiments,
         backend=args.backend,
         bucket_path=args.bucket_path,
+        datalib_dirs=args.datalib_dir,
         vision_model=args.vision_model,
         batch_size=args.batch_size,
         n_threads=args.n_threads,

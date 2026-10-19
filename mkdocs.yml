@@ -42,6 +42,7 @@ nav:
   - Quick start: quickstart.md
   - Configuration: configuration.md
   - Authentication: authentication.md
+  - Data Library: data-library.md
   - Autodiscovery:
       - Standalone CLI: autodiscovery/standalone.md
       - How It Works: autodiscovery/overview.md
@@ -62,6 +63,7 @@ nav:
       - System Architecture: design/architecture.md
       - Swappable Auth Providers: design/auth-providers.md
       - Swappable Persistence Backends: design/storage-backends.md
+      - Data Library: design/data-library.md
 
 markdown_extensions:
   - pymdownx.highlight:

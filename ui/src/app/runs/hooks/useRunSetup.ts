@@ -5,6 +5,7 @@ import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
+import { getUserApi, type DatalibDirFromApi, type DatalibScope } from '@/api/UserApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadDatasetFile, type UploadTarget } from '@/api/datasetUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
@@ -93,6 +94,19 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [hasAi1Permission, setHasAi1Permission] = useState(false);
     const [preloadedDescs, setPreloadedDescs] = useState<Record<string, string>>({});
+    // Data library: read-only directories already in storage, mounted into the run
+    // as-is (no upload). `availableDatalibDirs` is what the user can pick from, both
+    // global (shared with all users) and the user's own; `scope` is always set. A
+    // global and a user directory may share a name, so selections are tracked per
+    // scope. The selected sets may also hold names restored from a draft or fork
+    // that no longer exist, so the user can see and deselect them.
+    const [availableDatalibDirs, setAvailableDatalibDirs] = useState<
+        (DatalibDirFromApi & { scope: DatalibScope })[]
+    >([]);
+    const [selectedDatalibDirs, setSelectedDatalibDirs] = useState<Set<string>>(new Set());
+    const [selectedGlobalDatalibDirs, setSelectedGlobalDatalibDirs] = useState<Set<string>>(
+        new Set()
+    );
     const selectedPreloadedDatasets = useMemo(() => {
         if (!hasAi1Permission) return [];
         return PRELOADED_DATASETS.filter((d) => selectedIds.has(d.id)).map((d) => ({
@@ -169,6 +183,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                         parentRunName: metadata.parentRunName ?? null,
                     }));
 
+                    setSelectedDatalibDirs(new Set(metadata.datalibDirs));
+                    setSelectedGlobalDatalibDirs(new Set(metadata.globalDatalibDirs));
+
                     // Populate fileUploads from saved datasets
                     if (metadata?.datasets && metadata.datasets.length > 0) {
                         const uploadStates: FileUploadState[] = metadata.datasets.map((dataset) => {
@@ -211,6 +228,27 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         fetchRunMetadata();
     }, [runid, api]);
 
+    // Fetch the viewer's data library directories. Failure (or no directories)
+    // simply hides the picker; it never blocks setting up a run.
+    useEffect(() => {
+        let cancelled = false;
+        getUserApi()
+            .getViewerDatalib()
+            .then(({ data }) => {
+                if (cancelled) return;
+                // Older responses have no `scope`; those entries are the user's own.
+                setAvailableDatalibDirs(
+                    (data.dirs ?? []).map((d) => ({ ...d, scope: d.scope ?? 'user' }))
+                );
+            })
+            .catch((err) => {
+                console.error('Error fetching data library directories:', err);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     // Warn user before leaving page if uploads are in progress
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -236,6 +274,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const fileUploadsRef = useRef(fileUploads);
     const settingsRef = useRef(settings);
     const selectedPreloadedRef = useRef(selectedPreloadedDatasets);
+    const selectedDatalibRef = useRef(selectedDatalibDirs);
+    const selectedGlobalDatalibRef = useRef(selectedGlobalDatalibDirs);
 
     useEffect(() => {
         fileUploadsRef.current = fileUploads;
@@ -248,6 +288,14 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     useEffect(() => {
         selectedPreloadedRef.current = selectedPreloadedDatasets;
     }, [selectedPreloadedDatasets]);
+
+    useEffect(() => {
+        selectedDatalibRef.current = selectedDatalibDirs;
+    }, [selectedDatalibDirs]);
+
+    useEffect(() => {
+        selectedGlobalDatalibRef.current = selectedGlobalDatalibDirs;
+    }, [selectedGlobalDatalibDirs]);
 
     useEffect(() => {
         fileUploads.forEach((upload, index) => {
@@ -299,6 +347,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         return [...uploads, ...preloaded];
     };
 
+    const getSelectedDatalibDirs = () => Array.from(selectedDatalibRef.current).sort();
+    const getSelectedGlobalDatalibDirs = () => Array.from(selectedGlobalDatalibRef.current).sort();
+
     const saveDatasetMetadata = useCallback(async () => {
         // Prevent concurrent saves
         if (isSavingMetadata.current) {
@@ -320,6 +371,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 domain: currentSettings.domain.trim(),
                 intent: currentSettings.intent.trim(),
                 datasets,
+                datalib_dirs: getSelectedDatalibDirs(),
+                global_datalib_dirs: getSelectedGlobalDatalibDirs(),
                 // Job configuration parameters
                 n_experiments: currentSettings.nExperiments,
                 exploration_weight: currentSettings.explorationWeight,
@@ -560,6 +613,8 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 domain: currentSettings.domain.trim(),
                 intent: currentSettings.intent.trim(),
                 datasets,
+                datalib_dirs: getSelectedDatalibDirs(),
+                global_datalib_dirs: getSelectedGlobalDatalibDirs(),
                 // Job configuration parameters
                 n_experiments: currentSettings.nExperiments,
                 exploration_weight: currentSettings.explorationWeight,
@@ -643,9 +698,16 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         // Check Files/Preloaded
         const hasNoFiles = fileUploads.length === 0;
         const hasNoPreloaded = selectedIds.size === 0;
+        const hasNoDatalib = selectedDatalibDirs.size === 0 && selectedGlobalDatalibDirs.size === 0;
 
-        if (hasNoFiles && hasNoPreloaded) {
-            errors.datasets = 'Please upload at least one file or select a preloaded dataset';
+        if (hasNoFiles && hasNoPreloaded && hasNoDatalib) {
+            const alternatives = [
+                hasAi1Permission ? 'a preloaded dataset' : null,
+                availableDatalibDirs.length > 0 ? 'a data library directory' : null,
+            ].filter(Boolean);
+            errors.datasets = alternatives.length
+                ? `Please upload at least one file or select ${alternatives.join(' or ')}`
+                : 'Please upload at least one file';
         }
 
         // Check Name & Description
@@ -745,6 +807,23 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         debouncedSaveMetadata(); // Auto-save when selection changes
     };
 
+    const toggleDatalibDir = (scope: DatalibScope, name: string) => {
+        const setSelected =
+            scope === 'global' ? setSelectedGlobalDatalibDirs : setSelectedDatalibDirs;
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
+        setFieldErrors((prev) => {
+            const { datasets, ...rest } = prev;
+            return rest;
+        });
+        setFormError(null);
+        debouncedSaveMetadata(); // Auto-save when selection changes
+    };
+
     const updatePreloadedDescription = (id: string, desc: string) => {
         setPreloadedDescs((prev) => ({ ...prev, [id]: desc }));
         debouncedSaveMetadata(); // Auto-save when description changes
@@ -793,5 +872,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         selectedDatasetIds: selectedIds,
         togglePreloadedDataset,
         updatePreloadedDescription,
+        availableDatalibDirs,
+        selectedDatalibDirs,
+        selectedGlobalDatalibDirs,
+        toggleDatalibDir,
     };
 }

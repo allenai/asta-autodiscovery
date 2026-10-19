@@ -77,6 +77,17 @@ def _validate_storage_config(config: JobConfig) -> None:
         )
 
 
+def _has_uploaded_datasets(metadata: dict[str, Any]) -> bool:
+    """Whether a run's metadata lists datasets stored in its own ``data/``.
+
+    Metadata written before the data library existed always lists some, so this
+    is only ``False`` for a run that reads solely from data-library directories.
+    """
+    return bool(metadata.get("datasets")) or not (
+        metadata.get("datalib_dirs") or metadata.get("global_datalib_dirs")
+    )
+
+
 def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
     """Warn when in-process code execution would expose other users' data.
 
@@ -175,6 +186,28 @@ class JobManager:
             List of user IDs
         """
         return persistence.list_user_ids(self.config)
+
+    # Data library
+
+    def list_datalib_dirs(self, userid: str) -> list[persistence.DatalibDir]:
+        """List the data-library directories a user can select, with their READMEs.
+
+        The global library's directories come first, then the user's own; each
+        carries its ``scope``.
+        """
+        return persistence.list_datalib_dirs(None, self.config) + persistence.list_datalib_dirs(
+            userid, self.config
+        )
+
+    def missing_datalib_dirs(self, userid: str | None, dirnames: list[str]) -> list[str]:
+        """Return which of ``dirnames`` are not in a data library.
+
+        ``userid=None`` checks the global library.
+
+        Raises:
+            ValueError: If any name is not a valid top-level directory name.
+        """
+        return persistence.missing_datalib_dirs(userid, dirnames, self.config)
 
     # Job management
 
@@ -276,8 +309,11 @@ class JobManager:
         new_run_id = str(uuid.uuid4())
         path = self.create_job(user_id, new_run_id)
 
-        # Verify parent data files still exist
-        if not self.has_data_files(parent_userid, parent_run_id):
+        # Verify parent data files still exist. A run that reads only from the
+        # data library has no uploads to copy.
+        if _has_uploaded_datasets(parent_metadata) and not self.has_data_files(
+            parent_userid, parent_run_id
+        ):
             raise DatasetExpiredError(
                 "The parent run's dataset has been deleted. "
                 "To start a new run, please upload your data again."
@@ -287,7 +323,9 @@ class JobManager:
         self.copy_job_data(parent_userid, parent_run_id, user_id, new_run_id)
 
         # Build and upload child metadata
-        child_metadata = self._build_fork_metadata(parent_metadata, parent_run_id)
+        child_metadata = self._build_fork_metadata(
+            parent_metadata, parent_run_id, same_owner=user_id == parent_userid
+        )
         self.upload_metadata(user_id, new_run_id, child_metadata)
 
         # Create run_details.json
@@ -300,8 +338,15 @@ class JobManager:
         )
 
     @staticmethod
-    def _build_fork_metadata(parent_metadata: dict[str, Any], parent_run_id: str) -> dict[str, Any]:
-        """Build child metadata from parent metadata for a fork operation."""
+    def _build_fork_metadata(
+        parent_metadata: dict[str, Any], parent_run_id: str, *, same_owner: bool = True
+    ) -> dict[str, Any]:
+        """Build child metadata from parent metadata for a fork operation.
+
+        User data-library selections name directories in the *parent owner's*
+        library, so they carry over only when the same user forks their own run.
+        Global selections are available to everyone and always carry over.
+        """
         parent_name = parent_metadata.get("name", "Untitled")
         return {
             # Descriptive fields from parent
@@ -310,6 +355,8 @@ class JobManager:
             "domain": parent_metadata.get("domain", ""),
             "intent": parent_metadata.get("intent", ""),
             "datasets": parent_metadata.get("datasets", []),
+            "datalib_dirs": (parent_metadata.get("datalib_dirs") or None) if same_owner else None,
+            "global_datalib_dirs": parent_metadata.get("global_datalib_dirs") or None,
             # Advanced settings from parent
             "n_experiments": parent_metadata.get("n_experiments"),
             "exploration_weight": parent_metadata.get("exploration_weight"),
@@ -600,6 +647,8 @@ class JobManager:
         exploration_weight: float | None = None,
         code_timeout: int | None = None,
         n_warmstart: int | None = None,
+        datalib_dirs: list[str] | None = None,
+        global_datalib_dirs: list[str] | None = None,
         **kwargs,
     ) -> str:
         """Execute a Cloud Run job.
@@ -618,6 +667,10 @@ class JobManager:
             exploration_weight: Exploration weight for UCB1 (optional)
             code_timeout: Timeout for code execution in seconds (optional)
             n_warmstart: Number of warmstart experiments (optional)
+            datalib_dirs: Names of the user's data-library directories to mount
+                read-only into the job (optional)
+            global_datalib_dirs: Names of global data-library directories to
+                mount likewise (optional)
             **kwargs: Additional arguments
 
         Returns:
@@ -637,6 +690,8 @@ class JobManager:
             exploration_weight=exploration_weight,
             code_timeout=code_timeout,
             n_warmstart=n_warmstart,
+            datalib_dirs=datalib_dirs,
+            global_datalib_dirs=global_datalib_dirs,
             **kwargs,
         )
 

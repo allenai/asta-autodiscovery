@@ -1,6 +1,7 @@
 import json
 import os
 
+from autodiscovery.datalib import describe as describe_datalib
 from autodiscovery.utils import fetch_from_s3
 
 
@@ -206,31 +207,63 @@ def get_datasets_fpaths(dataset_metadata: str, is_blade=False) -> (list, str):
 
 
 def get_load_dataset_experiment(
-    dataset_paths, dataset_metadata, run_eda=False, dataset_metadata_type="asta"
+    dataset_paths,
+    dataset_metadata,
+    run_eda=False,
+    dataset_metadata_type="asta",
+    datalib_manifests=None,
 ):
-    # Set up the initial experiment to load the dataset
+    """Build the first experiment of a run: load the data and summarize it.
+
+    ``datalib_manifests`` (see :mod:`autodiscovery.datalib`) are read-only
+    directory trees provided alongside, or instead of, the metadata's datasets.
+    Because a directory may hold any number of datasets in any layout, the
+    experiment asks for it to be surveyed first rather than loaded wholesale.
+    """
+    datalib_manifests = datalib_manifests or []
     load_dataset_objective = "Load the dataset and generate summary statistics. "
     metadata_dir = os.path.dirname(os.path.abspath(dataset_metadata))
-    load_dataset_steps = f"1. Load the dataset(s) at {[os.path.relpath(dp, metadata_dir) for dp in dataset_paths]}.\n2. Generate summary statistics for the dataset(s)."
+    steps = []
+    if dataset_paths:
+        steps.append(
+            f"Load the dataset(s) at {[os.path.relpath(dp, metadata_dir) for dp in dataset_paths]}."
+        )
+    if datalib_manifests:
+        steps.append(
+            "Survey the read-only data library director(ies) at "
+            f"{[m.path for m in datalib_manifests]}: use each README.md and the file layout "
+            "to identify the dataset(s) they contain and how they are organized, then load "
+            "the relevant ones (reading selectively or sampling if they are large)."
+        )
+    steps.append("Generate summary statistics for the dataset(s).")
     load_dataset_deliverables = "1. Dataset(s) loaded.\n2. Summary statistics generated."
     if run_eda:
-        load_dataset_steps += "\n3. Perform some exploratory data analysis (EDA) on the dataset(s) to get a better understanding of the data."
+        steps.append(
+            "Perform some exploratory data analysis (EDA) on the dataset(s) to get a better understanding of the data."
+        )
         load_dataset_deliverables += "\n3. Exploratory data analysis (EDA) performed."
-    if dataset_metadata_type == "blade":
+    load_dataset_steps = "\n".join(f"{i}. {step}" for i, step in enumerate(steps, 1))
+    if dataset_paths or not datalib_manifests:
+        if dataset_metadata_type == "blade":
+            load_dataset_objective += (
+                f"Here is the dataset metadata:\n\n{get_blade_description(dataset_metadata)}"
+            )
+        elif dataset_metadata_type == "ai2":
+            load_dataset_objective += (
+                f"Here is the dataset metadata:\n\n{get_ai2_description(dataset_metadata)}"
+            )
+        elif dataset_metadata_type == "asta":
+            load_dataset_objective += (
+                f"Here is the dataset metadata:\n\n{get_asta_description(dataset_metadata)}"
+            )
+        else:  # DiscoveryBench-style
+            load_dataset_objective += (
+                f"Here is the dataset metadata:\n\n{get_dataset_description(dataset_metadata)}"
+            )
+    if datalib_manifests:
         load_dataset_objective += (
-            f"Here is the dataset metadata:\n\n{get_blade_description(dataset_metadata)}"
-        )
-    elif dataset_metadata_type == "ai2":
-        load_dataset_objective += (
-            f"Here is the dataset metadata:\n\n{get_ai2_description(dataset_metadata)}"
-        )
-    elif dataset_metadata_type == "asta":
-        load_dataset_objective += (
-            f"Here is the dataset metadata:\n\n{get_asta_description(dataset_metadata)}"
-        )
-    else:  # DiscoveryBench-style
-        load_dataset_objective += (
-            f"Here is the dataset metadata:\n\n{get_dataset_description(dataset_metadata)}"
+            "\n\nThe following read-only data library director(ies) are also provided:"
+            f"\n\n{describe_datalib(datalib_manifests)}"
         )
     load_dataset_experiment = {
         "hypothesis": None,

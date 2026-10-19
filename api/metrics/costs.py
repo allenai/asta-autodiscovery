@@ -34,27 +34,34 @@ _FALLBACK_PRICING = {"input": 2.00, "output": 12.00}
 
 # Global standard estimates, net of Google's 50% promotional credits through 2026.
 _FLASH_PROMO_END = datetime(2027, 1, 1, tzinfo=UTC)
+_FLASH_PROMO_MODELS = frozenset({"gemini-3.7-flash", "gemini-3.8-flash"})
 _FLASH_PROMO_PRICING = {"input": 0.75, "output": 3.75}
+
+
+def _parse_usage_time(usage_at: str | None) -> datetime | None:
+    """Parse a usage timestamp as UTC; missing and invalid values are unknown."""
+    try:
+        when = datetime.fromisoformat(usage_at) if usage_at else None
+    except (ValueError, TypeError):
+        return None
+    if when is None:
+        return None
+    return when.replace(tzinfo=UTC) if when.tzinfo is None else when.astimezone(UTC)
 
 
 def _lookup_pricing(model_name: str, *, usage_at: str | None = None) -> dict[str, float]:
     """Look up global standard pricing at an ISO timestamp, stripping provider prefixes.
 
-    Missing or invalid timestamps use the current time. Naive timestamps are UTC.
+    Missing or invalid timestamps use standard, non-promotional rates so estimates
+    never depend on scan time. Naive timestamps are UTC.
     """
-    # Strip provider prefix (e.g., "google/gemini-3.1-pro-preview" -> "gemini-3.1-pro-preview")
-    stripped = model_name.split("/")[-1] if "/" in model_name else model_name
-    if stripped in {"gemini-3.7-flash", "gemini-3.8-flash"}:
-        try:
-            when = datetime.fromisoformat(usage_at) if usage_at else datetime.now(UTC)
-        except (ValueError, TypeError):
-            when = datetime.now(UTC)
-        if when.tzinfo is None:
-            when = when.replace(tzinfo=UTC)
-        if when < _FLASH_PROMO_END:
+    pricing_key = model_name if model_name in LLM_PRICING else model_name.rsplit("/", 1)[-1]
+    if pricing_key in _FLASH_PROMO_MODELS:
+        when = _parse_usage_time(usage_at)
+        if when is not None and when < _FLASH_PROMO_END:
             return _FLASH_PROMO_PRICING
 
-    return LLM_PRICING.get(stripped, _FALLBACK_PRICING)
+    return LLM_PRICING.get(pricing_key, _FALLBACK_PRICING)
 
 
 def calculate_llm_cost(
@@ -64,7 +71,7 @@ def calculate_llm_cost(
 
     Args:
         usage_summary: The llm_usage_summary.json data with by_model breakdown.
-        usage_at: Run creation time for historical pricing. All usage in a run
+        usage_at: Resolved run timestamp for historical pricing. All usage in a run
             is estimated at this rate, including runs spanning a price change.
 
     Returns:

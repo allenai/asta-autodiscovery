@@ -40,9 +40,9 @@ def test_gemini_flash_promotional_pricing(model, usage_at, expected) -> None:
 @pytest.mark.parametrize("usage_at", [None, "", "invalid"])
 @pytest.mark.parametrize(
     ("now", "expected"),
-    [(datetime(2026, 12, 31, tzinfo=UTC), 0.75), (datetime(2027, 1, 1, tzinfo=UTC), 1.50)],
+    [(datetime(2026, 12, 31, tzinfo=UTC), 1.50), (datetime(2027, 1, 1, tzinfo=UTC), 1.50)],
 )
-def test_missing_usage_time_uses_current_rate(monkeypatch, usage_at, now, expected):
+def test_missing_usage_time_uses_standard_rate(monkeypatch, usage_at, now, expected):
     class FrozenDateTime(datetime):
         @classmethod
         def now(cls, tz=None):
@@ -69,3 +69,9 @@ def test_total_cost_uses_historical_rate(usage_at, expected):
     model = "vertex_ai/gemini-3.8-flash"
     usage = {"by_model": {model: {"prompt_tokens": 1_000_000, "total_tokens": 2_000_000}}}
     assert calculate_llm_cost(usage, usage_at=usage_at) == (expected, {model: expected})
+
+
+def test_exact_pricing_key_precedes_provider_stripping(monkeypatch):
+    exact_rate = {"input": 3.0, "output": 15.0}
+    monkeypatch.setitem(costs.LLM_PRICING, "custom/gemini-3.8-flash", exact_rate)
+    assert _lookup_pricing("custom/gemini-3.8-flash", usage_at="2026-12-31") == exact_rate

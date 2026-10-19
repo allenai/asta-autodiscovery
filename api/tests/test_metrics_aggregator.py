@@ -2,10 +2,11 @@
 
 import json
 import re
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
-from metrics import aggregator
+from metrics import aggregator, costs
 from metrics.aggregator import AggregatedData, JobSnapshot, MetricsCache
 
 BUCKET_ENV_VARS = ("GCS_BUCKET", "AUTODISCOVERY_BUCKET", "GCP_PROJECT")
@@ -136,8 +137,26 @@ def test_successful_refresh_clears_recorded_error():
     assert cache.last_error is None
 
 
-@pytest.mark.parametrize(("created_at", "expected"), [("2026-12-31", 4.5), ("2027-01-01", 9.0)])
-def test_gemini_pricing_date_reaches_all_dashboard_views(tmp_path, created_at, expected):
+@pytest.mark.parametrize(
+    ("created_at", "event_at", "finished_at", "expected"),
+    [
+        ("2026-12-31", "2027-01-01", "2027-01-01", 4.5),
+        ("2027-01-01", "2026-12-31", "2027-01-01", 9.0),
+        (None, "2026-12-31", "2027-01-01", 4.5),
+        ("invalid", "2026-12-31", "2027-01-01", 4.5),
+        (None, None, "2026-12-31", 4.5),
+        (None, "invalid", "2027-01-01", 9.0),
+        (None, "2027-01-01T00:30:00+01:00", None, 4.5),
+        (None, None, None, 9.0),
+        ("invalid", "invalid", "invalid", 9.0),
+    ],
+)
+@pytest.mark.parametrize(
+    "now", [datetime(2026, 12, 31, tzinfo=UTC), datetime(2027, 1, 2, tzinfo=UTC)]
+)
+def test_gemini_pricing_date_reaches_all_dashboard_views(
+    tmp_path, monkeypatch, created_at, event_at, finished_at, expected, now
+):
     """Rescanning old runs must not reprice them using the dashboard's current date."""
     config = aggregator.JobConfig(storage_backend="local", storage_dir=str(tmp_path))
     store = aggregator.get_store(config)
@@ -158,13 +177,15 @@ def test_gemini_pricing_date_reaches_all_dashboard_views(tmp_path, created_at, e
         "by_node": {"1": bucket},
     }
     store.write_text(
-        f"{base}/run_details.json", json.dumps({"status": "SUCCEEDED", "created_at": created_at})
+        f"{base}/run_details.json",
+        json.dumps({"status": "SUCCEEDED", "created_at": created_at, "finished_at": finished_at}),
     )
     store.write_text(f"{base}/output/llm_usage_summary.json", json.dumps(summary))
     store.write_text(
         f"{base}/output/llm_usage_events.jsonl",
         json.dumps(
             {
+                "ts": event_at,
                 "model": model,
                 "agent_name": "programmer",
                 "component": "chat",
@@ -174,11 +195,23 @@ def test_gemini_pricing_date_reaches_all_dashboard_views(tmp_path, created_at, e
         ),
     )
 
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    monkeypatch.setattr(costs, "datetime", FrozenDateTime)
     job = aggregator._scan_job("u1", "j1", store)
     assert job is not None
     assert job.llm_cost_usd == expected
+    assert job.created_at == created_at
+    data = AggregatedData(jobs=[job], refreshed_at=now.isoformat())
+    aggregator._save_persisted_cache(store, data)
+    restored = aggregator._load_persisted_cache(store)
+    assert restored is not None
+    assert restored.jobs == [job]
     cache = MetricsCache()
-    cache._data = AggregatedData(jobs=[job], refreshed_at="2099-01-01T00:00:00Z")
+    cache._data = restored
     with patch.object(aggregator, "get_metrics_cache", return_value=cache):
         detail = aggregator.compute_run_metrics("u1", "j1")
         assert detail["llm_cost_by_model"] == {model: expected}
@@ -194,12 +227,26 @@ def test_gemini_pricing_date_reaches_all_dashboard_views(tmp_path, created_at, e
         assert cost.total_reasoning_cost_usd == pytest.approx(expected / 6)
 
 
-def test_persisted_costs_from_before_dated_pricing_are_rebuilt(tmp_path):
+@pytest.mark.parametrize("schema_version", [1, 2])
+def test_persisted_costs_from_before_dated_pricing_are_rebuilt(tmp_path, schema_version):
     config = aggregator.JobConfig(storage_backend="local", storage_dir=str(tmp_path))
     store = aggregator.get_store(config)
     store.write_text(
         aggregator.PERSIST_BLOB_PATH,
-        json.dumps({"schema_version": 1, "jobs": [{"llm_cost_usd": 4.5}]}),
+        json.dumps({"schema_version": schema_version, "jobs": [{"llm_cost_usd": 4.5}]}),
     )
 
     assert aggregator._load_persisted_cache(store) is None
+
+
+def test_missing_creation_time_uses_earliest_valid_usage_timestamp():
+    events = [
+        {"ts": "2027-01-01T00:01:00Z"},
+        {"ts": "invalid"},
+        {"ts": "2027-01-01T00:30:00+01:00"},
+        {},
+        {"ts": "2026-12-31T23:45:00"},
+    ]
+    assert aggregator._resolve_pricing_time(None, events, "2027-01-02") == (
+        "2026-12-31T23:30:00+00:00"
+    )

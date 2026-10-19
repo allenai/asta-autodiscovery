@@ -1078,6 +1078,9 @@ def create() -> Blueprint:
                 {"error": e.message, "requested": e.requested, "available": e.available}
             ), 402  # Payment Required
 
+        except BadRequest as e:
+            return jsonify({"error": e.description}), 400
+
         except Exception as e:
             current_app.logger.error(f"Failed to submit run: {e}")
             return jsonify({"error": str(e)}), 500

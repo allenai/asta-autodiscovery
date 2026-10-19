@@ -26,10 +26,12 @@ from ..model_config import MODEL_ENV, chosen_model
 _CODE_EXECUTION_BACKENDS = ("process", "local", "modal")
 
 #: In-container path where the store root appears to the job, so a run's data is
-#: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every job backend mounts at this path
-#: (Cloud Run as a GCS volume, docker as a host bind mount) so the job arguments
-#: are backend-agnostic. The deployed Cloud Run job definition must agree
-#: (``--add-volume-mount`` in ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
+#: at ``/mnt/data/users/<uid>/jobs/<jid>``. Every container job backend mounts at
+#: this path (Cloud Run as a GCS volume, docker as a host bind mount) so the job
+#: arguments are backend-agnostic. The process backend has no container to mount
+#: into and passes the store's own root instead (``mount_root``). The deployed
+#: Cloud Run job definition must agree (``--add-volume-mount`` in
+#: ``packages/autodiscovery/scripts/rebuild_and_deploy.sh``).
 JOB_MOUNT_ROOT = "/mnt/data"
 
 
@@ -50,6 +52,8 @@ def build_job_args(
     exploration_weight: float | None = None,
     code_timeout: int | None = None,
     n_warmstart: int | None = None,
+    *,
+    mount_root: str = JOB_MOUNT_ROOT,
     **kwargs: Any,
 ) -> list[str]:
     """Build the CLI argument list passed to the AD job container.
@@ -80,6 +84,9 @@ def build_job_args(
         exploration_weight: Exploration weight for UCB1 (optional)
         code_timeout: Timeout for code execution in seconds (optional)
         n_warmstart: Number of warmstart experiments (optional)
+        mount_root: Where the store root appears to the job. Container backends
+            keep the default, :data:`JOB_MOUNT_ROOT`; the process backend passes
+            the local store's directory.
         **kwargs: Additional arguments to pass to the job
 
     Returns:
@@ -117,8 +124,8 @@ def build_job_args(
 
     # Construct paths
     job_base = job_dir(userid, jobid)
-    metadata_path = f"{JOB_MOUNT_ROOT}/{job_base}/metadata.json"
-    output_path = f"{JOB_MOUNT_ROOT}/{job_base}/output"
+    metadata_path = f"{mount_root}/{job_base}/metadata.json"
+    output_path = f"{mount_root}/{job_base}/output"
 
     # Build arguments - required ones first
     args = [

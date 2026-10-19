@@ -42,6 +42,11 @@ def test_manager_default_config(monkeypatch):
         ("gcp", "modal", "password_file", False),
         # Safe: single-user (no multi-tenant exposure).
         ("gcp", "process", "none", False),
+        # Unsafe: host processes see every user's data, whatever runs the code.
+        ("process", "process", "password_file", True),
+        ("process", "local", "auth0", True),
+        # Safe: the process backend's intended single-user use.
+        ("process", "process", "none", False),
     ],
 )
 def test_unsafe_code_execution_warning(
@@ -76,6 +81,9 @@ def test_unsafe_code_execution_warning(
         ("local", "docker", "modal"),
         # A local job container bind-mounts a host directory; a bucket has none.
         ("gcs", "docker", "process"),
+        # A host job process reads the run's directory in place.
+        ("gcs", "process", "process"),
+        ("local", "process", "modal"),
         # Unknown backend name.
         ("s3", "docker", "process"),
     ],
@@ -97,6 +105,8 @@ def test_rejects_unworkable_storage_config(storage_backend, backend, code_backen
     "storage_backend,backend,code_backend",
     [
         ("local", "docker", "process"),  # the out-of-the-box default
+        ("local", "process", "process"),
+        ("local", "process", "local"),
         ("gcs", "gcp", "process"),
         ("gcs", "gcp", "modal"),
     ],

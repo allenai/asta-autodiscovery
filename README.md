@@ -53,6 +53,10 @@ whatever was last built. See
 [docs/configuration.md](docs/configuration.md#docker-backend-default) for the job backends and the
 environment they need.
 
+To run the same stack without Docker — API, UI, and each run as processes on your machine,
+single-user — use `make dev-host` instead; see
+[docs/configuration.md](docs/configuration.md#process-backend).
+
 ## Running Tests
 
 ```sh

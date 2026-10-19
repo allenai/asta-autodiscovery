@@ -700,12 +700,12 @@ function renderDetail() {
     </div>
     ${beliefHtml}
     ${n.hypothesis ? `<div class="detail-section"><h4>Hypothesis</h4><div class="md-content">${renderMarkdown(n.hypothesis)}</div></div>` : ''}
-    ${n.analysis ? `<div class="detail-section"><h4>Analysis</h4><div class="md-content">${renderMarkdown(n.analysis)}</div></div>` : ''}
+    ${n.analysis ? `<div class="detail-section"><h4>Findings</h4><div class="md-content">${renderMarkdown(n.analysis)}</div></div>` : ''}
     ${planHtml}
     ${codeHtml}
     ${outputHtml}
     ${figuresHtml}
-    ${n.review && n.review !== 'N/A' ? `<div class="detail-section"><h4>Review</h4><div class="md-content">${renderMarkdown(n.review)}</div></div>` : ''}
+    ${n.review && n.review !== 'N/A' ? `<div class="detail-section"><h4>Validity Check</h4><div class="md-content">${renderMarkdown(n.review)}</div></div>` : ''}
   `;
 }
 

@@ -68,7 +68,7 @@ export function ExperimentContextSummary({
 
             {experiment.analysis && (
                 <Box>
-                    <SectionHeader>Analysis</SectionHeader>
+                    <SectionHeader>Findings</SectionHeader>
                     <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
                 </Box>
             )}

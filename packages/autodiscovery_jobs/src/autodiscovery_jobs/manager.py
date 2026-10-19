@@ -26,6 +26,8 @@ def _validate_storage_config(config: JobConfig) -> None:
       so they need ``gcs``; they cannot mount a directory on this host.
     - **Docker jobs** (``JOB_BACKEND=docker``) bind-mount the run's directory from
       the host, so they need ``local``; a bucket has no host directory.
+    - **Process jobs** (``JOB_BACKEND=process``) read and write the run's directory
+      in place on this host, so they need ``local`` too.
     - **Modal sandboxes** (``CODE_EXECUTION_BACKEND=modal``) mount the run's data
       prefix from ``gs://`` (``--bucket_path``), so they need ``gcs``.
 
@@ -59,6 +61,13 @@ def _validate_storage_config(config: JobConfig) -> None:
             f"cannot provide. Set STORAGE_BACKEND=local, or JOB_BACKEND=gcp. {see}"
         )
 
+    if job_backend == "process" and is_gcs:
+        raise StorageBackendError(
+            "STORAGE_BACKEND=gcs is incompatible with JOB_BACKEND=process: a job process "
+            "reads the run's directory in place on this host, which a bucket cannot "
+            f"provide. Set STORAGE_BACKEND=local, or JOB_BACKEND=gcp. {see}"
+        )
+
     if config.code_execution_backend == "modal" and not is_gcs:
         raise StorageBackendError(
             f"STORAGE_BACKEND={config.storage_backend} is incompatible with "
@@ -78,6 +87,12 @@ def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
     ``gcp`` + in-process + a multi-user auth provider is a cross-tenant exposure:
     steer such deployments to ``CODE_EXECUTION_BACKEND=modal`` (scoped, read-only).
 
+    The process job backend has no container at all: the job and its generated
+    code run on the API's host as the API's user, seeing the whole store and the
+    API's environment. With a multi-user auth provider that is the same exposure,
+    with no code-execution setting that avoids it (``modal`` needs ``gcs``, which
+    the process backend cannot use).
+
     This is a loud warning rather than a hard failure; when the configuration
     syntax gains cross-field validation (issue #54) it can become a real
     constraint. Single-user local mode (AUTH_PROVIDER=none) is unaffected.
@@ -92,6 +107,13 @@ def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
             "exposes every user's data to executed code. Set CODE_EXECUTION_BACKEND=modal "
             "for a scoped, read-only per-job data mount. See docs/configuration.md.",
             config.code_execution_backend,
+        )
+    if config.backend == "process" and multi_user:
+        logger.warning(
+            "UNSAFE CONFIG: JOB_BACKEND=process runs each job, and the untrusted code it "
+            "generates, directly on this host with access to every user's data and the "
+            "API's credentials. It is meant for single-user use (AUTH_PROVIDER=none). For "
+            "a multi-user deployment use JOB_BACKEND=docker or gcp. See docs/configuration.md."
         )
 
 

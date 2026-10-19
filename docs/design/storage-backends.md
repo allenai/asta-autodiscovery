@@ -154,6 +154,7 @@ Each job backend is tied to one store, and Modal needs `gs://`:
 | --- | --- | --- |
 | `JOB_BACKEND=docker` | ✅ job container bind-mounts the run's host directory | ❌ local job containers bind-mount a host directory, not a bucket |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ Cloud Run mounts the bucket |
+| `JOB_BACKEND=process` | ✅ the job process reads the run's directory in place | ❌ a host process has no bucket mount |
 | `CODE_EXECUTION_BACKEND=process`/`local` | ✅ reads the job's own mount | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
@@ -173,6 +174,10 @@ arguments are byte-identical across job backends:
 ```
 bind  $STORAGE_HOST_DIR/users/<uid>/jobs/<jid>  →  /mnt/data/users/<uid>/jobs/<jid>
 ```
+
+The process job backend, added later, has no container and so no mount: its job reads the
+store in place, and its arguments name the store's own root (`STORAGE_DIR`) where the
+container backends name `/mnt/data`. Below the root the keys are the same.
 
 A bind mount needs no FUSE device, no extra capabilities, and no credentials. The only
 credential a docker job container receives is the GCP key, bind-mounted when

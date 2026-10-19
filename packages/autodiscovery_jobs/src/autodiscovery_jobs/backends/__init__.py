@@ -2,9 +2,9 @@
 
 A backend launches the AD job image and reports on the resulting execution.
 The concrete backend is selected per deployment via ``config.backend``
-(``JOB_BACKEND`` env var): ``gcp`` (Cloud Run, the production default) or
-``docker`` (local containers). Use :func:`get_backend` to obtain the configured
-implementation.
+(``JOB_BACKEND`` env var): ``gcp`` (Cloud Run, the production default),
+``docker`` (local containers), or ``process`` (subprocesses on the API's host).
+Use :func:`get_backend` to obtain the configured implementation.
 """
 
 from __future__ import annotations
@@ -37,20 +37,19 @@ def get_backend(config: JobConfig | None = None) -> JobBackend:
         from .docker import DockerBackend
 
         return DockerBackend(config)
-    if backend == "local":
-        from .local import LocalProcessBackend
+    if backend == "process":
+        from .process import ProcessBackend
 
-        return LocalProcessBackend(config)
+        return ProcessBackend(config)
 
     raise JobBackendError(
-        f"Unknown job backend '{config.backend}'. Expected 'gcp', 'docker', or 'local'."
+        f"Unknown job backend '{config.backend}'. Expected 'gcp', 'docker', or 'process'."
     )
 
 
 __all__ = [
     "JobBackend",
     "CloudRunBackend",
-    "LocalProcessBackend",
     "build_job_args",
     "get_backend",
 ]

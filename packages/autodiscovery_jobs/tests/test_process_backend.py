@@ -1,186 +1,199 @@
-"""Tests for managed local subprocess execution."""
+"""Tests for the host-process job backend."""
 
 from __future__ import annotations
 
 import json
-import stat
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 from autodiscovery_jobs import JobManager
-from autodiscovery_jobs.backends.local import LocalProcessBackend
+from autodiscovery_jobs.backends import get_backend
+from autodiscovery_jobs.backends.process import ProcessBackend
 from autodiscovery_jobs.config import JobConfig
-from autodiscovery_jobs.local_runner import LocalProcessRunner
-from autodiscovery_jobs.run_details import (
-    create_run_details,
-    get_run_details,
-    update_run_details,
-)
+from autodiscovery_jobs.exceptions import JobBackendError
 
 
 @pytest.fixture
-def runner(tmp_path: Path) -> LocalProcessRunner:
-    """Create a single-slot local runner in a temporary directory."""
-    return LocalProcessRunner(JobConfig(local_root=str(tmp_path)))
+def process_config(tmp_path: Path) -> JobConfig:
+    """A process-backend configuration on a local store under ``tmp_path``."""
+    return JobConfig(
+        storage_backend="local",
+        storage_dir=str(tmp_path / "store"),
+        backend="process",
+        job_name="test-job",
+        process_job_dir=str(tmp_path / "executions"),
+    )
 
 
-def wait_for_phase(
-    runner: LocalProcessRunner,
-    execution_id: str,
-    phases: set[str],
-    timeout: float = 5,
-) -> dict:
-    """Wait for a test execution to enter one of the expected phases."""
+def fake_engine(config: JobConfig) -> JobConfig:
+    """Return ``config`` with the engine replaced by the Python in ``$SCRIPT``.
+
+    The backend runs ``<python> -m autodiscovery.run <args>``; a wrapper standing
+    in for the interpreter ignores those and runs the inline script instead.
+    """
+    wrapper = Path(config.process_job_dir).parent / "fake-python"
+    wrapper.write_text(f'#!/bin/sh\nexec "{sys.executable}" -c "$SCRIPT"\n', encoding="utf-8")
+    wrapper.chmod(0o755)
+    return replace(config, process_job_python=str(wrapper))
+
+
+def launch(config: JobConfig, script: str, monkeypatch) -> tuple[ProcessBackend, str]:
+    monkeypatch.setenv("SCRIPT", script)
+    backend = ProcessBackend(fake_engine(config))
+    return backend, backend.run_job("testuser", "job1", n_experiments=2)
+
+
+def wait_for_phase(backend: ProcessBackend, execution_id: str, phase: str, timeout=10) -> dict:
     deadline = time.monotonic() + timeout
+    status: dict = {}
     while time.monotonic() < deadline:
-        status = runner.get_status(execution_id)
-        if status["phase"] in phases:
+        status = backend.get_job_status(execution_id)
+        if status["phase"] == phase:
             return status
-        time.sleep(0.01)
-    raise AssertionError(f"Execution did not reach {phases}")
+        time.sleep(0.02)
+    raise AssertionError(f"Execution did not reach {phase}: {status}")
 
 
-def test_success_and_logs(runner: LocalProcessRunner, tmp_path: Path) -> None:
-    """Persist successful completion and captured output."""
-    execution_id = runner.start(
-        [sys.executable, "-c", "print('completed')"],
-        run_id="run-1",
-        cwd=tmp_path / "work",
-        log_path=tmp_path / "logs" / "run.log",
+def test_get_backend_process(process_config):
+    assert isinstance(get_backend(process_config), ProcessBackend)
+
+
+def test_run_job_runs_the_engine_on_the_store_in_place(process_config, monkeypatch):
+    """The job gets the shared args, rooted at the local store instead of a mount."""
+    backend, execution_id = launch(
+        process_config, "import sys; print(' '.join(sys.argv[1:]))", monkeypatch
     )
 
-    status = wait_for_phase(runner, execution_id, {"SUCCEEDED"})
-
-    assert status["return_code"] == 0
-    assert runner.get_logs(execution_id) == ["completed"]
-
-
-def test_failure_is_persisted(runner: LocalProcessRunner, tmp_path: Path) -> None:
-    """Persist a nonzero process exit as a failed execution."""
-    execution_id = runner.start(
-        [sys.executable, "-c", "raise SystemExit(7)"],
-        run_id="run-1",
-        cwd=tmp_path / "work",
-        log_path=tmp_path / "logs" / "run.log",
+    state = json.loads(
+        (Path(process_config.process_job_dir) / execution_id / "state.json").read_text()
     )
+    command = state["command"]
+    store = Path(process_config.storage_dir).resolve()
+    assert command[1:3] == ["-m", "autodiscovery.run"]
+    assert f"--dataset_metadata={store}/users/testuser/jobs/job1/metadata.json" in command
+    assert f"--out_dir={store}/users/testuser/jobs/job1/output" in command
+    assert "--model=openai/test-model" in command
+    assert execution_id.startswith("test-job-")
+    wait_for_phase(backend, execution_id, "SUCCEEDED")
 
-    status = wait_for_phase(runner, execution_id, {"FAILED"})
 
-    assert status["return_code"] == 7
+def test_success_and_logs(process_config, monkeypatch):
+    backend, execution_id = launch(process_config, "print('completed')", monkeypatch)
+
+    status = wait_for_phase(backend, execution_id, "SUCCEEDED")
+
+    assert status["exit_code"] == 0
+    assert status["completion_time"]
+    assert backend.get_job_logs(execution_id) == ["completed"]
 
 
-def test_cancel_and_concurrency_limit(runner: LocalProcessRunner, tmp_path: Path) -> None:
-    """Cancel a process group and reject a second concurrent execution."""
-    execution_id = runner.start(
-        [sys.executable, "-c", "import time; time.sleep(30)"],
-        run_id="run-1",
-        cwd=tmp_path / "work-1",
-        log_path=tmp_path / "logs" / "run-1.log",
-    )
-    with pytest.raises(RuntimeError, match="concurrency limit"):
-        runner.start(
-            [sys.executable, "-c", "print('second')"],
-            run_id="run-2",
-            cwd=tmp_path / "work-2",
-            log_path=tmp_path / "logs" / "run-2.log",
-        )
+def test_job_runs_in_its_own_working_directory(process_config, monkeypatch):
+    backend, execution_id = launch(process_config, "import os; print(os.getcwd())", monkeypatch)
 
-    runner.cancel(execution_id)
-    status = wait_for_phase(runner, execution_id, {"CANCELLED"})
+    wait_for_phase(backend, execution_id, "SUCCEEDED")
+
+    work_dir = Path(process_config.process_job_dir).resolve() / execution_id / "work"
+    assert backend.get_job_logs(execution_id) == [str(work_dir)]
+
+
+def test_failure_is_reported(process_config, monkeypatch):
+    backend, execution_id = launch(process_config, "raise SystemExit(7)", monkeypatch)
+
+    status = wait_for_phase(backend, execution_id, "FAILED")
+
+    assert status["exit_code"] == 7
+
+
+def test_status_survives_a_new_backend_instance(process_config, monkeypatch):
+    """Another API worker, or a restarted API, reads the same status from disk."""
+    backend, execution_id = launch(process_config, "print('done')", monkeypatch)
+    wait_for_phase(backend, execution_id, "SUCCEEDED")
+
+    other = ProcessBackend(process_config)
+
+    assert other.get_job_status(execution_id)["phase"] == "SUCCEEDED"
+    assert other.get_job_logs(execution_id) == ["done"]
+
+
+def test_a_process_that_vanished_is_failed(process_config, monkeypatch):
+    """A job killed from outside leaves no exit status, and is not left RUNNING."""
+    backend, execution_id = launch(process_config, "import time; time.sleep(30)", monkeypatch)
+    state_path = Path(process_config.process_job_dir) / execution_id / "state.json"
+    original = state_path.read_text()
+    state_path.write_text(json.dumps({**json.loads(original), "pid": 2**22 + 12345}))
+
+    assert backend.get_job_status(execution_id)["phase"] == "FAILED"
+
+    state_path.write_text(original)
+    backend.cancel_job(execution_id)
+
+
+def test_cancel_and_concurrency_limit(process_config, monkeypatch):
+    backend, execution_id = launch(process_config, "import time; time.sleep(30)", monkeypatch)
+    wait_for_phase(backend, execution_id, "RUNNING")
+
+    with pytest.raises(JobBackendError, match="already running"):
+        backend.run_job("testuser", "job2", n_experiments=2)
+
+    backend.cancel_job(execution_id)
+    status = backend.get_job_status(execution_id)
 
     assert status["phase"] == "CANCELLED"
+    assert status["completion_time"]
+    # The slot is free again.
+    second = backend.run_job("testuser", "job2", n_experiments=2)
+    backend.cancel_job(second)
 
 
-def test_manager_builds_local_engine_command(tmp_path: Path) -> None:
-    """Build the upstream engine command with local paths and provider options."""
-    config = JobConfig(backend="local", local_root=str(tmp_path))
-    manager = JobManager(config)
-    manager.create_job("local", "run-1")
-    source = tmp_path / "table.csv"
-    source.write_text("value\n1\n", encoding="utf-8")
-    manager.upload_dataset("local", "run-1", source)
-    manager.upload_metadata(
-        "local",
-        "run-1",
-        {"datasets": [{"name": "table.csv"}], "name": "Test run"},
-    )
-    manager.backend.runner.start = Mock(return_value="local-execution")
+def test_cancel_after_completion_is_a_no_op(process_config, monkeypatch):
+    backend, execution_id = launch(process_config, "print('done')", monkeypatch)
+    wait_for_phase(backend, execution_id, "SUCCEEDED")
 
-    execution_id = manager.run_job(
-        "local",
-        "run-1",
-        n_experiments=2,
-        model="claude-haiku-4.5",
-        llm_provider="copilot",
-        embedding_provider="copilot",
-    )
+    backend.cancel_job(execution_id)
 
-    assert execution_id == "local-execution"
-    command = manager.backend.runner.start.call_args.args[0]
-    assert command[:3] == [sys.executable, "-m", "autodiscovery.local_worker"]
-    assert "--backend=process" in command
-    assert "--llm_provider=copilot" in command
-    assert "--embedding_provider=copilot" in command
-    runtime_metadata = tmp_path / "runs" / "run-1" / "work" / ".autodiscovery-metadata.json"
-    assert runtime_metadata.is_file()
-    runtime_datasets = json.loads(runtime_metadata.read_text(encoding="utf-8"))["datasets"]
-    assert runtime_datasets[0]["name"] == "table.csv"
-    alias = tmp_path / "runs" / "run-1" / "work" / "table.csv"
-    assert alias.is_symlink()
-    assert alias.read_text(encoding="utf-8") == "value\n1\n"
-    assert not (tmp_path / "runs" / "run-1" / "data" / "table.csv").stat().st_mode & stat.S_IWUSR
-    assert manager.get_metadata("local", "run-1")["name"] == "Test run"
+    assert backend.get_job_status(execution_id)["phase"] == "SUCCEEDED"
 
 
-def test_local_runtime_view_flattens_nested_declared_paths(tmp_path: Path) -> None:
-    """Give base and threaded agents one stable basename for every declared local file."""
-    run_path = tmp_path / "run"
-    source = run_path / "data" / "study" / "nested" / "table.csv"
-    source.parent.mkdir(parents=True)
-    source.write_text("value\n1\n", encoding="utf-8")
+def test_unknown_and_unsafe_execution_ids(process_config):
+    backend = ProcessBackend(process_config)
 
-    runtime_metadata = LocalProcessBackend._prepare_runtime_view(
-        run_path, {"datasets": [{"name": "study/nested/table.csv"}]}
+    with pytest.raises(JobBackendError, match="not found"):
+        backend.get_job_status("test-job-missing")
+    with pytest.raises(JobBackendError, match="Invalid execution ID"):
+        backend.get_job_status("../escape")
+    assert backend.get_job_logs(None) == []
+
+
+def test_requires_an_interpreter_with_the_engine(process_config, monkeypatch):
+    monkeypatch.setattr(
+        "autodiscovery_jobs.backends.process.importlib.util.find_spec", lambda name: None
     )
 
-    assert json.loads(runtime_metadata.read_text(encoding="utf-8"))["datasets"] == [
-        {"name": "table.csv"}
-    ]
-    assert (run_path / "work" / "table.csv").resolve() == source.resolve()
+    with pytest.raises(JobBackendError, match="PROCESS_JOB_PYTHON"):
+        ProcessBackend(process_config).run_job("testuser", "job1", n_experiments=2)
 
 
-def test_local_runtime_view_rejects_duplicate_basenames(tmp_path: Path) -> None:
-    """Fail before model calls when flattening would make dataset paths ambiguous."""
-    run_path = tmp_path / "run"
-    for folder in ("first", "second"):
-        source = run_path / "data" / folder / "table.csv"
-        source.parent.mkdir(parents=True, exist_ok=True)
-        source.write_text(folder, encoding="utf-8")
+def test_manager_runs_jobs_through_the_process_backend(process_config, monkeypatch):
+    monkeypatch.setenv("SCRIPT", "print('via manager')")
+    manager = JobManager(fake_engine(process_config))
+    manager.create_job("testuser", "job1")
 
-    with pytest.raises(ValueError, match="filenames must be unique"):
-        LocalProcessBackend._prepare_runtime_view(
-            run_path,
-            {"datasets": [{"name": "first/table.csv"}, {"name": "second/table.csv"}]},
-        )
+    execution_id = manager.run_job("testuser", "job1", n_experiments=1)
+
+    assert wait_for_phase(manager.backend, execution_id, "SUCCEEDED")
+    assert manager.get_job_logs(execution_id) == ["via manager"]
 
 
-def test_local_run_details_round_trip(tmp_path: Path) -> None:
-    """Persist local lifecycle state without creating a cloud client."""
-    config = JobConfig(backend="local", local_root=str(tmp_path))
-    manager = JobManager(config)
-    manager.create_job("local", "run-1")
+def test_config_reads_process_settings_from_the_environment(monkeypatch):
+    monkeypatch.setenv("PROCESS_JOB_DIR", "/tmp/ad-jobs")
+    monkeypatch.setenv("PROCESS_JOB_PYTHON", "/opt/ad/bin/python")
+    monkeypatch.setenv("PROCESS_MAX_CONCURRENT_JOBS", "3")
 
-    created = create_run_details("local", "run-1", config)
-    updated = update_run_details(
-        "local",
-        "run-1",
-        {"execution_id": "local-123", "status": "RUNNING"},
-        config,
-    )
+    config = JobConfig.from_env()
 
-    assert created.status == "CREATED"
-    assert updated.execution_id == "local-123"
-    assert get_run_details("local", "run-1", config) == updated
+    assert config.process_job_dir == "/tmp/ad-jobs"
+    assert config.process_job_python == "/opt/ad/bin/python"
+    assert config.process_max_concurrent_jobs == 3

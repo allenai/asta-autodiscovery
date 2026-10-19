@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, replace
-from pathlib import Path
 
 # How many days uploaded datasets are retained before the cleanup cron deletes
 # them from GCS.  Both the cleanup script and the API's expiry estimate read
@@ -38,7 +37,8 @@ class JobConfig:
     region: str = "us-west1"
     job_name: str = "autodiscovery-job"
 
-    # Job backend selection: "docker" (local containers, default) or "gcp" (Cloud Run).
+    # Job backend selection: "docker" (local containers, default), "gcp" (Cloud
+    # Run), or "process" (subprocesses on this host, for single-user use).
     # Docker is the default to keep the out-of-the-box experience infra-agnostic;
     # deployments that run jobs on Cloud Run must set JOB_BACKEND=gcp explicitly.
     backend: str = "docker"
@@ -57,10 +57,15 @@ class JobConfig:
     modal_app_name: str = "asta-autodiscovery"
     modal_bucket_secret: str = "example-bucket-secret"
 
-    # Single-user local process backend configuration (ignored by other backends).
-    local_root: str = str(Path.home() / "AutoDiscovery")
-    local_user_id: str = "local"
-    local_max_concurrent_jobs: int = 1
+    # Process job backend (JOB_BACKEND=process; ignored by other backends): jobs
+    # run as subprocesses on this host. Each execution's state, log, and working
+    # directory live under process_job_dir. process_job_python is the interpreter
+    # that runs the engine; None means the API's own, which must have the
+    # autodiscovery package installed. process_max_concurrent_jobs caps how many
+    # run at once (0 for no cap).
+    process_job_dir: str = "~/.autodiscovery/jobs"
+    process_job_python: str | None = None
+    process_max_concurrent_jobs: int = 1
 
     @classmethod
     def from_env(cls, **overrides) -> JobConfig:
@@ -90,13 +95,10 @@ class JobConfig:
             ),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),
             modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
-            local_root=os.environ.get("AUTODISCOVERY_LOCAL_ROOT", cls.local_root),
-            local_user_id=os.environ.get("AUTODISCOVERY_LOCAL_USER_ID", cls.local_user_id),
-            local_max_concurrent_jobs=int(
-                os.environ.get(
-                    "AUTODISCOVERY_LOCAL_MAX_CONCURRENT_JOBS",
-                    cls.local_max_concurrent_jobs,
-                )
+            process_job_dir=os.environ.get("PROCESS_JOB_DIR", cls.process_job_dir),
+            process_job_python=os.environ.get("PROCESS_JOB_PYTHON") or None,
+            process_max_concurrent_jobs=int(
+                os.environ.get("PROCESS_MAX_CONCURRENT_JOBS", cls.process_max_concurrent_jobs)
             ),
         )
 

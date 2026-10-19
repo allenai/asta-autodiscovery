@@ -9,8 +9,9 @@ the ``users/<userid>/jobs/<jobid>/`` subtree as a filesystem mount either way.
 import json
 import logging
 import re
-from dataclasses import dataclass
-from pathlib import Path
+from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from . import keys
@@ -990,13 +991,49 @@ DATALIB_SCOPE_GLOBAL = "global"
 DATALIB_SCOPE_USER = "user"
 
 
+#: How many files of a data-library directory are listed to tally its file
+#: types. Listing runs whenever the picker loads, so it is capped; a directory
+#: with more files reports ``file_count_capped``.
+DATALIB_FILE_COUNT_LIMIT = 2000
+
+
 @dataclass(frozen=True)
 class DatalibDir:
-    """One selectable top-level data-library directory."""
+    """One selectable top-level data-library directory.
+
+    ``file_types`` maps lowercase extensions without the dot (``""`` for none)
+    to file counts, most common first. It and ``file_count`` cover at most
+    :data:`DATALIB_FILE_COUNT_LIMIT` files; ``file_count_capped`` says when the
+    directory holds more. The top-level ``README.md`` is not counted.
+    """
 
     name: str
     description: str | None
     scope: str = DATALIB_SCOPE_USER
+    file_types: dict[str, int] = field(default_factory=dict)
+    file_count: int = 0
+    file_count_capped: bool = False
+
+
+def _tally_file_types(
+    store: ObjectStore, prefix: str, limit: int
+) -> tuple[dict[str, int], int, bool]:
+    """Count a prefix's files by extension, up to ``limit`` of them.
+
+    Lists two extra objects: one to detect that there are more, one for the
+    README, which is skipped.
+    """
+    counts: Counter[str] = Counter()
+    seen = 0
+    for info in store.list(prefix, limit=limit + 2):
+        rel = info.key[len(prefix) :]
+        if rel == DATALIB_README_NAME:
+            continue
+        if seen == limit:
+            return dict(counts.most_common()), seen, True
+        seen += 1
+        counts[PurePosixPath(rel).suffix.lower().lstrip(".")] += 1
+    return dict(counts.most_common()), seen, False
 
 
 def _library_label(userid: str | None) -> str:
@@ -1048,7 +1085,23 @@ def list_datalib_dirs(
         except Exception as e:
             logger.warning("Failed to read %s: %s", readme_key, e)
             description = None
-        dirs.append(DatalibDir(name=name, description=description, scope=scope))
+        try:
+            file_types, file_count, capped = _tally_file_types(
+                store, f"{keys.datalib_dir(userid, name)}/", DATALIB_FILE_COUNT_LIMIT
+            )
+        except Exception as e:
+            logger.warning("Failed to tally files in data library directory %s: %s", name, e)
+            file_types, file_count, capped = {}, 0, False
+        dirs.append(
+            DatalibDir(
+                name=name,
+                description=description,
+                scope=scope,
+                file_types=file_types,
+                file_count=file_count,
+                file_count_capped=capped,
+            )
+        )
     return dirs
 
 

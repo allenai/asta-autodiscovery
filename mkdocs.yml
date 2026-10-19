@@ -42,6 +42,7 @@ nav:
   - Quick start: quickstart.md
   - Configuration: configuration.md
   - Authentication: authentication.md
+  - Data Library: data-library.md
   - Autodiscovery:
       - Standalone CLI: autodiscovery/standalone.md
       - How It Works: autodiscovery/overview.md

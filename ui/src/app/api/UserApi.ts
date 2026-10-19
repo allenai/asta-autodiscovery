@@ -39,6 +39,15 @@ export interface DatalibDirFromApi {
     description: string | null;
     /** Absent from older API responses, which only listed user directories */
     scope?: DatalibScope;
+    /**
+     * Files by extension (lowercase, no dot; `""` for none), most common first. Counts
+     * cover at most a capped number of files; see `file_count_capped`.
+     */
+    file_types?: { ext: string; count: number }[];
+    /** Number of files counted (excluding the top-level README.md) */
+    file_count?: number;
+    /** True when the directory holds more files than were counted */
+    file_count_capped?: boolean;
 }
 
 export interface GetViewerDatalibResponseBody {

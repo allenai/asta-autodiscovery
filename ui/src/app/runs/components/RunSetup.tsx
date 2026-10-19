@@ -518,6 +518,26 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
 // Descriptions longer than this (or spanning several lines) get a show more/less toggle.
 const DATALIB_DESCRIPTION_PREVIEW_CHARS = 160;
 
+// How many file types a data library row names before lumping the rest into "others".
+const DATALIB_NAMED_FILE_TYPES = 3;
+
+/**
+ * A terse description of a directory's shape, e.g. "12 csv, 5 tsv, 2 pdf, 14 others".
+ * Files without an extension count toward "others". When the server stopped counting,
+ * the total is shown as a lower bound.
+ */
+function formatDatalibFileTypes(dir: DatalibDirFromApi): string | null {
+    const types = dir.file_types ?? [];
+    const total = dir.file_count ?? types.reduce((sum, t) => sum + t.count, 0);
+    if (total === 0) return dir.file_types ? 'No files' : null;
+    const named = types.filter((t) => t.ext !== '').slice(0, DATALIB_NAMED_FILE_TYPES);
+    const others = total - named.reduce((sum, t) => sum + t.count, 0);
+    const parts = named.map((t) => `${t.count.toLocaleString()} ${t.ext}`);
+    if (others > 0) parts.push(`${others.toLocaleString()} other${others === 1 ? '' : 's'}`);
+    const summary = parts.join(', ');
+    return dir.file_count_capped ? `${summary} (first ${total.toLocaleString()} files)` : summary;
+}
+
 // Data library groups, in display order. Each is rendered only if it has entries.
 const DATALIB_GROUPS: { scope: DatalibScope; title: string; subtitle: string }[] = [
     { scope: 'global', title: 'Shared', subtitle: 'available to all users' },
@@ -543,8 +563,11 @@ function DatalibPicker({ available, selected, onToggle, disabled }: DatalibPicke
     const missing = Array.from(selected)
         .filter((name) => !availableNames.has(name))
         .sort()
-        .map((name) => ({ name, description: null, isMissing: true }));
-    const rows = [...available.map((d) => ({ ...d, isMissing: false })), ...missing];
+        .map((name) => ({ name, description: null, isMissing: true, shape: null }));
+    const rows = [
+        ...available.map((d) => ({ ...d, isMissing: false, shape: formatDatalibFileTypes(d) })),
+        ...missing,
+    ];
 
     const toggleExpanded = (name: string) =>
         setExpanded((prev) => {
@@ -556,7 +579,7 @@ function DatalibPicker({ available, selected, onToggle, disabled }: DatalibPicke
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {rows.map(({ name, description, isMissing }) => {
+            {rows.map(({ name, description, isMissing, shape }) => {
                 const isSelected = selected.has(name);
                 const isExpanded = expanded.has(name);
                 const text = description?.trim() ?? '';
@@ -576,6 +599,7 @@ function DatalibPicker({ available, selected, onToggle, disabled }: DatalibPicke
                             />
                             <FolderOutlinedIcon fontSize="small" />
                             <DatalibName>{name}</DatalibName>
+                            {shape && <DatalibShape>{shape}</DatalibShape>}
                             {isMissing && <DatalibMissing>No longer available</DatalibMissing>}
                         </DatalibRowLabel>
                         {text && (
@@ -651,6 +675,13 @@ const DatalibName = styled('span')({
     fontSize: '0.875rem',
     overflowWrap: 'anywhere',
 });
+
+const DatalibShape = styled('span')(({ theme }) => ({
+    color: theme.color['cream-60'].rgba.toString(),
+    fontSize: '0.8rem',
+    marginLeft: 'auto',
+    textAlign: 'right',
+}));
 
 const DatalibMissing = styled('span')(({ theme }) => ({
     color: theme.color['error-red-100'].hex,

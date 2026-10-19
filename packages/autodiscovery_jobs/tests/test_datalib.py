@@ -88,6 +88,35 @@ def test_list_datalib_dirs(populated_store):
     assert dirs[1].description == "# Census\nHousehold survey."
 
 
+def test_list_datalib_dirs_tallies_file_types(populated_store):
+    census = persistence.list_datalib_dirs("u1", populated_store)[1]
+
+    # The top-level README describes the directory and is not counted.
+    assert census.file_types == {"csv": 1}
+    assert census.file_count == 1
+    assert not census.file_count_capped
+
+
+def test_file_type_tally_orders_by_count_and_caps(local_config, monkeypatch):
+    store = get_store(local_config)
+    store.write_text("datalib/mixed/README.md", "x")
+    for i in range(3):
+        store.write_text(f"datalib/mixed/t{i}.tsv", "x")
+    store.write_text("datalib/mixed/a.csv", "x")
+    store.write_text("datalib/mixed/sub/NOTES", "x")
+    store.write_text("datalib/mixed/sub/B.PDF", "x")
+
+    full = persistence.list_datalib_dirs(None, local_config)[0]
+    assert list(full.file_types.items())[0] == ("tsv", 3)
+    assert full.file_types == {"tsv": 3, "csv": 1, "": 1, "pdf": 1}
+    assert (full.file_count, full.file_count_capped) == (6, False)
+
+    monkeypatch.setattr(persistence, "DATALIB_FILE_COUNT_LIMIT", 4)
+    capped = persistence.list_datalib_dirs(None, local_config)[0]
+    assert (capped.file_count, capped.file_count_capped) == (4, True)
+    assert sum(capped.file_types.values()) == 4
+
+
 def test_list_datalib_dirs_truncates_readme(populated_store):
     dirs = persistence.list_datalib_dirs("u1", populated_store, max_description_chars=8)
     assert dirs[1].description == "# Census"

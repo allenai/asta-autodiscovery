@@ -22,8 +22,9 @@ The top-level directories are what a run selects, any number of them; what is in
 each is up to the user. A run may use data-library directories alongside uploaded or
 preloaded datasets, or **instead of** them.
 
-Both libraries are populated out of band for now; the webapp only lists and selects
-them. Every user can see and select every global directory.
+Both libraries are populated out of band: the app only lists and selects them, and
+provides no way to write to them (see the [operator guide](../data-library.md)). Every
+user can see and select every global directory.
 
 ## One path, everywhere
 
@@ -95,14 +96,22 @@ in place and can change between runs, so this records what a given run was shown
 | --- | --- |
 | Keys | `keys.datalib_prefix`, `keys.datalib_dir` (both take `userid=None` for the global library), and `keys.validate_datalib_dirname`, which rejects anything but a single, non-dot path segment. |
 | Persistence / `JobManager` | `list_datalib_dirs(userid)` → `DatalibDir(name, description, scope)`, global directories first; `missing_datalib_dirs(userid_or_None, names)`. |
-| API | `GET /api/user/me/datalib` → `{"dirs": [{"name", "description", "scope": "global" \| "user"}]}`. Run metadata gains `datalib_dirs` and `global_datalib_dirs`, each `[name, ...]`. |
+| API | `GET /api/user/me/datalib` → `{"dirs": [{"name", "description", "scope": "global" \| "user", "file_types": [{"ext", "count"}], "file_count", "file_count_capped"}]}`. File types are tallied over at most the first 2,000 files of each directory, most common first, and sent as a list because `jsonify` sorts object keys. Run metadata gains `datalib_dirs` and `global_datalib_dirs`, each `[name, ...]`. |
 | Submit | Checks every selected user directory exists in the **submitting user's** library and every global one in the global library (400 otherwise), and that the run has at least one dataset or directory. |
 | Job args | `--datalib_dir=/mnt/data/users/<uid>/datalib/<dir>` or `--datalib_dir=/mnt/data/datalib/<dir>`, repeatable. The job does not distinguish the two. With `modal`, the job mounts each from the `--bucket_path` bucket under the key its path implies, as it does the run's own data. |
 | Fork | Keeps `datalib_dirs` when the owner forks their own run; drops them when another user forks a shared run, since the names refer to the owner's library. Keeps `global_datalib_dirs` for anyone. A run with only data-library directories has no uploads to copy, so it can be forked without them. |
 | Dataset expiry | Expiry deletes a run's own uploads only, so a run with only data-library directories reports no expiry. |
-| UI | A "Data library" multi-select in run setup, shown when there are any global or user directories, with global and user directories visibly distinguished and each README as secondary text; the run's parameters view lists the selection the same way. |
+| UI | A "Data library" multi-select in run setup, shown when there are any global or user directories, with global ("Shared") and user ("Yours") directories in separate groups. Each row shows the README as secondary text and a terse file-type summary such as `12 csv, 5 tsv, 2 pdf, 14 others`. The run's parameters view lists the selection the same way. |
 
 The standalone CLI takes `--datalib_dir` too, with any local directory.
+
+## Possible future extensions
+
+- **Permissions on global directories.** Every global directory is visible to every
+  user. Self-hosted deployments may want to grant particular global directories to
+  particular users or groups, e.g. through the auth provider's permissions, as preloaded
+  datasets are gated today. The listing endpoint and the submit check are the two places
+  that would enforce it.
 
 ## Open questions
 

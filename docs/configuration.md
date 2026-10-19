@@ -87,7 +87,8 @@ interchangeable (`gsutil rsync` moves data either way). See
 > `users/<userid>/datalib/<dirname>/` (for one user) or `datalib/<dirname>/` (for every
 > user), with an optional `README.md` describing each directory. Users can then select
 > those directories when setting up a run, and they are mounted into it read-only rather
-> than copied. No configuration is needed on either backend. See [Data Library](design/data-library.md).
+> than copied. No configuration is needed on either backend. The app does not write to the
+> data library: you place the files there directly. See [Data Library](data-library.md).
 
 ### Google Cloud
 

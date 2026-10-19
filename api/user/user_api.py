@@ -80,7 +80,11 @@ def create() -> Blueprint:
         instead of uploading a dataset: the global library's (``datalib/``,
         ``scope: "global"``) first, then the user's own
         (``users/<uid>/datalib/``, ``scope: "user"``). Each carries the contents
-        of its ``README.md`` (truncated) as its description, or ``null``.
+        of its ``README.md`` (truncated) as its description, or ``null``, and a
+        tally of its files by extension (``file_types``: ``[{"ext", "count"}]``,
+        most common first; ``ext`` is ``""`` for none), over at most a capped
+        number of files
+        (``file_count_capped`` when there are more).
         """
         user_id = request.user.get("sub")
 
@@ -90,7 +94,18 @@ def create() -> Blueprint:
             return jsonify(
                 {
                     "dirs": [
-                        {"name": d.name, "description": d.description, "scope": d.scope}
+                        {
+                            "name": d.name,
+                            "description": d.description,
+                            "scope": d.scope,
+                            # A list, not an object: jsonify sorts object keys,
+                            # which would lose the most-common-first order.
+                            "file_types": [
+                                {"ext": ext, "count": n} for ext, n in d.file_types.items()
+                            ],
+                            "file_count": d.file_count,
+                            "file_count_capped": d.file_count_capped,
+                        }
                         for d in dirs
                     ]
                 }

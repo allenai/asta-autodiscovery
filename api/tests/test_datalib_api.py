@@ -38,7 +38,14 @@ def client(manager):
 
 def test_list_datalib(client, manager):
     manager.list_datalib_dirs.return_value = [
-        DatalibDir(name="weather", description=None, scope="global"),
+        DatalibDir(
+            name="weather",
+            description=None,
+            scope="global",
+            file_types={"parquet": 12, "csv": 2},
+            file_count=14,
+            file_count_capped=True,
+        ),
         DatalibDir(name="atlas", description=None),
         DatalibDir(name="census", description="# Census"),
     ]
@@ -48,9 +55,30 @@ def test_list_datalib(client, manager):
     assert resp.status_code == 200
     assert resp.get_json() == {
         "dirs": [
-            {"name": "weather", "description": None, "scope": "global"},
-            {"name": "atlas", "description": None, "scope": "user"},
-            {"name": "census", "description": "# Census", "scope": "user"},
+            {
+                "name": "weather",
+                "description": None,
+                "scope": "global",
+                "file_types": [{"ext": "parquet", "count": 12}, {"ext": "csv", "count": 2}],
+                "file_count": 14,
+                "file_count_capped": True,
+            },
+            {
+                "name": "atlas",
+                "description": None,
+                "scope": "user",
+                "file_types": [],
+                "file_count": 0,
+                "file_count_capped": False,
+            },
+            {
+                "name": "census",
+                "description": "# Census",
+                "scope": "user",
+                "file_types": [],
+                "file_count": 0,
+                "file_count_capped": False,
+            },
         ]
     }
     manager.list_datalib_dirs.assert_called_once_with("u1")

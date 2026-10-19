@@ -356,14 +356,25 @@ def create() -> Blueprint:
             pass
         return None, None
 
-    def _compute_dataset_expires_at(run_details: RunDetails | None) -> str | None:
+    def _compute_dataset_expires_at(
+        run_details: RunDetails | None, metadata: dict | None = None
+    ) -> str | None:
         """Compute dataset expiry timestamp (created_at + DATASET_EXPIRY_DAYS).
 
         This is an estimate — the actual cleanup cron may run slightly later,
         but using the shared DATASET_EXPIRY_DAYS constant keeps the prediction
         consistent with the deletion threshold.
+
+        Expiry deletes only a run's own uploads, so a run that reads solely from
+        the data library never expires.
         """
         if not run_details or not run_details.created_at:
+            return None
+        if (
+            metadata
+            and not metadata.get("datasets")
+            and (metadata.get("datalib_dirs") or metadata.get("global_datalib_dirs"))
+        ):
             return None
         try:
             created = datetime.fromisoformat(run_details.created_at)
@@ -458,7 +469,7 @@ def create() -> Blueprint:
             run_metadata_model = MetadataModel.from_dict(metadata_dict) if metadata_dict else None
 
             # Compute dataset expiry
-            dataset_expires_at = _compute_dataset_expires_at(run_details)
+            dataset_expires_at = _compute_dataset_expires_at(run_details, metadata_dict)
 
             return RunModel(
                 runid=run_id,
@@ -591,7 +602,7 @@ def create() -> Blueprint:
             has_ai1_datasets = PermissionType.AI1_DATASETS.value in permissions
 
             # Compute dataset expiry
-            dataset_expires_at = _compute_dataset_expires_at(run_details)
+            dataset_expires_at = _compute_dataset_expires_at(run_details, metadata_dict)
 
             run_model = RunModel(
                 runid=req.runid,
@@ -1010,6 +1021,27 @@ def create() -> Blueprint:
             if n_experiments is None:
                 raise BadRequest("Number of Experiments is required in metadata")
 
+            # Data-library directories are mounted, not copied, so they must still
+            # exist at launch: user directories in the submitting user's own
+            # library, global ones in the global library.
+            datalib_dirs = metadata.get("datalib_dirs") or []
+            global_datalib_dirs = metadata.get("global_datalib_dirs") or []
+            for owner, selected, label in (
+                (None, global_datalib_dirs, "Global data library"),
+                (req.userid, datalib_dirs, "Data library"),
+            ):
+                if not selected:
+                    continue
+                try:
+                    missing = manager.missing_datalib_dirs(owner, selected)
+                except ValueError as e:
+                    raise BadRequest(str(e)) from e
+                if missing:
+                    noun = "directory" if len(missing) == 1 else "directories"
+                    raise BadRequest(f"{label} {noun} not found: {', '.join(missing)}")
+            if not datasets and not datalib_dirs and not global_datalib_dirs:
+                raise BadRequest("Select at least one dataset or data library directory.")
+
             # Validate experiment count and sufficient credits before submission
             check_experiment_limits(
                 n_experiments=n_experiments, userid=req.userid, config=manager.config
@@ -1019,6 +1051,8 @@ def create() -> Blueprint:
             job_params = {
                 "n_experiments": n_experiments,
                 "user_query": intent,
+                "datalib_dirs": datalib_dirs,
+                "global_datalib_dirs": global_datalib_dirs,
             }
 
             # Add optional parameters if present in metadata

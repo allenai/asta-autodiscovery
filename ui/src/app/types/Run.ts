@@ -110,6 +110,10 @@ export type Metadata = {
     name: string;
     description: string | null;
     datasets: MetadataDataset[];
+    /** Names of the user's own data library directories mounted read-only into the run */
+    datalibDirs: string[];
+    /** Names of global (shared) data library directories mounted read-only into the run */
+    globalDatalibDirs: string[];
     domain?: string;
     intent?: string;
     // Sharing
@@ -221,6 +225,8 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         domain: metadataFromApi.domain || undefined,
         intent: metadataFromApi.intent || undefined,
         datasets: metadataFromApi.datasets.map(getMetadataDatasetFromApi),
+        datalibDirs: metadataFromApi.datalib_dirs ?? [],
+        globalDatalibDirs: metadataFromApi.global_datalib_dirs ?? [],
         isShared: !!metadataFromApi.is_shared,
         isBookmarked: !!metadataFromApi.is_bookmarked,
         bookmarkedExperimentIds: metadataFromApi.bookmarked_experiment_ids ?? [],

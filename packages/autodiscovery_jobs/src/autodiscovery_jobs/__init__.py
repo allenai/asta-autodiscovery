@@ -69,6 +69,7 @@ from .manager import ForkResult, JobManager
 
 # Re-export functional APIs for direct use
 from .persistence import (
+    DatalibDir,
     UserDataSummary,
     create_job_directory,
     delete_job_directory,
@@ -163,6 +164,7 @@ __all__ = [
     "delete_job_directory",
     "soft_delete_job",
     # Per-user erasure (maintainer-only; see scripts/purge_user_data.py)
+    "DatalibDir",
     "UserDataSummary",
     "summarize_user_data",
     "purge_user_data",

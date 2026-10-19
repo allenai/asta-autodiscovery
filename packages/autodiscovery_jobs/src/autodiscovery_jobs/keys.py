@@ -11,10 +11,21 @@ so a bucket and a data directory hold identical trees::
     users/<userid>/jobs/<jobid>/data/<filename>         # uploaded datasets
     users/<userid>/jobs/<jobid>/output/args.json        # resolved job args
     users/<userid>/jobs/<jobid>/output/mcts_node_*.json # experiment results
+    users/<userid>/datalib/<dirname>/...                # user's read-only data library
+    users/<userid>/datalib/<dirname>/README.md          # its description
+    datalib/<dirname>/...                               # global data library
+    datalib/<dirname>/README.md                         # its description
     index/shared-runs/<jobid>                           # shared-run owner index
 
 The job container sees ``users/<userid>/jobs/<jobid>/`` as a directory mounted
-at :data:`~autodiscovery_jobs.backends.base.JOB_MOUNT_ROOT`.
+at :data:`~autodiscovery_jobs.backends.base.JOB_MOUNT_ROOT`, and each data-library
+directory a run selects, read-only, at the same key path under that root.
+
+The data library holds large or reused datasets: a user's own, and a global one
+shared with every user. Both are populated out of band, and a run mounts the
+directories it selects instead of copying them into its own ``data/``. Only
+their top-level directories are selectable. The ``datalib_*`` helpers take
+``userid=None`` for the global library.
 """
 
 from __future__ import annotations
@@ -42,6 +53,48 @@ def job_prefix(userid: str, jobid: str) -> str:
 def job_key(userid: str, jobid: str, name: str) -> str:
     """Key of one object inside a run, e.g. ``job_key(u, j, "output/args.json")``."""
     return f"{job_prefix(userid, jobid)}{name}"
+
+
+def datalib_prefix(userid: str | None) -> str:
+    """Key prefix (trailing slash) holding a data library's directories.
+
+    ``userid=None`` is the global library, shared with every user.
+    """
+    return f"{user_prefix(userid)}datalib/" if userid is not None else "datalib/"
+
+
+def datalib_dir(userid: str | None, dirname: str) -> str:
+    """One data-library directory, without a trailing slash.
+
+    ``userid=None`` is the global library.
+
+    ``dirname`` must already be a single path segment
+    (see :func:`validate_datalib_dirname`).
+    """
+    return f"{datalib_prefix(userid)}{dirname}"
+
+
+def validate_datalib_dirname(dirname: str) -> str:
+    """Return ``dirname`` if it names a single top-level data-library directory.
+
+    Selections arrive from the client and become mount paths and object keys, so
+    anything that could step outside ``datalib/`` is rejected rather than
+    normalized.
+
+    Raises:
+        ValueError: If ``dirname`` is empty, ``.``/``..``, contains a slash or a
+            NUL, or starts with a dot.
+    """
+    if (
+        not isinstance(dirname, str)
+        or not dirname
+        or dirname.startswith(".")
+        or "/" in dirname
+        or "\\" in dirname
+        or "\0" in dirname
+    ):
+        raise ValueError(f"Invalid data library directory name: {dirname!r}")
+    return dirname
 
 
 def shared_run_index_key(jobid: str) -> str:

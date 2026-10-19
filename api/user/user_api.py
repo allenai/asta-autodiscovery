@@ -74,11 +74,13 @@ def create() -> Blueprint:
     @api.route("/me/datalib", methods=["GET"])
     @requires_auth()
     def get_viewer_datalib():
-        """List the authenticated user's data-library directories.
+        """List the data-library directories the authenticated user can select.
 
-        These are the top-level directories under ``users/<uid>/datalib/`` that a
-        run can mount read-only instead of uploading a dataset. Each carries the
-        contents of its ``README.md`` (truncated) as its description, or ``null``.
+        These are the top-level directories that a run can mount read-only
+        instead of uploading a dataset: the global library's (``datalib/``,
+        ``scope: "global"``) first, then the user's own
+        (``users/<uid>/datalib/``, ``scope: "user"``). Each carries the contents
+        of its ``README.md`` (truncated) as its description, or ``null``.
         """
         user_id = request.user.get("sub")
 
@@ -86,7 +88,12 @@ def create() -> Blueprint:
             job_manager = get_job_manager()
             dirs = job_manager.list_datalib_dirs(user_id)
             return jsonify(
-                {"dirs": [{"name": d.name, "description": d.description} for d in dirs]}
+                {
+                    "dirs": [
+                        {"name": d.name, "description": d.description, "scope": d.scope}
+                        for d in dirs
+                    ]
+                }
             ), 200
         except Exception as e:
             current_app.logger.error(f"Failed to list data library for user {user_id}: {str(e)}")

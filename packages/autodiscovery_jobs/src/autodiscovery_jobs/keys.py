@@ -11,17 +11,21 @@ so a bucket and a data directory hold identical trees::
     users/<userid>/jobs/<jobid>/data/<filename>         # uploaded datasets
     users/<userid>/jobs/<jobid>/output/args.json        # resolved job args
     users/<userid>/jobs/<jobid>/output/mcts_node_*.json # experiment results
-    users/<userid>/datalib/<dirname>/...                # read-only data library
+    users/<userid>/datalib/<dirname>/...                # user's read-only data library
     users/<userid>/datalib/<dirname>/README.md          # its description
+    datalib/<dirname>/...                               # global data library
+    datalib/<dirname>/README.md                         # its description
     index/shared-runs/<jobid>                           # shared-run owner index
 
 The job container sees ``users/<userid>/jobs/<jobid>/`` as a directory mounted
 at :data:`~autodiscovery_jobs.backends.base.JOB_MOUNT_ROOT`, and each data-library
 directory a run selects, read-only, at the same key path under that root.
 
-The data library holds a user's large or reused datasets. It is populated out of
-band, and a run mounts the directories it selects instead of copying them into
-its own ``data/``. Only its top-level directories are selectable.
+The data library holds large or reused datasets: a user's own, and a global one
+shared with every user. Both are populated out of band, and a run mounts the
+directories it selects instead of copying them into its own ``data/``. Only
+their top-level directories are selectable. The ``datalib_*`` helpers take
+``userid=None`` for the global library.
 """
 
 from __future__ import annotations
@@ -51,13 +55,18 @@ def job_key(userid: str, jobid: str, name: str) -> str:
     return f"{job_prefix(userid, jobid)}{name}"
 
 
-def datalib_prefix(userid: str) -> str:
-    """Key prefix (trailing slash) holding a user's data-library directories."""
-    return f"{user_prefix(userid)}datalib/"
+def datalib_prefix(userid: str | None) -> str:
+    """Key prefix (trailing slash) holding a data library's directories.
+
+    ``userid=None`` is the global library, shared with every user.
+    """
+    return f"{user_prefix(userid)}datalib/" if userid is not None else "datalib/"
 
 
-def datalib_dir(userid: str, dirname: str) -> str:
+def datalib_dir(userid: str | None, dirname: str) -> str:
     """One data-library directory, without a trailing slash.
+
+    ``userid=None`` is the global library.
 
     ``dirname`` must already be a single path segment
     (see :func:`validate_datalib_dirname`).

@@ -16,6 +16,11 @@ from autodiscovery_jobs.storage import get_store
 # ---------------------------------------------------------------------------
 
 
+def test_global_datalib_keys():
+    assert keys.datalib_prefix(None) == "datalib/"
+    assert keys.datalib_dir(None, "census") == "datalib/census"
+
+
 def test_datalib_keys():
     assert keys.datalib_prefix("u1") == "users/u1/datalib/"
     assert keys.datalib_dir("u1", "census") == "users/u1/datalib/census"
@@ -45,7 +50,34 @@ def populated_store(local_config):
     store.write_text("users/u1/datalib/atlas/cells.h5ad", "x")
     store.write_text("users/u1/datalib/.staging/ignored.txt", "x")
     store.write_text("users/u2/datalib/other/README.md", "someone else's")
+    store.write_text("datalib/census/README.md", "# Shared census")
+    store.write_text("datalib/weather/2021.parquet", "x")
     return local_config
+
+
+def test_list_global_datalib_dirs(populated_store):
+    dirs = persistence.list_datalib_dirs(None, populated_store)
+
+    assert [(d.name, d.scope) for d in dirs] == [("census", "global"), ("weather", "global")]
+    assert dirs[0].description == "# Shared census"
+
+
+def test_manager_lists_global_then_user_dirs(populated_store):
+    dirs = JobManager(populated_store).list_datalib_dirs("u1")
+
+    assert [(d.scope, d.name) for d in dirs] == [
+        ("global", "census"),
+        ("global", "weather"),
+        ("user", "atlas"),
+        ("user", "census"),
+    ]
+
+
+def test_missing_global_datalib_dirs(populated_store):
+    # A user directory of the same name does not satisfy a global selection.
+    assert persistence.missing_datalib_dirs(None, ["weather", "atlas"], populated_store) == [
+        "atlas"
+    ]
 
 
 def test_list_datalib_dirs(populated_store):
@@ -110,6 +142,23 @@ def test_build_job_args_datalib_dirs_follow_the_mount_root():
     assert "--datalib_dir=/srv/ad/users/u1/datalib/census" in args
 
 
+def test_build_job_args_global_datalib_dirs_have_no_user_in_the_path():
+    args = build_job_args(
+        "u1",
+        "j1",
+        JobConfig(),
+        n_experiments=3,
+        datalib_dirs=["census"],
+        global_datalib_dirs=["census"],
+    )
+
+    datalib_args = [a for a in args if a.startswith("--datalib_dir=")]
+    assert datalib_args == [
+        "--datalib_dir=/mnt/data/datalib/census",
+        "--datalib_dir=/mnt/data/users/u1/datalib/census",
+    ]
+
+
 def test_build_job_args_without_datalib_is_unchanged():
     config = JobConfig(bucket="test-bucket", code_execution_backend="modal")
 
@@ -140,11 +189,17 @@ def test_docker_mounts_datalib_dirs_read_only(monkeypatch):
 
     client = Mock()
     with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
-        DockerBackend(config).run_job("u1", "j1", n_experiments=4, datalib_dirs=["census"])
+        DockerBackend(config).run_job(
+            "u1", "j1", n_experiments=4, datalib_dirs=["census"], global_datalib_dirs=["weather"]
+        )
 
     kwargs = client.containers.run.call_args.kwargs
     assert kwargs["volumes"]["/host/ad-data/users/u1/datalib/census"] == {
         "bind": "/mnt/data/users/u1/datalib/census",
+        "mode": "ro",
+    }
+    assert kwargs["volumes"]["/host/ad-data/datalib/weather"] == {
+        "bind": "/mnt/data/datalib/weather",
         "mode": "ro",
     }
     # The run's own directory is still mounted read-write beside it.
@@ -167,6 +222,13 @@ def test_fork_metadata_keeps_datalib_dirs_for_the_owner():
 def test_fork_metadata_drops_datalib_dirs_for_another_user():
     child = JobManager._build_fork_metadata(_PARENT, "p1", same_owner=False)
     assert child["datalib_dirs"] is None
+
+
+def test_fork_metadata_keeps_global_datalib_dirs_for_anyone():
+    parent = {**_PARENT, "global_datalib_dirs": ["weather"]}
+    for same_owner in (True, False):
+        child = JobManager._build_fork_metadata(parent, "p1", same_owner=same_owner)
+        assert child["global_datalib_dirs"] == ["weather"]
 
 
 def test_fork_of_datalib_only_run_needs_no_uploaded_data(mock_config):

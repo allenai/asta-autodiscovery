@@ -25,11 +25,20 @@ export interface GetViewerCreditsResponseBody {
     credits: ViewerCreditsFromApi;
 }
 
+/**
+ * Which data library a directory belongs to: `global` directories are shared with
+ * all users, `user` directories are the viewer's own. A global and a user directory
+ * may have the same name.
+ */
+export type DatalibScope = 'global' | 'user';
+
 /** A top-level directory in the viewer's read-only data library. */
 export interface DatalibDirFromApi {
     name: string;
     /** Contents of the directory's README.md (possibly truncated), if it has one */
     description: string | null;
+    /** Absent from older API responses, which only listed user directories */
+    scope?: DatalibScope;
 }
 
 export interface GetViewerDatalibResponseBody {
@@ -51,7 +60,10 @@ export class UserApi extends BaseApi {
         });
     }
 
-    /** List the viewer's data library directories, which can be mounted read-only into runs. */
+    /**
+     * List the data library directories the viewer can mount read-only into runs:
+     * global (shared) directories first, then the viewer's own.
+     */
     async getViewerDatalib() {
         return this.request<GetViewerDatalibResponseBody>({
             url: `${USER_URL_PREFIX}/me/datalib`,

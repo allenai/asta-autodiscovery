@@ -370,7 +370,11 @@ def create() -> Blueprint:
         """
         if not run_details or not run_details.created_at:
             return None
-        if metadata and not metadata.get("datasets") and metadata.get("datalib_dirs"):
+        if (
+            metadata
+            and not metadata.get("datasets")
+            and (metadata.get("datalib_dirs") or metadata.get("global_datalib_dirs"))
+        ):
             return None
         try:
             created = datetime.fromisoformat(run_details.created_at)
@@ -1018,17 +1022,24 @@ def create() -> Blueprint:
                 raise BadRequest("Number of Experiments is required in metadata")
 
             # Data-library directories are mounted, not copied, so they must still
-            # exist in the submitting user's own library at launch.
+            # exist at launch: user directories in the submitting user's own
+            # library, global ones in the global library.
             datalib_dirs = metadata.get("datalib_dirs") or []
-            if datalib_dirs:
+            global_datalib_dirs = metadata.get("global_datalib_dirs") or []
+            for owner, selected, label in (
+                (None, global_datalib_dirs, "Global data library"),
+                (req.userid, datalib_dirs, "Data library"),
+            ):
+                if not selected:
+                    continue
                 try:
-                    missing = manager.missing_datalib_dirs(req.userid, datalib_dirs)
+                    missing = manager.missing_datalib_dirs(owner, selected)
                 except ValueError as e:
                     raise BadRequest(str(e)) from e
                 if missing:
                     noun = "directory" if len(missing) == 1 else "directories"
-                    raise BadRequest(f"Data library {noun} not found: {', '.join(missing)}")
-            if not datasets and not datalib_dirs:
+                    raise BadRequest(f"{label} {noun} not found: {', '.join(missing)}")
+            if not datasets and not datalib_dirs and not global_datalib_dirs:
                 raise BadRequest("Select at least one dataset or data library directory.")
 
             # Validate experiment count and sufficient credits before submission
@@ -1041,6 +1052,7 @@ def create() -> Blueprint:
                 "n_experiments": n_experiments,
                 "user_query": intent,
                 "datalib_dirs": datalib_dirs,
+                "global_datalib_dirs": global_datalib_dirs,
             }
 
             # Add optional parameters if present in metadata

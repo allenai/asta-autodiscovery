@@ -83,7 +83,9 @@ def _has_uploaded_datasets(metadata: dict[str, Any]) -> bool:
     Metadata written before the data library existed always lists some, so this
     is only ``False`` for a run that reads solely from data-library directories.
     """
-    return bool(metadata.get("datasets")) or not metadata.get("datalib_dirs")
+    return bool(metadata.get("datasets")) or not (
+        metadata.get("datalib_dirs") or metadata.get("global_datalib_dirs")
+    )
 
 
 def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
@@ -188,11 +190,19 @@ class JobManager:
     # Data library
 
     def list_datalib_dirs(self, userid: str) -> list[persistence.DatalibDir]:
-        """List a user's selectable data-library directories, with their READMEs."""
-        return persistence.list_datalib_dirs(userid, self.config)
+        """List the data-library directories a user can select, with their READMEs.
 
-    def missing_datalib_dirs(self, userid: str, dirnames: list[str]) -> list[str]:
-        """Return which of ``dirnames`` are not in the user's data library.
+        The global library's directories come first, then the user's own; each
+        carries its ``scope``.
+        """
+        return persistence.list_datalib_dirs(None, self.config) + persistence.list_datalib_dirs(
+            userid, self.config
+        )
+
+    def missing_datalib_dirs(self, userid: str | None, dirnames: list[str]) -> list[str]:
+        """Return which of ``dirnames`` are not in a data library.
+
+        ``userid=None`` checks the global library.
 
         Raises:
             ValueError: If any name is not a valid top-level directory name.
@@ -333,8 +343,9 @@ class JobManager:
     ) -> dict[str, Any]:
         """Build child metadata from parent metadata for a fork operation.
 
-        Data-library selections name directories in the *parent owner's* library,
-        so they carry over only when the same user forks their own run.
+        User data-library selections name directories in the *parent owner's*
+        library, so they carry over only when the same user forks their own run.
+        Global selections are available to everyone and always carry over.
         """
         parent_name = parent_metadata.get("name", "Untitled")
         return {
@@ -345,6 +356,7 @@ class JobManager:
             "intent": parent_metadata.get("intent", ""),
             "datasets": parent_metadata.get("datasets", []),
             "datalib_dirs": (parent_metadata.get("datalib_dirs") or None) if same_owner else None,
+            "global_datalib_dirs": parent_metadata.get("global_datalib_dirs") or None,
             # Advanced settings from parent
             "n_experiments": parent_metadata.get("n_experiments"),
             "exploration_weight": parent_metadata.get("exploration_weight"),
@@ -636,6 +648,7 @@ class JobManager:
         code_timeout: int | None = None,
         n_warmstart: int | None = None,
         datalib_dirs: list[str] | None = None,
+        global_datalib_dirs: list[str] | None = None,
         **kwargs,
     ) -> str:
         """Execute a Cloud Run job.
@@ -656,6 +669,8 @@ class JobManager:
             n_warmstart: Number of warmstart experiments (optional)
             datalib_dirs: Names of the user's data-library directories to mount
                 read-only into the job (optional)
+            global_datalib_dirs: Names of global data-library directories to
+                mount likewise (optional)
             **kwargs: Additional arguments
 
         Returns:
@@ -676,6 +691,7 @@ class JobManager:
             code_timeout=code_timeout,
             n_warmstart=n_warmstart,
             datalib_dirs=datalib_dirs,
+            global_datalib_dirs=global_datalib_dirs,
             **kwargs,
         )
 

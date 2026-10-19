@@ -38,6 +38,7 @@ def client(manager):
 
 def test_list_datalib(client, manager):
     manager.list_datalib_dirs.return_value = [
+        DatalibDir(name="weather", description=None, scope="global"),
         DatalibDir(name="atlas", description=None),
         DatalibDir(name="census", description="# Census"),
     ]
@@ -47,8 +48,9 @@ def test_list_datalib(client, manager):
     assert resp.status_code == 200
     assert resp.get_json() == {
         "dirs": [
-            {"name": "atlas", "description": None},
-            {"name": "census", "description": "# Census"},
+            {"name": "weather", "description": None, "scope": "global"},
+            {"name": "atlas", "description": None, "scope": "user"},
+            {"name": "census", "description": "# Census", "scope": "user"},
         ]
     }
     manager.list_datalib_dirs.assert_called_once_with("u1")
@@ -70,6 +72,31 @@ def test_submit_passes_datalib_dirs_to_the_job(client, manager):
 
     manager.missing_datalib_dirs.assert_called_once_with("u1", ["census"])
     assert manager.run_job.call_args.kwargs["datalib_dirs"] == ["census"]
+
+
+def test_submit_checks_global_dirs_in_the_global_library(client, manager):
+    manager.get_metadata.return_value = {
+        "datasets": [],
+        "global_datalib_dirs": ["weather"],
+        "n_experiments": 3,
+    }
+    manager.missing_datalib_dirs.return_value = []
+
+    _submit(client)
+
+    manager.missing_datalib_dirs.assert_called_once_with(None, ["weather"])
+    assert manager.run_job.call_args.kwargs["global_datalib_dirs"] == ["weather"]
+
+
+def test_submit_rejects_a_missing_global_dir(client, manager):
+    manager.get_metadata.return_value = {"global_datalib_dirs": ["gone"], "n_experiments": 3}
+    manager.missing_datalib_dirs.return_value = ["gone"]
+
+    resp = _submit(client)
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "Global data library directory not found: gone"
+    manager.run_job.assert_not_called()
 
 
 def test_submit_rejects_a_missing_datalib_dir(client, manager):

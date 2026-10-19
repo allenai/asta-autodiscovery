@@ -57,6 +57,17 @@ export function RunParametersModal({
         return option?.label ?? value;
     };
 
+    // Global (shared) data library directories first, then the user's own, matching
+    // the run setup picker. A global and a user directory may share a name.
+    const datalibEntries = [
+        ...(metadata?.globalDatalibDirs ?? []).map((name) => ({
+            scope: 'global',
+            name,
+            label: 'Shared',
+        })),
+        ...(metadata?.datalibDirs ?? []).map((name) => ({ scope: 'user', name, label: 'Yours' })),
+    ];
+
     return (
         <Dialog
             open={open}
@@ -156,14 +167,14 @@ export function RunParametersModal({
                         </FieldRow>
                     )}
 
-                    {metadata?.datalibDirs && metadata.datalibDirs.length > 0 && (
+                    {datalibEntries.length > 0 && (
                         <FieldRow>
                             <FieldLabel>Data library</FieldLabel>
                             <DatasetList>
-                                {metadata.datalibDirs.map((dir) => (
-                                    <DatasetItem key={dir}>
-                                        <DatasetName>{dir}</DatasetName>
-                                        <DatasetSize>Mounted read-only</DatasetSize>
+                                {datalibEntries.map(({ scope, name, label }) => (
+                                    <DatasetItem key={`${scope}:${name}`}>
+                                        <DatasetName>{name}</DatasetName>
+                                        <DatasetSize>{label} · Mounted read-only</DatasetSize>
                                     </DatasetItem>
                                 ))}
                             </DatasetList>

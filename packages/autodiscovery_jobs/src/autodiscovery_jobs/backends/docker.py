@@ -22,7 +22,13 @@ from typing import Any
 
 from ..exceptions import DockerBackendError
 from ..keys import datalib_dir, job_dir
-from .base import JOB_MOUNT_ROOT, JobBackend, build_job_args, datalib_mount_path
+from .base import (
+    JOB_MOUNT_ROOT,
+    JobBackend,
+    build_job_args,
+    datalib_mount_path,
+    selected_datalib_dirs,
+)
 
 # Environment variables forwarded from the API container to each job container.
 # These mirror the secrets/env the Cloud Run job receives (see
@@ -116,9 +122,11 @@ class DockerBackend(JobBackend):
         # Each selected data-library directory, read-only, at its store-shaped
         # path (build_job_args names the same paths). Sibling of the run's own
         # mount, so neither shadows the other.
-        for dirname in kwargs.get("datalib_dirs") or []:
-            volumes[self._host_run_dir(datalib_dir(userid, dirname))] = {
-                "bind": datalib_mount_path(userid, dirname),
+        for owner, dirname in selected_datalib_dirs(
+            userid, kwargs.get("datalib_dirs"), kwargs.get("global_datalib_dirs")
+        ):
+            volumes[self._host_run_dir(datalib_dir(owner, dirname))] = {
+                "bind": datalib_mount_path(owner, dirname),
                 "mode": "ro",
             }
 

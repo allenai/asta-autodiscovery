@@ -84,10 +84,10 @@ interchangeable (`gsutil rsync` moves data either way). See
 > `client_max_body_size` for `/api` matters for this backend.
 
 > **Data library.** Datasets too large to upload per run can be placed in the store at
-> `users/<userid>/datalib/<dirname>/`, with an optional `README.md` describing each
-> directory. The user can then select those directories when setting up a run, and they are
-> mounted into it read-only rather than copied. No configuration is needed on either
-> backend. See [Data Library](design/data-library.md).
+> `users/<userid>/datalib/<dirname>/` (for one user) or `datalib/<dirname>/` (for every
+> user), with an optional `README.md` describing each directory. Users can then select
+> those directories when setting up a run, and they are mounted into it read-only rather
+> than copied. No configuration is needed on either backend. See [Data Library](design/data-library.md).
 
 ### Google Cloud
 

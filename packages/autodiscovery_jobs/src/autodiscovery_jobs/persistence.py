@@ -985,24 +985,34 @@ def dataset_key(userid: str, jobid: str, filename: str) -> str:
 DATALIB_README_NAME = "README.md"
 
 
+#: Scopes a data-library directory can belong to.
+DATALIB_SCOPE_GLOBAL = "global"
+DATALIB_SCOPE_USER = "user"
+
+
 @dataclass(frozen=True)
 class DatalibDir:
     """One selectable top-level data-library directory."""
 
     name: str
     description: str | None
+    scope: str = DATALIB_SCOPE_USER
+
+
+def _library_label(userid: str | None) -> str:
+    return "the global data library" if userid is None else f"data library for user {userid}"
 
 
 def list_datalib_dirs(
-    userid: str,
+    userid: str | None,
     config: JobConfig | None = None,
     *,
     max_description_chars: int = 4000,
 ) -> list[DatalibDir]:
-    """List a user's top-level data-library directories, with their READMEs.
+    """List a data library's top-level directories, with their READMEs.
 
     Args:
-        userid: User identifier
+        userid: User identifier, or ``None`` for the global library
         config: Configuration (uses default if None)
         max_description_chars: Truncate each README to this many characters.
 
@@ -1020,8 +1030,9 @@ def list_datalib_dirs(
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f"Failed to list data library for user {userid}: {e}") from e
+        raise StorageError(f"Failed to list {_library_label(userid)}: {e}") from e
 
+    scope = DATALIB_SCOPE_GLOBAL if userid is None else DATALIB_SCOPE_USER
     dirs = []
     for name in names:
         try:
@@ -1037,14 +1048,16 @@ def list_datalib_dirs(
         except Exception as e:
             logger.warning("Failed to read %s: %s", readme_key, e)
             description = None
-        dirs.append(DatalibDir(name=name, description=description))
+        dirs.append(DatalibDir(name=name, description=description, scope=scope))
     return dirs
 
 
 def missing_datalib_dirs(
-    userid: str, dirnames: list[str], config: JobConfig | None = None
+    userid: str | None, dirnames: list[str], config: JobConfig | None = None
 ) -> list[str]:
-    """Return which of ``dirnames`` are not in the user's data library.
+    """Return which of ``dirnames`` are not in a data library.
+
+    ``userid=None`` checks the global library.
 
     Raises:
         ValueError: If any name is not a valid top-level directory name.
@@ -1058,7 +1071,7 @@ def missing_datalib_dirs(
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f"Failed to list data library for user {userid}: {e}") from e
+        raise StorageError(f"Failed to list {_library_label(userid)}: {e}") from e
     return [name for name in dirnames if name not in present]
 
 

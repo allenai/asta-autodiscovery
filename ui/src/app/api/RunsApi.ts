@@ -30,8 +30,10 @@ export interface RunMetadataFromApi {
         url?: string | null;
         is_preloaded?: boolean;
     }[];
-    /** Names of data library directories mounted read-only into the run */
+    /** Names of the user's own data library directories mounted read-only into the run */
     datalib_dirs?: string[] | null;
+    /** Names of global (shared) data library directories mounted read-only into the run */
+    global_datalib_dirs?: string[] | null;
     // Sharing
     is_shared?: boolean | null;
     // Bookmarking
@@ -145,8 +147,10 @@ export interface MetadataFromApi {
     domain: string | null;
     intent: string | null;
     datasets: MetadataDatasetFromApi[];
-    /** Names of data library directories mounted read-only into the run */
+    /** Names of the user's own data library directories mounted read-only into the run */
     datalib_dirs?: string[] | null;
+    /** Names of global (shared) data library directories mounted read-only into the run */
+    global_datalib_dirs?: string[] | null;
     // Sharing
     is_shared?: boolean | null;
     // Bookmarking

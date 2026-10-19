@@ -41,7 +41,7 @@ import DatasetUpload, {
 } from '@/runs/components/DatasetUpload';
 import { mkExpandAdvancedSettingsTrackAttrs, mkSubmitRunBtnTrackAttrs } from '@/analytics/runSetup';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
-import type { DatalibDirFromApi } from '@/api/UserApi';
+import type { DatalibDirFromApi, DatalibScope } from '@/api/UserApi';
 
 const DEBOUNCE_SAVE_MS = 3000;
 
@@ -84,6 +84,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         updatePreloadedDescription,
         availableDatalibDirs,
         selectedDatalibDirs,
+        selectedGlobalDatalibDirs,
         toggleDatalibDir,
     } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
 
@@ -291,25 +292,47 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                     />
                 </FormControl>
 
-                {(availableDatalibDirs.length > 0 || selectedDatalibDirs.size > 0) && (
+                {(availableDatalibDirs.length > 0 ||
+                    selectedDatalibDirs.size > 0 ||
+                    selectedGlobalDatalibDirs.size > 0) && (
                     <FormControl fullWidth>
                         <StyledFormLabel error={!!datasetErrors}>
                             Data library <OptionalText>(Optional)</OptionalText>
                         </StyledFormLabel>
                         <HelperText>
-                            Select directories from your data library. They are mounted read-only
+                            Select directories from the data library. They are mounted read-only
                             into the session as-is, so no upload is needed — useful for large
                             datasets. Unlike source files, which are each described individually, a
                             directory is described to AutoDiscovery as a whole: by its README.md and
                             an overview of the files it contains, from which AutoDiscovery works out
                             which data to use.
                         </HelperText>
-                        <DatalibPicker
-                            available={availableDatalibDirs}
-                            selected={selectedDatalibDirs}
-                            onToggle={toggleDatalibDir}
-                            disabled={isFormDisabled}
-                        />
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {DATALIB_GROUPS.map(({ scope, title, subtitle }) => {
+                                const available = availableDatalibDirs.filter(
+                                    (d) => d.scope === scope
+                                );
+                                const selected =
+                                    scope === 'global'
+                                        ? selectedGlobalDatalibDirs
+                                        : selectedDatalibDirs;
+                                if (available.length === 0 && selected.size === 0) return null;
+                                return (
+                                    <Box key={scope}>
+                                        <DatalibGroupTitle>
+                                            {title}
+                                            <span> — {subtitle}</span>
+                                        </DatalibGroupTitle>
+                                        <DatalibPicker
+                                            available={available}
+                                            selected={selected}
+                                            onToggle={(name) => toggleDatalibDir(scope, name)}
+                                            disabled={isFormDisabled}
+                                        />
+                                    </Box>
+                                );
+                            })}
+                        </Box>
                     </FormControl>
                 )}
             </ConfigurationBox>
@@ -495,6 +518,12 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
 // Descriptions longer than this (or spanning several lines) get a show more/less toggle.
 const DATALIB_DESCRIPTION_PREVIEW_CHARS = 160;
 
+// Data library groups, in display order. Each is rendered only if it has entries.
+const DATALIB_GROUPS: { scope: DatalibScope; title: string; subtitle: string }[] = [
+    { scope: 'global', title: 'Shared', subtitle: 'available to all users' },
+    { scope: 'user', title: 'Yours', subtitle: 'only available to you' },
+];
+
 interface DatalibPickerProps {
     available: DatalibDirFromApi[];
     selected: Set<string>;
@@ -503,7 +532,7 @@ interface DatalibPickerProps {
 }
 
 /**
- * Multi-select list of the user's data library directories. Each row shows the
+ * Multi-select list of data library directories of one scope. Each row shows the
  * directory name and, when present, its README.md as a description. Names that are
  * selected but no longer available (e.g. restored from a draft or duplicated
  * session) are listed too, flagged, so the user can deselect them.
@@ -570,6 +599,18 @@ function DatalibPicker({ available, selected, onToggle, disabled }: DatalibPicke
         </Box>
     );
 }
+
+const DatalibGroupTitle = styled(Typography)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    marginBottom: theme.spacing(0.75),
+
+    '& > span': {
+        color: theme.color['cream-60'].rgba.toString(),
+        fontWeight: 400,
+    },
+}));
 
 const DatalibRow = styled(Box)<{ selected: boolean }>(({ theme, selected }) => ({
     display: 'flex',

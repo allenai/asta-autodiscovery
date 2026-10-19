@@ -4,20 +4,26 @@ Status: **First pass** · Branch: `feature/user-datalib-mounts`
 
 ## Goal
 
-Let a run read a user's large or reused datasets **in place**, read-only, instead of
-uploading or copying them into every run. A user's data library is a set of
-directories in the store:
+Let a run read large or reused datasets **in place**, read-only, instead of uploading
+or copying them into every run. A data library is a set of directories in the store,
+either a user's own or a global one shared with every user:
 
 ```
-users/<userid>/datalib/<dirname>/...          # any tree: one dataset or many
+users/<userid>/datalib/<dirname>/...          # a user's: any tree, one dataset or many
 users/<userid>/datalib/<dirname>/README.md    # its description (optional)
+datalib/<dirname>/...                         # global: same pattern, at the store root
+datalib/<dirname>/README.md
 ```
+
+A global and a user directory may share a name; they are selected and tracked
+separately (`global_datalib_dirs` and `datalib_dirs` in run metadata).
 
 The top-level directories are what a run selects, any number of them; what is inside
 each is up to the user. A run may use data-library directories alongside uploaded or
 preloaded datasets, or **instead of** them.
 
-The library is populated out of band for now; the webapp only lists and selects it.
+Both libraries are populated out of band for now; the webapp only lists and selects
+them. Every user can see and select every global directory.
 
 ## One path, everywhere
 
@@ -26,6 +32,7 @@ every environment that sees it:
 
 ```
 /mnt/data/users/<userid>/datalib/<dirname>
+/mnt/data/datalib/<dirname>                   # global
 ```
 
 This is the same rule the job containers already follow for a run's own directory
@@ -35,10 +42,10 @@ inventing its own mapping.
 
 | Environment | How the directory gets there |
 | --- | --- |
-| Docker job container (`JOB_BACKEND=docker`) | A read-only bind of `$STORAGE_HOST_DIR/users/<uid>/datalib/<dir>`, beside the run's own read-write bind. |
+| Docker job container (`JOB_BACKEND=docker`) | A read-only bind of `$STORAGE_HOST_DIR/users/<uid>/datalib/<dir>` (or `$STORAGE_HOST_DIR/datalib/<dir>`), beside the run's own read-write bind. |
 | Cloud Run job container (`JOB_BACKEND=gcp`) | Already there: the job definition mounts the whole bucket at `/mnt/data`. |
 | Host process (`JOB_BACKEND=process`) | Already there: the job reads the local store in place, so the path is `$STORAGE_DIR/users/<uid>/datalib/<dir>` (the store's directory stands in for `/mnt/data`). Not read-only, like the rest of the store for this backend. |
-| Modal sandbox (`CODE_EXECUTION_BACKEND=modal`) | A read-only `CloudShare` of `gs://<bucket>/users/<uid>/datalib/<dir>/` at the same path. |
+| Modal sandbox (`CODE_EXECUTION_BACKEND=modal`) | A read-only `CloudShare` of the directory's prefix in the bucket (`users/<uid>/datalib/<dir>/` or `datalib/<dir>/`) at the same path. |
 | `process` / `local` code execution | Runs in the job container, so reads the container's path directly. |
 
 On Cloud Run the mount is the bucket's job-level volume, which is neither read-only nor
@@ -86,14 +93,14 @@ in place and can change between runs, so this records what a given run was shown
 
 | Layer | Change |
 | --- | --- |
-| Keys | `keys.datalib_prefix`, `keys.datalib_dir`, and `keys.validate_datalib_dirname`, which rejects anything but a single, non-dot path segment. |
-| Persistence / `JobManager` | `list_datalib_dirs(userid)` → `DatalibDir(name, description)`; `missing_datalib_dirs(userid, names)`. |
-| API | `GET /api/user/me/datalib` → `{"dirs": [{"name", "description"}]}`. Run metadata gains `datalib_dirs: [name, ...]`. |
-| Submit | Checks every selected directory exists in the **submitting user's** library (400 otherwise), and that the run has at least one dataset or directory. |
-| Job args | `--datalib_dir=/mnt/data/users/<uid>/datalib/<dir>`, repeatable. With `modal`, the job mounts each from the `--bucket_path` bucket under the key its path implies, as it does the run's own data. |
-| Fork | Keeps `datalib_dirs` when the owner forks their own run; drops them when another user forks a shared run, since the names refer to the owner's library. A run with only data-library directories has no uploads to copy, so it can be forked without them. |
+| Keys | `keys.datalib_prefix`, `keys.datalib_dir` (both take `userid=None` for the global library), and `keys.validate_datalib_dirname`, which rejects anything but a single, non-dot path segment. |
+| Persistence / `JobManager` | `list_datalib_dirs(userid)` → `DatalibDir(name, description, scope)`, global directories first; `missing_datalib_dirs(userid_or_None, names)`. |
+| API | `GET /api/user/me/datalib` → `{"dirs": [{"name", "description", "scope": "global" \| "user"}]}`. Run metadata gains `datalib_dirs` and `global_datalib_dirs`, each `[name, ...]`. |
+| Submit | Checks every selected user directory exists in the **submitting user's** library and every global one in the global library (400 otherwise), and that the run has at least one dataset or directory. |
+| Job args | `--datalib_dir=/mnt/data/users/<uid>/datalib/<dir>` or `--datalib_dir=/mnt/data/datalib/<dir>`, repeatable. The job does not distinguish the two. With `modal`, the job mounts each from the `--bucket_path` bucket under the key its path implies, as it does the run's own data. |
+| Fork | Keeps `datalib_dirs` when the owner forks their own run; drops them when another user forks a shared run, since the names refer to the owner's library. Keeps `global_datalib_dirs` for anyone. A run with only data-library directories has no uploads to copy, so it can be forked without them. |
 | Dataset expiry | Expiry deletes a run's own uploads only, so a run with only data-library directories reports no expiry. |
-| UI | A "Data library" multi-select in run setup (shown when the user has any directories), with each README as secondary text; the run's parameters view lists the selection. |
+| UI | A "Data library" multi-select in run setup, shown when there are any global or user directories, with global and user directories visibly distinguished and each README as secondary text; the run's parameters view lists the selection the same way. |
 
 The standalone CLI takes `--datalib_dir` too, with any local directory.
 

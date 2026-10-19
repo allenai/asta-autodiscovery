@@ -5,7 +5,7 @@ import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { useViewerRuns } from '@/contexts/ViewerRunsContext';
 import { useToasts } from '@/contexts/ToastsContext';
 import { getRunsApi } from '@/api/RunsApi';
-import { getUserApi, type DatalibDirFromApi } from '@/api/UserApi';
+import { getUserApi, type DatalibDirFromApi, type DatalibScope } from '@/api/UserApi';
 import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadDatasetFile, type UploadTarget } from '@/api/datasetUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
@@ -94,12 +94,19 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [hasAi1Permission, setHasAi1Permission] = useState(false);
     const [preloadedDescs, setPreloadedDescs] = useState<Record<string, string>>({});
-    // Data library: read-only directories the user already has in storage, mounted
-    // into the run as-is (no upload). `availableDatalibDirs` is what the user can pick
-    // from; `selectedDatalibDirs` may also hold names restored from a draft or fork
+    // Data library: read-only directories already in storage, mounted into the run
+    // as-is (no upload). `availableDatalibDirs` is what the user can pick from, both
+    // global (shared with all users) and the user's own; `scope` is always set. A
+    // global and a user directory may share a name, so selections are tracked per
+    // scope. The selected sets may also hold names restored from a draft or fork
     // that no longer exist, so the user can see and deselect them.
-    const [availableDatalibDirs, setAvailableDatalibDirs] = useState<DatalibDirFromApi[]>([]);
+    const [availableDatalibDirs, setAvailableDatalibDirs] = useState<
+        (DatalibDirFromApi & { scope: DatalibScope })[]
+    >([]);
     const [selectedDatalibDirs, setSelectedDatalibDirs] = useState<Set<string>>(new Set());
+    const [selectedGlobalDatalibDirs, setSelectedGlobalDatalibDirs] = useState<Set<string>>(
+        new Set()
+    );
     const selectedPreloadedDatasets = useMemo(() => {
         if (!hasAi1Permission) return [];
         return PRELOADED_DATASETS.filter((d) => selectedIds.has(d.id)).map((d) => ({
@@ -177,6 +184,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                     }));
 
                     setSelectedDatalibDirs(new Set(metadata.datalibDirs));
+                    setSelectedGlobalDatalibDirs(new Set(metadata.globalDatalibDirs));
 
                     // Populate fileUploads from saved datasets
                     if (metadata?.datasets && metadata.datasets.length > 0) {
@@ -227,7 +235,11 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         getUserApi()
             .getViewerDatalib()
             .then(({ data }) => {
-                if (!cancelled) setAvailableDatalibDirs(data.dirs ?? []);
+                if (cancelled) return;
+                // Older responses have no `scope`; those entries are the user's own.
+                setAvailableDatalibDirs(
+                    (data.dirs ?? []).map((d) => ({ ...d, scope: d.scope ?? 'user' }))
+                );
             })
             .catch((err) => {
                 console.error('Error fetching data library directories:', err);
@@ -263,6 +275,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     const settingsRef = useRef(settings);
     const selectedPreloadedRef = useRef(selectedPreloadedDatasets);
     const selectedDatalibRef = useRef(selectedDatalibDirs);
+    const selectedGlobalDatalibRef = useRef(selectedGlobalDatalibDirs);
 
     useEffect(() => {
         fileUploadsRef.current = fileUploads;
@@ -279,6 +292,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     useEffect(() => {
         selectedDatalibRef.current = selectedDatalibDirs;
     }, [selectedDatalibDirs]);
+
+    useEffect(() => {
+        selectedGlobalDatalibRef.current = selectedGlobalDatalibDirs;
+    }, [selectedGlobalDatalibDirs]);
 
     useEffect(() => {
         fileUploads.forEach((upload, index) => {
@@ -331,6 +348,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     };
 
     const getSelectedDatalibDirs = () => Array.from(selectedDatalibRef.current).sort();
+    const getSelectedGlobalDatalibDirs = () => Array.from(selectedGlobalDatalibRef.current).sort();
 
     const saveDatasetMetadata = useCallback(async () => {
         // Prevent concurrent saves
@@ -354,6 +372,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 intent: currentSettings.intent.trim(),
                 datasets,
                 datalib_dirs: getSelectedDatalibDirs(),
+                global_datalib_dirs: getSelectedGlobalDatalibDirs(),
                 // Job configuration parameters
                 n_experiments: currentSettings.nExperiments,
                 exploration_weight: currentSettings.explorationWeight,
@@ -595,6 +614,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 intent: currentSettings.intent.trim(),
                 datasets,
                 datalib_dirs: getSelectedDatalibDirs(),
+                global_datalib_dirs: getSelectedGlobalDatalibDirs(),
                 // Job configuration parameters
                 n_experiments: currentSettings.nExperiments,
                 exploration_weight: currentSettings.explorationWeight,
@@ -678,7 +698,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         // Check Files/Preloaded
         const hasNoFiles = fileUploads.length === 0;
         const hasNoPreloaded = selectedIds.size === 0;
-        const hasNoDatalib = selectedDatalibDirs.size === 0;
+        const hasNoDatalib = selectedDatalibDirs.size === 0 && selectedGlobalDatalibDirs.size === 0;
 
         if (hasNoFiles && hasNoPreloaded && hasNoDatalib) {
             const alternatives = [
@@ -787,8 +807,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         debouncedSaveMetadata(); // Auto-save when selection changes
     };
 
-    const toggleDatalibDir = (name: string) => {
-        setSelectedDatalibDirs((prev) => {
+    const toggleDatalibDir = (scope: DatalibScope, name: string) => {
+        const setSelected =
+            scope === 'global' ? setSelectedGlobalDatalibDirs : setSelectedDatalibDirs;
+        setSelected((prev) => {
             const next = new Set(prev);
             if (next.has(name)) next.delete(name);
             else next.add(name);
@@ -852,6 +874,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         updatePreloadedDescription,
         availableDatalibDirs,
         selectedDatalibDirs,
+        selectedGlobalDatalibDirs,
         toggleDatalibDir,
     };
 }

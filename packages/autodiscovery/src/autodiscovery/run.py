@@ -46,6 +46,7 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
+from autodiscovery.report import generate_report
 
 
 def _theoretical_max_boolean_cat(
@@ -909,8 +910,13 @@ def resolve_model_args(args) -> None:
         llm.validate(args.embedding_model, flag="--embedding_model", mode="embedding")
 
 
-def main(args):
-    """Run AutoDiscovery exploration from a parsed argument namespace."""
+def main(args) -> str:
+    """Run AutoDiscovery exploration from a parsed argument namespace.
+
+    Returns:
+        The directory the run's results were written to: ``args.out_dir``, or a
+        timestamped directory beneath it with ``--timestamp_dir``.
+    """
     print("Script arguments:")
     print(args.__dict__, "\n")
 
@@ -979,7 +985,7 @@ def main(args):
                 embedding_model=args.embedding_model,
                 embedding_dimensions=getattr(args, "embedding_dimensions", None),
             )
-            return
+            return log_dirname
 
         if args.continue_from_dir is not None:
             # Copy all files except args.json from continue_from_dir to the new log directory
@@ -1002,7 +1008,7 @@ def main(args):
         remaining_iters = (args.n_experiments + 1) - total_nodes  # + 1 to account for root node
         if remaining_iters <= 0:
             print(f"Already reached or exceeded target of {args.n_experiments} experiments")
-            return
+            return log_dirname
         print(
             f"RESUMING: Running {remaining_iters} more experiments to reach the target experiment count of {args.n_experiments}.\n"
         )
@@ -1085,12 +1091,29 @@ def main(args):
         n_threads=args.n_threads,
         agent_usage_mode=args.agent_usage_mode,
     )
+    return log_dirname
+
+
+def run_and_report(args) -> None:
+    """Run AutoDiscovery, then write its static HTML report beside the results.
+
+    Every way of launching the engine goes through here -- the job image's
+    entry point (``python -m autodiscovery.run``) on any job backend, and
+    ``autodiscovery-easy`` -- so a run leaves the same artifacts however it was
+    started. A report failure is logged, not raised: the run's results stand.
+    """
+    results_dir = main(args)
+    try:
+        report_path = generate_report(os.path.abspath(results_dir))
+        print(f"\nHTML report: {report_path}")
+    except Exception as e:
+        print(f"\nWarning: could not generate HTML report: {e}")
 
 
 if __name__ == "__main__":
     parser = ArgParser()
     args = parser.parse_args()
-    main(args)
+    run_and_report(args)
 
     if args.delete_work_dir:
         shutil.rmtree(args.work_dir)

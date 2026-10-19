@@ -37,7 +37,8 @@ class JobConfig:
     region: str = "us-west1"
     job_name: str = "autodiscovery-job"
 
-    # Job backend selection: "docker" (local containers, default) or "gcp" (Cloud Run).
+    # Job backend selection: "docker" (local containers, default), "gcp" (Cloud
+    # Run), or "process" (subprocesses on this host, for single-user use).
     # Docker is the default to keep the out-of-the-box experience infra-agnostic;
     # deployments that run jobs on Cloud Run must set JOB_BACKEND=gcp explicitly.
     backend: str = "docker"
@@ -55,6 +56,16 @@ class JobConfig:
     # Modal Configuration (for sandbox execution)
     modal_app_name: str = "asta-autodiscovery"
     modal_bucket_secret: str = "example-bucket-secret"
+
+    # Process job backend (JOB_BACKEND=process; ignored by other backends): jobs
+    # run as subprocesses on this host. Each execution's state, log, and working
+    # directory live under process_job_dir. process_job_python is the interpreter
+    # that runs the engine; None means the API's own, which must have the
+    # autodiscovery package installed. process_max_concurrent_jobs caps how many
+    # run at once (0 for no cap).
+    process_job_dir: str = "~/.autodiscovery/jobs"
+    process_job_python: str | None = None
+    process_max_concurrent_jobs: int = 1
 
     @classmethod
     def from_env(cls, **overrides) -> JobConfig:
@@ -84,6 +95,11 @@ class JobConfig:
             ),
             modal_app_name=os.environ.get("MODAL_APP_NAME", cls.modal_app_name),
             modal_bucket_secret=os.environ.get("MODAL_BUCKET_SECRET", cls.modal_bucket_secret),
+            process_job_dir=os.environ.get("PROCESS_JOB_DIR", cls.process_job_dir),
+            process_job_python=os.environ.get("PROCESS_JOB_PYTHON") or None,
+            process_max_concurrent_jobs=int(
+                os.environ.get("PROCESS_MAX_CONCURRENT_JOBS", cls.process_max_concurrent_jobs)
+            ),
         )
 
         # Apply overrides (unknown keys are ignored)

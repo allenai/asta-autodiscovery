@@ -1,4 +1,4 @@
-.PHONY: help dev check-model test test-modal test-all lint lint-fix format type-check sync adk-web serve-docs deploy-docs \
+.PHONY: help dev dev-host check-model test test-modal test-all lint lint-fix format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
@@ -78,6 +78,29 @@ check-model: ## Fail unless a model is chosen (AUTODISCOVERY_MODEL in the shell 
 dev: check-model ## Build the job image and start the local stack
 	docker compose build autodiscovery
 	docker compose up --build
+
+# The same stack with no Docker: the API under gunicorn and the UI under Vite, both
+# on this host, with Vite forwarding /api to the API (nginx's job under compose).
+# Runs are launched as host subprocesses (JOB_BACKEND=process) that read the store
+# in place, which is single-user by design: auth is off and both servers listen on
+# localhost only. .env is read as compose reads it (shell values win), except that
+# STORAGE_DIR comes from the shell, defaulting to ./data like compose's. Ctrl-C
+# stops both servers; a run in progress keeps going, and the API reports its
+# outcome once restarted.
+DEV_HOST_API_PORT ?= 8000
+DEV_HOST_UI_PORT ?= 3000
+
+dev-host: check-model ## Start the local stack on this host, without Docker
+	cd ui && yarn install --frozen-lockfile
+	trap 'kill 0' EXIT; \
+	(cd ui && API_PROXY_TARGET=http://127.0.0.1:$(DEV_HOST_API_PORT) \
+		yarn dev --host 127.0.0.1 --port $(DEV_HOST_UI_PORT)) & \
+	AUTH_PROVIDER=none JOB_BACKEND=process STORAGE_BACKEND=local \
+	STORAGE_DIR="$${STORAGE_DIR:-$(CURDIR)/data}" \
+	uv run --all-packages --with-requirements api/requirements.txt \
+		$(if $(wildcard .env),--env-file .env) \
+		gunicorn --chdir api --workers 2 --timeout 0 --reload \
+		--bind 127.0.0.1:$(DEV_HOST_API_PORT) 'app:create_app()'
 
 # Development server targets
 adk-web: ## Serve Google ADK Web against packages/devtools/adk

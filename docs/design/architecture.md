@@ -28,7 +28,7 @@ mind:
 |------|----------|---------|-------------------|-----------|
 | Authentication | `AUTH_PROVIDER` | `none` · `auth0` · `password_file` | who the user is | [Authentication](../authentication.md), [Swappable Auth Providers](auth-providers.md) |
 | Persistence | `STORAGE_BACKEND` | `local` · `gcs` | the object store | [Swappable Persistence Backends](storage-backends.md) |
-| Job execution | `JOB_BACKEND` | `docker` · `gcp` | how a run is launched and hosted | [Configuration](../configuration.md#job-execution) |
+| Job execution | `JOB_BACKEND` | `docker` · `gcp` · `process` | how a run is launched and hosted | [Configuration](../configuration.md#job-execution) |
 | Code execution | `CODE_EXECUTION_BACKEND` | `process` · `local` · `modal` | how a run's generated code runs | [Configuration](../configuration.md#code-execution-backend) |
 | Model | `AUTODISCOVERY_MODEL` | any [litellm](https://docs.litellm.ai/docs/providers) provider | which LLM the agents use | [Quick start](../quickstart.md) |
 
@@ -143,7 +143,7 @@ flowchart TB
 
     auth["Auth provider<br/>AUTH_PROVIDER<br/>none · auth0 · password_file"]
     store[("Object store<br/>STORAGE_BACKEND<br/>local · gcs")]
-    jobbe["Job backend<br/>JOB_BACKEND<br/>docker · gcp"]
+    jobbe["Job backend<br/>JOB_BACKEND<br/>docker · gcp · process"]
     code["Code-execution backend<br/>CODE_EXECUTION_BACKEND<br/>process · local · modal"]
     llm["LLM provider<br/>AUTODISCOVERY_MODEL<br/>(any litellm provider)"]
 

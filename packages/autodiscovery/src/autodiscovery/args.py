@@ -14,7 +14,7 @@ EMBEDDING_MODEL_ENV = "AUTODISCOVERY_EMBEDDING_MODEL"
 #: Shared help text so every model flag documents the same litellm convention.
 MODEL_FLAG_HELP = (
     "Model to use for {role}, as litellm's <provider>/<model> "
-    "(e.g. openai/gpt-5.4-mini, anthropic/claude-sonnet-5, vertex_ai/gemini-3.7-flash, "
+    "(e.g. openai/gpt-5.4-mini, anthropic/claude-sonnet-5, vertex_ai/gemini-3.8-flash, "
     "github_copilot/claude-haiku-4.5). The provider prefix is required. "
     "Defaults to ${env}{fallback}."
 )

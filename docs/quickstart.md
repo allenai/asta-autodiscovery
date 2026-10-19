@@ -55,7 +55,7 @@ reject a temperature -- from the rest.
 ### Google (Vertex AI)
 
 ```sh
-AUTODISCOVERY_MODEL=vertex_ai/gemini-3.7-flash
+AUTODISCOVERY_MODEL=vertex_ai/gemini-3.8-flash
 VERTEXAI_PROJECT=your-gcp-project
 VERTEXAI_LOCATION=global
 # A service-account key with Vertex AI access. Use an ABSOLUTE path: the key

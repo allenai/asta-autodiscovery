@@ -23,6 +23,11 @@ implies.
 
 Without `--datalib_dir`, prompts and the first experiment are unchanged.
 
+### Deduplication defaults to `vertex_ai/gemini-3.8-flash`
+
+`--model` for the deduplication step now defaults to `vertex_ai/gemini-3.8-flash`
+instead of `vertex_ai/gemini-3.7-flash`, which Vertex AI retires on 2027-01-28.
+
 ### There is no default model; choosing one is required
 
 `--model` no longer defaults to `vertex_ai/gemini-3.7-flash`. Choose a model on

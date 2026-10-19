@@ -75,7 +75,7 @@ class _StubBackend:
 
 def _executor(stdout, stderr="", **kwargs):
     return SandboxCodeExecutor(
-        _StubBackend(stdout, stderr), vision_model="vertex_ai/gemini-3.7-flash", **kwargs
+        _StubBackend(stdout, stderr), vision_model="vertex_ai/gemini-3.8-flash", **kwargs
     )
 
 

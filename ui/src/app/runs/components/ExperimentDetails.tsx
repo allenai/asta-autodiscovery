@@ -140,10 +140,23 @@ export const ExperimentDetails = memo(function ExperimentDetails({
                     </>
                 )}
 
-                {experiment.review && (
+                {(experiment.status === ExperimentStatus.SUCCEEDED ||
+                    experiment.status === ExperimentStatus.FAILED) && (
                     <Box>
                         <SectionHeader>Validity Check</SectionHeader>
-                        <StyledMarkdown>{escapeMarkdown(experiment.review)}</StyledMarkdown>
+                        <StatusChip
+                            label={
+                                experiment.status === ExperimentStatus.SUCCEEDED
+                                    ? 'Valid'
+                                    : 'Insufficient'
+                            }
+                            size="small"
+                            $status={experiment.status}
+                        />
+                        {/* A passing review only restates findings; caveats show on failure. */}
+                        {experiment.status === ExperimentStatus.FAILED && experiment.review && (
+                            <StyledMarkdown>{escapeMarkdown(experiment.review)}</StyledMarkdown>
+                        )}
                     </Box>
                 )}
             </ContentWrapper>

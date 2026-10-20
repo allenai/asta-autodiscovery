@@ -384,6 +384,7 @@ are **not secret**.
 | `VITE_AUTH0_DOMAIN` | No | `auth0.allenai.org` | Auth0 tenant domain for the browser login flow. |
 | `VITE_AUTH0_CLIENT_ID` | No | *(built-in public client id)* | Public Auth0 application (client) id for the SPA. Public by design. |
 | `VITE_AUTH0_AUDIENCE` | No | `https://asta-core.allen.ai` | Auth0 API audience requested by the browser. |
+| `VITE_HEAP_PROJECT_ID` | No | *(empty — analytics disabled)* | [Heap](https://www.heap.io/) project (environment) id. When set, the UI loads Heap, identifies signed-in users by email and sends click/track events to that project. When empty, no analytics script is loaded and tracking calls are no-ops. |
 
 The `VITE_AUTH*` values are build-time fallbacks; at runtime the UI prefers the
 provider and settings served by `GET /api/auth/config`.

@@ -8,19 +8,21 @@ import CreditsChip from '@/components/CreditsChip';
 import { AboutButton } from '@/components/AboutButton';
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { filterTransientProps } from '@/utils/styledProps';
 import { TEST_ID_BACK_BUTTON, TEST_ID_CREDITS_CHIP } from '@/testIds';
 
 // Smart component — reads hooks, computes props, delegates rendering
 export function Header() {
     const { isAuthenticated } = useAuth0();
+    const { creditsEnabled } = useViewerCredits();
     const router = useRouter();
     const pathname = usePathname();
 
     return (
         <HeaderView
             showBackButton={pathname.includes('/shared') && !isAuthenticated}
-            showCredits={isAuthenticated}
+            showCredits={isAuthenticated && creditsEnabled}
             isSharedSamples={pathname.startsWith('/shared/samples')}
             onBack={() => router.push('/runs')}
         />

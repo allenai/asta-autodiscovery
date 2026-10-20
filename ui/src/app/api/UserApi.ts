@@ -22,7 +22,7 @@ export interface ViewerCreditsFromApi {
 }
 
 export interface GetViewerCreditsResponseBody {
-    credits: ViewerCreditsFromApi;
+    credits: ViewerCreditsFromApi | null; // null when credit tracking is disabled
 }
 
 /**

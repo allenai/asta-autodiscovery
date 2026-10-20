@@ -362,7 +362,8 @@ Configures the "dig deeper" handoff that sends an experiment's context to Asta.
 
 Both `ASTA_CONTEXT_SERVICE_URL` and `ASTA_CONTEXT_SERVICE_API_KEY` must be set to enable it. With
 either missing the feature is off: the UI hides the "Continue exploring with Asta" entry points and
-the API returns `503` from the handoff endpoint. The rest of the app is unaffected.
+the API returns `503` from the handoff endpoint. The rest of the app is unaffected. All of the
+API's Asta-specific code lives in the `api/asta/` package.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |

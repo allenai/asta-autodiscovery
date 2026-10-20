@@ -5,7 +5,7 @@ import os
 
 import requests
 
-_log = logging.getLogger("api.asta_client")
+_log = logging.getLogger(__name__)
 
 ASTA_BASE_URL = os.environ.get("ASTA_BASE_URL", "https://asta.allen.ai")
 

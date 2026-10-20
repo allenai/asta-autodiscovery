@@ -142,7 +142,7 @@ export const ExperimentDetails = memo(function ExperimentDetails({
 
                 {experiment.review && (
                     <Box>
-                        <SectionHeader>Review</SectionHeader>
+                        <SectionHeader>Validity Check</SectionHeader>
                         <StyledMarkdown>{escapeMarkdown(experiment.review)}</StyledMarkdown>
                     </Box>
                 )}

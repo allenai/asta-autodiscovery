@@ -11,7 +11,7 @@ type ExperimentContextSummaryProps = {
 };
 
 /**
- * Renders the Belief Shift, Hypothesis, and Analysis sections for an experiment.
+ * Renders the Belief Shift, Hypothesis, and Findings sections for an experiment.
  * Shared between the experiment detail panel and the Continue with Asta modal so the
  * two stay visually in sync. Parent is expected to supply vertical spacing between the
  * rendered <Box> sections (e.g. a Stack with spacing).
@@ -68,7 +68,7 @@ export function ExperimentContextSummary({
 
             {experiment.analysis && (
                 <Box>
-                    <SectionHeader>Analysis</SectionHeader>
+                    <SectionHeader>Findings</SectionHeader>
                     <StyledMarkdown>{escapeMarkdown(experiment.analysis)}</StyledMarkdown>
                 </Box>
             )}

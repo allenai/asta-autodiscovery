@@ -9,6 +9,11 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
+### Clearer experiment section labels
+
+Experiment sections in the web UI and standalone HTML report are now labeled
+**Findings** (formerly Analysis) and **Validity Check** (formerly Review).
+
 ### Read-only data-library directories
 
 `auto-discovery` accepts `--datalib_dir <path>`, repeatable: a directory the run

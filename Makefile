@@ -1,4 +1,4 @@
-.PHONY: help dev dev-host check-model test test-modal test-all lint lint-fix format type-check sync adk-web serve-docs deploy-docs \
+.PHONY: help dev dev-host check-model test lint lint-fix format type-check sync adk-web serve-docs deploy-docs \
         build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
@@ -17,18 +17,18 @@ help: ## List all targets
 # IPython / asta_sandbox). This makes the targets work from a cold environment,
 # so CI can invoke `make test` directly.
 #
+# api/ is not a workspace member -- its image installs api/requirements.txt -- so
+# those requirements are layered on with --with-requirements; without them the
+# api/tests modules skip on a missing Flask. pytest runs as `python -m pytest`
+# because the `pytest` entry point would use the base venv's interpreter and
+# miss the layered packages.
+#
 # PYTEST_ARGS forwards extra flags to pytest, e.g. `make test PYTEST_ARGS=--cov`.
 # Make treats bare trailing words as goals, so `make test -- --cov` cannot work.
 PYTEST_ARGS ?=
 
-test: ## Run the main test suite (excludes Modal tests)
-	uv run --all-packages pytest -m "not modal and not adc" $(PYTEST_ARGS)
-
-test-modal: ## Run the Modal tests only
-	uv run --all-packages pytest -m "modal" $(PYTEST_ARGS)
-
-test-all: ## Run every test
-	uv run --all-packages pytest $(PYTEST_ARGS)
+test: ## Run the test suite
+	uv run --all-packages --with-requirements api/requirements.txt python -m pytest $(PYTEST_ARGS)
 
 # Code quality targets
 lint: ## Run Ruff lint + format checks (no changes)

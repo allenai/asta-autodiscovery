@@ -40,10 +40,6 @@ pythonpath = [
     "packages/autodiscovery_modal/src",
     "packages/autodiscovery_jobs/src",
 ]
-markers = [
-    "modal: integration tests that run against Modal",
-    "adc: tests that require Application Default Credentials",
-]
 
 [tool.uv.workspace]
 members = [

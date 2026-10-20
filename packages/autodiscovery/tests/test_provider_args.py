@@ -390,7 +390,7 @@ def test_a_vertex_model_needs_both_settings(configured: str | None, monkeypatch)
     if configured:
         monkeypatch.setenv(configured, "something")
     with pytest.raises(ModelError) as excinfo:
-        validate("vertex_ai/gemini-3.7-flash", flag="--model")
+        validate("vertex_ai/gemini-3.8-flash", flag="--model")
 
     assert "VERTEXAI_PROJECT" in str(excinfo.value)
     assert "VERTEXAI_LOCATION" in str(excinfo.value)
@@ -399,7 +399,7 @@ def test_a_vertex_model_needs_both_settings(configured: str | None, monkeypatch)
 def test_a_configured_vertex_model_validates(monkeypatch) -> None:
     configure_vertex(monkeypatch)
 
-    validate("vertex_ai/gemini-3.7-flash", flag="--model")
+    validate("vertex_ai/gemini-3.8-flash", flag="--model")
 
 
 @pytest.mark.parametrize("alias", ["VERTEX_PROJECT", "VERTEX_LOCATION", "VERTEX_PROJECT_ID"])
@@ -415,12 +415,12 @@ def test_litellms_short_aliases_do_not_satisfy_the_check(alias: str, monkeypatch
     monkeypatch.setenv(alias, "something")
 
     with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
-        validate("vertex_ai/gemini-3.7-flash", flag="--model")
+        validate("vertex_ai/gemini-3.8-flash", flag="--model")
 
 
 def test_a_missing_vertex_setting_stops_a_run_before_any_model_call() -> None:
     with pytest.raises(ModelError, match="VERTEXAI_PROJECT"):
-        resolve_model_args(engine_args("--model", "vertex_ai/gemini-3.7-flash"))
+        resolve_model_args(engine_args("--model", "vertex_ai/gemini-3.8-flash"))
 
 
 # --- Provider credentials ---------------------------------------------------
@@ -471,9 +471,9 @@ def test_a_run_naming_no_vertex_model_needs_no_vertex_settings() -> None:
         # There is no default model, so forgetting to choose one is the most
         # likely first-run failure of all.
         ([], "No model chosen"),
-        (["--model", "vertex_ai/gemini-3.7-flash"], "VERTEXAI_PROJECT"),
+        (["--model", "vertex_ai/gemini-3.8-flash"], "VERTEXAI_PROJECT"),
         # Every 0.2.x user hits this one on upgrade.
-        (["--model", "gemini-3.7-flash"], "missing a provider"),
+        (["--model", "gemini-3.8-flash"], "missing a provider"),
     ],
 )
 def test_easy_cli_reports_a_model_error_as_a_flag_error(

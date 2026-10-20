@@ -23,6 +23,28 @@ implies.
 
 Without `--datalib_dir`, prompts and the first experiment are unchanged.
 
+### Deduplication defaults to `vertex_ai/gemini-3.8-flash`
+
+The standalone `python -m autodiscovery.deduplication` helper retains its own
+`--model` default, now `vertex_ai/gemini-3.8-flash` instead of
+`vertex_ai/gemini-3.7-flash`. This is an exception to the main discovery CLI
+model-selection requirement below; discovery runs pass their chosen model to
+deduplication explicitly.
+
+### Dashboard estimates use historical Gemini Flash pricing
+
+Gemini 3.7/3.8 Flash estimates use $0.75 input / $3.75 output per million tokens
+before 2027-01-01 and $1.50 / $7.50 from that date, following
+[Google's global standard pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing).
+All tokens in a run use its creation-time rate, including runs spanning the
+price change. If creation time is missing or invalid, estimates use the earliest
+valid usage-event timestamp, then finish time. With no valid timestamp, estimates
+use the standard, non-promotional rate. Regional premiums and other billing
+adjustments are not modeled. The metrics cache schema is bumped to rebuild old
+estimates; the resolved pricing date is persisted for consistent breakdowns.
+Every metrics dashboard page now shows a note that costs are estimates, why
+historical costs may differ from billing, and which price changes are applied.
+
 ### There is no default model; choosing one is required
 
 `--model` no longer defaults to `vertex_ai/gemini-3.7-flash`. Choose a model on

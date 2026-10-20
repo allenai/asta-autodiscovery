@@ -13,7 +13,7 @@ AZURE = {
     "AZURE_API_BASE": "https://example.openai.azure.com",
 }
 VERTEX = {
-    "AUTODISCOVERY_MODEL": "vertex_ai/gemini-3.7-flash",
+    "AUTODISCOVERY_MODEL": "vertex_ai/gemini-3.8-flash",
     "VERTEXAI_PROJECT": "test-project",
     "VERTEXAI_LOCATION": "global",
     "GCP_KEY_HOST_PATH": "/host/secrets/gcp-key.json",

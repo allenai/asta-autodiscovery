@@ -5,6 +5,7 @@ import { useRouter, usePathname } from '@/router';
 import { useAuth0 } from '@/contexts/Auth0Context';
 import AuthButton from '@/components/AuthButton';
 import { scrollbarStyles } from '@/utils/scrollbar';
+import CostEstimateNote from './components/CostEstimateNote';
 
 const ADMIN_PERMISSION = 'enroll:autodiscovery_admin';
 
@@ -93,7 +94,10 @@ export default function MetricsLayout({ children }: { children: React.ReactNode 
                 </Box>
                 <AuthButton />
             </TopBar>
-            <Content>{children}</Content>
+            <Content>
+                <CostEstimateNote />
+                {children}
+            </Content>
         </Wrapper>
     );
 }

@@ -34,9 +34,9 @@ uv run --package autodiscovery python -m autodiscovery.run \
     --out_dir="outputs" \
     --dataset_metadata="discoverybench/real/test/nls_ses/metadata.json" \
     --n_experiments=16 \
-    --model="vertex_ai/gemini-3.7-flash" \
-    --belief_model="vertex_ai/gemini-3.7-flash" \
-    --vision_model="vertex_ai/gemini-3.7-flash"
+    --model="vertex_ai/gemini-3.8-flash" \
+    --belief_model="vertex_ai/gemini-3.8-flash" \
+    --vision_model="vertex_ai/gemini-3.8-flash"
 ```
 
 Model flags take litellm's `<provider>/<model>` naming; the provider prefix is required.

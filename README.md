@@ -60,10 +60,7 @@ single-user — use `make dev-host` instead; see
 ## Running Tests
 
 ```sh
-make test           # main test suite; excludes Modal tests
-make test-modal     # Modal tests only
-make test-all       # everything
-
+make test                     # the full test suite
 make test PYTEST_ARGS=--cov   # forward extra flags to pytest
 ```
 

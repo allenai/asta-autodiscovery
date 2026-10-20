@@ -27,6 +27,7 @@ Example usage:
 """
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from time import monotonic
@@ -57,6 +58,16 @@ CREDITS_CACHE_TTL_SECONDS = 5.0
 
 # Cap on distinct (user, config) entries kept per worker process.
 CREDITS_CACHE_MAX_ENTRIES = 512
+
+
+def credits_enabled() -> bool:
+    """Whether per-user experiment credits are tracked and enforced.
+
+    Off by default (``CREDITS_ENABLED`` unset): runs are limited only by
+    ``DEFAULT_EXPERIMENT_LIMIT`` per run, ``/api/user/me/credits`` reports
+    ``null`` and the UI hides its credit displays.
+    """
+    return os.environ.get("CREDITS_ENABLED", "").strip().lower() in ("1", "true", "yes")
 
 
 class JobStats(NamedTuple):
@@ -358,13 +369,14 @@ def can_start_experiments(n_experiments: int, userid: str, config: JobConfig | N
 
 def check_experiment_limits(
     n_experiments: int, userid: str, config: JobConfig | None = None
-) -> UserCredits:
+) -> UserCredits | None:
     """Verify experiment count is valid and user has sufficient credits.
 
     Performs three validation checks in order:
     1. Validates n_experiments > 0
     2. Validates n_experiments <= DEFAULT_EXPERIMENT_LIMIT (500)
-    3. Validates user has sufficient available credits
+    3. Validates user has sufficient available credits, when
+       :func:`credits_enabled`
 
     Uses the conservative 'available' metric (granted - used - pending).
     This function is useful in API endpoints where you want to fail fast
@@ -376,7 +388,7 @@ def check_experiment_limits(
         config: Configuration (uses default if None)
 
     Returns:
-        UserCredits object if all checks pass
+        UserCredits object if all checks pass, or None when credits are disabled
 
     Raises:
         InvalidExperimentCountError: If n_experiments <= 0
@@ -402,7 +414,10 @@ def check_experiment_limits(
     if n_experiments > DEFAULT_EXPERIMENT_LIMIT:
         raise ExperimentLimitExceededError(requested=n_experiments, limit=DEFAULT_EXPERIMENT_LIMIT)
 
-    # Validation 3: Check sufficient credits (existing logic)
+    # Validation 3: Check sufficient credits
+    if not credits_enabled():
+        return None
+
     credits = get_user_credits(userid=userid, config=config)
 
     if credits.available < n_experiments:

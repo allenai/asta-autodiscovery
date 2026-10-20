@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request
 from utils.auth import get_auth_provider, requires_auth
-from utils.credits import get_cached_user_credits
+from utils.credits import credits_enabled, get_cached_user_credits
 
 # Import autodiscovery_jobs when available
 try:
@@ -50,8 +50,13 @@ def create() -> Blueprint:
     @api.route("/me/credits", methods=["GET"])
     @requires_auth()
     def get_viewer_credits():
-        """Get the number of credits for the authenticated user."""
+        """Get the number of credits for the authenticated user.
+
+        ``credits`` is ``null`` when credit tracking is disabled.
+        """
         user_id = request.user.get("sub")
+        if not credits_enabled():
+            return jsonify({"credits": None}), 200
 
         try:
             job_manager = get_job_manager()

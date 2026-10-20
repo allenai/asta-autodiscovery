@@ -1,6 +1,7 @@
 import logging
 import os
 
+from asta import asta_api
 from auth import auth_api
 from autodiscovery_jobs.model_config import check_model_config
 from flask import Flask
@@ -31,6 +32,7 @@ def create_app() -> ProxyFix:
     app.register_blueprint(auth_api.create(), url_prefix="/api/auth")
     app.register_blueprint(user_api.create(), url_prefix="/api/user")
     app.register_blueprint(runs_api.create(), url_prefix="/api/runs")
+    app.register_blueprint(asta_api.create(), url_prefix="/api/runs")
     app.register_blueprint(metrics_api.create(), url_prefix="/api/metrics")
     app.register_error_handler(HTTPException, error.handle)
 

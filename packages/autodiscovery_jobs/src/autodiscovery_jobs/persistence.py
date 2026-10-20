@@ -1367,11 +1367,10 @@ def purge_user_data(
 
     This covers the store ``STORAGE_BACKEND`` selects only. Two nearby surfaces
     are deliberately out of scope: dataset copies handed to the Asta workspaces
-    bucket by :func:`asta_gcs.copy_dataset_to_asta_workspace` belong to Asta
-    once the session there has been started, and the metrics dashboard's
-    derived job snapshot rebuilds itself by rescanning the job directories, so
-    the subject's rows drop out of it on the next refresh with no maintenance
-    here.
+    bucket by the API's ``asta`` package belong to Asta once the session there
+    has been started, and the metrics dashboard's derived job snapshot rebuilds
+    itself by rescanning the job directories, so the subject's rows drop out of
+    it on the next refresh with no maintenance here.
 
     Args:
         userid: User identifier (Auth0 ``sub``).

@@ -10,6 +10,9 @@ import { getRunFromApi, getRunDetailsFromApi } from '@/types/Run';
 import { uploadDatasetFile, type UploadTarget } from '@/api/datasetUpload';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
 
+// Matches DEFAULT_EXPERIMENT_LIMIT in api/utils/credits.py; the budget cap when credits are disabled
+const MAX_EXPERIMENTS_PER_RUN = 500;
+
 export const MCTS_SELECTION = {
     PROGRESSIVE_WIDENING: {
         value: 'pw',
@@ -87,7 +90,7 @@ interface FieldErrors {
 }
 
 export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: UseRunSetupProps) {
-    const { credits } = useViewerCredits();
+    const { credits, creditsEnabled } = useViewerCredits();
     const { updateViewerRun, viewerRuns } = useViewerRuns();
     const { addErrorToast } = useToasts();
     const api = getRunsApi();
@@ -116,6 +119,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     }, [selectedIds, preloadedDescs, hasAi1Permission]);
 
     const creditsAvailable = credits?.available ?? 0;
+    const maxExperiments = creditsEnabled ? creditsAvailable : MAX_EXPERIMENTS_PER_RUN;
 
     // Get max file size from the run
     const maxFileSize = viewerRuns?.[runid]?.maxFileSize || null;
@@ -680,10 +684,10 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
 
         const num = parseInt(value, 10);
 
-        if (isNaN(num) || num < 1 || num > creditsAvailable) {
+        if (isNaN(num) || num < 1 || num > maxExperiments) {
             setFieldErrors((prev) => ({
                 ...prev,
-                nExperiments: `Must be between 1 and ${creditsAvailable}`,
+                nExperiments: `Must be between 1 and ${maxExperiments}`,
             }));
         } else {
             updateSettings('nExperiments', num);
@@ -723,9 +727,9 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         if (
             !settings.nExperiments ||
             settings.nExperiments < 1 ||
-            settings.nExperiments > creditsAvailable
+            settings.nExperiments > maxExperiments
         ) {
-            errors.nExperiments = `Must be between 1 and ${creditsAvailable}`;
+            errors.nExperiments = `Must be between 1 and ${maxExperiments}`;
         }
 
         // Check the object keys directly
@@ -832,6 +836,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
     return {
         // Computed values
         creditsAvailable,
+        creditsEnabled,
 
         // Dataset upload state
         fileUploads,

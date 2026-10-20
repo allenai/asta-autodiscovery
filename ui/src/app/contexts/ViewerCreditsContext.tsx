@@ -14,6 +14,9 @@ import { getUserApi, ViewerCreditsFromApi } from '@/api/UserApi';
 
 export interface ViewerCreditsState {
     credits: ViewerCreditsFromApi | null;
+    // True only once the API has returned credits; false while loading or when
+    // credit tracking is disabled, so credit UI never flashes in and out
+    creditsEnabled: boolean;
     lastError: string | null;
     isPolling: boolean;
     isLoading: boolean;
@@ -27,6 +30,7 @@ export const REFRESH_INTERVAL_MS = 60000; // 60 seconds
 
 export const DEFAULT_STATE: ViewerCreditsState = {
     credits: null,
+    creditsEnabled: false,
     lastError: null,
     isPolling: false,
     isLoading: false,
@@ -103,9 +107,12 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
         return () => clearInterval(interval);
     }, [isAuthenticated, isPolling, updateViewerCredits]);
 
+    const creditsEnabled = credits !== null;
+
     const memoizedState = useMemo<ViewerCreditsState>(
         () => ({
             credits,
+            creditsEnabled,
             lastError,
             isPolling,
             isLoading,
@@ -116,6 +123,7 @@ export const ViewerCreditsProvider = ({ children }: ViewerCreditsProviderProps) 
         }),
         [
             credits,
+            creditsEnabled,
             lastError,
             isPolling,
             isLoading,

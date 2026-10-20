@@ -42,6 +42,8 @@ valid usage-event timestamp, then finish time. With no valid timestamp, estimate
 use the standard, non-promotional rate. Regional premiums and other billing
 adjustments are not modeled. The metrics cache schema is bumped to rebuild old
 estimates; the resolved pricing date is persisted for consistent breakdowns.
+Every metrics dashboard page now shows a note that costs are estimates, why
+historical costs may differ from billing, and which price changes are applied.
 
 ### There is no default model; choosing one is required
 

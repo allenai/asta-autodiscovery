@@ -282,7 +282,7 @@ has a complete `.env` per provider.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTODISCOVERY_MODEL` | **Yes** | *(none)* | Model for every run, as litellm's `<provider>/<model>` (e.g. `openai/gpt-5.4-mini`, `anthropic/claude-sonnet-5`, `azure/<deployment>`, `vertex_ai/gemini-3.7-flash`, `github_copilot/claude-haiku-4.5`). The provider prefix is required. The API passes it to each job as `--model`. |
+| `AUTODISCOVERY_MODEL` | **Yes** | *(none)* | Model for every run, as litellm's `<provider>/<model>` (e.g. `openai/gpt-5.4-mini`, `anthropic/claude-sonnet-5`, `azure/<deployment>`, `vertex_ai/gemini-3.8-flash`, `github_copilot/claude-haiku-4.5`). The provider prefix is required. The API passes it to each job as `--model`. |
 | `AUTODISCOVERY_BELIEF_MODEL` | No | `AUTODISCOVERY_MODEL` | Model for belief elicitation (the job's `--belief_model`). |
 | `AUTODISCOVERY_VISION_MODEL` | No | `AUTODISCOVERY_MODEL` | Model for interpreting plots (the job's `--vision_model`). Must accept image input. |
 | `AUTODISCOVERY_EMBEDDING_MODEL` | No | *(none)* | Embedding model for hypothesis deduplication (the job's `--embedding_model`). Only used, and only required, with the standalone CLI's `--dedupe`. |

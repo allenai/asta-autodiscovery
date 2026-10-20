@@ -11,7 +11,7 @@ generate follow-up hypotheses in a recursive exploration.
 1.0.0 changes two things that every existing command line depends on:
 
 - **Model flags now name their provider.** `--model gemini-3.1-pro-preview`
-  becomes `--model vertex_ai/gemini-3.7-flash`. A bare model name is rejected at
+  becomes `--model vertex_ai/gemini-3.8-flash`. A bare model name is rejected at
   startup. See [Selecting models](#selecting-models) below.
 - **Vertex AI authenticates via Application Default Credentials only.**
   `VERTEX_ACCESS_TOKEN`, `GOOGLE_OAUTH_ACCESS_TOKEN` and
@@ -71,7 +71,7 @@ Run `auto-discovery --help` to see the full set of options.
 
 All model traffic goes through [litellm](https://docs.litellm.ai/), and every model flag names
 its provider explicitly as `<provider>/<model>` — for example
-`vertex_ai/gemini-3.7-flash`, `openai/o4-mini`, `github_copilot/claude-haiku-4.5`. You only
+`vertex_ai/gemini-3.8-flash`, `openai/o4-mini`, `github_copilot/claude-haiku-4.5`. You only
 need to configure the providers you actually name in `--model`, `--belief_model`,
 `--vision_model` and `--embedding_model`.
 
@@ -138,13 +138,13 @@ code and blocks for about three minutes before failing.
 
 | Flag | What it controls | Default |
 | --- | --- | --- |
-| `--model` | Primary reasoning model used for hypothesis generation and analysis. | `vertex_ai/gemini-3.7-flash` |
-| `--belief_model` | Model used for belief updates over experimental outcomes. | `vertex_ai/gemini-3.7-flash` |
-| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | `vertex_ai/gemini-3.7-flash` |
-| `--embedding_model` | Model used for deduplication embeddings. | `openai/text-embedding-3-large` |
+| `--model` | Primary reasoning model used for hypothesis generation and analysis. | None; set it or `AUTODISCOVERY_MODEL` |
+| `--belief_model` | Model used for belief updates over experimental outcomes. | `AUTODISCOVERY_BELIEF_MODEL`, else `--model` |
+| `--vision_model` | Model used to interpret plots and figures emitted by experiments. | `AUTODISCOVERY_VISION_MODEL`, else `--model` |
+| `--embedding_model` | Model used for deduplication embeddings. | `AUTODISCOVERY_EMBEDDING_MODEL`; required only with `--dedupe` |
 
 Because the provider travels with each flag, mixing providers is supported — for example,
-`--model openai/gpt-4o --belief_model vertex_ai/gemini-3.7-flash` uses OpenAI for the main
+`--model openai/gpt-4o --belief_model vertex_ai/gemini-3.8-flash` uses OpenAI for the main
 loop and Vertex AI for belief updates, with both `OPENAI_API_KEY` and the Vertex variables set.
 
 Each flag is validated against litellm's offline model registry at startup, before the first

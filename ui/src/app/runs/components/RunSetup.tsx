@@ -63,6 +63,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
         settings,
         creditsAvailable,
+        creditsEnabled,
         fileUploads,
         maxFileSize,
         fieldErrors,
@@ -347,11 +348,17 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         Experiment budget
                     </StyledFormLabel>
                     <HelperText>
-                        Set the maximum number of experiments to generate (
-                        <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
-                        your first session, we recommend starting with a small budget ({'<'}10
-                        experiments) to learn how the system works. Once you're familiar with the
-                        output, you can confidently scale up to 50–100 experiments per session.
+                        Set the maximum number of experiments to generate
+                        {creditsEnabled && (
+                            <>
+                                {' '}
+                                (<strong>1 Credit = 1 Experiment</strong>)
+                            </>
+                        )}{' '}
+                        during the exploration. If this is your first session, we recommend starting
+                        with a small budget ({'<'}10 experiments) to learn how the system works.
+                        Once you're familiar with the output, you can confidently scale up to 50–100
+                        experiments per session.
                     </HelperText>
                     <TextField
                         type="number"
@@ -362,9 +369,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         error={!!fieldErrors.nExperiments}
                         fullWidth
                     />
-                    <RemainingCreditsChip
-                        label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
-                    />
+                    {creditsEnabled && (
+                        <RemainingCreditsChip
+                            label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
+                        />
+                    )}
                 </FormControl>
                 <FormControl fullWidth>
                     <StyledFormLabel>

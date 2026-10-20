@@ -1,7 +1,8 @@
-"""Tests for credit aggregation caching."""
+"""Tests for credit aggregation caching and the credit-tracking switch."""
 
 from unittest.mock import patch
 
+import pytest
 from autodiscovery_jobs import JobConfig
 from utils import credits
 
@@ -77,3 +78,29 @@ def test_cached_user_credits_expires_after_ttl():
         assert credits.get_cached_user_credits("user", config).consumed == 2
 
     assert calculate.call_count == 2
+
+
+def test_credits_disabled_by_default(monkeypatch):
+    monkeypatch.delenv("CREDITS_ENABLED", raising=False)
+    assert not credits.credits_enabled()
+
+
+def test_check_experiment_limits_skips_credits_when_disabled(monkeypatch):
+    monkeypatch.delenv("CREDITS_ENABLED", raising=False)
+
+    with patch.object(credits, "get_user_credits") as calculate:
+        assert credits.check_experiment_limits(10, "user") is None
+        with pytest.raises(credits.ExperimentLimitExceededError):
+            credits.check_experiment_limits(credits.DEFAULT_EXPERIMENT_LIMIT + 1, "user")
+
+    calculate.assert_not_called()
+
+
+def test_check_experiment_limits_enforces_credits_when_enabled(monkeypatch):
+    monkeypatch.setenv("CREDITS_ENABLED", "true")
+
+    with (
+        patch.object(credits, "get_user_credits", return_value=credits.UserCredits(500, 495, 0, 5)),
+        pytest.raises(credits.InsufficientCreditsError),
+    ):
+        credits.check_experiment_limits(10, "user")

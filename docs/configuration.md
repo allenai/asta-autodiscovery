@@ -48,6 +48,23 @@ each provider; the table below is the variable reference.
 | `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
 | `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
 
+## Experiment credits
+
+Per-user experiment credits are **off by default**. Every run is still capped at 500
+experiments, but there is no per-user budget: the API does not check credits on submission,
+`GET /api/user/me/credits` returns `{"credits": null}`, and the UI hides the credits chip in the
+header and the remaining-credits display on the run setup page.
+
+With `CREDITS_ENABLED=true`, each user has a budget of credits (1 credit = 1 experiment).
+Experiments of a finished run consume credits and those of an in-progress run reserve them, and
+a submission that would exceed the user's remaining credits is rejected with `402`. Users get
+1,000 credits unless their profile in the store (`users/<userid>/user.json`) sets
+`granted_credits`.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `CREDITS_ENABLED` | No | `false` | Track and enforce per-user experiment credits (`true`/`1`/`yes` to enable). |
+
 ## Persistence
 
 Run metadata, uploaded datasets, results, and user profiles are held in a swappable

@@ -4,7 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Flask is an api/ dependency, not a workspace one, so `make test` skips this module.
+# Flask is an api/ dependency, not a workspace one: `make test` layers in
+# api/requirements.txt, but a bare `uv run pytest` skips this module.
 flask = pytest.importorskip("flask")
 
 from metrics import metrics_api  # noqa: E402

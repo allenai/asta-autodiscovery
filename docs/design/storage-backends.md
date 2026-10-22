@@ -282,8 +282,8 @@ backend raises a clear error if it is relative.
   a sentinel still left the client interpreting instead of just executing.
 - The in-container mount point is renamed from `/mnt/gcs` to `/mnt/data`
   (`backends.base.JOB_MOUNT_ROOT`), since it is a GCS volume only on Cloud Run. **The
-  deployed Cloud Run job definition pins that path**, so `rebuild_and_deploy.sh` (updated
-  here) must be run when this lands; until it is, Cloud Run jobs launched by the new API
+  deployed Cloud Run job definition pins that path**, so each deployment's job definition
+  must be updated to mount there when this lands; until it is, Cloud Run jobs launched by the new API
   will look for their data at a path the old job definition does not mount.
 - The Asta workspace handoff (now `api/asta/workspace.py`) still writes to a GCS bucket — that bucket is
   Asta's, not ours — but does so through `export_to_gs`, so it is server-side when the run

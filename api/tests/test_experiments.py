@@ -6,6 +6,7 @@ unbounded captured source and stdout — are detail-only.
 
 from autodiscovery import report
 from autodiscovery_jobs import JobConfig
+from autodiscovery_jobs.persistence import ROOT_NODE_FILENAME
 from runs.models import ExperimentModel
 from utils.experiments import ExperimentNode, ExperimentTree
 
@@ -89,11 +90,14 @@ def test_html_report_serializes_experiments_as_the_api_does():
         },
         {"id": "node_2_1", "parent_id": "node_1_0", "creation_idx": 3, "hypothesis": "p"},
     ]
+    # The API builds its tree from the node files the store lists, which leaves
+    # out the root (data-loading) node.
+    files = {f"mcts_{n['id']}.json": n for n in raw}
     tree = ExperimentTree(
         userid="user",
         jobid="job",
         config=JobConfig(bucket="bucket", project_id="project"),
-        nodes=[ExperimentNode(n, f"mcts_{n['id']}.json") for n in raw],
+        nodes=[ExperimentNode(n, f) for f, n in files.items() if f != ROOT_NODE_FILENAME],
     )
     api = [
         ExperimentModel(**d).model_dump(exclude={"rich_outputs"})

@@ -124,8 +124,9 @@ def test_report_carries_the_run_as_the_api_serves_it(tmp_path: Path, viewer: Pat
     run.generate_report(str(out))
 
     data = _report_data(out / "report")
-    root, exp = data["experiments"]
-    assert root["child_ids"] == ["node_2_0"]
+    # The root (data-loading) node is not an experiment, as in the API.
+    (exp,) = data["experiments"]
+    assert exp["parent_id"] == "node_1_0"
     assert exp["id_in_run"] == 1
     assert exp["status"] == "SUCCEEDED"
     assert (exp["prior"], exp["posterior"], exp["runtime_ms"]) == (0.25, 0.75, 2500.0)
@@ -180,7 +181,7 @@ def test_report_of_a_running_run_reads_the_nodes_saved_so_far(tmp_path: Path, vi
     run.generate_report(str(tmp_path), "RUNNING")
 
     data = _report_data(tmp_path / "report")
-    assert [e["experiment_id"] for e in data["experiments"]] == ["node_1_0", "node_2_0"]
+    assert [e["experiment_id"] for e in data["experiments"]] == ["node_2_0"]
     assert data["run"]["run_details"]["status"] == "RUNNING"
     assert data["run"]["run_details"]["finished_at"] is None
     assert data["run"]["run_stats"]["pending_experiments"] == 2

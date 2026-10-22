@@ -46,6 +46,11 @@ _IMAGE_MIME_EXT = {
 }
 _RICH_OUTPUT_PRIORITY = ("image/svg+xml", "image/png", "image/jpeg", "text/plain")
 
+# The run's first node loads the data and is not an experiment. The API leaves it
+# out of a run's experiments (ROOT_NODE_FILENAME in autodiscovery_jobs.persistence),
+# and the UI draws a placeholder root in its place.
+_ROOT_NODE_ID = "node_1_0"
+
 
 def _load_nodes(out_dir: str, prefer_aggregate: bool) -> list[dict]:
     """Load MCTS nodes from the output directory.
@@ -162,6 +167,7 @@ def _write_rich_outputs(
 
 def _experiments(nodes: list[dict], rich_outputs: dict[str, list]) -> list[dict]:
     """Shape nodes as the API's experiment details (api/utils/experiments.py)."""
+    nodes = [n for n in nodes if n.get("id") != _ROOT_NODE_ID]
     children: dict[str | None, list[dict]] = {}
     for node in nodes:
         children.setdefault(node.get("parent_id"), []).append(node)
@@ -297,6 +303,7 @@ def generate_report(out_dir: str, status: str = "SUCCEEDED") -> str:
     rich_outputs = {
         nid: _write_rich_outputs(bundles, nid, figures_dir)
         for nid, bundles in raw_rich_outputs.items()
+        if nid != _ROOT_NODE_ID
     }
     experiments = _experiments(raw_nodes, rich_outputs)
     data = {

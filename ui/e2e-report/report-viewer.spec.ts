@@ -67,7 +67,8 @@ test('renders a finished run from disk, offline', async ({ page }) => {
     ]) {
         await expect(table).toContainText(hypothesis);
     }
-    // The tree draws every node, the root included.
+    // The tree draws every experiment, under the placeholder root it draws for the
+    // data-loading node, which the report leaves out as the API does.
     await expect(page.locator(`${byTestId(TEST_ID_EXPERIMENT_GRAPH)} circle.node`)).toHaveCount(4);
 
     // An experiment's details, with its figures read from figures/ beside the page.
@@ -110,7 +111,7 @@ test('follows a running run as data.js is rewritten', async ({ page }) => {
         },
         experiments: finished.experiments.slice(0, experiments),
     });
-    write(running(2));
+    write(running(1));
 
     await page.clock.install();
     await page.goto(pathToFileURL(join(dir, 'index.html')).href);
@@ -124,7 +125,7 @@ test('follows a running run as data.js is rewritten', async ({ page }) => {
     await expect(details).toContainText('The data support it.');
 
     // report.py rewrites data.js as the next experiment finishes.
-    write(running(3));
+    write(running(2));
     await page.clock.runFor(DEFAULT_REFRESH_INTERVAL_MS);
     await expect(table).toContainText('Rainfall predicts yield.');
     // The reader's place survives the reload.

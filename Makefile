@@ -1,7 +1,5 @@
 .PHONY: help dev dev-host check-model test lint lint-fix format type-check sync report-viewer adk-web \
-        test-report-viewer serve-docs deploy-docs build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
-        build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
-        modal-deploy \
+        test-report-viewer serve-docs deploy-docs build-docker-compose build-ui modal-deploy \
         show-version set-version push-version-tag
 
 # Self-documenting help. The README covers the common targets in prose; this
@@ -46,9 +44,6 @@ type-check: ## Run pyright
 	uv run pyright
 
 # Deployment targets
-deploy-autodiscovery: ## Rebuild and deploy the autodiscovery image
-	cd packages/autodiscovery && ./scripts/rebuild_and_deploy.sh
-
 modal-deploy: ## Deploy the Modal IPython session app
 	uv run modal deploy -m autodiscovery_modal.ipython_session
 
@@ -148,81 +143,6 @@ build-docker-compose: ## Build every compose service (CI)
 
 build-ui: ## Install UI deps and build the UI and the report's run view (CI)
 	cd ui && yarn install --frozen-lockfile && yarn build && yarn build:report
-
-# Image build/push targets
-IMAGE_TAG ?= dev
-SCRIPTS_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery-scripts
-AUTODISCOVERY_IMAGE = us-west1-docker.pkg.dev/example-gcp-project/autodiscovery/autodiscovery
-
-build-scripts-image: ## Build the scripts image
-	docker build \
-		--platform linux/amd64 \
-		-t $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
-		-f scripts/Dockerfile \
-		.
-
-push-scripts-image: build-scripts-image ## Build and push the scripts image
-	docker push $(SCRIPTS_IMAGE):$(IMAGE_TAG)
-
-update-scripts-jobs: ## Point the scripts Cloud Run jobs at IMAGE_TAG
-	@echo "Updating Cloud Run jobs to use $(SCRIPTS_IMAGE):$(IMAGE_TAG)..."
-	@if [ "$(IMAGE_TAG)" = "dev" ]; then \
-		gcloud run jobs update autodiscovery-send-emails-dev \
-			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project && \
-		gcloud run jobs update autodiscovery-dataset-cleanup-dev \
-			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project; \
-	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
-		gcloud run jobs update autodiscovery-send-emails-prod \
-			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project && \
-		gcloud run jobs update autodiscovery-dataset-cleanup-prod \
-			--image $(SCRIPTS_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project; \
-	else \
-		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
-		exit 1; \
-	fi
-
-build-autodiscovery-image: ## Build the autodiscovery job image (needs GITHUB_TOKEN)
-	@if [ -z "$(GITHUB_TOKEN)" ]; then \
-		echo "Error: GITHUB_TOKEN environment variable is required"; \
-		echo "Usage: GITHUB_TOKEN=your_token make build-autodiscovery-image"; \
-		exit 1; \
-	fi
-	@echo "$$GITHUB_TOKEN" > .github_token.tmp
-	docker build \
-		--platform linux/amd64 \
-		--secret id=github_token,src=.github_token.tmp \
-		-t $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
-		-f packages/autodiscovery/Dockerfile \
-		.
-	@rm -f .github_token.tmp
-
-push-autodiscovery-image: build-autodiscovery-image ## Build and push the autodiscovery job image
-	docker push $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG)
-
-update-autodiscovery-job: ## Point the autodiscovery Cloud Run job at IMAGE_TAG
-	@echo "Updating Cloud Run job to use $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG)..."
-	@if [ "$(IMAGE_TAG)" = "dev" ]; then \
-		gcloud run jobs update autodiscovery-job-dev \
-			--image $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project; \
-	elif [ "$(IMAGE_TAG)" = "prod" ]; then \
-		gcloud run jobs update autodiscovery-job-prod \
-			--image $(AUTODISCOVERY_IMAGE):$(IMAGE_TAG) \
-			--region us-west1 \
-			--project example-gcp-project; \
-	else \
-		echo "IMAGE_TAG must be 'dev' or 'prod'"; \
-		exit 1; \
-	fi
 
 # Show current version
 show-version: ## Print the current workspace version

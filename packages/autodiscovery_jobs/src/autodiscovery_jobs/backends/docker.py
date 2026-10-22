@@ -31,9 +31,9 @@ from .base import (
 )
 
 # Environment variables forwarded from the API container to each job container.
-# These mirror the secrets/env the Cloud Run job receives (see
-# packages/autodiscovery/scripts/rebuild_and_deploy.sh). Only vars that are
-# actually set on the API container are forwarded.
+# A Cloud Run job gets the equivalents from its own job definition instead (see
+# "Cloud Run backend" in docs/configuration.md). Only vars that are actually set
+# on the API container are forwarded.
 _JOB_ENV_PASSTHROUGH = (
     "OPENAI_API_KEY",
     "AZURE_API_KEY",

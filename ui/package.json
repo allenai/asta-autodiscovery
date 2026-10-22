@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:report": "vite build --config vite.report.config.ts",
     "start": "vite preview",
     "lint": "eslint --ext .ts,.tsx src e2e",
     "ts-check": "tsc --noEmit",
@@ -75,6 +76,7 @@
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
     "vite": "^6.3.5",
+    "vite-plugin-singlefile": "2.3.3",
     "zod": "^4.3.6"
   },
   "type": "module"

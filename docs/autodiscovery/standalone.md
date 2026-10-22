@@ -173,7 +173,10 @@ auto-discovery \
 
 Datasets are positional file or directory paths (CSV, TSV, JSON, etc.). The CLI
 generates a metadata file, runs the MCTS loop, writes results to `--out_dir`,
-and emits a static HTML report.
+and emits a static HTML report: open `<out_dir>/report/index.html` in a browser
+for the web UI's view of the run, offline. From a source checkout rather than the
+PyPI package, build that page once first with `make report-viewer` (needs Node.js
+and Yarn).
 
 See `auto-discovery --help` for the full option list (model selection, MCTS
 parameters, belief mode, execution backend, etc.).

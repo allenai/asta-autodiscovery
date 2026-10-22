@@ -254,15 +254,18 @@ interface RunViewContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
+    /** False where there is no API to share through, e.g. the standalone HTML report. */
+    canShare?: boolean;
 }
 
-function RunViewContent({
+export function RunViewContent({
     run,
     error,
     canStop,
     cancelling,
     handleStop,
     experimentsLabel,
+    canShare = true,
 }: RunViewContentProps) {
     const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
@@ -830,17 +833,19 @@ function RunViewContent({
                                 canExploreWithAsta={run.canExploreWithAsta}
                                 actions={
                                     <>
-                                        <Tooltip title="Share experiment" placement="bottom">
-                                            <ExpandingActionButton
-                                                onClick={onShareExperimentClick}
-                                                size="small"
-                                                variant="outlined">
-                                                <ShareOutlinedIcon fontSize="small" />
-                                                <ButtonLabel className="button-label">
-                                                    Share experiment
-                                                </ButtonLabel>
-                                            </ExpandingActionButton>
-                                        </Tooltip>
+                                        {canShare && (
+                                            <Tooltip title="Share experiment" placement="bottom">
+                                                <ExpandingActionButton
+                                                    onClick={onShareExperimentClick}
+                                                    size="small"
+                                                    variant="outlined">
+                                                    <ShareOutlinedIcon fontSize="small" />
+                                                    <ButtonLabel className="button-label">
+                                                        Share experiment
+                                                    </ButtonLabel>
+                                                </ExpandingActionButton>
+                                            </Tooltip>
+                                        )}
                                         <LargeScreenAction>
                                             <Tooltip
                                                 title={isExpPanelExpanded ? 'Collapse' : 'Expand'}

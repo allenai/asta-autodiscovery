@@ -1,5 +1,5 @@
-.PHONY: help dev dev-host check-model test lint lint-fix format type-check sync adk-web serve-docs deploy-docs \
-        build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
+.PHONY: help dev dev-host check-model test lint lint-fix format type-check sync report-viewer adk-web \
+        serve-docs deploy-docs build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
         show-version set-version push-version-tag
@@ -56,6 +56,20 @@ modal-deploy: ## Deploy the Modal IPython session app
 sync: ## Install all workspace packages and extras
 	uv sync --all-packages --all-extras
 
+# The HTML report every run writes (autodiscovery/report.py) is the web UI's run
+# view, built from ui/ into package data of asta-autodiscovery. It is not checked
+# in: the job image and the PyPI build make their own, and a source checkout needs
+# this before `auto-discovery` can write a viewable report. A file target, so it
+# rebuilds only when the UI's sources or dependencies change.
+REPORT_VIEWER := packages/autodiscovery/src/autodiscovery/report_viewer/index.html
+REPORT_VIEWER_SOURCES := $(shell find ui/src -type f) ui/report.html ui/vite.config.ts \
+	ui/vite.report.config.ts ui/package.json ui/yarn.lock
+
+report-viewer: $(REPORT_VIEWER) ## Build the HTML report's run view (needs Node.js and Yarn)
+
+$(REPORT_VIEWER): $(REPORT_VIEWER_SOURCES)
+	cd ui && yarn install --frozen-lockfile && yarn build:report
+
 # Local stack targets
 # The `autodiscovery` service is behind compose's `jobs` profile, so it is not
 # built or started by `docker compose up --build` -- only by naming it. Building
@@ -90,7 +104,7 @@ dev: check-model ## Build the job image and start the local stack
 DEV_HOST_API_PORT ?= 8000
 DEV_HOST_UI_PORT ?= 3000
 
-dev-host: check-model ## Start the local stack on this host, without Docker
+dev-host: check-model $(REPORT_VIEWER) ## Start the local stack on this host, without Docker
 	cd ui && yarn install --frozen-lockfile
 	trap 'kill 0' EXIT; \
 	(cd ui && API_PROXY_TARGET=http://127.0.0.1:$(DEV_HOST_API_PORT) \
@@ -122,8 +136,8 @@ build-docker-compose: ## Build every compose service (CI)
 	GOOGLE_ACCESS_KEY_SECRET="" \
 	docker compose build
 
-build-ui: ## Install UI deps and build the UI (CI)
-	cd ui && yarn install --frozen-lockfile && yarn build
+build-ui: ## Install UI deps and build the UI and the report's run view (CI)
+	cd ui && yarn install --frozen-lockfile && yarn build && yarn build:report
 
 # Image build/push targets
 IMAGE_TAG ?= dev

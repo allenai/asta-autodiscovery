@@ -9,6 +9,15 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
+### The HTML report is the web UI's run view
+
+The static report each run writes to `<out_dir>/report` is now built from the
+web UI's own run view: the same experiment tree, table, top surprisals, details
+panel, figures and session configuration, read-only and offline. The page is one
+self-contained `index.html`, with the run's data in `data.js` and its figures in
+`figures/` beside it. `python -m autodiscovery.report <out_dir>` regenerates the
+report for an existing run.
+
 ### Clearer experiment section labels
 
 Experiment sections in the web UI and standalone HTML report are now labeled

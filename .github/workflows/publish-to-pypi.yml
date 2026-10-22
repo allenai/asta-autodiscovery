@@ -11,8 +11,44 @@ on:
         type: string
 
 jobs:
+  # asta-autodiscovery ships the HTML report's run view as package data, built
+  # from ui/. It is built here, not in the publish job: yarn install runs the
+  # install scripts of hundreds of npm packages, which must not share a job with
+  # the PyPI publishing token.
+  report-viewer:
+    name: Build the HTML report's run view
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Build report viewer
+        working-directory: ui
+        run: |
+          yarn install --frozen-lockfile
+          yarn build:report
+
+      - name: Upload report viewer
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-viewer
+          path: packages/autodiscovery/src/autodiscovery/report_viewer/
+          if-no-files-found: error
+
   publish:
     name: Build and publish to PyPI
+    needs: report-viewer
     runs-on: ubuntu-latest
 
     # Split from the release job below so neither token carries the other's
@@ -28,6 +64,17 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ inputs.version }}
+
+      - name: Download report viewer
+        uses: actions/download-artifact@v4
+        with:
+          name: report-viewer
+          path: packages/autodiscovery/src/autodiscovery/report_viewer
+
+      # Fail before anything is published, rather than ship a wheel whose runs
+      # cannot render their report.
+      - name: Check report viewer
+        run: test -s packages/autodiscovery/src/autodiscovery/report_viewer/index.html
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -55,6 +102,9 @@ jobs:
 
       - name: Build asta-autodiscovery
         run: uv build --package asta-autodiscovery --out-dir dist/asta-autodiscovery
+
+      - name: Check the wheel ships the report viewer
+        run: unzip -l dist/asta-autodiscovery/*.whl | grep -q 'autodiscovery/report_viewer/index.html'
 
       - name: Publish asta-autodiscovery to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

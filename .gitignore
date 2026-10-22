@@ -43,3 +43,6 @@ UI_DESIGN_GUIDE.md
 
 # autodiscovery run output (--out_dir); contains local paths and run artifacts
 /results/
+
+# The HTML report's run view, built from ui/ (`make report-viewer`)
+/packages/autodiscovery/src/autodiscovery/report_viewer/

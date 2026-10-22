@@ -1,5 +1,5 @@
 .PHONY: help dev dev-host check-model test lint lint-fix format type-check sync report-viewer adk-web \
-        serve-docs deploy-docs build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
+        test-report-viewer serve-docs deploy-docs build-docker-compose build-ui build-scripts-image push-scripts-image update-scripts-jobs \
         build-autodiscovery-image push-autodiscovery-image update-autodiscovery-job deploy-autodiscovery \
         modal-deploy \
         show-version set-version push-version-tag
@@ -69,6 +69,16 @@ report-viewer: $(REPORT_VIEWER) ## Build the HTML report's run view (needs Node.
 
 $(REPORT_VIEWER): $(REPORT_VIEWER_SOURCES)
 	cd ui && yarn install --frozen-lockfile && yarn build:report
+
+# Opens a synthetic run's report from disk in Chromium (ui/e2e-report). report.py
+# needs only the standard library, so this runs it from source without installing
+# the engine's dependencies. Needs Playwright's Chromium once:
+# `cd ui && yarn playwright install chromium`.
+test-report-viewer: $(REPORT_VIEWER) ## Smoke-test the HTML report in a browser
+	out=$$(mktemp -d) && \
+	PYTHONPATH=packages/autodiscovery/src uv run --no-project --python 3.13 \
+		python ui/e2e-report/make_report.py "$$out" && \
+	cd ui && REPORT_DIR="$$out/output/report" yarn test:report
 
 # Local stack targets
 # The `autodiscovery` service is behind compose's `jobs` profile, so it is not

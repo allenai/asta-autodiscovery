@@ -99,6 +99,7 @@ make report-viewer
 ```
 
 `python -m autodiscovery.report <out_dir>` regenerates the report for an existing run.
+`make test-report-viewer` opens a synthetic run's report from disk in Chromium, as CI does.
 
 ## Documentation
 

@@ -7,14 +7,15 @@
     "build": "tsc --noEmit && vite build",
     "build:report": "vite build --config vite.report.config.ts",
     "start": "vite preview",
-    "lint": "eslint --ext .ts,.tsx src e2e",
+    "lint": "eslint --ext .ts,.tsx src e2e e2e-report",
     "ts-check": "tsc --noEmit",
     "verify": "yarn ts-check && yarn lint && yarn test",
     "fix": "prettier --write . && eslint --fix .",
     "test": "yarn test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:public": "playwright test --grep @public",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:report": "playwright test --config playwright.report.config.ts"
   },
   "dependencies": {
     "@allenai/varnish2": "^3.0.8-alpha.0",

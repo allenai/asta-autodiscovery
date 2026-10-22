@@ -13,7 +13,7 @@ generated code opens.
 from __future__ import annotations
 
 import os
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import asdict, dataclass, field
 
 #: File at the top of a directory that describes it.
@@ -21,11 +21,14 @@ README_NAME = "README.md"
 
 # Bounds on how much of a directory is inspected and shown. Directories may be
 # very large and are often a network mount, so the walk is capped by entries
-# visited, not just by what is displayed.
+# visited, not just by what is displayed. The walk is breadth-first, so the cap
+# cuts off the deepest levels first, and the rendered tree is capped separately
+# so a wide directory cannot flood the prompt.
 _MAX_README_CHARS = 8000
 _MAX_DEPTH = 3
 _MAX_ENTRIES_PER_DIR = 15
 _MAX_ENTRIES_VISITED = 5000
+_MAX_TREE_LINES = 200
 
 
 @dataclass
@@ -63,12 +66,11 @@ def build_manifest(path: str) -> DatalibManifest:
         if len(readme) > _MAX_README_CHARS:
             readme = readme[:_MAX_README_CHARS] + "\n[... README truncated ...]"
 
-    walk = _Walk()
-    walk.visit(path, depth=0)
+    walk = _Walk(path)
     return DatalibManifest(
         path=path,
         readme=readme,
-        tree=walk.lines,
+        tree=_bounded_tree(walk.root),
         n_files=walk.n_files,
         n_dirs=walk.n_dirs,
         total_bytes=walk.total_bytes,
@@ -82,54 +84,101 @@ def build_manifests(paths: list[str]) -> list[DatalibManifest]:
     return [build_manifest(p) for p in paths]
 
 
-class _Walk:
-    """Depth-first walk that renders a bounded, indented tree and tallies stats."""
+@dataclass
+class _Dir:
+    """A directory reached by the walk.
 
-    def __init__(self):
-        self.lines: list[str] = []
+    ``entries`` holds ``(name, child)`` pairs in display order, where ``child`` is
+    a :class:`_Dir` or a file size; it is ``None`` if the directory was never
+    listed (too deep, or the walk ran out of budget). ``n_entries`` is the full
+    size of the listing, which may be more than ``entries`` holds.
+    """
+
+    entries: list[tuple[str, _Dir | int]] | None = None
+    n_entries: int = 0
+
+
+class _Walk:
+    """Breadth-first walk that records a bounded tree and tallies stats."""
+
+    def __init__(self, path: str):
         self.n_files = 0
         self.n_dirs = 0
         self.total_bytes = 0
         self.extensions: Counter[str] = Counter()
         self.visited = 0
         self.truncated = False
+        self.root = _Dir()
 
-    def visit(self, dirpath: str, depth: int, display: bool = True) -> None:
-        """Tally ``dirpath``'s entries, rendering them only while ``display``."""
+        queue = deque([(path, self.root, 0)])
+        while queue:
+            if self.visited >= _MAX_ENTRIES_VISITED:
+                self.truncated = True
+                return
+            self._list(*queue.popleft(), queue)
+
+    def _list(self, dirpath: str, node: _Dir, depth: int, queue: deque) -> None:
+        """Tally ``dirpath``'s entries into ``node``, queueing its subdirectories."""
+        node.entries = []
         try:
             with os.scandir(dirpath) as it:
                 entries = sorted(it, key=lambda e: (not _is_dir(e), e.name))
         except OSError:
             return
+        node.n_entries = len(entries)
 
-        indent = "  " * depth
-        for i, entry in enumerate(entries):
+        for entry in entries:
             if self.visited >= _MAX_ENTRIES_VISITED:
                 self.truncated = True
                 return
             self.visited += 1
-            shown = display and i < _MAX_ENTRIES_PER_DIR
             if _is_dir(entry):
                 self.n_dirs += 1
-                if shown:
-                    self.lines.append(f"{indent}{entry.name}/")
+                child = _Dir()
+                node.entries.append((entry.name, child))
                 if depth + 1 < _MAX_DEPTH:
-                    self.visit(entry.path, depth + 1, display=shown)
+                    queue.append((entry.path, child, depth + 1))
                 else:
                     # Deeper levels are neither shown nor counted.
                     self.truncated = True
-                    if shown:
-                        self.lines.append(f"{indent}  ...")
             else:
                 size = _size(entry)
                 self.n_files += 1
                 self.total_bytes += size
                 self.extensions[os.path.splitext(entry.name)[1].lower() or "(none)"] += 1
-                if shown:
-                    self.lines.append(f"{indent}{entry.name} ({_human_size(size)})")
+                node.entries.append((entry.name, size))
 
-        if display and len(entries) > _MAX_ENTRIES_PER_DIR:
-            self.lines.append(f"{indent}... and {len(entries) - _MAX_ENTRIES_PER_DIR} more")
+
+def _bounded_tree(root: _Dir) -> list[str]:
+    """Render as many whole levels of the tree as fit in ``_MAX_TREE_LINES``."""
+    for levels in range(_MAX_DEPTH, 0, -1):
+        lines: list[str] = []
+        _render(root, levels, "", lines)
+        if len(lines) <= _MAX_TREE_LINES:
+            break
+    return lines
+
+
+def _render(node: _Dir, levels: int, indent: str, lines: list[str]) -> None:
+    """Append ``levels`` levels of ``node``'s entries to ``lines``.
+
+    A directory whose contents are not shown gets a ``...`` line, and a listing
+    cut short ends with how many entries it leaves out.
+    """
+    if node.entries is not None and node.n_entries == 0:
+        return
+    if node.entries is None or levels == 0:
+        lines.append(f"{indent}...")
+        return
+    shown = node.entries[:_MAX_ENTRIES_PER_DIR]
+    for name, child in shown:
+        if isinstance(child, _Dir):
+            lines.append(f"{indent}{name}/")
+            _render(child, levels - 1, indent + "  ", lines)
+        else:
+            lines.append(f"{indent}{name} ({_human_size(child)})")
+    if node.n_entries > len(shown):
+        lines.append(f"{indent}... and {node.n_entries - len(shown)} more")
 
 
 def _is_dir(entry: os.DirEntry) -> bool:
@@ -164,7 +213,7 @@ def describe(manifests: list[DatalibManifest]) -> str:
             f"{m.n_files} files in {m.n_dirs} subdirectories, {_human_size(m.total_bytes)} total"
         )
         if m.truncated:
-            stats += " (counted from a partial listing; there is more than this)"
+            stats = f"At least {stats} (counted from a partial listing; there is more than this)"
         parts.append(stats)
         if m.extensions:
             top = ", ".join(f"{ext}: {n}" for ext, n in list(m.extensions.items())[:10])

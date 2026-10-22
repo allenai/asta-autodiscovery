@@ -74,7 +74,11 @@ a table). Instead the job builds a **manifest** of each directory at startup:
 - a bounded view of the file tree (a few levels, a few entries per directory).
 
 The walk is bounded by entries visited, not just by what is shown, since the directory
-may be very large and is often a network mount; a partial count says so.
+may be very large and is often a network mount; a partial count says so. It is
+breadth-first, so when the budget runs out it is the deepest levels that go unlisted,
+never a top-level entry. The rendered tree is capped separately: it shows as many whole
+levels as fit in a fixed number of lines, a directory whose contents are not shown is
+marked `...`, and a listing cut short ends with how many entries it leaves out.
 
 The manifest is used in two places:
 

@@ -86,6 +86,21 @@ cd ui && yarn install --frozen-lockfile
 
 End-to-end tests are documented in [ui/e2e/README.md](ui/e2e/README.md).
 
+### The HTML report
+
+The static HTML report every run writes beside its results is the UI's run view, built from
+the same components by `yarn build:report` (see `ui/vite.report.config.ts`) into one
+self-contained page that ships with the `asta-autodiscovery` package. The job image and the
+PyPI release build it themselves; in a source checkout, build it before running
+`auto-discovery` or `make dev-host` (which builds it for you):
+
+```sh
+make report-viewer
+```
+
+`python -m autodiscovery.report <out_dir>` regenerates the report for an existing run.
+`make test-report-viewer` opens a synthetic run's report from disk in Chromium, as CI does.
+
 ## Documentation
 
 Published at **https://allenai.github.io/asta-autodiscovery**. Build locally:

@@ -325,3 +325,54 @@ export const RunExperimentsProvider = ({
         </RunExperimentsContext.Provider>
     );
 };
+
+export type StaticRunExperimentsProps = PropsWithChildren<{
+    runid: string;
+    /** The run's experiments so far, each already carrying its detail fields. */
+    experiments: Experiment[];
+    hasJobCompleted: boolean;
+}>;
+
+/**
+ * Serves a run's experiments from memory instead of the API, for the standalone
+ * HTML report, which reloads its own data. Selecting an experiment needs no
+ * detail fetch because the report embeds every experiment in full; the selection
+ * is kept across reloads, since a finished experiment does not change.
+ */
+export const StaticRunExperimentsProvider = ({
+    runid,
+    experiments,
+    hasJobCompleted,
+    children,
+}: StaticRunExperimentsProps) => {
+    const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
+    const shouldScrollToSelected = useRef<boolean>(true);
+
+    const selectExperiment = useCallback(
+        (experiment: Experiment | null, options?: { scroll?: boolean }) => {
+            shouldScrollToSelected.current = options?.scroll ?? true;
+            setSelectedExperiment(experiment);
+        },
+        []
+    );
+
+    const memoizedState = useMemo<RunExperimentsState>(
+        () => ({
+            ...DEFAULT_STATE,
+            runid,
+            isLoadingInitial: false,
+            experiments,
+            hasJobCompleted,
+            selectedExperiment,
+            selectExperiment,
+            shouldScrollToSelected,
+        }),
+        [runid, experiments, hasJobCompleted, selectedExperiment, selectExperiment]
+    );
+
+    return (
+        <RunExperimentsContext.Provider value={memoizedState}>
+            {children}
+        </RunExperimentsContext.Provider>
+    );
+};

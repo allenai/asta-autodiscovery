@@ -1,3 +1,22 @@
+# The HTML report every run writes is the web UI's run view, built from ui/ into
+# package data (see ui/vite.report.config.ts and autodiscovery/report.py).
+FROM node:24-slim AS report-viewer
+
+WORKDIR /repo/ui
+
+# Same toolchain as ui/Dockerfile: git for the @stdlib dependencies that resolve
+# via git, and python3/make/g++ for node-gyp during yarn install.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ui/package.json ui/yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+COPY ui/ ./
+# Writes /repo/packages/autodiscovery/src/autodiscovery/report_viewer.
+RUN yarn build:report
+
 # Use Python 3.13 slim image
 FROM python:3.13-slim
 
@@ -17,6 +36,8 @@ ENV PATH="/root/.local/bin:/root/.cargo/bin:${PATH}"
 # Copy workspace files needed for uv sync
 COPY pyproject.toml uv.lock ./
 COPY packages ./packages
+COPY --from=report-viewer /repo/packages/autodiscovery/src/autodiscovery/report_viewer \
+    ./packages/autodiscovery/src/autodiscovery/report_viewer
 
 # Install Python dependencies (all public PyPI packages)
 RUN /root/.local/bin/uv sync --frozen --no-dev --package asta-autodiscovery

@@ -29,6 +29,7 @@
   "include": [
     "src",
     "e2e",
+    "e2e-report",
     "*.ts"
   ],
   "exclude": [

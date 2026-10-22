@@ -74,6 +74,52 @@ def test_manifest_flags_a_partial_walk(tmp_path, monkeypatch):
     assert "partial listing" in datalib.describe([m])
 
 
+def test_manifest_marks_a_listing_cut_short_by_the_budget(tmp_path, monkeypatch):
+    monkeypatch.setattr(datalib, "_MAX_ENTRIES_VISITED", 5)
+    monkeypatch.setattr(datalib, "_MAX_ENTRIES_PER_DIR", 3)
+    for i in range(50):
+        (tmp_path / f"f{i:02d}.csv").write_text("x")
+
+    m = datalib.build_manifest(str(tmp_path))
+
+    assert m.truncated
+    assert m.n_files == 5
+    assert m.tree[-1] == "... and 47 more"  # from the full listing, not the budget
+    assert "At least 5 files" in datalib.describe([m])
+
+
+def test_manifest_budget_does_not_hide_later_siblings(tmp_path, monkeypatch):
+    monkeypatch.setattr(datalib, "_MAX_ENTRIES_VISITED", 10)
+    for name, n in [("a", 20), ("b", 2), ("c", 2)]:
+        (tmp_path / name).mkdir()
+        for i in range(n):
+            (tmp_path / name / f"f{i:02d}.csv").write_text("x")
+    (tmp_path / "README.md").write_text("# lib")
+
+    m = datalib.build_manifest(str(tmp_path))
+
+    top = [line for line in m.tree if not line.startswith(" ")]
+    assert top == ["a/", "b/", "c/", "README.md (5 B)"]
+    # The budget ran out inside a/, so b/ was never listed: it is marked, not shown empty.
+    assert m.tree[m.tree.index("b/") + 1] == "  ..."
+
+
+def test_manifest_drops_whole_levels_to_fit_the_line_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(datalib, "_MAX_TREE_LINES", 40)
+    for i in range(4):
+        for j in range(4):
+            (tmp_path / f"d{i}" / f"e{j}").mkdir(parents=True)
+            for k in range(3):
+                (tmp_path / f"d{i}" / f"e{j}" / f"x{k}.csv").write_text("x")
+
+    m = datalib.build_manifest(str(tmp_path))
+
+    # Three levels would take 68 lines; two take 36 (4 d's, 16 e's, each e marked "...").
+    assert len(m.tree) == 36
+    assert m.tree[:3] == ["d0/", "  e0/", "    ..."]
+    assert m.n_files == 48  # the counts still cover everything walked
+
+
 def test_manifest_requires_a_directory(tmp_path):
     with pytest.raises(FileNotFoundError):
         datalib.build_manifest(str(tmp_path / "missing"))

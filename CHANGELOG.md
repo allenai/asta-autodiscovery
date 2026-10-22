@@ -15,7 +15,11 @@ The static report each run writes to `<out_dir>/report` is now built from the
 web UI's own run view: the same experiment tree, table, top surprisals, details
 panel, figures and session configuration, read-only and offline. The page is one
 self-contained `index.html`, with the run's data in `data.js` and its figures in
-`figures/` beside it. `python -m autodiscovery.report <out_dir>` regenerates the
+`figures/` beside it.
+
+The report is written when a run starts and rewritten as each experiment
+finishes, so a long run's results can be read, by reloading the page, while it
+is still going. `python -m autodiscovery.report <out_dir>` regenerates the
 report for an existing run.
 
 ### Clearer experiment section labels

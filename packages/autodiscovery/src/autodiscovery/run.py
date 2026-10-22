@@ -46,7 +46,23 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
-from autodiscovery.report import generate_report
+from autodiscovery.report import VIEWER_HTML, generate_report
+
+
+def _update_report(log_dirname: str, status: str) -> bool:
+    """Rewrite the run's HTML report so it can be read while the run goes on.
+
+    Best effort, and quiet when the viewer is not built: run_and_report writes
+    the final report and says what went wrong there. Returns whether it wrote.
+    """
+    if not VIEWER_HTML.is_file():
+        return False
+    try:
+        generate_report(log_dirname, status)
+    except Exception as e:
+        print(f"Warning: could not update HTML report: {e}")
+        return False
+    return True
 
 
 def _theoretical_max_boolean_cat(
@@ -700,6 +716,7 @@ def run_mcts(
                         # Save the new node and its parents' updated counts to JSON files
                         save_mcts_node(node, log_dirname, to_root=True)
                         usage_tracker.save_events(log_dirname)
+                        _update_report(log_dirname, "RUNNING")
 
                     if update_mcts_lock is not None:
                         with update_mcts_lock:
@@ -954,6 +971,12 @@ def main(args) -> str:
         json.dump(vars(args), f, indent=2)
     print(f"\nArguments saved to {args_file}\n")
 
+    # Runs can take days, so the report is written now and rewritten as each
+    # experiment finishes; reloading it shows the run so far.
+    if _update_report(log_dirname, "RUNNING"):
+        report_path = os.path.join(log_dirname, "report", "index.html")
+        print(f"HTML report, updated as experiments finish: {report_path}\n")
+
     # Get dataset paths
     dataset_paths, dataset_metadata = get_datasets_fpaths(
         args.dataset_metadata, is_blade=args.dataset_metadata_type == "blade"
@@ -1063,48 +1086,52 @@ def main(args) -> str:
     print(f"MCTS selection method: {args.mcts_selection}\n")
 
     # Run exploration
-    run_mcts(
-        root=root,
-        nodes_by_level=nodes_by_level,
-        dataset_paths=dataset_paths,
-        log_dirname=log_dirname,
-        work_dir=work_dirname,
-        max_iterations=remaining_iters,
-        branching_factor=args.k_experiments,
-        selection_method=selection_method,
-        allow_generate_experiments=args.allow_generate_experiments,
-        n_belief_samples=args.n_belief_samples,
-        k_parents=args.k_parents,
-        model_name=args.model,
-        embedding_model=args.embedding_model,
-        embedding_dimensions=getattr(args, "embedding_dimensions", None),
-        belief_model_name=args.belief_model,
-        temperature=args.temperature,
-        belief_temperature=args.belief_temperature,
-        reasoning_effort=args.reasoning_effort,
-        belief_reasoning_effort=args.belief_reasoning_effort,
-        implicit_bayes_posterior=args.implicit_bayes_posterior,
-        surprisal_width=args.surprisal_width,
-        user_query=args.user_query,
-        belief_mode=args.belief_mode,
-        use_binary_reward=args.use_binary_reward,
-        run_dedupe=args.dedupe,
-        experiment_first=args.experiment_first,
-        code_timeout=args.code_timeout,
-        n_warmstart=args.n_warmstart,
-        use_online_beliefs=args.use_online_beliefs,
-        evidence_weight=args.evidence_weight,
-        kl_scale=args.kl_scale,
-        reward_mode=args.reward_mode,
-        warmstart_experiments=args.warmstart_experiments,
-        backend=args.backend,
-        bucket_path=args.bucket_path,
-        datalib_dirs=args.datalib_dir,
-        vision_model=args.vision_model,
-        batch_size=args.batch_size,
-        n_threads=args.n_threads,
-        agent_usage_mode=args.agent_usage_mode,
-    )
+    try:
+        run_mcts(
+            root=root,
+            nodes_by_level=nodes_by_level,
+            dataset_paths=dataset_paths,
+            log_dirname=log_dirname,
+            work_dir=work_dirname,
+            max_iterations=remaining_iters,
+            branching_factor=args.k_experiments,
+            selection_method=selection_method,
+            allow_generate_experiments=args.allow_generate_experiments,
+            n_belief_samples=args.n_belief_samples,
+            k_parents=args.k_parents,
+            model_name=args.model,
+            embedding_model=args.embedding_model,
+            embedding_dimensions=getattr(args, "embedding_dimensions", None),
+            belief_model_name=args.belief_model,
+            temperature=args.temperature,
+            belief_temperature=args.belief_temperature,
+            reasoning_effort=args.reasoning_effort,
+            belief_reasoning_effort=args.belief_reasoning_effort,
+            implicit_bayes_posterior=args.implicit_bayes_posterior,
+            surprisal_width=args.surprisal_width,
+            user_query=args.user_query,
+            belief_mode=args.belief_mode,
+            use_binary_reward=args.use_binary_reward,
+            run_dedupe=args.dedupe,
+            experiment_first=args.experiment_first,
+            code_timeout=args.code_timeout,
+            n_warmstart=args.n_warmstart,
+            use_online_beliefs=args.use_online_beliefs,
+            evidence_weight=args.evidence_weight,
+            kl_scale=args.kl_scale,
+            reward_mode=args.reward_mode,
+            warmstart_experiments=args.warmstart_experiments,
+            backend=args.backend,
+            bucket_path=args.bucket_path,
+            datalib_dirs=args.datalib_dir,
+            vision_model=args.vision_model,
+            batch_size=args.batch_size,
+            n_threads=args.n_threads,
+            agent_usage_mode=args.agent_usage_mode,
+        )
+    except Exception:
+        _update_report(log_dirname, "FAILED")
+        raise
     return log_dirname
 
 

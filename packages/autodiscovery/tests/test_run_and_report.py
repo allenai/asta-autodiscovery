@@ -131,12 +131,11 @@ def test_report_carries_the_run_as_the_api_serves_it(tmp_path: Path, viewer: Pat
     assert (exp["prior"], exp["posterior"], exp["runtime_ms"]) == (0.25, 0.75, 2500.0)
     assert exp["code"] == "print(1)"
     # Positions are kept, so figure numbers line up with the web UI's.
-    assert exp["rich_outputs"] == [
-        {"x-report-figure-url": "figures/node_2_0_0.png"},
-        {"text/plain": "table"},
-        {},
-    ]
-    assert (out / "report" / "figures" / "node_2_0_0.png").read_bytes() == b"png-bytes"
+    figure, text, unsupported = exp["rich_outputs"]
+    assert (text, unsupported) == ({"text/plain": "table"}, {})
+    url = figure["x-report-figure-url"]
+    assert url.startswith("figures/node_2_0_0_") and url.endswith(".png")
+    assert (out / "report" / url).read_bytes() == b"png-bytes"
 
     run_data = data["run"]
     assert run_data["name"] == "Pets"
@@ -159,3 +158,49 @@ def test_report_without_a_built_viewer_keeps_the_data(monkeypatch, tmp_path: Pat
 
     assert (tmp_path / "report" / "data.js").is_file()
     assert not (tmp_path / "report" / "index.html").exists()
+
+
+def _node(node_id: str, parent_id: str | None, creation_idx: int, **fields) -> dict:
+    return {"id": node_id, "parent_id": parent_id, "creation_idx": creation_idx, **fields}
+
+
+def test_report_of_a_running_run_reads_the_nodes_saved_so_far(tmp_path: Path, viewer: Path) -> None:
+    """Mid-run, the report follows the per-experiment files, not a stale aggregate."""
+    (tmp_path / "args.json").write_text('{"n_experiments": 3}', encoding="utf-8")
+    # Left by an earlier run, e.g. one this run continues from.
+    (tmp_path / "mcts_nodes.json").write_text(
+        json.dumps([_node("node_1_0", None, 1, success=True)]), encoding="utf-8"
+    )
+    for node in (
+        _node("node_1_0", None, 1, success=True),
+        _node("node_2_0", "node_1_0", 2, success=True, hypothesis="h"),
+    ):
+        (tmp_path / f"mcts_{node['id']}.json").write_text(json.dumps(node), encoding="utf-8")
+
+    run.generate_report(str(tmp_path), "RUNNING")
+
+    data = _report_data(tmp_path / "report")
+    assert [e["experiment_id"] for e in data["experiments"]] == ["node_1_0", "node_2_0"]
+    assert data["run"]["run_details"]["status"] == "RUNNING"
+    assert data["run"]["run_details"]["finished_at"] is None
+    assert data["run"]["run_stats"]["pending_experiments"] == 2
+
+
+def test_live_report_updates_are_quiet_without_a_viewer(monkeypatch, tmp_path: Path) -> None:
+    """A source checkout that never built the viewer runs without per-experiment noise."""
+    monkeypatch.setattr(run, "VIEWER_HTML", tmp_path / "missing" / "index.html")
+
+    assert run._update_report(str(tmp_path), "RUNNING") is False
+    assert not (tmp_path / "report").exists()
+
+
+def test_live_report_updates_never_fail_the_run(monkeypatch, tmp_path: Path, viewer: Path) -> None:
+    """A report that cannot be written is a warning; the run carries on."""
+    monkeypatch.setattr(run, "VIEWER_HTML", viewer)
+
+    def fail(out_dir: str, status: str) -> str:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(run, "generate_report", fail)
+
+    assert run._update_report(str(tmp_path), "RUNNING") is False

@@ -254,8 +254,11 @@ interface RunViewContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
-    /** False where there is no API to share through, e.g. the standalone HTML report. */
-    canShare?: boolean;
+    /**
+     * The standalone HTML report: there is no API to share through, and the page
+     * does not poll, so new findings appear when it is reloaded.
+     */
+    standalone?: boolean;
 }
 
 export function RunViewContent({
@@ -265,7 +268,7 @@ export function RunViewContent({
     cancelling,
     handleStop,
     experimentsLabel,
-    canShare = true,
+    standalone = false,
 }: RunViewContentProps) {
     const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
@@ -705,16 +708,26 @@ export function RunViewContent({
                         </RunHeaderTopRow>
                         {isRunning && (
                             <RunHeaderMessage>
-                                <Typography variant="caption">
-                                    AutoDiscovery is running. New findings will populate the table
-                                    below automatically. You can click on any hypothesis to review
-                                    the details while the run continues.
-                                </Typography>
-                                <br />
-                                <Typography variant="caption">
-                                    Feel free to navigate away; your results will be here when the
-                                    analysis is complete.
-                                </Typography>
+                                {standalone ? (
+                                    <Typography variant="caption">
+                                        AutoDiscovery is running. This report is rewritten as each
+                                        experiment finishes; reload the page to see new findings.
+                                    </Typography>
+                                ) : (
+                                    <>
+                                        <Typography variant="caption">
+                                            AutoDiscovery is running. New findings will populate the
+                                            table below automatically. You can click on any
+                                            hypothesis to review the details while the run
+                                            continues.
+                                        </Typography>
+                                        <br />
+                                        <Typography variant="caption">
+                                            Feel free to navigate away; your results will be here
+                                            when the analysis is complete.
+                                        </Typography>
+                                    </>
+                                )}
                             </RunHeaderMessage>
                         )}
                         {run.details.status === 'FAILED' && (
@@ -833,7 +846,7 @@ export function RunViewContent({
                                 canExploreWithAsta={run.canExploreWithAsta}
                                 actions={
                                     <>
-                                        {canShare && (
+                                        {!standalone && (
                                             <Tooltip title="Share experiment" placement="bottom">
                                                 <ExpandingActionButton
                                                     onClick={onShareExperimentClick}

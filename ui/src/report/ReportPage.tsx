@@ -25,7 +25,7 @@ declare global {
 
 const noop = () => {};
 
-/** A finished run's view, read-only and served from the embedded data. */
+/** A run's view, read-only and served from the embedded data. */
 export default function ReportPage() {
     const data = window.AUTODISCOVERY_REPORT;
     const run = useMemo(() => (data ? getRunFromApi(data.run) : null), [data]);
@@ -58,7 +58,7 @@ export default function ReportPage() {
                             experimentsLabel={
                                 run.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments'
                             }
-                            canShare={false}
+                            standalone
                         />
                     </StaticRunExperimentsProvider>
                 </URLSearchParamsProvider>

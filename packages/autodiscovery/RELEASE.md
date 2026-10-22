@@ -49,7 +49,10 @@ file under them will be included.
 Dataset files/directories can have different descriptions for each one listed. Use a repeated `--dataset_description`
 parameter in place of the overall `--description`.
 
-When the run finishes, a static HTML report is written to `<out_dir>/report`.
+A static HTML report is written to `<out_dir>/report` when the run starts and rewritten as
+each experiment finishes. Open its `index.html` in a browser: it is the web UI's view of the
+run, it works offline from the files in that directory, and while the run goes on it picks up
+new findings by itself.
 
 ## Common options
 

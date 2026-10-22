@@ -2,7 +2,7 @@ import { styled, Typography, Box, Dialog, DialogContent, IconButton } from '@mui
 import CloseIcon from '@mui/icons-material/Close';
 import { useMemo, useState } from 'react';
 
-import { RichOutputBundle } from '@/types/Run';
+import { RICH_OUTPUT_URL_KEY, RichOutputBundle } from '@/types/Run';
 import { CodeBlock } from '@/components/CodeBlock';
 
 type RichOutputMime = 'image/svg+xml' | 'image/png' | 'image/jpeg' | 'text/plain';
@@ -10,7 +10,6 @@ type RichOutputMime = 'image/svg+xml' | 'image/png' | 'image/jpeg' | 'text/plain
 type RichOutputPreview =
     | {
           kind: 'image';
-          mime: Exclude<RichOutputMime, 'text/plain'>;
           src: string;
       }
     | {
@@ -36,6 +35,10 @@ const buildSvgDataUri = (payload: string) => {
 };
 
 const getPreferredRichOutput = (bundle: RichOutputBundle): RichOutputPreview => {
+    const url = bundle[RICH_OUTPUT_URL_KEY];
+    if (url) {
+        return { kind: 'image', src: url };
+    }
     for (const mime of RICH_OUTPUT_PRIORITY) {
         const payload = bundle[mime];
         if (!payload) {
@@ -46,7 +49,7 @@ const getPreferredRichOutput = (bundle: RichOutputBundle): RichOutputPreview => 
         }
         const src =
             mime === 'image/svg+xml' ? buildSvgDataUri(payload) : `data:${mime};base64,${payload}`;
-        return { kind: 'image', mime, src };
+        return { kind: 'image', src };
     }
     return null;
 };

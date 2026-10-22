@@ -14,9 +14,10 @@ convention = "google"
 
 [lint.per-file-ignores]
 "**/tests/*.py" = ["D"]
-"**/report.py" = ["E501", "T20"]
+"**/report.py" = ["T20"]
 "scripts/*.py" = ["D", "T20"]
 # CLI entry points and the research loop report progress on stdout by design.
 "api/scripts/*.py" = ["T20"]
 "sonar/*.py" = ["T20"]
+"ui/e2e-report/*.py" = ["T20"]
 "packages/autodiscovery/src/autodiscovery/*.py" = ["T20"]

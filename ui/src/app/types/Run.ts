@@ -99,6 +99,13 @@ export type Experiment = {
 
 export type RichOutputBundle = Record<string, string>;
 
+/**
+ * Bundle key the standalone HTML report uses for a figure it saved as a file:
+ * the value is the figure's URL relative to the report, in place of an inline
+ * MIME payload.
+ */
+export const RICH_OUTPUT_URL_KEY = 'x-report-figure-url';
+
 export type MetadataDataset = {
     name: string;
     description: string | null;

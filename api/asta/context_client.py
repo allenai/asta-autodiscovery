@@ -126,8 +126,9 @@ def find_owned_artifact(owner_id: str, artifact_id: str) -> dict | None:
     stops a user importing someone else's artifact by guessing its ID.
     """
     for artifact in list_owner_artifacts(owner_id):
-        if str(artifact.get("id")) == artifact_id:
-            return artifact
+        metadata = artifact.get("metadata")
+        if metadata and str(metadata.get("artifact_id")) == artifact_id:
+            return metadata
     return None
 
 

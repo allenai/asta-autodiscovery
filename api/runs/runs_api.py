@@ -29,6 +29,7 @@ from runs.datasets import (
     UPLOAD_MAX_FILE_SIZE_BYTES,
     UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES,
     UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR,
+    is_valid_dataset_filename,
 )
 from runs.models import (
     BookmarkExperimentRequestModel,
@@ -707,7 +708,7 @@ def create() -> Blueprint:
         # two. So reject anything that could point outside the run's data prefix
         # rather than rewriting it. (The filesystem store also refuses to escape its
         # root, but that would surface as a 500.)
-        if "/" in file.filename or "\\" in file.filename or file.filename in (".", ".."):
+        if not is_valid_dataset_filename(file.filename):
             raise BadRequest("Invalid filename")
 
         # Enforce the size cap where the bytes actually arrive. The check in

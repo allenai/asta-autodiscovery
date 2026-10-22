@@ -2,13 +2,19 @@
 
 import os
 from datetime import UTC, datetime, timedelta
+from typing import BinaryIO, cast
 
 import requests
 from autodiscovery_jobs import JobConfig, JobManager
 from autodiscovery_jobs.persistence import dataset_key, read_rich_outputs
 from autodiscovery_jobs.storage import get_store
 from flask import Blueprint, current_app, jsonify, request
-from runs.datasets import UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
+from runs.datasets import (
+    UPLOAD_MAX_FILE_SIZE_BYTES,
+    UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES,
+    LimitedDatasetReader,
+    is_valid_dataset_filename,
+)
 from runs.models import UploadDatasetResponseModel
 from utils.auth import PermissionType, requires_auth
 from utils.experiments import ExperimentTree
@@ -61,6 +67,7 @@ def _resolve_asta_user_uuid() -> tuple[str | None, tuple | None]:
                 )
 
     if userinfo is None:
+        current_app.logger.error("Could not fetch Auth0 userinfo")
         return None, (jsonify({"error": "Failed to fetch user profile from Auth0"}), 502)
 
     email = userinfo.get("email", "")
@@ -86,7 +93,7 @@ def create() -> Blueprint:
 
     @api.route("/<runid>/import-context-artifact", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
-    def import_context_artifact(runid: str):
+    def import_context_artifact(runid: str):  # pyright: ignore reportUnusedFunction
         """Copy one of the caller's Asta context-service artifacts into the run's data.
 
         An alternative to uploading: the file lands at the same data key an upload
@@ -121,8 +128,8 @@ def create() -> Blueprint:
         if artifact is None:
             return jsonify({"error": f"Artifact {req.artifact_id} not found"}), 404
 
-        filename = req.filename or artifact.get("filename") or ""
-        if not filename or "/" in filename or "\\" in filename or filename in (".", ".."):
+        filename = req.filename or artifact.get("path", "").rsplit("/", 1)[-1]
+        if not is_valid_dataset_filename(filename):
             raise BadRequest("Invalid filename")
 
         has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
@@ -131,25 +138,30 @@ def create() -> Blueprint:
             if has_higher_limit
             else UPLOAD_MAX_FILE_SIZE_BYTES
         )
-        size = artifact.get("file_size_bytes")
-        if isinstance(size, int) and size > max_file_size:
-            return jsonify({"error": "File too large."}), 413
-
+        stream = None
         try:
             download_url = context_client.get_download_url(req.artifact_id)
             with requests.get(download_url, stream=True, timeout=(10, 300)) as src:
                 src.raise_for_status()
-                if int(src.headers.get("Content-Length") or 0) > max_file_size:
+                try:
+                    size = int(src.headers.get("Content-Length", ""))
+                except (ValueError, TypeError):
+                    size = 0
+                if size > max_file_size:
                     return jsonify({"error": "File too large."}), 413
                 src.raw.decode_content = True
+                stream = LimitedDatasetReader(src.raw, max_file_size)
                 key = dataset_key(userid, runid, filename)
                 store = get_store(manager.config)
+                # Both stores commit atomically; a failed read preserves the old object.
                 store.write_stream(
                     key,
-                    src.raw,
-                    content_type=artifact.get("content_type") or src.headers.get("Content-Type"),
+                    cast(BinaryIO, stream),
+                    content_type=src.headers.get("Content-Type"),
                 )
         except Exception as e:
+            if stream is not None and stream.limit_exceeded:
+                return jsonify({"error": "File too large."}), 413
             current_app.logger.error("Failed to import context artifact: %s", e)
             return jsonify({"error": "Failed to import Asta artifact"}), 502
 

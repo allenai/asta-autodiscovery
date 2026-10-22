@@ -174,7 +174,25 @@ container never sees other users' data — see
 
 To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then
 unused). That requires `STORAGE_BACKEND=gcs`, since Cloud Run cannot mount a directory on
-your host.
+your host. See [Cloud Run backend](#cloud-run-backend) for the job it launches.
+
+### Cloud Run backend
+
+The gcp backend does not create or configure a Cloud Run job: it executes an existing one,
+`CLOUDRUN_JOB_NAME` in `GCP_PROJECT` and `GCP_REGION`, overriding only the container's
+arguments for each run. Everything else comes from the job definition you create, which must:
+
+- run the job image built from `packages/autodiscovery/Dockerfile` (repository root as the
+  build context);
+- mount the `GCS_BUCKET` bucket as a Cloud Storage volume at `/mnt/data`, where each run
+  reads its data at `/mnt/data/users/<uid>/jobs/<jid>`;
+- set the environment the run needs, as plain variables or Secret Manager references: the
+  model provider's credentials (see [Model and LLM providers](#model-and-llm-providers)) and,
+  with `CODE_EXECUTION_BACKEND=modal`, the Modal variables (see
+  [Modal](#modal-code-execution-sandbox-backend)).
+
+Deploying a new image means pointing the job at it (`gcloud run jobs update <job> --image
+<image>`); the volume and environment stay as configured.
 
 > **Security note.** The docker backend gives the API access to the host Docker socket, which is
 > effectively root on the host. This is fine for local/single-user use, but for a shared,

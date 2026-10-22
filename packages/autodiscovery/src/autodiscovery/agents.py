@@ -10,7 +10,7 @@ from autogen import ConversableAgent, UserProxyAgent
 from autogen.agentchat.contrib.capabilities import transform_messages
 from autogen.coding import CodeBlock, CodeExecutor, CodeResult
 
-from autodiscovery import llm
+from autodiscovery import datalib, llm
 from autodiscovery.llm_usage import UsageTracker, record_ag2_response_usage
 from autodiscovery.structured_outputs import (
     Experiment,
@@ -45,6 +45,11 @@ IMAGE_ANALYST_PROMPT = """Please analyze the given plot image and provide the fo
 # traceback or many tabular rows) without letting one tool result consume a large
 # fraction of a future model request.
 MAX_CODE_OUTPUT_CHARS = 20_000
+
+#: Where the store is mounted in every code environment: key ``users/<uid>/...`` is
+#: visible at ``/mnt/data/users/<uid>/...``. Mirrors ``autodiscovery_jobs.backends.base.
+#: JOB_MOUNT_ROOT`` (not imported: this package does not depend on autodiscovery_jobs).
+STORE_MOUNT_ROOT = "/mnt/data"
 
 
 def _truncate_output_parts(parts: list[str]) -> str:
@@ -389,14 +394,22 @@ def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
     return bucket_name, key_prefix
 
 
+def store_mount_path(key_prefix: str) -> str:
+    """Return the absolute path a store key prefix is mounted at.
+
+    E.g. ``users/u/jobs/j/data/`` -> ``/mnt/data/users/u/jobs/j/data``.
+    """
+    return f"{STORE_MOUNT_ROOT}/{key_prefix.strip('/')}".rstrip("/")
+
+
 def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: str | None) -> str:
     """Return the directory the code transform should ``os.chdir`` into per cell.
 
     For the process/local backends this must be **absolute**: their subprocess
     already starts with ``cwd=work_dir``, so a relative path injected by
     :class:`SimpleCodeBlockTransform` would stack (``work_dir/work_dir``) and
-    raise ``FileNotFoundError``. modal uses its absolute mount path (``/data``),
-    which is idempotent regardless of the sandbox's starting directory.
+    raise ``FileNotFoundError``. modal uses its absolute mount path
+    (:func:`store_mount_path`), which is idempotent regardless of the sandbox's starting directory.
     """
     if backend == "modal":
         return modal_working_dir
@@ -406,7 +419,7 @@ def code_transform_working_dir(backend: str, work_dir: str, modal_working_dir: s
 class SimpleCodeBlockTransform(transforms.MessageTransform):
     """Simple transform that extracts code from JSON and wraps it in markdown code blocks."""
 
-    def __init__(self, working_dir="/data"):
+    def __init__(self, working_dir=None):
         """Initialize with optional working directory to change to before executing code."""
         self.working_dir = working_dir
 
@@ -540,6 +553,7 @@ def get_agents(
     backend="process",
     bucket_path=None,
     dataset_paths=None,
+    datalib_dirs=None,
     usage_tracker: UsageTracker | None = None,
 ) -> dict[str, ConversableAgent]:
     """Build and return the conversational agents used by AutoDiscovery.
@@ -557,6 +571,8 @@ def get_agents(
         backend: Code execution backend (local, process, or modal).
         bucket_path: Optional GCS bucket path for Modal datasets.
         dataset_paths: Optional dataset paths (reserved for future use).
+        datalib_dirs: Read-only data-library directories the code may read, as
+            absolute paths. The modal backend mounts each at the same path.
         vision_model: Vision model for plot analysis, as litellm's
             ``<provider>/<model>``.
         usage_tracker: Optional usage tracker for direct image-analysis calls.
@@ -584,6 +600,9 @@ def get_agents(
 
     # Experiment Generator
     _user_query_or_empty = f"{user_query}\n\n" if user_query is not None else ""
+    datalib_dirs = list(datalib_dirs or [])
+    # Empty without a data library, so those prompts are unchanged.
+    _datalib_note = datalib.prompt_note(datalib_dirs)
 
     experiment_generator = ConversableAgent(
         name="experiment_generator",
@@ -598,6 +617,7 @@ def get_agents(
             "The hypothesis should be a falsifiable statement that can be sufficiently tested by an experiment using the provided data. "
             "Explain in natural language what this experiment plan is so that a programmer can implement it (do not provide the code yourself). "
             "Remember, you are interested in open-ended research, so your proposals may be exploratory in nature and may have only an indirect connection to the previous explorations provided. "
+            f"{_datalib_note}"
             "Here are some instructions that you must follow:\n"
             "1. Strictly use only the dataset(s) provided and do not simulate dummy/synthetic data or columns that cannot be derived from the existing columns.\n"
             "2. Each hypothesis (and experiment plan) should be creative, independent, and self-contained.\n"
@@ -637,7 +657,9 @@ def install(package):
             "Your code will be included in a python file that is executed and any relevant results should be printed to standard out or presented using plt.show appropriately. "
             "Make sure you provide python code in the proper format to execute. "
             "Ensure your code is clean and concise, and include debug statements only when they are absolutely necessary. "
-            "Use only the dataset given and do not assume any other files are available. The state is not preserved between code blocks, so do not assume any variables or imports from previous code blocks. "
+            "Use only the dataset given and do not assume any other files are available. "
+            f"{_datalib_note}"
+            "The state is not preserved between code blocks, so do not assume any variables or imports from previous code blocks. "
             "Import any libraries you need to use. Always attempt to import a library before installing it (it may already be installed). "
             "If you need to install a library, use the following code example:"
             f"{install_snippet}"
@@ -697,6 +719,7 @@ def install(package):
             "The revised experiment plan should still aim to validate the most recent hypothesis. "
             "Do not provide the code yourself but explain in natural language what the experiment should do for a programmer. "
             "Strictly use only the dataset provided and do not create synthetic data or columns that cannot be derived from the given columns. "
+            f"{_datalib_note}"
             "The experiment should be creative, independent, and self-contained. "
             "Generally, in typical data-driven research, you will need to explore and visualize the data for possible high-level insights, clean, transform, or derive new variables from the dataset to be suited for the investigation, deep-dive into specific parts of the data for fine-grained analysis, perform data modeling, and run statistical tests."
         ),
@@ -719,7 +742,9 @@ def install(package):
         # Parse bucket path
         bucket_name, key_prefix = parse_bucket_path(bucket_path)
 
-        modal_mount_path = "/data"
+        # Same path the run's data has in the job container, so the sandbox shows the
+        # store's layout unchanged.
+        modal_mount_path = store_mount_path(key_prefix)
         modal_working_dir = modal_mount_path
 
         # Get Modal configuration from environment
@@ -759,7 +784,21 @@ def install(package):
             environment={"DATASET_ROOT": modal_mount_path},
             sandbox_timeout_s=code_timeout + _SANDBOX_OVERHEAD_S,
         )
-        _run_async(modal_executor.add_shares(cloud_share))
+        # Each data-library directory, read-only, at the same path it has in the
+        # job container, so the paths the agents were given work here too. Like
+        # the run's data, it is in the bucket under the key its path implies.
+        datalib_shares = [
+            CloudShare(
+                dest=path,
+                bucket=bucket_name,
+                key_prefix=datalib.store_key_prefix(path, STORE_MOUNT_ROOT),
+                read_only=True,
+                bucket_endpoint_url=bucket_endpoint_url,
+                modal_secret=modal.Secret.from_name(secret_name),
+            )
+            for path in datalib_dirs
+        ]
+        _run_async(modal_executor.add_shares(cloud_share, *datalib_shares))
 
         executor = SandboxCodeExecutor(
             modal_executor,

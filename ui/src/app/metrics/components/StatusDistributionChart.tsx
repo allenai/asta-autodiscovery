@@ -1,4 +1,3 @@
-
 import { Box, Typography, styled } from '@mui/material';
 
 const STATUS_COLORS: Record<string, string> = {

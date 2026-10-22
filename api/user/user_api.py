@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request
 from utils.auth import get_auth_provider, requires_auth
-from utils.credits import get_cached_user_credits
+from utils.credits import credits_enabled, get_cached_user_credits
 
 # Import autodiscovery_jobs when available
 try:
@@ -50,8 +50,13 @@ def create() -> Blueprint:
     @api.route("/me/credits", methods=["GET"])
     @requires_auth()
     def get_viewer_credits():
-        """Get the number of credits for the authenticated user."""
+        """Get the number of credits for the authenticated user.
+
+        ``credits`` is ``null`` when credit tracking is disabled.
+        """
         user_id = request.user.get("sub")
+        if not credits_enabled():
+            return jsonify({"credits": None}), 200
 
         try:
             job_manager = get_job_manager()
@@ -70,5 +75,48 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to fetch credits for user {user_id}: {str(e)}")
             return jsonify({"error": f"Failed to fetch credits: {str(e)}"}), 500
+
+    @api.route("/me/datalib", methods=["GET"])
+    @requires_auth()
+    def get_viewer_datalib():
+        """List the data-library directories the authenticated user can select.
+
+        These are the top-level directories that a run can mount read-only
+        instead of uploading a dataset: the global library's (``datalib/``,
+        ``scope: "global"``) first, then the user's own
+        (``users/<uid>/datalib/``, ``scope: "user"``). Each carries the contents
+        of its ``README.md`` (truncated) as its description, or ``null``, and a
+        tally of its files by extension (``file_types``: ``[{"ext", "count"}]``,
+        most common first; ``ext`` is ``""`` for none), over at most a capped
+        number of files
+        (``file_count_capped`` when there are more).
+        """
+        user_id = request.user.get("sub")
+
+        try:
+            job_manager = get_job_manager()
+            dirs = job_manager.list_datalib_dirs(user_id)
+            return jsonify(
+                {
+                    "dirs": [
+                        {
+                            "name": d.name,
+                            "description": d.description,
+                            "scope": d.scope,
+                            # A list, not an object: jsonify sorts object keys,
+                            # which would lose the most-common-first order.
+                            "file_types": [
+                                {"ext": ext, "count": n} for ext, n in d.file_types.items()
+                            ],
+                            "file_count": d.file_count,
+                            "file_count_capped": d.file_count_capped,
+                        }
+                        for d in dirs
+                    ]
+                }
+            ), 200
+        except Exception as e:
+            current_app.logger.error(f"Failed to list data library for user {user_id}: {str(e)}")
+            return jsonify({"error": f"Failed to list data library: {str(e)}"}), 500
 
     return api

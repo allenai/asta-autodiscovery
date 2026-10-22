@@ -9,6 +9,60 @@ All notable changes to the published packages — [`asta-autodiscovery`][pypi]
 
 ## Unreleased
 
+### The HTML report is the web UI's run view
+
+The static report each run writes to `<out_dir>/report` is now built from the
+web UI's own run view: the same experiment tree, table, top surprisals, details
+panel, figures and session configuration, read-only and offline. The page is one
+self-contained `index.html`, with the run's data in `data.js` and its figures in
+`figures/` beside it.
+
+The report is written when a run starts and rewritten as each experiment
+finishes, and an open page picks up new findings by itself, so a long run's
+results can be read while it is still going. `python -m autodiscovery.report <out_dir>` regenerates the
+report for an existing run.
+
+### Clearer experiment section labels
+
+Experiment sections in the web UI and standalone HTML report are now labeled
+**Findings** (formerly Analysis) and **Validity Check** (formerly Review).
+
+### Read-only data-library directories
+
+`auto-discovery` accepts `--datalib_dir <path>`, repeatable: a directory the run
+reads in place, alongside or instead of the datasets in `--dataset_metadata`.
+A directory may hold any number of datasets in any layout; its `README.md`, if
+present, describes it. The agents are shown each directory's README and a
+bounded view of its file tree, the first experiment surveys it, and the manifest
+is saved to `datalib_manifest.json` in the output directory. With
+`--backend modal`, a directory under `/mnt/data` is mounted read-only in the
+sandbox at the same path, from the `--bucket_path` bucket by the key its path
+implies.
+
+Without `--datalib_dir`, prompts and the first experiment are unchanged.
+
+### Deduplication defaults to `vertex_ai/gemini-3.8-flash`
+
+The standalone `python -m autodiscovery.deduplication` helper retains its own
+`--model` default, now `vertex_ai/gemini-3.8-flash` instead of
+`vertex_ai/gemini-3.7-flash`. This is an exception to the main discovery CLI
+model-selection requirement below; discovery runs pass their chosen model to
+deduplication explicitly.
+
+### Dashboard estimates use historical Gemini Flash pricing
+
+Gemini 3.7/3.8 Flash estimates use $0.75 input / $3.75 output per million tokens
+before 2027-01-01 and $1.50 / $7.50 from that date, following
+[Google's global standard pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing).
+All tokens in a run use its creation-time rate, including runs spanning the
+price change. If creation time is missing or invalid, estimates use the earliest
+valid usage-event timestamp, then finish time. With no valid timestamp, estimates
+use the standard, non-promotional rate. Regional premiums and other billing
+adjustments are not modeled. The metrics cache schema is bumped to rebuild old
+estimates; the resolved pricing date is persisted for consistent breakdowns.
+Every metrics dashboard page now shows a note that costs are estimates, why
+historical costs may differ from billing, and which price changes are applied.
+
 ### There is no default model; choosing one is required
 
 `--model` no longer defaults to `vertex_ai/gemini-3.7-flash`. Choose a model on
@@ -76,6 +130,13 @@ root was re-selected forever with nothing left to run, writing the same log
 lines at full speed. Exploration now stops after that failure.
 
 [#79]: https://github.com/allenai/asta-autodiscovery/issues/79
+
+### Added: every run writes the static HTML report
+
+`python -m autodiscovery.run` now writes `report/index.html` into the run's
+results directory when it finishes, as `auto-discovery` already did. A run
+leaves the same artifacts whichever way it is launched, including as a webapp
+job. A report that cannot be generated is a warning; the run's results stand.
 
 ## 1.0.1
 

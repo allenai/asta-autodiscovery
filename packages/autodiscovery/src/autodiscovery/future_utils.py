@@ -9,7 +9,7 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
-def gather_completed_futures(
+def gather_completed_futures[T](
     future_labels: Mapping[Future[T | None], str],
     *,
     on_error: Callable[[str, Exception], None] | None = None,

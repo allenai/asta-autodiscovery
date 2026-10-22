@@ -1,6 +1,6 @@
 import { styled } from '@mui/material';
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 
 import { useRouter } from '@/router';
 

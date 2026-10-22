@@ -29,7 +29,7 @@ Every model flag accepts [litellm's](https://docs.litellm.ai/docs/providers)
 --model openai/gpt-5.4-mini
 --model anthropic/claude-sonnet-5
 --model azure/gpt-5.4-mini            # your Azure OpenAI deployment name
---model vertex_ai/gemini-3.7-flash
+--model vertex_ai/gemini-3.8-flash
 --model github_copilot/claude-haiku-4.5
 ```
 
@@ -39,8 +39,8 @@ asking litellm, which authenticates for some providers. Unqualified names are
 rejected at startup with the qualified form to use:
 
 ```
-'gemini-3.7-flash' is missing a provider. Model names are litellm-qualified
-as <provider>/<model>, e.g. vertex_ai/gemini-3.7-flash or openai/gemini-3.7-flash.
+'gemini-3.8-flash' is missing a provider. Model names are litellm-qualified
+as <provider>/<model>, e.g. vertex_ai/gemini-3.8-flash or openai/gemini-3.8-flash.
 ```
 
 `google/<model>` is also rejected: it was Vertex's OpenAI-compatible wire prefix,
@@ -58,7 +58,7 @@ in one run — Copilot for chat, Vertex for plot analysis:
 ```sh
 auto-discovery \
    --model github_copilot/claude-haiku-4.5 \
-   --vision_model vertex_ai/gemini-3.7-flash \
+   --vision_model vertex_ai/gemini-3.8-flash \
    ...
 ```
 
@@ -173,7 +173,12 @@ auto-discovery \
 
 Datasets are positional file or directory paths (CSV, TSV, JSON, etc.). The CLI
 generates a metadata file, runs the MCTS loop, writes results to `--out_dir`,
-and emits a static HTML report.
+and emits a static HTML report: open `<out_dir>/report/index.html` in a browser
+for the web UI's view of the run, offline. The report is there from the start of
+the run and rewritten as each experiment finishes, and an open page picks up new
+findings by itself. From a source checkout rather than the
+PyPI package, build that page once first with `make report-viewer` (needs Node.js
+and Yarn).
 
 See `auto-discovery --help` for the full option list (model selection, MCTS
 parameters, belief mode, execution backend, etc.).

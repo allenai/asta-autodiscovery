@@ -51,9 +51,6 @@ class TreeLogger:
 
         messages = None
         with open(filename) as f:
-            if as_json:
-                messages = json.load(f)
-            else:
-                messages = f.read()
+            messages = json.load(f) if as_json else f.read()
 
         return messages

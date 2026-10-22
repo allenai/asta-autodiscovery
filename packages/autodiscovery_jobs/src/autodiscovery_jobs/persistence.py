@@ -9,8 +9,9 @@ the ``users/<userid>/jobs/<jobid>/`` subtree as a filesystem mount either way.
 import json
 import logging
 import re
-from dataclasses import dataclass
-from pathlib import Path
+from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from . import keys
@@ -127,7 +128,7 @@ def list_user_ids(config: JobConfig | None = None) -> list[str]:
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f"Failed to list users: {e}")
+        raise StorageError(f"Failed to list users: {e}") from e
 
 
 def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
@@ -149,7 +150,7 @@ def list_user_jobs(userid: str, config: JobConfig | None = None) -> list[str]:
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f"Failed to list jobs for user {userid}: {e}")
+        raise StorageError(f"Failed to list jobs for user {userid}: {e}") from e
 
 
 def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | None:
@@ -180,7 +181,7 @@ def get_userid_for_job(jobid: str, config: JobConfig | None = None) -> str | Non
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f"Failed to find user for job {jobid}: {e}")
+        raise StorageError(f"Failed to find user for job {jobid}: {e}") from e
 
 
 def get_shared_run_index(jobid: str, config: JobConfig | None = None) -> str | None:
@@ -210,7 +211,7 @@ def write_shared_run_index(jobid: str, userid: str, config: JobConfig | None = N
         config: Configuration (uses default if None)
     """
     store, _ = _store(config)
-    try:
+    try:  # noqa: SIM105
         store.write_text(
             keys.shared_run_index_key(jobid), json.dumps({"runid": jobid, "userid": userid})
         )
@@ -226,7 +227,7 @@ def delete_shared_run_index(jobid: str, config: JobConfig | None = None) -> None
         config: Configuration (uses default if None)
     """
     store, _ = _store(config)
-    try:
+    try:  # noqa: SIM105
         store.delete(keys.shared_run_index_key(jobid))
     except Exception:
         pass  # Best-effort; entry may not exist
@@ -286,7 +287,7 @@ def create_job_directory(
 
         return store.uri(base)
     except Exception as e:
-        raise StorageError(f"Failed to create job directory: {e}")
+        raise StorageError(f"Failed to create job directory: {e}") from e
 
 
 def copy_job_data_files(
@@ -323,7 +324,7 @@ def copy_job_data_files(
 
     try:
         for info in store.list(source_prefix):
-            filename = info.key[len(source_prefix):]
+            filename = info.key[len(source_prefix) :]
             if not filename or filename == PLACEHOLDER_NAME:
                 continue
             store.copy(info.key, f"{dest_prefix}{filename}")
@@ -331,7 +332,7 @@ def copy_job_data_files(
 
         return copied_files
     except Exception as e:
-        raise StorageError(f"Failed to copy job data files: {e}")
+        raise StorageError(f"Failed to copy job data files: {e}") from e
 
 
 def has_data_files(
@@ -353,7 +354,7 @@ def has_data_files(
     prefix = f"{keys.job_prefix(userid, jobid)}data/"
 
     for info in store.list(prefix, limit=10):
-        filename = info.key[len(prefix):]
+        filename = info.key[len(prefix) :]
         if filename and filename != PLACEHOLDER_NAME:
             return True
     return False
@@ -383,7 +384,7 @@ def delete_job_directory(userid: str, jobid: str, config: JobConfig | None = Non
         for key in [info.key for info in store.list(prefix)]:
             store.delete(key)
     except Exception as e:
-        raise StorageError(f"Failed to delete job directory: {e}")
+        raise StorageError(f"Failed to delete job directory: {e}") from e
 
 
 def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) -> dict[str, Any]:
@@ -457,7 +458,7 @@ def soft_delete_job(userid: str, jobid: str, config: JobConfig | None = None) ->
         }
 
     except Exception as e:
-        raise StorageError(f"Failed to soft delete job: {e}")
+        raise StorageError(f"Failed to soft delete job: {e}") from e
 
 
 def upload_dataset(
@@ -507,7 +508,7 @@ def upload_dataset(
 
         return store.uri(data_prefix)
     except Exception as e:
-        raise StorageError(f"Failed to upload dataset: {e}")
+        raise StorageError(f"Failed to upload dataset: {e}") from e
 
 
 def expire_datasets(
@@ -570,7 +571,7 @@ def expire_datasets(
 
         return expired_paths
     except Exception as e:
-        raise StorageError(f"Failed to expire datasets: {e}")
+        raise StorageError(f"Failed to expire datasets: {e}") from e
 
 
 def upload_metadata(
@@ -602,7 +603,7 @@ def upload_metadata(
         store.write_text(key, json.dumps(metadata, indent=2), content_type="application/json")
         return store.uri(key)
     except Exception as e:
-        raise StorageError(f"Failed to upload metadata: {e}")
+        raise StorageError(f"Failed to upload metadata: {e}") from e
 
 
 def upload_job_args(
@@ -634,7 +635,7 @@ def upload_job_args(
         store.write_text(key, json.dumps(args, indent=2), content_type="application/json")
         return store.uri(key)
     except Exception as e:
-        raise StorageError(f"Failed to save job args: {e}")
+        raise StorageError(f"Failed to save job args: {e}") from e
 
 
 def get_metadata_or_none(
@@ -725,7 +726,7 @@ def get_job_results(userid: str, jobid: str, config: JobConfig | None = None) ->
             if not info.key.endswith(PLACEHOLDER_NAME)
         ]
     except Exception as e:
-        raise StorageError(f"Failed to list job results: {e}")
+        raise StorageError(f"Failed to list job results: {e}") from e
 
 
 def download_job_results(
@@ -764,7 +765,7 @@ def download_job_results(
                 continue
 
             # Get relative path from output/ directory
-            local_path = local_dir / info.key[len(prefix):]
+            local_path = local_dir / info.key[len(prefix) :]
 
             # Create parent directories
             local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -774,7 +775,7 @@ def download_job_results(
 
         return downloaded
     except Exception as e:
-        raise StorageError(f"Failed to download job results: {e}")
+        raise StorageError(f"Failed to download job results: {e}") from e
 
 
 def count_experiment_results(userid: str, jobid: str, config: JobConfig | None = None) -> int:
@@ -878,7 +879,7 @@ def list_experiment_files(userid: str, jobid: str, config: JobConfig | None = No
                 filenames.append(filename)
         return sorted(filenames)
     except Exception as e:
-        raise StorageError(f"Failed to list experiment files for job {jobid}: {e}")
+        raise StorageError(f"Failed to list experiment files for job {jobid}: {e}") from e
 
 
 def read_experiment_node(
@@ -980,6 +981,153 @@ def dataset_key(userid: str, jobid: str, filename: str) -> str:
     return f"{keys.job_prefix(userid, jobid)}data/{filename}"
 
 
+#: Name of the file at the top of a data-library directory that describes it —
+#: the data library's equivalent of the description paired with an upload.
+DATALIB_README_NAME = "README.md"
+
+
+#: Scopes a data-library directory can belong to.
+DATALIB_SCOPE_GLOBAL = "global"
+DATALIB_SCOPE_USER = "user"
+
+
+#: How many files of a data-library directory are listed to tally its file
+#: types. Listing runs whenever the picker loads, so it is capped; a directory
+#: with more files reports ``file_count_capped``.
+DATALIB_FILE_COUNT_LIMIT = 2000
+
+
+@dataclass(frozen=True)
+class DatalibDir:
+    """One selectable top-level data-library directory.
+
+    ``file_types`` maps lowercase extensions without the dot (``""`` for none)
+    to file counts, most common first. It and ``file_count`` cover at most
+    :data:`DATALIB_FILE_COUNT_LIMIT` files; ``file_count_capped`` says when the
+    directory holds more. The top-level ``README.md`` is not counted.
+    """
+
+    name: str
+    description: str | None
+    scope: str = DATALIB_SCOPE_USER
+    file_types: dict[str, int] = field(default_factory=dict)
+    file_count: int = 0
+    file_count_capped: bool = False
+
+
+def _tally_file_types(
+    store: ObjectStore, prefix: str, limit: int
+) -> tuple[dict[str, int], int, bool]:
+    """Count a prefix's files by extension, up to ``limit`` of them.
+
+    Lists two extra objects: one to detect that there are more, one for the
+    README, which is skipped.
+    """
+    counts: Counter[str] = Counter()
+    seen = 0
+    for info in store.list(prefix, limit=limit + 2):
+        rel = info.key[len(prefix) :]
+        if rel == DATALIB_README_NAME:
+            continue
+        if seen == limit:
+            return dict(counts.most_common()), seen, True
+        seen += 1
+        counts[PurePosixPath(rel).suffix.lower().lstrip(".")] += 1
+    return dict(counts.most_common()), seen, False
+
+
+def _library_label(userid: str | None) -> str:
+    return "the global data library" if userid is None else f"data library for user {userid}"
+
+
+def list_datalib_dirs(
+    userid: str | None,
+    config: JobConfig | None = None,
+    *,
+    max_description_chars: int = 4000,
+) -> list[DatalibDir]:
+    """List a data library's top-level directories, with their READMEs.
+
+    Args:
+        userid: User identifier, or ``None`` for the global library
+        config: Configuration (uses default if None)
+        max_description_chars: Truncate each README to this many characters.
+
+    Returns:
+        The directories sorted by name; ``description`` is ``None`` when a
+        directory has no README.
+
+    Raises:
+        StorageError: If listing fails
+    """
+    store, _ = _store(config)
+    prefix = keys.datalib_prefix(userid)
+    try:
+        names = sorted(store.list_dirs(prefix))
+    except StorageError:
+        raise
+    except Exception as e:
+        raise StorageError(f"Failed to list {_library_label(userid)}: {e}") from e
+
+    scope = DATALIB_SCOPE_GLOBAL if userid is None else DATALIB_SCOPE_USER
+    dirs = []
+    for name in names:
+        try:
+            keys.validate_datalib_dirname(name)
+        except ValueError:
+            # Not selectable (e.g. a dot-directory), so not listed either.
+            continue
+        readme_key = f"{keys.datalib_dir(userid, name)}/{DATALIB_README_NAME}"
+        try:
+            description = store.read_text(readme_key)[:max_description_chars]
+        except ObjectNotFoundError:
+            description = None
+        except Exception as e:
+            logger.warning("Failed to read %s: %s", readme_key, e)
+            description = None
+        try:
+            file_types, file_count, capped = _tally_file_types(
+                store, f"{keys.datalib_dir(userid, name)}/", DATALIB_FILE_COUNT_LIMIT
+            )
+        except Exception as e:
+            logger.warning("Failed to tally files in data library directory %s: %s", name, e)
+            file_types, file_count, capped = {}, 0, False
+        dirs.append(
+            DatalibDir(
+                name=name,
+                description=description,
+                scope=scope,
+                file_types=file_types,
+                file_count=file_count,
+                file_count_capped=capped,
+            )
+        )
+    return dirs
+
+
+def missing_datalib_dirs(
+    userid: str | None, dirnames: list[str], config: JobConfig | None = None
+) -> list[str]:
+    """Return which of ``dirnames`` are not in a data library.
+
+    ``userid=None`` checks the global library.
+
+    Raises:
+        ValueError: If any name is not a valid top-level directory name.
+        StorageError: If listing fails
+    """
+    for name in dirnames:
+        keys.validate_datalib_dirname(name)
+    store, _ = _store(config)
+    try:
+        present = set(store.list_dirs(keys.datalib_prefix(userid)))
+    except StorageError:
+        raise
+    except Exception as e:
+        raise StorageError(f"Failed to list {_library_label(userid)}: {e}") from e
+    return [name for name in dirnames if name not in present]
+
+
 def generate_upload_url(
     userid: str,
     jobid: str,
@@ -1031,7 +1179,7 @@ def generate_upload_url(
     try:
         upload_url = store.signed_upload_url(key, content_type, expiration_seconds)
     except Exception as e:
-        raise StorageError(f"Failed to generate upload URL: {e}")
+        raise StorageError(f"Failed to generate upload URL: {e}") from e
 
     return {
         "upload_url": upload_url,
@@ -1179,7 +1327,7 @@ def summarize_user_data(userid: str, config: JobConfig | None = None) -> UserDat
 
         shared_run_ids = _shared_run_ids_for_user(store, userid)
     except Exception as e:
-        raise StorageError(f"Failed to summarize data for user {userid}: {e}")
+        raise StorageError(f"Failed to summarize data for user {userid}: {e}") from e
 
     active_job_ids = []
     for jobid in sorted(job_ids):
@@ -1219,11 +1367,10 @@ def purge_user_data(
 
     This covers the store ``STORAGE_BACKEND`` selects only. Two nearby surfaces
     are deliberately out of scope: dataset copies handed to the Asta workspaces
-    bucket by :func:`asta_gcs.copy_dataset_to_asta_workspace` belong to Asta
-    once the session there has been started, and the metrics dashboard's
-    derived job snapshot rebuilds itself by rescanning the job directories, so
-    the subject's rows drop out of it on the next refresh with no maintenance
-    here.
+    bucket by the API's ``asta`` package belong to Asta once the session there
+    has been started, and the metrics dashboard's derived job snapshot rebuilds
+    itself by rescanning the job directories, so the subject's rows drop out of
+    it on the next refresh with no maintenance here.
 
     Args:
         userid: User identifier (Auth0 ``sub``).
@@ -1265,7 +1412,7 @@ def purge_user_data(
             for jobid in shared_run_ids:
                 delete_shared_run_index(jobid, config)
     except Exception as e:
-        raise StorageError(f"Failed to purge data for user {userid}: {e}")
+        raise StorageError(f"Failed to purge data for user {userid}: {e}") from e
 
     return {
         "userid": userid,

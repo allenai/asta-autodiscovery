@@ -1,4 +1,3 @@
-
 import CloseIcon from '@mui/icons-material/Close';
 import { Alert, AlertTitle, IconButton, styled } from '@mui/material';
 import { useEffect, useState } from 'react';

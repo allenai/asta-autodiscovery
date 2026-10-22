@@ -1,4 +1,3 @@
-
 import {
     createContext,
     PropsWithChildren,
@@ -7,6 +6,7 @@ import {
     useRef,
     useEffect,
 } from 'react';
+
 import { useRouter, usePathname, useSearchParams } from '@/router';
 
 interface URLSearchParamsContextValue {

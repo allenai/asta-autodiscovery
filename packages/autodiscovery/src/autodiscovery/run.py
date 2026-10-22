@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from time import time
 
-from autodiscovery import llm
+from autodiscovery import datalib, llm
 from autodiscovery.agents import get_agents
 from autodiscovery.args import EMBEDDING_MODEL_ENV, MODEL_ENV, ArgParser
 from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
@@ -46,6 +46,23 @@ from autodiscovery.mcts_utils import (
     select_nodes,
     setup_group_chat,
 )
+from autodiscovery.report import VIEWER_HTML, generate_report
+
+
+def _update_report(log_dirname: str, status: str) -> bool:
+    """Rewrite the run's HTML report so it can be read while the run goes on.
+
+    Best effort, and quiet when the viewer is not built: run_and_report writes
+    the final report and says what went wrong there. Returns whether it wrote.
+    """
+    if not VIEWER_HTML.is_file():
+        return False
+    try:
+        generate_report(log_dirname, status)
+    except Exception as e:
+        print(f"Warning: could not update HTML report: {e}")
+        return False
+    return True
 
 
 def _theoretical_max_boolean_cat(
@@ -89,6 +106,7 @@ def compute_and_store_reward(
     belief_mode,
     use_binary_reward,
     all_surprisals=None,
+    nodes_by_level=None,
     use_online_beliefs=False,
     evidence_weight=1.0,
     kl_scale=20.0,
@@ -108,7 +126,9 @@ def compute_and_store_reward(
         surprisal_width: Width threshold for binary surprisal.
         belief_mode: Belief elicitation mode.
         use_binary_reward: Whether to compute binary reward.
-        all_surprisals: Running list of surprising nodes.
+        all_surprisals: Running list of (level, node_idx) tuples of surprising nodes.
+        nodes_by_level: Tree nodes keyed by level, used to resolve ``all_surprisals``.
+            Required when ``use_online_beliefs`` is set and ``all_surprisals`` is non-empty.
         use_online_beliefs: Whether to condition prior on prior surprising nodes.
         evidence_weight: Weight for current evidence in posterior update.
         kl_scale: Scale factor for KL reward normalization.
@@ -122,19 +142,22 @@ def compute_and_store_reward(
     # If there are past surprisal, computed the s-conditioned prior
     if all_surprisals is not None and len(all_surprisals) > 0 and use_online_beliefs:
         # Build evidence message for prior belief elicitation
+        if nodes_by_level is None:
+            raise ValueError("nodes_by_level is required to condition on prior surprisals")
+        prior_nodes = [nodes_by_level[level][idx] for level, idx in all_surprisals]
         evidence_msg = [
             {
                 "role": "user",
                 "content": "Previous study:\n\n"
                 + get_context_string(
-                    hyp_exp_query=f"Hypothesis: {nodes_by_level[level_index[0]][level_index[1]].hypothesis}",
-                    analysis=nodes_by_level[level_index[0]][level_index[1]].analysis,
-                    review=nodes_by_level[level_index[0]][level_index[1]].review,
-                    belief_mean=nodes_by_level[level_index[0]][level_index[1]].posterior.mean,
+                    hyp_exp_query=f"Hypothesis: {prior.hypothesis}",
+                    analysis=prior.analysis,
+                    review=prior.review,
+                    belief_mean=prior.posterior.mean,
                     include_code_output=False,
                 ),
             }
-            for level_index in all_surprisals
+            for prior in prior_nodes
         ]
         try:
             pt_prior, s_conditioned_prior, _, _ = calculate_prior_and_posterior_beliefs(
@@ -320,6 +343,7 @@ def run_mcts(
     warmstart_experiments=None,
     backend="process",
     bucket_path=None,
+    datalib_dirs=None,
     batch_size=1,
     n_threads=1,
     agent_usage_mode: str = "per_response",
@@ -364,6 +388,7 @@ def run_mcts(
         warmstart_experiments: Path to JSON file with warmstart experiments to run after data loading but before MCTS selection.
         backend: Code execution backend (local, process, or modal).
         bucket_path: GCS bucket path for Modal sandbox (e.g., gs://example-bucket/discoverybench/).
+        datalib_dirs: Read-only data-library directories available to the run's code.
         vision_model: Model used for image analysis in code execution.
         batch_size: Number of nodes to select and expand per iteration.
         n_threads: Number of threads to use for parallel node expansion.
@@ -446,6 +471,7 @@ def run_mcts(
                 backend=backend,
                 bucket_path=bucket_path,
                 dataset_paths=dataset_paths,
+                datalib_dirs=datalib_dirs,
                 vision_model=vision_model,
                 usage_tracker=usage_tracker,
             )
@@ -517,7 +543,7 @@ def run_mcts(
                 is_threaded=False,
             ):
                 print(
-                    f"({inbatch_idx + 1}/{len(next_nodes)}): "
+                    f"({inbatch_idx + 1}/{len(next_nodes)}): "  # noqa: B023
                     f"EXPANDING NODE {node.level}_{node.node_idx}\n"
                     "==========================\n"
                 )
@@ -640,9 +666,9 @@ def run_mcts(
                     # Get messages starting from the current query and update the node
                     node.messages = get_msgs_from_latest_query(groupchat.messages)
                     node.read_experiment_from_messages(
-                        store_new_experiments=False
-                        if node.level == 1 and _warmstart_experiments is not None
-                        else True
+                        store_new_experiments=not (
+                            node.level == 1 and _warmstart_experiments is not None
+                        )
                     )
                     rich_outputs = _get_executor_rich_outputs(agent_objs["code_executor"])
                     _write_rich_outputs(node.level, node.node_idx, rich_outputs)
@@ -660,6 +686,7 @@ def run_mcts(
                             belief_mode,
                             use_binary_reward,
                             all_surprisals,
+                            nodes_by_level=nodes_by_level,
                             use_online_beliefs=use_online_beliefs,
                             evidence_weight=evidence_weight,
                             kl_scale=kl_scale,
@@ -689,6 +716,7 @@ def run_mcts(
                         # Save the new node and its parents' updated counts to JSON files
                         save_mcts_node(node, log_dirname, to_root=True)
                         usage_tracker.save_events(log_dirname)
+                        _update_report(log_dirname, "RUNNING")
 
                     if update_mcts_lock is not None:
                         with update_mcts_lock:
@@ -717,17 +745,17 @@ def run_mcts(
                 thread_local = threading.local()
 
                 def _get_node_idx(new_level):
-                    with index_lock:
-                        new_node_idx = next_node_idx_by_level[new_level]
-                        next_node_idx_by_level[new_level] += 1
+                    with index_lock:  # noqa: B023
+                        new_node_idx = next_node_idx_by_level[new_level]  # noqa: B023
+                        next_node_idx_by_level[new_level] += 1  # noqa: B023
                     return new_node_idx
 
                 def _get_thread_agents():
-                    if not hasattr(thread_local, "agent_objs"):
+                    if not hasattr(thread_local, "agent_objs"):  # noqa: B023
                         thread_id = threading.get_ident()
                         thread_work_dir = os.path.join(work_dir, f"thread_{thread_id}")
                         os.makedirs(thread_work_dir, exist_ok=True)
-                        thread_local.agent_objs = get_agents(
+                        thread_local.agent_objs = get_agents(  # noqa: B023
                             thread_work_dir,
                             model_name=model_name,
                             temperature=temperature,
@@ -739,10 +767,11 @@ def run_mcts(
                             backend=backend,
                             bucket_path=bucket_path,
                             dataset_paths=dataset_paths,
+                            datalib_dirs=datalib_dirs,
                             vision_model=vision_model,
                             usage_tracker=usage_tracker,
                         )
-                    return thread_local.agent_objs
+                    return thread_local.agent_objs  # noqa: B023
 
                 def _expand_node_parallel(inbatch_idx, node):
                     return _expand_node(
@@ -751,7 +780,7 @@ def run_mcts(
                         _get_thread_agents(),
                         TreeLogger(log_dirname),
                         _get_node_idx,
-                        update_mcts_lock=update_mcts_lock,
+                        update_mcts_lock=update_mcts_lock,  # noqa: B023
                         is_threaded=True,
                     )
 
@@ -791,6 +820,7 @@ def run_mcts(
                         backend=backend,
                         bucket_path=bucket_path,
                         dataset_paths=dataset_paths,
+                        datalib_dirs=datalib_dirs,
                         vision_model=vision_model,
                         usage_tracker=usage_tracker,
                     )
@@ -800,8 +830,8 @@ def run_mcts(
                 )
 
                 def _get_node_idx(new_level):
-                    new_node_idx = next_node_idx_by_level[new_level]
-                    next_node_idx_by_level[new_level] += 1
+                    new_node_idx = next_node_idx_by_level[new_level]  # noqa: B023
+                    next_node_idx_by_level[new_level] += 1  # noqa: B023
                     return new_node_idx
 
                 expanded_nodes = []
@@ -902,8 +932,13 @@ def resolve_model_args(args) -> None:
         llm.validate(args.embedding_model, flag="--embedding_model", mode="embedding")
 
 
-def main(args):
-    """Run AutoDiscovery exploration from a parsed argument namespace."""
+def main(args) -> str:
+    """Run AutoDiscovery exploration from a parsed argument namespace.
+
+    Returns:
+        The directory the run's results were written to: ``args.out_dir``, or a
+        timestamped directory beneath it with ``--timestamp_dir``.
+    """
     print("Script arguments:")
     print(args.__dict__, "\n")
 
@@ -928,7 +963,7 @@ def main(args):
     work_dirname = os.path.join(args.work_dir, timestamp) if args.timestamp_dir else args.work_dir
 
     # Setup logger
-    logger = TreeLogger(log_dirname)
+    TreeLogger(log_dirname)  # creates log_dirname
 
     # Save args
     args_file = os.path.join(log_dirname, "args.json")
@@ -936,15 +971,29 @@ def main(args):
         json.dump(vars(args), f, indent=2)
     print(f"\nArguments saved to {args_file}\n")
 
+    # Runs can take days, so the report is written now and rewritten as each
+    # experiment finishes; reloading it shows the run so far.
+    if _update_report(log_dirname, "RUNNING"):
+        report_path = os.path.join(log_dirname, "report", "index.html")
+        print(f"HTML report, updated as experiments finish: {report_path}\n")
+
     # Get dataset paths
     dataset_paths, dataset_metadata = get_datasets_fpaths(
         args.dataset_metadata, is_blade=args.dataset_metadata_type == "blade"
     )
+    # Describe the data-library directories once, and keep what the agents were
+    # told alongside the results: the directories are read in place, so their
+    # contents can change between runs.
+    datalib_manifests = datalib.build_manifests(args.datalib_dir)
+    if datalib_manifests:
+        with open(os.path.join(log_dirname, "datalib_manifest.json"), "w") as f:
+            json.dump([m.to_dict() for m in datalib_manifests], f, indent=2)
     load_dataset_experiment = get_load_dataset_experiment(
         dataset_paths,
         dataset_metadata,
         run_eda=args.run_eda,
         dataset_metadata_type=args.dataset_metadata_type,
+        datalib_manifests=datalib_manifests,
     )
 
     if args.continue_from_dir or args.continue_from_json:
@@ -972,7 +1021,7 @@ def main(args):
                 embedding_model=args.embedding_model,
                 embedding_dimensions=getattr(args, "embedding_dimensions", None),
             )
-            return
+            return log_dirname
 
         if args.continue_from_dir is not None:
             # Copy all files except args.json from continue_from_dir to the new log directory
@@ -995,7 +1044,7 @@ def main(args):
         remaining_iters = (args.n_experiments + 1) - total_nodes  # + 1 to account for root node
         if remaining_iters <= 0:
             print(f"Already reached or exceeded target of {args.n_experiments} experiments")
-            return
+            return log_dirname
         print(
             f"RESUMING: Running {remaining_iters} more experiments to reach the target experiment count of {args.n_experiments}.\n"
         )
@@ -1037,53 +1086,75 @@ def main(args):
     print(f"MCTS selection method: {args.mcts_selection}\n")
 
     # Run exploration
-    run_mcts(
-        root=root,
-        nodes_by_level=nodes_by_level,
-        dataset_paths=dataset_paths,
-        log_dirname=log_dirname,
-        work_dir=work_dirname,
-        max_iterations=remaining_iters,
-        branching_factor=args.k_experiments,
-        selection_method=selection_method,
-        allow_generate_experiments=args.allow_generate_experiments,
-        n_belief_samples=args.n_belief_samples,
-        k_parents=args.k_parents,
-        model_name=args.model,
-        embedding_model=args.embedding_model,
-        embedding_dimensions=getattr(args, "embedding_dimensions", None),
-        belief_model_name=args.belief_model,
-        temperature=args.temperature,
-        belief_temperature=args.belief_temperature,
-        reasoning_effort=args.reasoning_effort,
-        belief_reasoning_effort=args.belief_reasoning_effort,
-        implicit_bayes_posterior=args.implicit_bayes_posterior,
-        surprisal_width=args.surprisal_width,
-        user_query=args.user_query,
-        belief_mode=args.belief_mode,
-        use_binary_reward=args.use_binary_reward,
-        run_dedupe=args.dedupe,
-        experiment_first=args.experiment_first,
-        code_timeout=args.code_timeout,
-        n_warmstart=args.n_warmstart,
-        use_online_beliefs=args.use_online_beliefs,
-        evidence_weight=args.evidence_weight,
-        kl_scale=args.kl_scale,
-        reward_mode=args.reward_mode,
-        warmstart_experiments=args.warmstart_experiments,
-        backend=args.backend,
-        bucket_path=args.bucket_path,
-        vision_model=args.vision_model,
-        batch_size=args.batch_size,
-        n_threads=args.n_threads,
-        agent_usage_mode=args.agent_usage_mode,
-    )
+    try:
+        run_mcts(
+            root=root,
+            nodes_by_level=nodes_by_level,
+            dataset_paths=dataset_paths,
+            log_dirname=log_dirname,
+            work_dir=work_dirname,
+            max_iterations=remaining_iters,
+            branching_factor=args.k_experiments,
+            selection_method=selection_method,
+            allow_generate_experiments=args.allow_generate_experiments,
+            n_belief_samples=args.n_belief_samples,
+            k_parents=args.k_parents,
+            model_name=args.model,
+            embedding_model=args.embedding_model,
+            embedding_dimensions=getattr(args, "embedding_dimensions", None),
+            belief_model_name=args.belief_model,
+            temperature=args.temperature,
+            belief_temperature=args.belief_temperature,
+            reasoning_effort=args.reasoning_effort,
+            belief_reasoning_effort=args.belief_reasoning_effort,
+            implicit_bayes_posterior=args.implicit_bayes_posterior,
+            surprisal_width=args.surprisal_width,
+            user_query=args.user_query,
+            belief_mode=args.belief_mode,
+            use_binary_reward=args.use_binary_reward,
+            run_dedupe=args.dedupe,
+            experiment_first=args.experiment_first,
+            code_timeout=args.code_timeout,
+            n_warmstart=args.n_warmstart,
+            use_online_beliefs=args.use_online_beliefs,
+            evidence_weight=args.evidence_weight,
+            kl_scale=args.kl_scale,
+            reward_mode=args.reward_mode,
+            warmstart_experiments=args.warmstart_experiments,
+            backend=args.backend,
+            bucket_path=args.bucket_path,
+            datalib_dirs=args.datalib_dir,
+            vision_model=args.vision_model,
+            batch_size=args.batch_size,
+            n_threads=args.n_threads,
+            agent_usage_mode=args.agent_usage_mode,
+        )
+    except Exception:
+        _update_report(log_dirname, "FAILED")
+        raise
+    return log_dirname
+
+
+def run_and_report(args) -> None:
+    """Run AutoDiscovery, then write its static HTML report beside the results.
+
+    Every way of launching the engine goes through here -- the job image's
+    entry point (``python -m autodiscovery.run``) on any job backend, and
+    the ``auto-discovery`` CLI -- so a run leaves the same artifacts however it was
+    started. A report failure is logged, not raised: the run's results stand.
+    """
+    results_dir = main(args)
+    try:
+        report_path = generate_report(os.path.abspath(results_dir))
+        print(f"\nHTML report: {report_path}")
+    except Exception as e:
+        print(f"\nWarning: could not generate HTML report: {e}")
 
 
 if __name__ == "__main__":
     parser = ArgParser()
     args = parser.parse_args()
-    main(args)
+    run_and_report(args)
 
     if args.delete_work_dir:
         shutil.rmtree(args.work_dir)

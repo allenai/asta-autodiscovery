@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+
 import { expectExternalLink, waitForExperimentsLoaded, AUTH_DOMAIN } from './helpers';
 import {
     TEST_ID_SIGN_IN_BUTTON,
@@ -66,10 +67,9 @@ for (const url of DETAILS_URLS) {
             const signInBtn = page.locator(`[data-test-id="${TEST_ID_SIGN_IN_BUTTON}"]`);
             await expect(signInBtn).toBeVisible();
 
-            const requestPromise = page.waitForRequest(
-                (req) => req.url().includes(AUTH_DOMAIN),
-                { timeout: 20000 }
-            );
+            const requestPromise = page.waitForRequest((req) => req.url().includes(AUTH_DOMAIN), {
+                timeout: 20000,
+            });
             await signInBtn.click();
             const request = await requestPromise;
             expect(request.url()).toContain(AUTH_DOMAIN);
@@ -93,7 +93,9 @@ for (const url of DETAILS_URLS) {
 
         test('closing details panel clears all selection state', async ({ page }) => {
             // Panel should be open initially (wait for URL sync effect to select the experiment)
-            const detailsPanel = page.locator(`[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`);
+            const detailsPanel = page.locator(
+                `[data-test-id="${TEST_ID_EXPERIMENT_DETAILS_PANEL}"]`
+            );
             await expect(detailsPanel).toBeVisible({ timeout: 60000 });
 
             // Close via the X button

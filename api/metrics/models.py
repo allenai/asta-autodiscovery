@@ -33,7 +33,9 @@ class OverviewMetrics(BaseModel):
     experiment_completion_rate: float = Field(0.0)
     llm_cost_usd: float = Field(0.0)
     # Cost-per-hypothesis breakdown (only jobs with LLM usage data)
-    hypotheses_with_usage: int = Field(0, description="Completed experiments from runs with LLM usage data")
+    hypotheses_with_usage: int = Field(
+        0, description="Completed experiments from runs with LLM usage data"
+    )
     cost_per_hypothesis_usd: float | None = Field(None)
     share_rate: float = Field(0.0, description="Runs with is_shared / total runs")
     runs_by_status: dict[str, int] = Field(default_factory=dict)

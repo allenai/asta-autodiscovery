@@ -336,24 +336,18 @@ def cli_main(argv: list[str] | None = None) -> None:
         use_online_beliefs=False,
         warmstart_experiments=None,
         bucket_path=None,
+        datalib_dir=[],
+        use_beam_search=False,
+        use_modal_sandbox=False,
         beam_width=8,
         pw_k=1.0,
         pw_alpha=0.5,
         agent_usage_mode="per_response",
     )
 
-    from autodiscovery.run import main
+    from autodiscovery.run import run_and_report
 
-    main(engine_args)
-
-    # Generate static HTML report
-    from autodiscovery.report import generate_report
-
-    try:
-        report_path = generate_report(os.path.abspath(args.out_dir))
-        print(f"\nHTML report: {report_path}")
-    except Exception as e:
-        print(f"\nWarning: could not generate HTML report: {e}")
+    run_and_report(engine_args)
 
 
 if __name__ == "__main__":

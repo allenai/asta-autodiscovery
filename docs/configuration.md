@@ -48,6 +48,23 @@ each provider; the table below is the variable reference.
 | `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
 | `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
 
+## Experiment credits
+
+Per-user experiment credits are **off by default**. Every run is still capped at 500
+experiments, but there is no per-user budget: the API does not check credits on submission,
+`GET /api/user/me/credits` returns `{"credits": null}`, and the UI hides the credits chip in the
+header and the remaining-credits display on the run setup page.
+
+With `CREDITS_ENABLED=true`, each user has a budget of credits (1 credit = 1 experiment).
+Experiments of a finished run consume credits and those of an in-progress run reserve them, and
+a submission that would exceed the user's remaining credits is rejected with `402`. Users get
+1,000 credits unless their profile in the store (`users/<userid>/user.json`) sets
+`granted_credits`.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `CREDITS_ENABLED` | No | `false` | Track and enforce per-user experiment credits (`true`/`1`/`yes` to enable). |
+
 ## Persistence
 
 Run metadata, uploaded datasets, results, and user profiles are held in a swappable
@@ -83,6 +100,13 @@ interchangeable (`gsutil rsync` moves data either way). See
 > streamed through the API (`POST /api/runs/upload-dataset`) — which is why the proxy's
 > `client_max_body_size` for `/api` matters for this backend.
 
+> **Data library.** Datasets too large to upload per run can be placed in the store at
+> `users/<userid>/datalib/<dirname>/` (for one user) or `datalib/<dirname>/` (for every
+> user), with an optional `README.md` describing each directory. Users can then select
+> those directories when setting up a run, and they are mounted into it read-only rather
+> than copied. No configuration is needed on either backend. The app does not write to the
+> data library: you place the files there directly. See [Data Library](data-library.md).
+
 ### Google Cloud
 
 Required when `STORAGE_BACKEND=gcs`, `JOB_BACKEND=gcp`, or `CODE_EXECUTION_BACKEND=modal`.
@@ -106,12 +130,18 @@ Each AutoDiscovery run is launched by a swappable **job backend**, selected with
   single-user/on-prem deployments.
 - `gcp` — runs the job as a Google Cloud Run job execution. Deployments that run jobs on Cloud
   Run must set `JOB_BACKEND=gcp` explicitly.
+- `process` — runs the job as a subprocess on the API's own host, with no container runtime.
+  For single-user use on your own machine when the API itself runs outside a container; see
+  [Process backend](#process-backend).
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `JOB_BACKEND` | No | `docker` | Job backend: `docker` (local containers) or `gcp` (Cloud Run). |
+| `JOB_BACKEND` | No | `docker` | Job backend: `docker` (local containers), `gcp` (Cloud Run), or `process` (host subprocesses). |
 | `AUTODISCOVERY_IMAGE` | docker | `autodiscovery:dev` | **docker backend.** Image the backend launches per job. Build it locally with `docker compose build autodiscovery`. |
 | `CLOUDRUN_JOB_NAME` | No | `autodiscovery-job` | **gcp backend.** Name of the Cloud Run job to execute. Compose sets `autodiscovery-job-dev` for local dev. |
+| `PROCESS_JOB_PYTHON` | No | *(the API's interpreter)* | **process backend.** Python interpreter that runs the engine (`python -m autodiscovery.run`). It must have the `asta-autodiscovery` package installed, e.g. the repository's `.venv/bin/python` after `make sync`. |
+| `PROCESS_JOB_DIR` | No | `~/.autodiscovery/jobs` | **process backend.** Directory holding one subdirectory per job execution: its state, its output log (`job.log`), and the job's working directory (`work/`). |
+| `PROCESS_MAX_CONCURRENT_JOBS` | No | `1` | **process backend.** How many jobs may run at once; submitting another while that many are running is an error. `0` removes the cap. |
 
 When `GOOGLE_APPLICATION_CREDENTIALS` is set, the docker backend bind-mounts that key into each
 job container so Google-hosted models (Vertex AI) can authenticate. It uses the **host** path
@@ -144,12 +174,65 @@ container never sees other users' data — see
 
 To run jobs on Cloud Run instead, set `JOB_BACKEND=gcp` (the Docker socket mount is then
 unused). That requires `STORAGE_BACKEND=gcs`, since Cloud Run cannot mount a directory on
-your host.
+your host. See [Cloud Run backend](#cloud-run-backend) for the job it launches.
+
+### Cloud Run backend
+
+The gcp backend does not create or configure a Cloud Run job: it executes an existing one,
+`CLOUDRUN_JOB_NAME` in `GCP_PROJECT` and `GCP_REGION`, overriding only the container's
+arguments for each run. Everything else comes from the job definition you create, which must:
+
+- run the job image built from `packages/autodiscovery/Dockerfile` (repository root as the
+  build context);
+- mount the `GCS_BUCKET` bucket as a Cloud Storage volume at `/mnt/data`, where each run
+  reads its data at `/mnt/data/users/<uid>/jobs/<jid>`;
+- set the environment the run needs, as plain variables or Secret Manager references: the
+  model provider's credentials (see [Model and LLM providers](#model-and-llm-providers)) and,
+  with `CODE_EXECUTION_BACKEND=modal`, the Modal variables (see
+  [Modal](#modal-code-execution-sandbox-backend)).
+
+Deploying a new image means pointing the job at it (`gcloud run jobs update <job> --image
+<image>`); the volume and environment stay as configured.
 
 > **Security note.** The docker backend gives the API access to the host Docker socket, which is
 > effectively root on the host. This is fine for local/single-user use, but for a shared,
 > multi-user deployment (e.g. `AUTH_PROVIDER=password_file`) prefer `JOB_BACKEND=gcp`, where the
 > API only holds scoped cloud credentials.
+
+### Process backend
+
+`JOB_BACKEND=process` launches each run as a subprocess of the API, on the API's host:
+`$PROCESS_JOB_PYTHON -m autodiscovery.run` with the same arguments the container backends
+pass. It suits a single-user setup on your own machine where the API runs directly on the
+host rather than in compose, and needs no container runtime.
+
+`make dev-host` runs the whole stack that way, with no Docker: the API under gunicorn and the
+UI under Vite's dev server, which forwards `/api` to the API as nginx does under compose. It
+sets `JOB_BACKEND=process`, `STORAGE_BACKEND=local` and `AUTH_PROVIDER=none`, keeps both
+servers on `127.0.0.1`, and otherwise reads `.env` the way compose does (shell values win).
+`STORAGE_DIR` is taken from the shell and defaults to `./data`, the same directory `make dev`
+uses. The UI is at http://localhost:3000 (`DEV_HOST_UI_PORT`, `DEV_HOST_API_PORT` to move
+them). Stopping it leaves a run in progress running; the API reports its outcome once
+restarted.
+
+There is no mount. The job reads and writes the run's directory in the local store in place,
+so the backend requires `STORAGE_BACKEND=local`, and its arguments name `STORAGE_DIR` (made
+absolute) where the container backends name `/mnt/data`. The job inherits the API's whole
+environment, so provider credentials need no forwarding: whatever lets the API's own process
+reach the model (keys, `gcloud auth application-default login`, a cached Copilot token) works
+for the job too.
+
+Each execution gets a directory under `PROCESS_JOB_DIR`; the run's execution ID names it. Its
+`job.log` is what the run's logs view shows, and the job records its own exit status there,
+so status stays correct when the API restarts, or a different API worker answers, while a
+run is in progress. Cancelling a run stops the job's whole process group.
+
+> **Security note.** Nothing scopes what a process job can reach. The job, and the generated
+> code it runs under `CODE_EXECUTION_BACKEND=process` or `local`, run as the API's user and
+> can read every user's data in the store and every credential in the API's environment —
+> the same trust model as the [standalone CLI](autodiscovery/standalone.md). Use it only
+> with `AUTH_PROVIDER=none`; the API warns at startup when it is paired with a multi-user
+> auth provider.
 
 ## Code-execution backend
 
@@ -184,6 +267,7 @@ rather than running against data the job or sandbox cannot see:
 | --- | --- | --- |
 | `JOB_BACKEND=docker` | ✅ | ❌ local job containers bind-mount a host directory, not a bucket |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ |
+| `JOB_BACKEND=process` | ✅ | ❌ a host job process reads the run's directory in place, which a bucket cannot provide |
 | `CODE_EXECUTION_BACKEND=process` / `local` | ✅ | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
@@ -199,6 +283,7 @@ job backend (how the mount is scoped) and on whether the deployment is multi-use
 | `docker` | `process` / `local` | ✅ safe | ✅ safe — mount is scoped to the job's own prefix |
 | `gcp` | `process` / `local` | ✅ safe | ⚠️ **unsafe** — Cloud Run mounts the whole bucket; executed code can read every user's data |
 | `gcp` | `modal` | ✅ safe | ✅ safe — scoped, read-only per-job data mount |
+| `process` | `process` / `local` | ✅ safe | ⚠️ **unsafe** — the job runs on the API's host, with every user's data and the API's credentials in reach |
 
 The unsafe combination arises because Cloud Run's GCS mount is fixed per job (it cannot be scoped
 per execution), while the docker backend re-mounts only the current job's prefix each run. The API
@@ -232,7 +317,7 @@ has a complete `.env` per provider.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTODISCOVERY_MODEL` | **Yes** | *(none)* | Model for every run, as litellm's `<provider>/<model>` (e.g. `openai/gpt-5.4-mini`, `anthropic/claude-sonnet-5`, `azure/<deployment>`, `vertex_ai/gemini-3.7-flash`, `github_copilot/claude-haiku-4.5`). The provider prefix is required. The API passes it to each job as `--model`. |
+| `AUTODISCOVERY_MODEL` | **Yes** | *(none)* | Model for every run, as litellm's `<provider>/<model>` (e.g. `openai/gpt-5.4-mini`, `anthropic/claude-sonnet-5`, `azure/<deployment>`, `vertex_ai/gemini-3.8-flash`, `github_copilot/claude-haiku-4.5`). The provider prefix is required. The API passes it to each job as `--model`. |
 | `AUTODISCOVERY_BELIEF_MODEL` | No | `AUTODISCOVERY_MODEL` | Model for belief elicitation (the job's `--belief_model`). |
 | `AUTODISCOVERY_VISION_MODEL` | No | `AUTODISCOVERY_MODEL` | Model for interpreting plots (the job's `--vision_model`). Must accept image input. |
 | `AUTODISCOVERY_EMBEDDING_MODEL` | No | *(none)* | Embedding model for hypothesis deduplication (the job's `--embedding_model`). Only used, and only required, with the standalone CLI's `--dedupe`. |
@@ -295,7 +380,8 @@ Configures the "dig deeper" handoff that sends an experiment's context to Asta.
 
 Both `ASTA_CONTEXT_SERVICE_URL` and `ASTA_CONTEXT_SERVICE_API_KEY` must be set to enable it. With
 either missing the feature is off: the UI hides the "Continue exploring with Asta" entry points and
-the API returns `503` from the handoff endpoint. The rest of the app is unaffected.
+the API returns `503` from the handoff endpoint. The rest of the app is unaffected. All of the
+API's Asta-specific code lives in the `api/asta/` package.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -316,6 +402,7 @@ are **not secret**.
 | `VITE_AUTH0_DOMAIN` | No | `auth0.allenai.org` | Auth0 tenant domain for the browser login flow. |
 | `VITE_AUTH0_CLIENT_ID` | No | *(built-in public client id)* | Public Auth0 application (client) id for the SPA. Public by design. |
 | `VITE_AUTH0_AUDIENCE` | No | `https://asta-core.allen.ai` | Auth0 API audience requested by the browser. |
+| `VITE_HEAP_PROJECT_ID` | No | *(empty — analytics disabled)* | [Heap](https://www.heap.io/) project (environment) id. When set, the UI loads Heap, identifies signed-in users by email and sends click/track events to that project. When empty, no analytics script is loaded and tracking calls are no-ops. |
 
 The `VITE_AUTH*` values are build-time fallbacks; at runtime the UI prefers the
 provider and settings served by `GET /api/auth/config`.

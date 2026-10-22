@@ -1,4 +1,3 @@
-
 import { Box, CircularProgress, styled, Typography } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';

@@ -45,14 +45,14 @@ def verify_token(token: str, auth0_domain: str, auth0_audience: str) -> dict:
             audience=auth0_audience,
             issuer=f"https://{auth0_domain}/",
         )
-    except jwt.ExpiredSignatureError:
-        raise ValueError("Token has expired")
-    except jwt.InvalidAudienceError:
-        raise ValueError("Invalid audience")
-    except jwt.InvalidIssuerError:
-        raise ValueError("Invalid issuer")
+    except jwt.ExpiredSignatureError as err:
+        raise ValueError("Token has expired") from err
+    except jwt.InvalidAudienceError as err:
+        raise ValueError("Invalid audience") from err
+    except jwt.InvalidIssuerError as err:
+        raise ValueError("Invalid issuer") from err
     except Exception as e:
-        raise ValueError(f"Invalid token: {str(e)}")
+        raise ValueError(f"Invalid token: {str(e)}") from e
 
 
 class Auth0Provider(AuthProvider):

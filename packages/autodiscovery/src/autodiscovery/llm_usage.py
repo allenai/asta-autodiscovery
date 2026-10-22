@@ -381,6 +381,7 @@ def _empty_bucket() -> dict[str, Any]:
         "reasoning_tokens": 0,
     }
 
+
 def _extract_usage_from_response(response: Any) -> dict[str, Any] | None:
     """Extract common usage fields from API responses."""
     usage_obj = getattr(response, "usage", None)

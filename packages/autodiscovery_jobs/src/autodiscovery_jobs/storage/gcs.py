@@ -32,7 +32,7 @@ def split_gs_uri(uri: str) -> tuple[str, str]:
     """
     if not uri.startswith("gs://"):
         raise StorageError(f"Not a gs:// URI: {uri!r}")
-    bucket, _, name = uri[len("gs://"):].partition("/")
+    bucket, _, name = uri[len("gs://") :].partition("/")
     if not bucket or not name:
         raise StorageError(f"gs:// URI must name a bucket and an object: {uri!r}")
     return bucket, name
@@ -196,11 +196,15 @@ class GcsStore(ObjectStore):
     ) -> str | None:
         """Return a v4 presigned ``PUT`` URL so the browser uploads straight to GCS."""
         try:
-            return self._bucket().blob(key).generate_signed_url(
-                version="v4",
-                expiration=timedelta(seconds=expires_in_seconds),
-                method="PUT",
-                content_type=content_type,
+            return (
+                self._bucket()
+                .blob(key)
+                .generate_signed_url(
+                    version="v4",
+                    expiration=timedelta(seconds=expires_in_seconds),
+                    method="PUT",
+                    content_type=content_type,
+                )
             )
         except Exception as e:
             raise StorageError(f"Failed to sign upload URL for {self.uri(key)}: {e}") from e

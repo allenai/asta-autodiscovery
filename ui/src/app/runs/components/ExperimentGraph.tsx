@@ -240,7 +240,9 @@ export const ExperimentGraph = memo(function ExperimentGraph({
 
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+    // Null until the container is measured. Centering on a guessed size would
+    // stick, because later renders keep the current transform.
+    const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
     const [hasInteracted, setHasInteracted] = useState(false);
     const currentTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
     const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown>>();
@@ -260,6 +262,7 @@ export const ExperimentGraph = memo(function ExperimentGraph({
 
     // Main D3 rendering effect
     useEffect(() => {
+        if (!dimensions) return;
         if (!svgRef.current || experiments.length === 0) {
             // Clear SVG if no experiments
             if (svgRef.current) {
@@ -669,7 +672,7 @@ export const ExperimentGraph = memo(function ExperimentGraph({
     };
 
     const handleResetView = () => {
-        if (!svgRef.current || !zoomBehaviorRef.current) return;
+        if (!svgRef.current || !zoomBehaviorRef.current || !dimensions) return;
         const svg = d3.select(svgRef.current);
         const centerTransform = d3.zoomIdentity.translate(
             dimensions.width / 2,

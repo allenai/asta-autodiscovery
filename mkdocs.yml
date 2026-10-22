@@ -32,33 +32,49 @@ plugins:
             - packages/autodiscovery/src
             - packages/autodiscovery_modal/src
             - packages/autodiscovery_jobs/src
+          options:
+            docstring_options:
+              # Much of the code is unannotated; don't fail strict builds on it.
+              warn_missing_types: false
 
 nav:
   - Home: index.md
   - Quick start: quickstart.md
   - Configuration: configuration.md
   - Authentication: authentication.md
+  - Data Library: data-library.md
   - Autodiscovery:
       - Standalone CLI: autodiscovery/standalone.md
-      - Surprisal Normalization: autodiscovery/surprisal_normalization.md
+      - How It Works: autodiscovery/overview.md
+      - Hypothesis Generation: autodiscovery/hypothesis_generation.md
+      - Tree Search: autodiscovery/tree_search.md
+      - Surprisal: autodiscovery/surprisal.md
+      - Surprisal Normalization (derivation): autodiscovery/surprisal_normalization.md
   - Code Execution:
       - IPython Session: code_execution/ipython_session.md
       - IPython Executor: code_execution/ipython_executor.md
   - Modal:
       - Sandbox Backend: autodiscovery_modal/sandbox_backend.md
   - API Reference:
+      - AutoDiscovery: api/autodiscovery.md
       - AutoDiscovery Modal: api/autodiscovery_modal.md
       - Code Execution: api/code_execution.md
   - Design:
+      - System Architecture: design/architecture.md
       - Swappable Auth Providers: design/auth-providers.md
       - Swappable Persistence Backends: design/storage-backends.md
+      - Data Library: design/data-library.md
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.arithmatex:
       generic: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra_css:
   - assets/styles/asta.css

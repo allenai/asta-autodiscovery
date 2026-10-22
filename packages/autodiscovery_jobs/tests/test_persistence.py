@@ -185,9 +185,7 @@ def test_soft_delete_job_preserves_results(job, tmp_path):
     # Uploaded data is gone; metadata and results survive.
     assert persistence.has_data_files("testuser", "job1", job) is False
     assert persistence.get_metadata("testuser", "job1", job) == {"name": "run"}
-    assert persistence.list_experiment_files("testuser", "job1", job) == [
-        "mcts_node_0_1.json"
-    ]
+    assert persistence.list_experiment_files("testuser", "job1", job) == ["mcts_node_0_1.json"]
 
     # Idempotent.
     persistence.soft_delete_job("testuser", "job1", job)
@@ -249,9 +247,9 @@ def test_experiment_files_exclude_root_node(job):
 def test_read_experiment_node(job):
     _write(job, "users/testuser/jobs/job1/output/mcts_node_0_1.json", {"id": "node_0_1"})
 
-    assert persistence.read_experiment_node(
-        "testuser", "job1", "mcts_node_0_1.json", job
-    ) == {"id": "node_0_1"}
+    assert persistence.read_experiment_node("testuser", "job1", "mcts_node_0_1.json", job) == {
+        "id": "node_0_1"
+    }
     assert persistence.read_experiment_node("testuser", "job1", "nope.json", job) is None
 
 
@@ -262,9 +260,7 @@ def test_read_rich_outputs(job):
         [{"text/plain": "hi"}],
     )
 
-    assert persistence.read_rich_outputs("testuser", "job1", 0, 1, job) == [
-        {"text/plain": "hi"}
-    ]
+    assert persistence.read_rich_outputs("testuser", "job1", 0, 1, job) == [{"text/plain": "hi"}]
     # Missing and malformed payloads degrade to an empty list.
     assert persistence.read_rich_outputs("testuser", "job1", 9, 9, job) == []
     _write(job, "users/testuser/jobs/job1/output/rich_outputs/ro_2_2.json", {"not": "a list"})

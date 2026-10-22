@@ -51,7 +51,7 @@ def test_run_job_with_optional_params(mock_config):
         )
         mock_client.run_job.return_value = mock_operation
 
-        execution_id = cloudrun.run_job(
+        cloudrun.run_job(
             "testuser",
             "job1",
             mock_config,

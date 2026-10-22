@@ -21,8 +21,6 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
-
 from autodiscovery_jobs import (
     Auth0Error,
     Auth0UserNotFoundError,
@@ -37,9 +35,17 @@ from autodiscovery_jobs import (
 from autodiscovery_jobs.exceptions import ObjectNotFoundError
 from autodiscovery_jobs.persistence import list_experiment_files, read_experiment_node
 from autodiscovery_jobs.storage import get_store
+from jinja2 import Environment, FileSystemLoader
 
 # Set up Jinja2 environment for email templates
-TEMPLATES_DIR = Path(__file__).parent.parent / "packages" / "autodiscovery_jobs" / "src" / "autodiscovery_jobs" / "templates"
+TEMPLATES_DIR = (
+    Path(__file__).parent.parent
+    / "packages"
+    / "autodiscovery_jobs"
+    / "src"
+    / "autodiscovery_jobs"
+    / "templates"
+)
 jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=False)
 
 # Configure logging
@@ -190,7 +196,11 @@ def build_email_body(
         "n_experiments": metadata.get("n_experiments", ""),
         "duration": format_duration(started_at, finished_at),
     }
-    if high_surprisal_count is not None and total_experiments is not None and surprisal_width is not None:
+    if (
+        high_surprisal_count is not None
+        and total_experiments is not None
+        and surprisal_width is not None
+    ):
         context["high_surprisal_count"] = high_surprisal_count
         context["total_experiments"] = total_experiments
         context["surprisal_width"] = surprisal_width
@@ -228,7 +238,9 @@ def send_completion_emails(
     else:
         all_user_ids = manager.list_user_ids()
         user_ids = [uid for uid in all_user_ids if "|" in uid]
-        logger.info(f"Found {len(user_ids)} users to scan (skipped {len(all_user_ids) - len(user_ids)} non-Auth0 users)")
+        logger.info(
+            f"Found {len(user_ids)} users to scan (skipped {len(all_user_ids) - len(user_ids)} non-Auth0 users)"
+        )
 
     emails_sent = 0
     already_sent = 0
@@ -259,7 +271,9 @@ def send_completion_emails(
 
                 # Only send emails for successful runs
                 if run_details.status != "SUCCEEDED":
-                    logger.debug(f"Skipping {userid}/{runid}: status is {run_details.status} (only notifying on success)")
+                    logger.debug(
+                        f"Skipping {userid}/{runid}: status is {run_details.status} (only notifying on success)"
+                    )
                     continue
 
                 # Check finish time
@@ -315,15 +329,22 @@ def send_completion_emails(
                 # Build email content
                 subject = build_email_subject(status, run_name)
                 body_html = build_email_body(
-                    runid, status, run_name, started_at, run_details.finished_at,
-                    origin_url=origin_url, metadata=metadata,
+                    runid,
+                    status,
+                    run_name,
+                    started_at,
+                    run_details.finished_at,
+                    origin_url=origin_url,
+                    metadata=metadata,
                     high_surprisal_count=high_surprisal_count,
                     total_experiments=total_experiments,
                     surprisal_width=surprisal_width,
                 )
 
                 if dry_run:
-                    logger.info(f"[DRY RUN] Would send email to {recipient_email} for {userid}/{runid}")
+                    logger.info(
+                        f"[DRY RUN] Would send email to {recipient_email} for {userid}/{runid}"
+                    )
                     logger.info(f"  Subject: {subject}")
                 else:
                     # Send email

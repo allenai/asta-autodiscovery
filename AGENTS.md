@@ -55,7 +55,7 @@ See [`README.md`](README.md) for the full workflow. In short:
 
 ```sh
 make sync   # install all packages (incl. test + docs deps)
-make test   # main test suite (excludes Modal tests)
+make test   # test suite
 make lint   # Ruff lint + format checks
 ```
 

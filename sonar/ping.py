@@ -11,9 +11,9 @@ def is_ok(url: str) -> bool:
     """
     try:
         resp = requests.get(url)
-    except:
+    except Exception:
         return False
-    return True if math.floor(resp.status_code / 100) == 2 else False
+    return math.floor(resp.status_code / 100) == 2
 
 
 def scan():
@@ -47,7 +47,7 @@ def scan():
     last_check = time.perf_counter()
     is_api_live = False
     is_ui_live = False
-    while is_api_live != True or is_ui_live != True:
+    while not is_api_live or not is_ui_live:
         if term is True:
             break
         # We don't use `time.sleep()`, as that'd prevent us from being able

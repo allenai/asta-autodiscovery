@@ -1,4 +1,3 @@
-
 import { styled, Typography } from '@mui/material';
 
 import UserProfile from '@/components/UserProfile';

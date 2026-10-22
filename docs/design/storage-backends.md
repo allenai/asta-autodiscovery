@@ -154,6 +154,7 @@ Each job backend is tied to one store, and Modal needs `gs://`:
 | --- | --- | --- |
 | `JOB_BACKEND=docker` | ✅ job container bind-mounts the run's host directory | ❌ local job containers bind-mount a host directory, not a bucket |
 | `JOB_BACKEND=gcp` | ❌ Cloud Run cannot mount a host directory | ✅ Cloud Run mounts the bucket |
+| `JOB_BACKEND=process` | ✅ the job process reads the run's directory in place | ❌ a host process has no bucket mount |
 | `CODE_EXECUTION_BACKEND=process`/`local` | ✅ reads the job's own mount | ✅ |
 | `CODE_EXECUTION_BACKEND=modal` | ❌ the sandbox mounts the dataset from `gs://` | ✅ |
 
@@ -173,6 +174,10 @@ arguments are byte-identical across job backends:
 ```
 bind  $STORAGE_HOST_DIR/users/<uid>/jobs/<jid>  →  /mnt/data/users/<uid>/jobs/<jid>
 ```
+
+The process job backend, added later, has no container and so no mount: its job reads the
+store in place, and its arguments name the store's own root (`STORAGE_DIR`) where the
+container backends name `/mnt/data`. Below the root the keys are the same.
 
 A bind mount needs no FUSE device, no extra capabilities, and no credentials. The only
 credential a docker job container receives is the GCP key, bind-mounted when
@@ -277,9 +282,9 @@ backend raises a clear error if it is relative.
   a sentinel still left the client interpreting instead of just executing.
 - The in-container mount point is renamed from `/mnt/gcs` to `/mnt/data`
   (`backends.base.JOB_MOUNT_ROOT`), since it is a GCS volume only on Cloud Run. **The
-  deployed Cloud Run job definition pins that path**, so `rebuild_and_deploy.sh` (updated
-  here) must be run when this lands; until it is, Cloud Run jobs launched by the new API
+  deployed Cloud Run job definition pins that path**, so each deployment's job definition
+  must be updated to mount there when this lands; until it is, Cloud Run jobs launched by the new API
   will look for their data at a path the old job definition does not mount.
-- The Asta workspace handoff (`asta_gcs.py`) still writes to a GCS bucket — that bucket is
+- The Asta workspace handoff (now `api/asta/workspace.py`) still writes to a GCS bucket — that bucket is
   Asta's, not ours — but does so through `export_to_gs`, so it is server-side when the run
   store is GCS and streamed otherwise.

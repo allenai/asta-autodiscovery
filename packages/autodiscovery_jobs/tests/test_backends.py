@@ -278,7 +278,7 @@ def test_docker_local_store_requires_absolute_host_dir(monkeypatch):
     config = JobConfig(backend="docker", storage_backend="local", job_image="ad:dev")
 
     client = Mock()
-    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):
+    with patch("autodiscovery_jobs.backends.docker._docker_client", return_value=client):  # noqa: SIM117
         with pytest.raises(DockerBackendError, match="absolute"):
             DockerBackend(config).run_job("u", "j", n_experiments=1)
 

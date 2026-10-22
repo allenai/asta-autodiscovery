@@ -42,6 +42,11 @@ def test_manager_default_config(monkeypatch):
         ("gcp", "modal", "password_file", False),
         # Safe: single-user (no multi-tenant exposure).
         ("gcp", "process", "none", False),
+        # Unsafe: host processes see every user's data, whatever runs the code.
+        ("process", "process", "password_file", True),
+        ("process", "local", "auth0", True),
+        # Safe: the process backend's intended single-user use.
+        ("process", "process", "none", False),
     ],
 )
 def test_unsafe_code_execution_warning(
@@ -76,6 +81,9 @@ def test_unsafe_code_execution_warning(
         ("local", "docker", "modal"),
         # A local job container bind-mounts a host directory; a bucket has none.
         ("gcs", "docker", "process"),
+        # A host job process reads the run's directory in place.
+        ("gcs", "process", "process"),
+        ("local", "process", "modal"),
         # Unknown backend name.
         ("s3", "docker", "process"),
     ],
@@ -97,6 +105,8 @@ def test_rejects_unworkable_storage_config(storage_backend, backend, code_backen
     "storage_backend,backend,code_backend",
     [
         ("local", "docker", "process"),  # the out-of-the-box default
+        ("local", "process", "process"),
+        ("local", "process", "local"),
         ("gcs", "gcp", "process"),
         ("gcs", "gcp", "modal"),
     ],
@@ -201,8 +211,10 @@ def test_upload_metadata(mock_config):
 
 def test_get_shared_run_owner_index_hit(mock_config):
     """Test get_shared_run_owner returns userid immediately on index hit (fast path)."""
-    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid:
+    with (
+        patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index,
+        patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid,
+    ):
         mock_index.return_value = "testuser"
 
         manager = JobManager(mock_config)
@@ -215,10 +227,12 @@ def test_get_shared_run_owner_index_hit(mock_config):
 
 def test_get_shared_run_owner_success(mock_config):
     """Test get_shared_run_owner falls back to glob scan on index miss and lazily populates index."""
-    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata, \
-         patch("autodiscovery_jobs.persistence.write_shared_run_index") as mock_write_index:
+    with (
+        patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index,
+        patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata,
+        patch("autodiscovery_jobs.persistence.write_shared_run_index") as mock_write_index,
+    ):
         mock_index.return_value = None  # index miss
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"is_shared": True, "name": "Test Run"}
@@ -235,10 +249,12 @@ def test_get_shared_run_owner_success(mock_config):
 
 def test_get_shared_run_owner_not_shared(mock_config):
     """Test get_shared_run_owner returns None when run is not shared."""
-    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata, \
-         patch("autodiscovery_jobs.persistence.write_shared_run_index") as mock_write_index:
+    with (
+        patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index,
+        patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata,
+        patch("autodiscovery_jobs.persistence.write_shared_run_index") as mock_write_index,
+    ):
         mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"is_shared": False, "name": "Private Run"}
@@ -252,8 +268,10 @@ def test_get_shared_run_owner_not_shared(mock_config):
 
 def test_get_shared_run_owner_not_found(mock_config):
     """Test get_shared_run_owner returns None when run doesn't exist."""
-    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid:
+    with (
+        patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index,
+        patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid,
+    ):
         mock_index.return_value = None
         mock_get_userid.return_value = None
 
@@ -266,9 +284,11 @@ def test_get_shared_run_owner_not_found(mock_config):
 
 def test_get_shared_run_owner_metadata_missing_is_shared(mock_config):
     """Test get_shared_run_owner returns None when metadata lacks is_shared."""
-    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata:
+    with (
+        patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index,
+        patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata,
+    ):
         mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.return_value = {"name": "Old Run"}
@@ -281,9 +301,11 @@ def test_get_shared_run_owner_metadata_missing_is_shared(mock_config):
 
 def test_get_shared_run_owner_metadata_error(mock_config):
     """Test get_shared_run_owner returns None when metadata read fails."""
-    with patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index, \
-         patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid, \
-         patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata:
+    with (
+        patch("autodiscovery_jobs.persistence.get_shared_run_index") as mock_index,
+        patch("autodiscovery_jobs.persistence.get_userid_for_job") as mock_get_userid,
+        patch("autodiscovery_jobs.persistence.get_metadata") as mock_get_metadata,
+    ):
         mock_index.return_value = None
         mock_get_userid.return_value = "testuser"
         mock_get_metadata.side_effect = Exception("GCS error")

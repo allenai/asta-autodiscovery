@@ -35,7 +35,7 @@ def nodes_to_csv(nodes_or_json_path, out_fpath):
             posterior_mean = round(node["posterior"]["mean"], 4)
             belief_change = round(node["belief_change"], 4)
             belief_kl = round(node["kl_divergence"], 4)
-        except:
+        except Exception:
             prior_mean = None
             posterior_mean = None
             belief_change = None

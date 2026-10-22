@@ -1,13 +1,13 @@
-
 import { useRef, useState } from 'react';
 import { Chip, Popover, styled } from '@mui/material';
+
 import { Link } from '@/router';
 
 import { useViewerCredits } from '@/contexts/ViewerCreditsContext';
 import { mkCreditsBtnTrackAttrs } from '@/analytics/run';
 
 export default function CreditsChip() {
-    const { credits, lastError, isLoadingInitial } = useViewerCredits();
+    const { credits, lastError } = useViewerCredits();
     const [isOpen, setIsOpen] = useState(false);
 
     const anchorRef = useRef<HTMLDivElement | null>(null);
@@ -21,8 +21,6 @@ export default function CreditsChip() {
                         <DesktopOnly>Experiment </DesktopOnly>Credits:{' '}
                         {lastError ? (
                             <ErrorText>Error</ErrorText>
-                        ) : isLoadingInitial ? (
-                            <LoadingShimmer />
                         ) : (
                             <CreditsValue>{credits?.available.toLocaleString()}</CreditsValue>
                         )}
@@ -82,9 +80,7 @@ export default function CreditsChip() {
                         .
                     </PopoverParagraph>
 
-                    {isLoadingInitial ? (
-                        <LoadingShimmer />
-                    ) : credits !== null ? (
+                    {credits !== null ? (
                         <CreditsReport>
                             <CreditLabel>Credits Consumed:</CreditLabel>
                             <CreditValue>{credits.consumed.toLocaleString()}</CreditValue>
@@ -126,32 +122,6 @@ const ErrorText = styled('span')`
 
 const CreditsValue = styled('span')`
     font-weight: 600;
-`;
-
-const LoadingShimmer = styled('span')`
-    display: inline-block;
-    width: 2em;
-    height: 1.2em;
-    vertical-align: middle;
-    margin-left: ${({ theme }) => theme.spacing(0.5)};
-    background: linear-gradient(
-        90deg,
-        ${({ theme }) => theme.color['dark-teal-100'].hex} 25%,
-        ${({ theme }) => theme.color['extra-dark-teal-100'].hex} 25%,
-        ${({ theme }) => theme.color['dark-teal-100'].hex} 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
-
-    @keyframes shimmer {
-        0% {
-            background-position: 100% 0;
-        }
-        100% {
-            background-position: -100% 0;
-        }
-    }
 `;
 
 const PopoverContent = styled('div')`

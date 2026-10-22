@@ -1,8 +1,8 @@
 """Dataset handoff into the Asta workspace bucket.
 
-The manifest and dataset metadata writes now go through asta-context-service
-(see api/utils/asta_context_client.py) so they are tracked. This module retains
-only the dataset copy.
+The manifest and dataset metadata writes go through asta-context-service (see
+:mod:`asta.context_client`) so they are tracked. This module retains only the
+dataset copy.
 
 The destination is always GCS — it is Asta's workspace bucket, not ours — so this
 is one of the few places that stays vendor-specific no matter which
@@ -14,9 +14,9 @@ it is itself GCS, streamed otherwise.
 import logging
 import os
 
-from . import keys
-from .config import JobConfig
-from .storage import get_store
+from autodiscovery_jobs import keys
+from autodiscovery_jobs.config import JobConfig
+from autodiscovery_jobs.storage import get_store
 
 _log = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def copy_dataset_to_asta_workspace(
 
     uris: list[str] = []
     for info in source_store.list(source_prefix):
-        filename = info.key[len(source_prefix):]
+        filename = info.key[len(source_prefix) :]
         if not filename or filename == ".placeholder":
             continue
 

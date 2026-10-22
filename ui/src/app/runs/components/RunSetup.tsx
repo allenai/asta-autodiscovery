@@ -1,4 +1,4 @@
-
+import { useState } from 'react';
 import {
     Box,
     TextField,
@@ -27,6 +27,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 
 import { MCTS_SELECTION, useRunSetup } from '@/runs/hooks/useRunSetup';
 import DatasetUpload, {
@@ -40,6 +41,7 @@ import DatasetUpload, {
 } from '@/runs/components/DatasetUpload';
 import { mkExpandAdvancedSettingsTrackAttrs, mkSubmitRunBtnTrackAttrs } from '@/analytics/runSetup';
 import { PRELOADED_DATASETS } from '@/runs/utils/preloadedDatasets';
+import type { DatalibDirFromApi, DatalibScope } from '@/api/UserApi';
 
 const DEBOUNCE_SAVE_MS = 3000;
 
@@ -61,6 +63,7 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
     const {
         settings,
         creditsAvailable,
+        creditsEnabled,
         fileUploads,
         maxFileSize,
         fieldErrors,
@@ -80,6 +83,10 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         selectedDatasetIds,
         togglePreloadedDataset,
         updatePreloadedDescription,
+        availableDatalibDirs,
+        selectedDatalibDirs,
+        selectedGlobalDatalibDirs,
+        toggleDatalibDir,
     } = useRunSetup({ runid, onSubmitSuccess, debounceSaveMs: DEBOUNCE_SAVE_MS });
 
     const isFormDisabled = isSubmitting || isLoading;
@@ -285,6 +292,50 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         error={datasetErrors}
                     />
                 </FormControl>
+
+                {(availableDatalibDirs.length > 0 ||
+                    selectedDatalibDirs.size > 0 ||
+                    selectedGlobalDatalibDirs.size > 0) && (
+                    <FormControl fullWidth>
+                        <StyledFormLabel error={!!datasetErrors}>
+                            Data library <OptionalText>(Optional)</OptionalText>
+                        </StyledFormLabel>
+                        <HelperText>
+                            Select directories from the data library. They are mounted read-only
+                            into the session as-is, so no upload is needed — useful for large
+                            datasets. Unlike source files, which are each described individually, a
+                            directory is described to AutoDiscovery as a whole: by its README.md and
+                            an overview of the files it contains, from which AutoDiscovery works out
+                            which data to use.
+                        </HelperText>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {DATALIB_GROUPS.map(({ scope, title, subtitle }) => {
+                                const available = availableDatalibDirs.filter(
+                                    (d) => d.scope === scope
+                                );
+                                const selected =
+                                    scope === 'global'
+                                        ? selectedGlobalDatalibDirs
+                                        : selectedDatalibDirs;
+                                if (available.length === 0 && selected.size === 0) return null;
+                                return (
+                                    <Box key={scope}>
+                                        <DatalibGroupTitle>
+                                            {title}
+                                            <span> — {subtitle}</span>
+                                        </DatalibGroupTitle>
+                                        <DatalibPicker
+                                            available={available}
+                                            selected={selected}
+                                            onToggle={(name) => toggleDatalibDir(scope, name)}
+                                            disabled={isFormDisabled}
+                                        />
+                                    </Box>
+                                );
+                            })}
+                        </Box>
+                    </FormControl>
+                )}
             </ConfigurationBox>
 
             <SectionHeader sx={{ mt: 3 }}>
@@ -297,11 +348,17 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         Experiment budget
                     </StyledFormLabel>
                     <HelperText>
-                        Set the maximum number of experiments to generate (
-                        <strong>1 Credit = 1 Experiment</strong>) during the exploration. If this is
-                        your first session, we recommend starting with a small budget ({'<'}10
-                        experiments) to learn how the system works. Once you're familiar with the
-                        output, you can confidently scale up to 50–100 experiments per session.
+                        Set the maximum number of experiments to generate
+                        {creditsEnabled && (
+                            <>
+                                {' '}
+                                (<strong>1 Credit = 1 Experiment</strong>)
+                            </>
+                        )}{' '}
+                        during the exploration. If this is your first session, we recommend starting
+                        with a small budget ({'<'}10 experiments) to learn how the system works.
+                        Once you're familiar with the output, you can confidently scale up to 50–100
+                        experiments per session.
                     </HelperText>
                     <TextField
                         type="number"
@@ -312,9 +369,11 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
                         error={!!fieldErrors.nExperiments}
                         fullWidth
                     />
-                    <RemainingCreditsChip
-                        label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
-                    />
+                    {creditsEnabled && (
+                        <RemainingCreditsChip
+                            label={`Your credits after this run: ${creditsAvailable - settings.nExperiments}`}
+                        />
+                    )}
                 </FormControl>
                 <FormControl fullWidth>
                     <StyledFormLabel>
@@ -464,6 +523,206 @@ export default function RunSetup({ runid, onSubmitSuccess }: RunSetupProps) {
         </Box>
     );
 }
+
+// Descriptions longer than this (or spanning several lines) get a show more/less toggle.
+const DATALIB_DESCRIPTION_PREVIEW_CHARS = 160;
+
+// How many file types a data library row names before lumping the rest into "others".
+const DATALIB_NAMED_FILE_TYPES = 3;
+
+/**
+ * A terse description of a directory's shape, e.g. "12 csv, 5 tsv, 2 pdf, 14 others".
+ * Files without an extension count toward "others". When the server stopped counting,
+ * the total is shown as a lower bound.
+ */
+function formatDatalibFileTypes(dir: DatalibDirFromApi): string | null {
+    const types = dir.file_types ?? [];
+    const total = dir.file_count ?? types.reduce((sum, t) => sum + t.count, 0);
+    if (total === 0) return dir.file_types ? 'No files' : null;
+    const named = types.filter((t) => t.ext !== '').slice(0, DATALIB_NAMED_FILE_TYPES);
+    const others = total - named.reduce((sum, t) => sum + t.count, 0);
+    const parts = named.map((t) => `${t.count.toLocaleString()} ${t.ext}`);
+    if (others > 0) parts.push(`${others.toLocaleString()} other${others === 1 ? '' : 's'}`);
+    const summary = parts.join(', ');
+    return dir.file_count_capped ? `${summary} (first ${total.toLocaleString()} files)` : summary;
+}
+
+// Data library groups, in display order. Each is rendered only if it has entries.
+const DATALIB_GROUPS: { scope: DatalibScope; title: string; subtitle: string }[] = [
+    { scope: 'global', title: 'Shared', subtitle: 'available to all users' },
+    { scope: 'user', title: 'Yours', subtitle: 'only available to you' },
+];
+
+interface DatalibPickerProps {
+    available: DatalibDirFromApi[];
+    selected: Set<string>;
+    onToggle: (name: string) => void;
+    disabled: boolean;
+}
+
+/**
+ * Multi-select list of data library directories of one scope. Each row shows the
+ * directory name and, when present, its README.md as a description. Names that are
+ * selected but no longer available (e.g. restored from a draft or duplicated
+ * session) are listed too, flagged, so the user can deselect them.
+ */
+function DatalibPicker({ available, selected, onToggle, disabled }: DatalibPickerProps) {
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const availableNames = new Set(available.map((d) => d.name));
+    const missing = Array.from(selected)
+        .filter((name) => !availableNames.has(name))
+        .sort()
+        .map((name) => ({ name, description: null, isMissing: true, shape: null }));
+    const rows = [
+        ...available.map((d) => ({ ...d, isMissing: false, shape: formatDatalibFileTypes(d) })),
+        ...missing,
+    ];
+
+    const toggleExpanded = (name: string) =>
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {rows.map(({ name, description, isMissing, shape }) => {
+                const isSelected = selected.has(name);
+                const isExpanded = expanded.has(name);
+                const text = description?.trim() ?? '';
+                const isLong =
+                    text.length > DATALIB_DESCRIPTION_PREVIEW_CHARS || text.includes('\n');
+                return (
+                    <DatalibRow key={name} selected={isSelected}>
+                        <DatalibRowLabel>
+                            <Checkbox
+                                checked={isSelected}
+                                onChange={() => onToggle(name)}
+                                disabled={disabled}
+                                size="small"
+                                icon={<CheckBoxOutlineBlankIcon fontSize="small" />}
+                                checkedIcon={<CheckedIcon />}
+                                sx={{ p: 0 }}
+                            />
+                            <FolderOutlinedIcon fontSize="small" />
+                            <DatalibName>{name}</DatalibName>
+                            {shape && <DatalibShape>{shape}</DatalibShape>}
+                            {isMissing && <DatalibMissing>No longer available</DatalibMissing>}
+                        </DatalibRowLabel>
+                        {text && (
+                            <DatalibDescription className={isExpanded ? 'expanded' : ''}>
+                                {text}
+                            </DatalibDescription>
+                        )}
+                        {isLong && (
+                            <DatalibMoreLink
+                                component="button"
+                                type="button"
+                                underline="hover"
+                                onClick={() => toggleExpanded(name)}
+                                aria-expanded={isExpanded}>
+                                {isExpanded ? 'Show less' : 'Show more'}
+                            </DatalibMoreLink>
+                        )}
+                    </DatalibRow>
+                );
+            })}
+        </Box>
+    );
+}
+
+const DatalibGroupTitle = styled(Typography)(({ theme }) => ({
+    color: theme.color['cream-100'].hex,
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    marginBottom: theme.spacing(0.75),
+
+    '& > span': {
+        color: theme.color['cream-60'].rgba.toString(),
+        fontWeight: 400,
+    },
+}));
+
+const DatalibRow = styled(Box)<{ selected: boolean }>(({ theme, selected }) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(0.5),
+    padding: theme.spacing(1, 1.5),
+    borderRadius: theme.shape.borderRadius + 'px',
+    border:
+        '1px solid ' +
+        (selected ? theme.color['green-100'].hex : theme.color['cream-20'].rgba.toString()),
+    backgroundColor: selected ? theme.color['cream-4'].rgba.toString() : 'transparent',
+    transition: 'all 200ms ease-in-out',
+
+    '&:hover': {
+        borderColor: theme.color['green-100'].hex,
+    },
+
+    '& .MuiCheckbox-root': {
+        color: theme.color['cream-20'].rgba.toString(),
+    },
+}));
+
+const DatalibRowLabel = styled('label')(({ theme }) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    color: theme.color['cream-100'].hex,
+    cursor: 'pointer',
+    userSelect: 'none',
+
+    '& > .MuiSvgIcon-root': {
+        color: theme.color['cream-60'].rgba.toString(),
+    },
+}));
+
+const DatalibName = styled('span')({
+    fontWeight: 600,
+    fontSize: '0.875rem',
+    overflowWrap: 'anywhere',
+});
+
+const DatalibShape = styled('span')(({ theme }) => ({
+    color: theme.color['cream-60'].rgba.toString(),
+    fontSize: '0.8rem',
+    marginLeft: 'auto',
+    textAlign: 'right',
+}));
+
+const DatalibMissing = styled('span')(({ theme }) => ({
+    color: theme.color['error-red-100'].hex,
+    fontSize: '0.8rem',
+    marginLeft: 'auto',
+}));
+
+const DatalibDescription = styled(Typography)(({ theme }) => ({
+    color: theme.color['cream-80'].rgba.toString(),
+    fontSize: '0.8rem',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    // Align with the directory name (checkbox + icon + gaps)
+    paddingLeft: theme.spacing(7),
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+
+    '&.expanded': {
+        display: 'block',
+        maxHeight: '240px',
+        overflowY: 'auto',
+    },
+}));
+
+const DatalibMoreLink = styled(Link)(({ theme }) => ({
+    alignSelf: 'flex-start',
+    color: theme.color['green-40'].rgba.toString(),
+    fontSize: '0.8rem',
+    marginLeft: theme.spacing(7),
+})) as typeof Link;
 
 const SectionHeader = styled(Box)(({ theme }) => ({
     color: theme.color['cream-100'].hex,

@@ -29,7 +29,7 @@ from autodiscovery_jobs import keys
 from autodiscovery_jobs.config import JobConfig
 from autodiscovery_jobs.storage import ObjectStore, get_store
 
-from .costs import _lookup_pricing, calculate_llm_cost, get_duration_seconds
+from .costs import _lookup_pricing, _parse_usage_time, calculate_llm_cost, get_duration_seconds
 from .models import (
     AggregatedUsageBucket,
     AggregatedUsageResponse,
@@ -51,7 +51,8 @@ ROOT_NODE_FILENAMES = {"mcts_node_0_0.json", "mcts_node_1_0.json"}
 # Where the persisted metrics cache snapshot lives in the shared store.
 # Loaded on cold start so pod restarts don't re-scan every job from scratch.
 PERSIST_BLOB_PATH = "_metrics/jobs_cache.json"
-PERSIST_SCHEMA_VERSION = 1
+# Rebuild cached terminal costs with stable historical pricing timestamps.
+PERSIST_SCHEMA_VERSION = 3
 
 # Per-pod file lock so only one gunicorn worker scans the store at a time. Other
 # workers wait for the persisted snapshot and pick it up via warm-start.
@@ -76,6 +77,7 @@ class JobSnapshot:
     model: str | None = None
     llm_usage_summary: dict | None = None
     llm_cost_usd: float = 0.0
+    pricing_at: str | None = None
     llm_cost_by_agent: dict[str, dict[str, float]] = field(default_factory=dict)
     llm_cost_by_component: dict[str, dict[str, float]] = field(default_factory=dict)
     llm_cost_by_node: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -93,6 +95,7 @@ class AggregatedData:
 # ---------------------------------------------------------------------------
 # Store helpers
 # ---------------------------------------------------------------------------
+
 
 def _read_json(store: ObjectStore, key: str) -> dict | None:
     """Read and parse a JSON object from the store. Returns None on any error."""
@@ -132,9 +135,7 @@ def _save_persisted_cache(store: ObjectStore, data: AggregatedData) -> None:
             "scan_duration_seconds": data.scan_duration_seconds,
             "jobs": [dataclasses.asdict(j) for j in data.jobs],
         }
-        store.write_text(
-            PERSIST_BLOB_PATH, json.dumps(payload), content_type="application/json"
-        )
+        store.write_text(PERSIST_BLOB_PATH, json.dumps(payload), content_type="application/json")
         logger.warning(
             f"Persisted metrics cache: {len(data.jobs)} jobs to {store.uri(PERSIST_BLOB_PATH)}"
         )
@@ -186,9 +187,11 @@ def _coerce_nonnegative_int(value: object) -> int:
         return 0
 
 
-def _lookup_bucket_cost_by_type(model_name: str, bucket: dict[str, Any]) -> tuple[float, float, float]:
+def _lookup_bucket_cost_by_type(
+    model_name: str, bucket: dict[str, Any], *, usage_at: str | None = None
+) -> tuple[float, float, float]:
     """Calculate prompt/completion/reasoning costs for one usage bucket."""
-    pricing = _lookup_pricing(model_name)
+    pricing = _lookup_pricing(model_name, usage_at=usage_at)
 
     prompt_tokens = _coerce_nonnegative_int(bucket.get("prompt_tokens"))
     completion_tokens = _coerce_nonnegative_int(bucket.get("completion_tokens"))
@@ -266,12 +269,14 @@ def _accumulate_cost(
 
 def _build_event_cost_breakdowns(
     events: list[dict[str, Any]],
+    *,
+    usage_at: str | None = None,
 ) -> tuple[
     dict[str, dict[str, float]],
     dict[str, dict[str, float]],
     dict[str, dict[str, float]],
 ]:
-    """Build exact cost maps from raw usage events by agent/component/node."""
+    """Attribute event costs by agent/component/node at the run's creation-time rate."""
     by_agent: dict[str, dict[str, float]] = {}
     by_component: dict[str, dict[str, float]] = {}
     by_node: dict[str, dict[str, float]] = {}
@@ -279,7 +284,9 @@ def _build_event_cost_breakdowns(
     for event in events:
         model = str(event.get("model") or "unknown")
         bucket = _extract_event_bucket(event)
-        prompt_cost, completion_cost, reasoning_cost = _lookup_bucket_cost_by_type(model, bucket)
+        prompt_cost, completion_cost, reasoning_cost = _lookup_bucket_cost_by_type(
+            model, bucket, usage_at=usage_at
+        )
 
         agent_key = str(event.get("agent_name") or "unassigned")
         component_key = str(event.get("component") or "unknown")
@@ -317,6 +324,7 @@ def _derive_requested_experiments(
 # Job scanning
 # ---------------------------------------------------------------------------
 
+
 def _count_experiments_inline(
     store: ObjectStore,
     userid: str,
@@ -347,6 +355,17 @@ def _infer_model(llm_summary: dict | None) -> str | None:
         return None
     # Return the model with the most total tokens
     return max(by_model, key=lambda k: by_model[k].get("total_tokens", 0))
+
+
+def _resolve_pricing_time(
+    created_at: str | None, events: list[dict[str, Any]], finished_at: str | None
+) -> str | None:
+    """Prefer creation time, then earliest usage, then finish time for legacy runs."""
+    when = _parse_usage_time(created_at)
+    if when is None:
+        event_times = [parsed for event in events if (parsed := _parse_usage_time(event.get("ts")))]
+        when = min(event_times) if event_times else _parse_usage_time(finished_at)
+    return when.isoformat() if when else None
 
 
 def _scan_job(
@@ -390,13 +409,15 @@ def _scan_job(
         llm_summary = _read_json(store, f"{base_path}/output/llm_usage_summary.json")
         llm_events = _read_jsonl(store, f"{base_path}/output/llm_usage_events.jsonl")
 
+        pricing_at = _resolve_pricing_time(created_at, llm_events, finished_at)
+
         # Calculate LLM cost and infer model from usage data
         llm_cost = 0.0
         if llm_summary:
-            llm_cost, _ = calculate_llm_cost(llm_summary)
+            llm_cost, _ = calculate_llm_cost(llm_summary, usage_at=pricing_at)
         model = _infer_model(llm_summary)
         llm_cost_by_agent, llm_cost_by_component, llm_cost_by_node = _build_event_cost_breakdowns(
-            llm_events
+            llm_events, usage_at=pricing_at
         )
 
         return JobSnapshot(
@@ -414,6 +435,7 @@ def _scan_job(
             model=model,
             llm_usage_summary=llm_summary,
             llm_cost_usd=llm_cost,
+            pricing_at=pricing_at,
             llm_cost_by_agent=llm_cost_by_agent,
             llm_cost_by_component=llm_cost_by_component,
             llm_cost_by_node=llm_cost_by_node,
@@ -534,6 +556,7 @@ def _scan_all_jobs(
 # ---------------------------------------------------------------------------
 # Cache
 # ---------------------------------------------------------------------------
+
 
 class MetricsCache:
     """In-memory cache for aggregated metrics data with background refresh."""
@@ -669,7 +692,7 @@ class MetricsCache:
         lock_file = None
         try:
             try:
-                lock_file = open(SCAN_LOCK_PATH, "w")
+                lock_file = open(SCAN_LOCK_PATH, "w")  # noqa: SIM115 - held for the scan, closed in finally
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
                 logger.warning(
@@ -736,6 +759,7 @@ def get_metrics_cache() -> MetricsCache:
 # Query helpers
 # ---------------------------------------------------------------------------
 
+
 def _filter_jobs(
     jobs: list[JobSnapshot],
     start_date: str | None = None,
@@ -786,9 +810,7 @@ def compute_overview(
     total_experiments = sum(j.n_experiments_completed for j in jobs)
     total_experiments_requested = sum(j.n_experiments_requested for j in jobs)
     exp_completion_rate = (
-        total_experiments / total_experiments_requested
-        if total_experiments_requested > 0
-        else 0.0
+        total_experiments / total_experiments_requested if total_experiments_requested > 0 else 0.0
     )
 
     # LLM costs
@@ -799,9 +821,7 @@ def compute_overview(
     hypotheses_with_usage = sum(j.n_experiments_completed for j in jobs_with_usage)
     llm_cost_for_hypotheses = sum(j.llm_cost_usd for j in jobs_with_usage)
     cost_per_hypothesis = (
-        llm_cost_for_hypotheses / hypotheses_with_usage
-        if hypotheses_with_usage > 0
-        else None
+        llm_cost_for_hypotheses / hypotheses_with_usage if hypotheses_with_usage > 0 else None
     )
 
     # Share rate
@@ -852,7 +872,9 @@ def compute_overview(
         experiment_completion_rate=round(exp_completion_rate, 4),
         llm_cost_usd=round(total_llm, 4),
         hypotheses_with_usage=hypotheses_with_usage,
-        cost_per_hypothesis_usd=round(cost_per_hypothesis, 4) if cost_per_hypothesis is not None else None,
+        cost_per_hypothesis_usd=round(cost_per_hypothesis, 4)
+        if cost_per_hypothesis is not None
+        else None,
         share_rate=round(share_rate, 4),
         runs_by_status=dict(status_counts),
         time_series=time_series,
@@ -983,7 +1005,9 @@ def compute_run_metrics(userid: str, runid: str) -> dict | None:
     # Calculate LLM cost breakdown by model
     llm_cost_by_model: dict[str, float] = {}
     if job.llm_usage_summary:
-        _, llm_cost_by_model = calculate_llm_cost(job.llm_usage_summary)
+        _, llm_cost_by_model = calculate_llm_cost(
+            job.llm_usage_summary, usage_at=job.pricing_at or job.created_at
+        )
 
     return {
         "runid": job.jobid,
@@ -1055,7 +1079,9 @@ def compute_aggregated_usage(
     if not jobs_with_usage:
         return AggregatedUsageResponse()
 
-    def _extract_run_costs_by_type(llm_summary: dict | None) -> tuple[float, float, float]:
+    def _extract_run_costs_by_type(
+        llm_summary: dict | None, *, usage_at: str | None = None
+    ) -> tuple[float, float, float]:
         """Compute per-run prompt/completion/reasoning costs from by_model usage."""
         if not llm_summary:
             return 0.0, 0.0, 0.0
@@ -1066,7 +1092,9 @@ def compute_aggregated_usage(
         reasoning_cost = 0.0
 
         for model_name, bucket in by_model.items():
-            p_cost, c_cost, r_cost = _lookup_bucket_cost_by_type(model_name, bucket)
+            p_cost, c_cost, r_cost = _lookup_bucket_cost_by_type(
+                model_name, bucket, usage_at=usage_at
+            )
             prompt_cost += p_cost
             completion_cost += c_cost
             reasoning_cost += r_cost
@@ -1096,6 +1124,7 @@ def compute_aggregated_usage(
 
         run_prompt_cost, run_completion_cost, run_reasoning_cost = _extract_run_costs_by_type(
             j.llm_usage_summary,
+            usage_at=j.pricing_at or j.created_at,
         )
         run_total_cost = run_prompt_cost + run_completion_cost + run_reasoning_cost
 
@@ -1107,10 +1136,17 @@ def compute_aggregated_usage(
         totals_per_run_costs.append(run_total_cost)
 
     totals_bucket = _build_aggregated_bucket(
-        totals_per_run_tokens, totals_per_run_costs,
-        totals_calls, totals_prompt, totals_completion,
-        totals_reasoning, totals_tokens, totals_cost,
-        totals_prompt_cost, totals_completion_cost, totals_reasoning_cost,
+        totals_per_run_tokens,
+        totals_per_run_costs,
+        totals_calls,
+        totals_prompt,
+        totals_completion,
+        totals_reasoning,
+        totals_tokens,
+        totals_cost,
+        totals_prompt_cost,
+        totals_completion_cost,
+        totals_reasoning_cost,
     )
 
     # --- Breakdown dimensions ---
@@ -1119,16 +1155,21 @@ def compute_aggregated_usage(
         cost_mode: str = "none",
     ) -> dict[str, AggregatedUsageBucket]:
         # Accumulate per-key data across runs
-        key_data: dict[str, dict] = defaultdict(lambda: {
-            "calls": 0, "prompt": 0, "completion": 0, "reasoning": 0,
-            "tokens": 0,
-            "cost": 0.0,
-            "prompt_cost": 0.0,
-            "completion_cost": 0.0,
-            "reasoning_cost": 0.0,
-            "per_run_tokens": [],
-            "per_run_costs": [],
-        })
+        key_data: dict[str, dict] = defaultdict(
+            lambda: {
+                "calls": 0,
+                "prompt": 0,
+                "completion": 0,
+                "reasoning": 0,
+                "tokens": 0,
+                "cost": 0.0,
+                "prompt_cost": 0.0,
+                "completion_cost": 0.0,
+                "reasoning_cost": 0.0,
+                "per_run_tokens": [],
+                "per_run_costs": [],
+            }
+        )
 
         for j in jobs_with_usage:
             dim = j.llm_usage_summary.get(dim_key, {})  # type: ignore[union-attr]
@@ -1152,6 +1193,7 @@ def compute_aggregated_usage(
                     prompt_cost, completion_cost, reasoning_cost = _lookup_bucket_cost_by_type(
                         key,
                         bucket,
+                        usage_at=j.pricing_at or j.created_at,
                     )
                 elif cost_mode == "events_exact":
                     by_dim_cost_map: dict[str, dict[str, float]] = {}
@@ -1180,10 +1222,17 @@ def compute_aggregated_usage(
         result = {}
         for key, d in key_data.items():
             result[key] = _build_aggregated_bucket(
-                d["per_run_tokens"], d["per_run_costs"],
-                d["calls"], d["prompt"], d["completion"],
-                d["reasoning"], d["tokens"], d["cost"],
-                d["prompt_cost"], d["completion_cost"], d["reasoning_cost"],
+                d["per_run_tokens"],
+                d["per_run_costs"],
+                d["calls"],
+                d["prompt"],
+                d["completion"],
+                d["reasoning"],
+                d["tokens"],
+                d["cost"],
+                d["prompt_cost"],
+                d["completion_cost"],
+                d["reasoning_cost"],
             )
         return result
 

@@ -1,6 +1,5 @@
-
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { useRouter } from '@/router';
+
 import {
     Box,
     Button,
@@ -31,6 +30,8 @@ import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import OpenInFullOutlinedIcon from '@mui/icons-material/OpenInFullOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
+
+import { useRouter } from '@/router';
 
 import { getRunsApi } from '@/api/RunsApi';
 import { Run, getExperimentFromApi, getRunFromApi } from '@/types/Run';
@@ -253,15 +254,18 @@ interface RunViewContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
+    /** The standalone HTML report, where there is no API to share through. */
+    standalone?: boolean;
 }
 
-function RunViewContent({
+export function RunViewContent({
     run,
     error,
     canStop,
     cancelling,
     handleStop,
     experimentsLabel,
+    standalone = false,
 }: RunViewContentProps) {
     const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
@@ -829,17 +833,19 @@ function RunViewContent({
                                 canExploreWithAsta={run.canExploreWithAsta}
                                 actions={
                                     <>
-                                        <Tooltip title="Share experiment" placement="bottom">
-                                            <ExpandingActionButton
-                                                onClick={onShareExperimentClick}
-                                                size="small"
-                                                variant="outlined">
-                                                <ShareOutlinedIcon fontSize="small" />
-                                                <ButtonLabel className="button-label">
-                                                    Share experiment
-                                                </ButtonLabel>
-                                            </ExpandingActionButton>
-                                        </Tooltip>
+                                        {!standalone && (
+                                            <Tooltip title="Share experiment" placement="bottom">
+                                                <ExpandingActionButton
+                                                    onClick={onShareExperimentClick}
+                                                    size="small"
+                                                    variant="outlined">
+                                                    <ShareOutlinedIcon fontSize="small" />
+                                                    <ButtonLabel className="button-label">
+                                                        Share experiment
+                                                    </ButtonLabel>
+                                                </ExpandingActionButton>
+                                            </Tooltip>
+                                        )}
                                         <LargeScreenAction>
                                             <Tooltip
                                                 title={isExpPanelExpanded ? 'Collapse' : 'Expand'}

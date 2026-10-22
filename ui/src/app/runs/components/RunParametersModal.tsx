@@ -1,4 +1,3 @@
-
 import {
     Button,
     CircularProgress,
@@ -57,6 +56,17 @@ export function RunParametersModal({
         const option = Object.values(MCTS_SELECTION).find((opt) => opt.value === value);
         return option?.label ?? value;
     };
+
+    // Global (shared) data library directories first, then the user's own, matching
+    // the run setup picker. A global and a user directory may share a name.
+    const datalibEntries = [
+        ...(metadata?.globalDatalibDirs ?? []).map((name) => ({
+            scope: 'global',
+            name,
+            label: 'Shared',
+        })),
+        ...(metadata?.datalibDirs ?? []).map((name) => ({ scope: 'user', name, label: 'Yours' })),
+    ];
 
     return (
         <Dialog
@@ -151,6 +161,20 @@ export function RunParametersModal({
                                                 {dataset.description}
                                             </DatasetDescription>
                                         )}
+                                    </DatasetItem>
+                                ))}
+                            </DatasetList>
+                        </FieldRow>
+                    )}
+
+                    {datalibEntries.length > 0 && (
+                        <FieldRow>
+                            <FieldLabel>Data library</FieldLabel>
+                            <DatasetList>
+                                {datalibEntries.map(({ scope, name, label }) => (
+                                    <DatasetItem key={`${scope}:${name}`}>
+                                        <DatasetName>{name}</DatasetName>
+                                        <DatasetSize>{label} · Mounted read-only</DatasetSize>
                                     </DatasetItem>
                                 ))}
                             </DatasetList>

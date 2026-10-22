@@ -26,6 +26,8 @@ def _validate_storage_config(config: JobConfig) -> None:
       so they need ``gcs``; they cannot mount a directory on this host.
     - **Docker jobs** (``JOB_BACKEND=docker``) bind-mount the run's directory from
       the host, so they need ``local``; a bucket has no host directory.
+    - **Process jobs** (``JOB_BACKEND=process``) read and write the run's directory
+      in place on this host, so they need ``local`` too.
     - **Modal sandboxes** (``CODE_EXECUTION_BACKEND=modal``) mount the run's data
       prefix from ``gs://`` (``--bucket_path``), so they need ``gcs``.
 
@@ -59,6 +61,13 @@ def _validate_storage_config(config: JobConfig) -> None:
             f"cannot provide. Set STORAGE_BACKEND=local, or JOB_BACKEND=gcp. {see}"
         )
 
+    if job_backend == "process" and is_gcs:
+        raise StorageBackendError(
+            "STORAGE_BACKEND=gcs is incompatible with JOB_BACKEND=process: a job process "
+            "reads the run's directory in place on this host, which a bucket cannot "
+            f"provide. Set STORAGE_BACKEND=local, or JOB_BACKEND=gcp. {see}"
+        )
+
     if config.code_execution_backend == "modal" and not is_gcs:
         raise StorageBackendError(
             f"STORAGE_BACKEND={config.storage_backend} is incompatible with "
@@ -66,6 +75,17 @@ def _validate_storage_config(config: JobConfig) -> None:
             "gs://, which this store has no address in. Set STORAGE_BACKEND=gcs, or use the "
             f"default CODE_EXECUTION_BACKEND=process. {see}"
         )
+
+
+def _has_uploaded_datasets(metadata: dict[str, Any]) -> bool:
+    """Whether a run's metadata lists datasets stored in its own ``data/``.
+
+    Metadata written before the data library existed always lists some, so this
+    is only ``False`` for a run that reads solely from data-library directories.
+    """
+    return bool(metadata.get("datasets")) or not (
+        metadata.get("datalib_dirs") or metadata.get("global_datalib_dirs")
+    )
 
 
 def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
@@ -77,6 +97,12 @@ def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
     Run mounts the whole bucket (its mount is fixed per job, not per execution). So
     ``gcp`` + in-process + a multi-user auth provider is a cross-tenant exposure:
     steer such deployments to ``CODE_EXECUTION_BACKEND=modal`` (scoped, read-only).
+
+    The process job backend has no container at all: the job and its generated
+    code run on the API's host as the API's user, seeing the whole store and the
+    API's environment. With a multi-user auth provider that is the same exposure,
+    with no code-execution setting that avoids it (``modal`` needs ``gcs``, which
+    the process backend cannot use).
 
     This is a loud warning rather than a hard failure; when the configuration
     syntax gains cross-field validation (issue #54) it can become a real
@@ -92,6 +118,13 @@ def _warn_if_unsafe_code_execution(config: JobConfig) -> None:
             "exposes every user's data to executed code. Set CODE_EXECUTION_BACKEND=modal "
             "for a scoped, read-only per-job data mount. See docs/configuration.md.",
             config.code_execution_backend,
+        )
+    if config.backend == "process" and multi_user:
+        logger.warning(
+            "UNSAFE CONFIG: JOB_BACKEND=process runs each job, and the untrusted code it "
+            "generates, directly on this host with access to every user's data and the "
+            "API's credentials. It is meant for single-user use (AUTH_PROVIDER=none). For "
+            "a multi-user deployment use JOB_BACKEND=docker or gcp. See docs/configuration.md."
         )
 
 
@@ -153,6 +186,28 @@ class JobManager:
             List of user IDs
         """
         return persistence.list_user_ids(self.config)
+
+    # Data library
+
+    def list_datalib_dirs(self, userid: str) -> list[persistence.DatalibDir]:
+        """List the data-library directories a user can select, with their READMEs.
+
+        The global library's directories come first, then the user's own; each
+        carries its ``scope``.
+        """
+        return persistence.list_datalib_dirs(None, self.config) + persistence.list_datalib_dirs(
+            userid, self.config
+        )
+
+    def missing_datalib_dirs(self, userid: str | None, dirnames: list[str]) -> list[str]:
+        """Return which of ``dirnames`` are not in a data library.
+
+        ``userid=None`` checks the global library.
+
+        Raises:
+            ValueError: If any name is not a valid top-level directory name.
+        """
+        return persistence.missing_datalib_dirs(userid, dirnames, self.config)
 
     # Job management
 
@@ -254,8 +309,11 @@ class JobManager:
         new_run_id = str(uuid.uuid4())
         path = self.create_job(user_id, new_run_id)
 
-        # Verify parent data files still exist
-        if not self.has_data_files(parent_userid, parent_run_id):
+        # Verify parent data files still exist. A run that reads only from the
+        # data library has no uploads to copy.
+        if _has_uploaded_datasets(parent_metadata) and not self.has_data_files(
+            parent_userid, parent_run_id
+        ):
             raise DatasetExpiredError(
                 "The parent run's dataset has been deleted. "
                 "To start a new run, please upload your data again."
@@ -265,7 +323,9 @@ class JobManager:
         self.copy_job_data(parent_userid, parent_run_id, user_id, new_run_id)
 
         # Build and upload child metadata
-        child_metadata = self._build_fork_metadata(parent_metadata, parent_run_id)
+        child_metadata = self._build_fork_metadata(
+            parent_metadata, parent_run_id, same_owner=user_id == parent_userid
+        )
         self.upload_metadata(user_id, new_run_id, child_metadata)
 
         # Create run_details.json
@@ -278,8 +338,15 @@ class JobManager:
         )
 
     @staticmethod
-    def _build_fork_metadata(parent_metadata: dict[str, Any], parent_run_id: str) -> dict[str, Any]:
-        """Build child metadata from parent metadata for a fork operation."""
+    def _build_fork_metadata(
+        parent_metadata: dict[str, Any], parent_run_id: str, *, same_owner: bool = True
+    ) -> dict[str, Any]:
+        """Build child metadata from parent metadata for a fork operation.
+
+        User data-library selections name directories in the *parent owner's*
+        library, so they carry over only when the same user forks their own run.
+        Global selections are available to everyone and always carry over.
+        """
         parent_name = parent_metadata.get("name", "Untitled")
         return {
             # Descriptive fields from parent
@@ -288,6 +355,8 @@ class JobManager:
             "domain": parent_metadata.get("domain", ""),
             "intent": parent_metadata.get("intent", ""),
             "datasets": parent_metadata.get("datasets", []),
+            "datalib_dirs": (parent_metadata.get("datalib_dirs") or None) if same_owner else None,
+            "global_datalib_dirs": parent_metadata.get("global_datalib_dirs") or None,
             # Advanced settings from parent
             "n_experiments": parent_metadata.get("n_experiments"),
             "exploration_weight": parent_metadata.get("exploration_weight"),
@@ -578,6 +647,8 @@ class JobManager:
         exploration_weight: float | None = None,
         code_timeout: int | None = None,
         n_warmstart: int | None = None,
+        datalib_dirs: list[str] | None = None,
+        global_datalib_dirs: list[str] | None = None,
         **kwargs,
     ) -> str:
         """Execute a Cloud Run job.
@@ -586,7 +657,7 @@ class JobManager:
             userid: User identifier
             jobid: Job identifier
             n_experiments: Number of experiments to run
-            model: Model to use (e.g., "openai/gpt-4o", "vertex_ai/gemini-3.7-flash"); uses args.py default when omitted
+            model: Model to use (e.g., "openai/gpt-4o", "vertex_ai/gemini-3.8-flash"); uses args.py default when omitted
             belief_model: Model for belief distribution (optional)
             temperature: Temperature for agents (optional)
             belief_temperature: Temperature for belief agent (optional)
@@ -596,6 +667,10 @@ class JobManager:
             exploration_weight: Exploration weight for UCB1 (optional)
             code_timeout: Timeout for code execution in seconds (optional)
             n_warmstart: Number of warmstart experiments (optional)
+            datalib_dirs: Names of the user's data-library directories to mount
+                read-only into the job (optional)
+            global_datalib_dirs: Names of global data-library directories to
+                mount likewise (optional)
             **kwargs: Additional arguments
 
         Returns:
@@ -615,6 +690,8 @@ class JobManager:
             exploration_weight=exploration_weight,
             code_timeout=code_timeout,
             n_warmstart=n_warmstart,
+            datalib_dirs=datalib_dirs,
+            global_datalib_dirs=global_datalib_dirs,
             **kwargs,
         )
 

@@ -37,7 +37,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--model",
             type=str,
-            default="vertex_ai/gemini-3.7-flash",
+            default="vertex_ai/gemini-3.8-flash",
             help="LLM model for hypothesis merging decisions, as litellm's <provider>/<model>.",
         )
         self.add_argument(

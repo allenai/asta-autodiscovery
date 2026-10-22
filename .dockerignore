@@ -1,5 +1,5 @@
-# .dockerignore - Used by api/Dockerfile and scripts/Dockerfile
-# Note: Must work for both the API build and maintenance scripts build
+# .dockerignore - Used by api/Dockerfile, scripts/Dockerfile and
+# packages/autodiscovery/Dockerfile (every build whose context is the repo root)
 
 # Ignore common development files
 .git
@@ -13,8 +13,16 @@
 **/*.pyc
 **/.DS_Store
 
-# Ignore other service directories
-ui
+# Ignore other service directories. Of ui/, only what the autodiscovery image
+# needs to build the HTML report's run view (see ui/vite.report.config.ts).
+ui/*
+!ui/package.json
+!ui/yarn.lock
+!ui/tsconfig.json
+!ui/report.html
+!ui/vite.config.ts
+!ui/vite.report.config.ts
+!ui/src
 proxy
 sonar
 autods-viz
@@ -37,3 +45,6 @@ mcpdoc.json
 !scripts/
 !pyproject.toml
 !uv.lock
+
+# A locally built run view; the autodiscovery image builds its own from ui/.
+packages/autodiscovery/src/autodiscovery/report_viewer

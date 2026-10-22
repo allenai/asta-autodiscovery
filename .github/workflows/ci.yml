@@ -31,6 +31,17 @@ jobs:
           GOOGLE_ACCESS_KEY_ID: ""
           GOOGLE_ACCESS_KEY_SECRET: ""
 
+      # The job image is behind compose's `jobs` profile, so the step above skips
+      # it. It builds the HTML report's run view from ui/ as well as the engine.
+      - name: Build the autodiscovery job image
+        run: docker compose build autodiscovery
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /dev/null
+          GCS_BUCKET: ""
+          GCP_PROJECT: ""
+          GOOGLE_ACCESS_KEY_ID: ""
+          GOOGLE_ACCESS_KEY_SECRET: ""
+
   # This build is purely for CI. It does not publish any artifacts.
   ui-build:
     name: UI Build
@@ -54,13 +65,74 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Lint
+        run: yarn lint
+
       - name: Build project
         run: yarn build
 
-  # Runs the credential-free Python unit tests (the `not modal and not adc`
-  # subset — everything that needs no Modal account or GCS/ADC credentials).
-  # `make test` uses `uv run --all-packages`, so no secrets are required and it
-  # is safe on PRs (including forks).
+      # The run view every AutoDiscovery run ships as its HTML report.
+      - name: Build report viewer
+        run: yarn build:report
+
+  # Opens a synthetic run's HTML report from disk in Chromium: the built run view
+  # must render offline from the data report.py writes. Needs no stack or secrets.
+  report-viewer:
+    name: Report viewer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "yarn"
+          cache-dependency-path: ui/yarn.lock
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Playwright (chromium)
+        working-directory: ui
+        run: |
+          yarn install --frozen-lockfile
+          yarn playwright install --with-deps chromium
+
+      - name: Smoke-test the report
+        run: make test-report-viewer
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-report-viewer
+          path: ui/playwright-report
+          retention-days: 7
+
+  # Ruff lint + format checks over the Python sources (see ruff.toml).
+  python-lint:
+    name: Python lint
+    runs-on: ubuntu-latest
+
+    env:
+      UV_PYTHON: "3.13"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Ruff
+        run: make lint
+
+  # Runs the Python unit tests. None of them need a Modal account or GCS/ADC
+  # credentials, so no secrets are required and it is safe on PRs (including
+  # forks).
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -76,14 +148,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Run unit tests (credential-free subset)
+      - name: Run unit tests
         run: make test
 
   # Notify the private repo once, but only after the builds and unit tests
   # succeed on a push to main. `needs` guarantees this runs only on their success.
   notify-private:
     name: Process public main change
-    needs: [docker-build, ui-build, unit-tests]
+    needs: [docker-build, ui-build, report-viewer, python-lint, unit-tests]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:

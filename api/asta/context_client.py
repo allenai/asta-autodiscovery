@@ -13,7 +13,7 @@ import os
 
 import requests
 
-_log = logging.getLogger("api.asta_context_client")
+_log = logging.getLogger(__name__)
 
 # Base URL of the deployed asta-context-service. Routes are mounted under /api.
 ASTA_CONTEXT_SERVICE_URL = os.environ.get("ASTA_CONTEXT_SERVICE_URL", "")

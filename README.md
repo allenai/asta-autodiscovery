@@ -2,6 +2,10 @@
 
 > AutoDiscovery for Asta
 
+**Live app:** https://autodiscovery.allen.ai — a public deployment of this repo; nearly all the code behind it lives here.
+
+**Documentation:** https://allenai.github.io/asta-autodiscovery
+
 ## Changelog
 
 Release notes for the published packages, including breaking changes, are in
@@ -9,7 +13,7 @@ Release notes for the published packages, including breaking changes, are in
 
 ## Standalone CLI
 
-To run AutoDiscovery against a local dataset without the full Skiff stack, see
+To run AutoDiscovery against a local dataset without the full web stack, see
 [docs/autodiscovery/standalone.md](docs/autodiscovery/standalone.md) for `pip install` and release
 instructions.
 
@@ -49,13 +53,14 @@ whatever was last built. See
 [docs/configuration.md](docs/configuration.md#docker-backend-default) for the job backends and the
 environment they need.
 
+To run the same stack without Docker — API, UI, and each run as processes on your machine,
+single-user — use `make dev-host` instead; see
+[docs/configuration.md](docs/configuration.md#process-backend).
+
 ## Running Tests
 
 ```sh
-make test           # main test suite; excludes Modal tests
-make test-modal     # Modal tests only
-make test-all       # everything
-
+make test                     # the full test suite
 make test PYTEST_ARGS=--cov   # forward extra flags to pytest
 ```
 
@@ -81,7 +86,24 @@ cd ui && yarn install --frozen-lockfile
 
 End-to-end tests are documented in [ui/e2e/README.md](ui/e2e/README.md).
 
+### The HTML report
+
+The static HTML report every run writes beside its results is the UI's run view, built from
+the same components by `yarn build:report` (see `ui/vite.report.config.ts`) into one
+self-contained page that ships with the `asta-autodiscovery` package. The job image and the
+PyPI release build it themselves; in a source checkout, build it before running
+`auto-discovery` or `make dev-host` (which builds it for you):
+
+```sh
+make report-viewer
+```
+
+`python -m autodiscovery.report <out_dir>` regenerates the report for an existing run.
+`make test-report-viewer` opens a synthetic run's report from disk in Chromium, as CI does.
+
 ## Documentation
+
+Published at **https://allenai.github.io/asta-autodiscovery**. Build locally:
 
 ```sh
 make serve-docs     # serve locally

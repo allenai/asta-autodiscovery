@@ -1,4 +1,4 @@
-"""Asta integration: the "dig deeper" handoff of an experiment to Asta.
+"""Asta integration: dataset imports and the "dig deeper" experiment handoff.
 
 Everything that talks to Asta lives in this package, so a deployment with no
 Asta behind it carries no Asta code paths outside it. The rest of the API

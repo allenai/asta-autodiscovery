@@ -25,6 +25,11 @@ from utils.credits import (
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
+from runs.datasets import (
+    UPLOAD_MAX_FILE_SIZE_BYTES,
+    UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES,
+    UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR,
+)
 from runs.models import (
     BookmarkExperimentRequestModel,
     BookmarkExperimentResponseModel,
@@ -51,7 +56,6 @@ from runs.models import (
     GetSharedRunOwnerResponseModel,
     GetViewerRunsRequestModel,
     GetViewerRunsResponseModel,
-    ImportContextArtifactRequestModel,
     MetadataModel,
     RunDetailsModel,
     RunModel,
@@ -92,13 +96,6 @@ try:
     JOBS_AVAILABLE = True
 except ImportError:
     JOBS_AVAILABLE = False
-
-# Max size of files that can be uploaded
-UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
-UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = (
-    100 * 1024 * 1024 * 1024
-)  # 100GB for users with higher upload limit permission
-UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR = "100GB"
 
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
@@ -746,115 +743,6 @@ def create() -> Blueprint:
         except Exception as e:
             current_app.logger.error(f"Failed to upload dataset: {e}")
             return jsonify({"error": str(e)}), 500
-
-    @api.route("/<runid>/import-context-artifact", methods=["POST"])
-    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
-    def import_context_artifact(runid: str):
-        """Copy one of the caller's Asta context-service artifacts into the run's data.
-
-        An alternative to uploading: the file lands at the same data key an upload
-        would, so metadata and the job runner treat it exactly like an uploaded file.
-        Only available when the Asta integration is configured.
-        """
-        import requests as _requests
-        from asta import context_client as asta_context_client
-
-        if not asta.is_enabled():
-            return jsonify({"error": "Asta integration is not configured"}), 404
-
-        userid = request.user.get("sub")
-        if not userid:
-            return jsonify({"error": "User ID not found in token"}), 401
-
-        try:
-            req = ImportContextArtifactRequestModel(**(request.get_json(silent=True) or {}))
-        except Exception as e:
-            raise BadRequest(f"Invalid request: {e}") from e
-
-        manager = get_job_manager()
-        if not manager.job_exists(userid, runid):
-            return jsonify({"error": f"Run {runid} not found"}), 404
-
-        user_uuid, err = _resolve_asta_user_uuid()
-        if err:
-            return err
-
-        try:
-            artifact = asta_context_client.find_owned_artifact(user_uuid, req.artifact_id)
-        except Exception as e:
-            current_app.logger.error("Context-service artifact lookup failed: %s", e)
-            return jsonify({"error": "Failed to look up Asta artifact"}), 502
-        if artifact is None:
-            return jsonify({"error": f"Artifact {req.artifact_id} not found"}), 404
-
-        filename = req.filename or artifact.get("filename") or ""
-        if not filename or "/" in filename or "\\" in filename or filename in (".", ".."):
-            raise BadRequest("Invalid filename")
-
-        has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
-        max_file_size = (
-            UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
-            if has_higher_limit
-            else UPLOAD_MAX_FILE_SIZE_BYTES
-        )
-        size = artifact.get("file_size_bytes")
-        if isinstance(size, int) and size > max_file_size:
-            return jsonify({"error": "File too large."}), 413
-
-        try:
-            download_url = asta_context_client.get_download_url(req.artifact_id)
-            with _requests.get(download_url, stream=True, timeout=(10, 300)) as src:
-                src.raise_for_status()
-                if int(src.headers.get("Content-Length") or 0) > max_file_size:
-                    return jsonify({"error": "File too large."}), 413
-                src.raw.decode_content = True
-                key = dataset_key(userid, runid, filename)
-                store = get_store(manager.config)
-                store.write_stream(
-                    key,
-                    src.raw,
-                    content_type=artifact.get("content_type") or src.headers.get("Content-Type"),
-                )
-        except Exception as e:
-            current_app.logger.error("Failed to import context artifact: %s", e)
-            return jsonify({"error": "Failed to import Asta artifact"}), 502
-
-        resp = UploadDatasetResponseModel(
-            path=store.uri(key),
-            filename=filename,
-            message="Dataset imported from Asta",
-        )
-        return jsonify(resp.model_dump()), 200
-
-    def _resolve_asta_user_uuid() -> tuple[str | None, tuple | None]:
-        """Map the authenticated Auth0 user to their Asta user UUID."""
-        import os
-
-        import requests as _requests
-        from asta import client as asta_client
-
-        token = (request.headers.get("Authorization", "") or "").split()[-1]
-        auth0_domain = os.environ.get("AUTH0_DOMAIN", "")
-        if not (token and auth0_domain):
-            return None, (jsonify({"error": "Failed to fetch user profile from Auth0"}), 502)
-        try:
-            info = _requests.get(
-                f"https://{auth0_domain}/userinfo",
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=10,
-            )
-            info.raise_for_status()
-            userinfo = info.json()
-            email = userinfo.get("email", "")
-            return asta_client.login_or_create_user(
-                auth0_user_id=request.user.get("sub", ""),
-                email=email,
-                name=userinfo.get("name", email),
-                nickname=userinfo.get("nickname", email),
-            ), None
-        except Exception as e:
-            current_app.logger.error("Asta user lookup failed: %s", e)
-            return None, (jsonify({"error": "Failed to authenticate with Asta"}), 502)
 
     @api.route("/<runid>/generate-upload-url", methods=["POST"])
     @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])

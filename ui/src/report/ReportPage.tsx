@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, styled } from '@mui/material';
 
 import { ExperimentFromApi, RunFromApi } from '@/api/RunsApi';
-import { StaticRunExperimentsProvider } from '@/contexts/RunExperimentsContext';
+import {
+    DEFAULT_REFRESH_INTERVAL_MS,
+    StaticRunExperimentsProvider,
+} from '@/contexts/RunExperimentsContext';
 import { URLSearchParamsProvider } from '@/contexts/URLSearchParamsContext';
 import { RunViewContent } from '@/runs/components/RunView';
 import { Run, getExperimentFromApi, getRunFromApi } from '@/types/Run';
@@ -25,9 +28,46 @@ declare global {
 
 const noop = () => {};
 
-/** A run's view, read-only and served from the embedded data. */
+/**
+ * Load data.js again. A script tag, not fetch(): a page opened from file:// may
+ * load scripts beside it but not fetch them. The query string keeps a browser
+ * from reusing the copy it already has.
+ */
+const reloadReportData = () =>
+    new Promise<ReportData | undefined>((resolve) => {
+        const script = document.createElement('script');
+        script.src = `data.js?t=${Date.now()}`;
+        script.onload = script.onerror = () => {
+            script.remove();
+            resolve(window.AUTODISCOVERY_REPORT);
+        };
+        document.head.appendChild(script);
+    });
+
+/** A run's view, read-only and served from the data.js beside the page. */
 export default function ReportPage() {
-    const data = window.AUTODISCOVERY_REPORT;
+    const [data, setData] = useState(window.AUTODISCOVERY_REPORT);
+    const isRunning = data?.run.run_details?.status === 'RUNNING';
+
+    // While the run goes on, report.py rewrites data.js as each experiment
+    // finishes; follow it at the web UI's polling interval. Only a new
+    // experiment or status changes what the page shows, so nothing else
+    // re-renders it.
+    useEffect(() => {
+        if (!isRunning) return;
+        const interval = setInterval(async () => {
+            const next = await reloadReportData();
+            setData((prev) =>
+                next &&
+                (next.experiments.length !== prev?.experiments.length ||
+                    next.run.run_details?.status !== prev?.run.run_details?.status)
+                    ? next
+                    : prev
+            );
+        }, DEFAULT_REFRESH_INTERVAL_MS);
+        return () => clearInterval(interval);
+    }, [isRunning]);
+
     const run = useMemo(() => (data ? getRunFromApi(data.run) : null), [data]);
     const experiments = useMemo(
         () => (data ? data.experiments.map(getExperimentFromApi) : []),
@@ -48,7 +88,10 @@ export default function ReportPage() {
         <Wrapper>
             <ScrollContent>
                 <URLSearchParamsProvider>
-                    <StaticRunExperimentsProvider runid={run.id} experiments={experiments}>
+                    <StaticRunExperimentsProvider
+                        runid={run.id}
+                        experiments={experiments}
+                        hasJobCompleted={!isRunning}>
                         <RunViewContent
                             run={run as Run & { details: NonNullable<Run['details']> }}
                             error={null}

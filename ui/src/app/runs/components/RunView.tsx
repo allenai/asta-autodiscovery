@@ -254,10 +254,7 @@ interface RunViewContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
-    /**
-     * The standalone HTML report: there is no API to share through, and the page
-     * does not poll, so new findings appear when it is reloaded.
-     */
+    /** The standalone HTML report, where there is no API to share through. */
     standalone?: boolean;
 }
 
@@ -708,26 +705,16 @@ export function RunViewContent({
                         </RunHeaderTopRow>
                         {isRunning && (
                             <RunHeaderMessage>
-                                {standalone ? (
-                                    <Typography variant="caption">
-                                        AutoDiscovery is running. This report is rewritten as each
-                                        experiment finishes; reload the page to see new findings.
-                                    </Typography>
-                                ) : (
-                                    <>
-                                        <Typography variant="caption">
-                                            AutoDiscovery is running. New findings will populate the
-                                            table below automatically. You can click on any
-                                            hypothesis to review the details while the run
-                                            continues.
-                                        </Typography>
-                                        <br />
-                                        <Typography variant="caption">
-                                            Feel free to navigate away; your results will be here
-                                            when the analysis is complete.
-                                        </Typography>
-                                    </>
-                                )}
+                                <Typography variant="caption">
+                                    AutoDiscovery is running. New findings will populate the table
+                                    below automatically. You can click on any hypothesis to review
+                                    the details while the run continues.
+                                </Typography>
+                                <br />
+                                <Typography variant="caption">
+                                    Feel free to navigate away; your results will be here when the
+                                    analysis is complete.
+                                </Typography>
                             </RunHeaderMessage>
                         )}
                         {run.details.status === 'FAILED' && (

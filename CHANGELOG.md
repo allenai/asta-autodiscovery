@@ -18,8 +18,8 @@ self-contained `index.html`, with the run's data in `data.js` and its figures in
 `figures/` beside it.
 
 The report is written when a run starts and rewritten as each experiment
-finishes, so a long run's results can be read, by reloading the page, while it
-is still going. `python -m autodiscovery.report <out_dir>` regenerates the
+finishes, and an open page picks up new findings by itself, so a long run's
+results can be read while it is still going. `python -m autodiscovery.report <out_dir>` regenerates the
 report for an existing run.
 
 ### Clearer experiment section labels

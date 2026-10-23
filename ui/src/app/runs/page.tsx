@@ -1,18 +1,23 @@
 import { Box, CircularProgress, styled, Typography } from '@mui/material';
 
 import { useAuth0 } from '@/contexts/Auth0Context';
+import { useExampleRuns } from '@/contexts/ExampleRunsContext';
 import { TEST_ID_AI2_LOGO_LINK, TEST_ID_ASTA_LOGO_LINK } from '@/testIds';
 import { IntroBox } from '@/runs/components/IntroBox';
 import { ExamplesRunsBox } from '@/runs/components/ExamplesRunsBox';
 import { ViewerRunsBox } from '@/runs/components/ViewerRunsBox';
 import { ToS } from '@/components/ToS';
 import { AstaAdBanner } from '@/components/AstaAdBanner';
+import { isAstaMarketingEnabled } from '@/utils/marketing';
 
 /**
  * Main /runs page - shows welcome message when no run is selected
  */
 export default function RunsPage() {
     const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+    const { exampleRuns, isExampleRunsLoading } = useExampleRuns();
+    // Deployments without sample runs get no empty "Example sessions" section.
+    const showExamples = isExampleRunsLoading || !!exampleRuns?.length;
 
     if (isLoading) {
         return (
@@ -66,14 +71,16 @@ export default function RunsPage() {
                             experiment.
                         </Attribution>
                     </Section>
-                    <Section>
-                        <ExamplesRunsBox />
-                    </Section>
+                    {showExamples && (
+                        <Section>
+                            <ExamplesRunsBox />
+                        </Section>
+                    )}
                     <FooterWrapper>
                         <ToS />
                     </FooterWrapper>
                 </LoggedOutLayout>
-                <AstaAdBanner isFullWidth />
+                {isAstaMarketingEnabled && <AstaAdBanner isFullWidth />}
             </>
         );
     }
@@ -86,10 +93,12 @@ export default function RunsPage() {
             <Section>
                 <ViewerRunsBox />
             </Section>
-            <Section>
-                <ExamplesRunsBox />
-            </Section>
-            <AstaAdBanner />
+            {showExamples && (
+                <Section>
+                    <ExamplesRunsBox />
+                </Section>
+            )}
+            {isAstaMarketingEnabled && <AstaAdBanner />}
         </Layout>
     );
 }

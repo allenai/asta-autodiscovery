@@ -60,6 +60,7 @@ import {
     hydrateExperimentsForExport,
 } from '@/utils/exportUtils';
 import { getRunStatusString } from '@/runs/utils/runUtils';
+import { useAuth0 } from '@/contexts/Auth0Context';
 import { useToasts } from '@/contexts/ToastsContext';
 import { useRunBookmarks } from '@/contexts/RunBookmarksContext';
 import {
@@ -68,6 +69,7 @@ import {
     RunPanel,
     ExperimentPanel,
     ExperimentPanelBackdrop,
+    ExperimentActionButton,
     LargeScreenAction,
     PanelDragHandle,
     usePanelWidthPx,
@@ -134,6 +136,7 @@ interface RunViewProps {
 export default function RunView({ runid, onRunCancelled, userid }: RunViewProps) {
     const api = getRunsApi();
     const { viewerRuns, addViewerRun, updateViewerRun } = useViewerRuns();
+    const { provider } = useAuth0();
 
     const run = viewerRuns?.[runid] ?? null;
     const [isLoading, setIsLoading] = useState(true);
@@ -242,6 +245,7 @@ export default function RunView({ runid, onRunCancelled, userid }: RunViewProps)
                 cancelling={cancelling}
                 handleStop={handleStop}
                 experimentsLabel={experimentsLabel}
+                canShare={provider !== 'none'}
             />
         </RunExperimentsProvider>
     );
@@ -254,8 +258,12 @@ interface RunViewContentProps {
     cancelling: boolean;
     handleStop: () => void;
     experimentsLabel: string;
-    /** The standalone HTML report, where there is no API to share through. */
-    standalone?: boolean;
+    /**
+     * Offer the share actions. Off in the standalone HTML report, where there is no
+     * API to share through, and with AUTH_PROVIDER=none, where there is no one else
+     * to share with.
+     */
+    canShare?: boolean;
 }
 
 export function RunViewContent({
@@ -265,7 +273,7 @@ export function RunViewContent({
     cancelling,
     handleStop,
     experimentsLabel,
-    standalone = false,
+    canShare = false,
 }: RunViewContentProps) {
     const { isRunBookmarksEnabled, checkRunBookmarked, updateRunBookmark } = useRunBookmarks();
     const runsApi = getRunsApi();
@@ -330,6 +338,17 @@ export function RunViewContent({
             setIsClosingPanel(false);
         }, 300);
     }, [selectExperiment]);
+
+    // Escape closes the experiment panel. Open dialogs and menus swallow their own
+    // Escape, so this only fires when the panel is the topmost thing.
+    useEffect(() => {
+        if (!selectedExperiment) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !event.defaultPrevented) handleClosePanel();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedExperiment, handleClosePanel]);
 
     const onShareClick = useCallback(
         async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -539,20 +558,22 @@ export function RunViewContent({
                                                 anchorEl={overflowAnchorEl}
                                                 open={!!overflowAnchorEl}
                                                 onClose={() => setOverflowAnchorEl(null)}>
-                                                <MenuItem
-                                                    onClick={(
-                                                        e: React.MouseEvent<HTMLLIElement>
-                                                    ) => {
-                                                        setOverflowAnchorEl(null);
-                                                        onShareClick(
-                                                            e as unknown as React.MouseEvent<HTMLButtonElement>
-                                                        );
-                                                    }}>
-                                                    <ListItemIcon>
-                                                        <ShareOutlinedIcon fontSize="small" />
-                                                    </ListItemIcon>
-                                                    <ListItemText>Share session</ListItemText>
-                                                </MenuItem>
+                                                {canShare && (
+                                                    <MenuItem
+                                                        onClick={(
+                                                            e: React.MouseEvent<HTMLLIElement>
+                                                        ) => {
+                                                            setOverflowAnchorEl(null);
+                                                            onShareClick(
+                                                                e as unknown as React.MouseEvent<HTMLButtonElement>
+                                                            );
+                                                        }}>
+                                                        <ListItemIcon>
+                                                            <ShareOutlinedIcon fontSize="small" />
+                                                        </ListItemIcon>
+                                                        <ListItemText>Share session</ListItemText>
+                                                    </MenuItem>
+                                                )}
                                                 <MenuItem
                                                     disabled={experiments.length === 0}
                                                     onClick={(e) => {
@@ -687,17 +708,19 @@ export function RunViewContent({
                                                     JSON
                                                 </MenuItem>
                                             </DownloadMenu>
-                                            <Tooltip title="Share session" placement="bottom">
-                                                <ExpandingActionButton
-                                                    onClick={onShareClick}
-                                                    size="small"
-                                                    variant="outlined">
-                                                    <ShareOutlinedIcon fontSize="small" />
-                                                    <ButtonLabel className="button-label">
-                                                        Share session
-                                                    </ButtonLabel>
-                                                </ExpandingActionButton>
-                                            </Tooltip>
+                                            {canShare && (
+                                                <Tooltip title="Share session" placement="bottom">
+                                                    <ExpandingActionButton
+                                                        onClick={onShareClick}
+                                                        size="small"
+                                                        variant="outlined">
+                                                        <ShareOutlinedIcon fontSize="small" />
+                                                        <ButtonLabel className="button-label">
+                                                            Share session
+                                                        </ButtonLabel>
+                                                    </ExpandingActionButton>
+                                                </Tooltip>
+                                            )}
                                         </>
                                     )}
                                 </RunHeaderActions>
@@ -833,7 +856,18 @@ export function RunViewContent({
                                 canExploreWithAsta={run.canExploreWithAsta}
                                 actions={
                                     <>
-                                        {!standalone && (
+                                        <Tooltip title="Close" placement="bottom">
+                                            <ExperimentActionButton
+                                                aria-label="Close experiment details"
+                                                onClick={handleClosePanel}
+                                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
+                                                {...mkCloseExperimentDetailsPanelAttrs({
+                                                    runId: run.id,
+                                                })}>
+                                                <CloseIcon fontSize="small" />
+                                            </ExperimentActionButton>
+                                        </Tooltip>
+                                        {canShare && (
                                             <Tooltip title="Share experiment" placement="bottom">
                                                 <ExpandingActionButton
                                                     onClick={onShareExperimentClick}
@@ -872,22 +906,6 @@ export function RunViewContent({
                                                 </ExpandingActionButton>
                                             </Tooltip>
                                         </LargeScreenAction>
-                                        <Tooltip title="Close" placement="bottom">
-                                            <ExpandingActionButton
-                                                aria-label="Close experiment details"
-                                                onClick={handleClosePanel}
-                                                size="small"
-                                                variant="outlined"
-                                                data-test-id={TEST_ID_EXPERIMENT_DETAILS_CLOSE}
-                                                {...mkCloseExperimentDetailsPanelAttrs({
-                                                    runId: run.id,
-                                                })}>
-                                                <CloseIcon fontSize="small" />
-                                                <ButtonLabel className="button-label">
-                                                    Close
-                                                </ButtonLabel>
-                                            </ExpandingActionButton>
-                                        </Tooltip>
                                     </>
                                 }
                             />

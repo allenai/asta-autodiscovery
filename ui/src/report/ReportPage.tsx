@@ -101,7 +101,6 @@ export default function ReportPage() {
                             experimentsLabel={
                                 run.stats?.requestedExperiments === 1 ? 'experiment' : 'experiments'
                             }
-                            standalone
                         />
                     </StaticRunExperimentsProvider>
                 </URLSearchParamsProvider>

@@ -44,7 +44,7 @@ GRANT_AMOUNT = 1000
 
 # Recorded in each granted profile. Bump it for a future grant, so that one
 # does not read this one as already applied.
-GRANT_ID = "grant-1000-credits-v1"
+GRANT_ID = "grant-1000-credits-v2"
 
 
 def read_profile(bucket: Bucket, userid: str) -> tuple[dict[str, Any], int] | None:

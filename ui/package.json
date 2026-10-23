@@ -76,7 +76,7 @@
     "eslint-plugin-standard": "^5.0.0",
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
-    "vite": "^6.3.5",
+    "vite": "^6.4.4",
     "vite-plugin-singlefile": "2.3.3",
     "zod": "^4.3.6"
   },

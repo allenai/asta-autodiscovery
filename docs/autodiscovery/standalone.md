@@ -201,14 +201,16 @@ Steps:
    `asta-autodiscovery-modal` and `asta-code-execution` are actually published,
    but we sync the whole workspace so versions don't drift.
 
-2. Just before merging to main, push the version tag:
+2. After the PR is merged, push the version tag from an up-to-date `main`:
 
    ```sh
+   git checkout main && git pull
    make push-version-tag
    ```
 
    This verifies version consistency, creates `v<version>`, and pushes it to
-   `origin`.
+   `origin`. Tag `main` rather than the PR branch: a squash merge leaves the
+   branch's commit off `main`, and the workflow builds whatever the tag points at.
 
 3. **Trigger the workflow**: in GitHub Actions, run the *Publish to PyPI*
    workflow with the tag (e.g. `v1.1.7`) as the `version` input.

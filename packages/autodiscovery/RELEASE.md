@@ -6,6 +6,13 @@ generate follow-up hypotheses in a recursive exploration.
 
 > Link to our NeurIPS 2025 paper: [AutoDiscovery: Open-ended Scientific Discovery via Bayesian Surprise](https://openreview.net/pdf?id=kJqTkj2HhF)
 
+## Upgrading from 1.x
+
+2.0.0 has no default model. A command line that relied on the 1.x default stops at startup
+with `No model chosen`: add `--model <provider>/<model>`, or export `AUTODISCOVERY_MODEL`.
+`--belief_model` and `--vision_model` follow `--model` unless set, and `--embedding_model` is
+needed only with `--dedupe`. See [Selecting models](#selecting-models) below.
+
 ## Upgrading from 0.2.x
 
 1.0.0 changes two things that every existing command line depends on:
@@ -35,6 +42,7 @@ Point `auto-discovery` at one or more dataset files and describe what you want e
 
 ```sh
 auto-discovery \
+    --model openai/gpt-5.4-mini \
     --name "Plant growth study" \
     --description "Field trial measurements of plant height under varying fertilizer dosage" \
     --intent "Focus on dose-response relationships" \
@@ -80,21 +88,20 @@ need to configure the providers you actually name in `--model`, `--belief_model`
 
 ### Vertex AI
 
-Used when a model flag names `vertex_ai/...`. The defaults are Vertex models, so this is required
-unless you override them all.
+Used when a model flag names `vertex_ai/...`.
 
 Pick one of the following. In all cases, set the project and location so the agent knows which
 Vertex endpoint to call — these are litellm's own variable names, read by litellm itself:
 
 ```sh
 export VERTEXAI_PROJECT=your-gcp-project-id
-export VERTEXAI_LOCATION=global   # `global` serves the default models
+export VERTEXAI_LOCATION=global   # `global` serves the Gemini models
 ```
 
 Both are required for a `vertex_ai/` model, and a run that names one without them stops at
 startup naming whichever is missing. Neither is inferred: Application Default Credentials carry
 a project of their own, which is frequently not the project you meant, and litellm's fallback
-location is `us-central1`, which does not serve the Gemini models the defaults name. Relying on
+location is `us-central1`, which does not serve every Gemini model. Relying on
 either turns a missing setting into a confusing 404 mid-run.
 
 **Service account key file (recommended for non-interactive use):**
@@ -122,6 +129,25 @@ Used when a model flag names `openai/...` (e.g. `openai/gpt-4o`).
 
 ```sh
 export OPENAI_API_KEY=sk-...
+```
+
+### Anthropic
+
+Used when a model flag names `anthropic/...`. Anthropic has no embedding models, so `--dedupe`
+needs an `--embedding_model` from another provider.
+
+```sh
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Azure OpenAI
+
+Used when a model flag names `azure/<deployment name>`. Name deployments after the model they
+serve, so the model's request handling resolves from litellm's registry.
+
+```sh
+export AZURE_API_KEY=...
+export AZURE_API_BASE=https://<resource>.openai.azure.com
 ```
 
 ### GitHub Copilot

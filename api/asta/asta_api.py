@@ -1,17 +1,24 @@
-"""The "dig deeper" handoff of an AutoDiscovery experiment to Asta.
-
-Served under the runs API's URL prefix, since it acts on a run's experiment.
-"""
+"""Asta dataset imports and experiment handoffs, served under the runs API prefix."""
 
 import os
 from datetime import UTC, datetime, timedelta
+from typing import BinaryIO, cast
 
 import requests
 from autodiscovery_jobs import JobConfig, JobManager
-from autodiscovery_jobs.persistence import read_rich_outputs
+from autodiscovery_jobs.persistence import dataset_key, read_rich_outputs
+from autodiscovery_jobs.storage import get_store
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import requires_auth
+from runs.datasets import (
+    UPLOAD_MAX_FILE_SIZE_BYTES,
+    UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES,
+    LimitedDatasetReader,
+    is_valid_dataset_filename,
+)
+from runs.models import UploadDatasetResponseModel
+from utils.auth import PermissionType, requires_auth
 from utils.experiments import ExperimentTree
+from werkzeug.exceptions import BadRequest
 
 from asta import client, context_client, workspace
 from asta.context_client import is_configured as is_enabled
@@ -19,6 +26,7 @@ from asta.models import (
     AutoDiscoveryContextModel,
     DigDeeperRequestModel,
     DigDeeperResponseModel,
+    ImportContextArtifactRequestModel,
     ManifestModel,
 )
 
@@ -27,13 +35,142 @@ from asta.models import (
 AUTODISCOVERY_BASE_URL = os.environ.get("AUTODISCOVERY_BASE_URL", "https://autodiscovery.allen.ai")
 
 
+def _access_token() -> str:
+    """Read the bearer token, including when authentication is disabled locally."""
+    parts = (request.headers.get("Authorization", "") or "").split()
+    return parts[-1] if parts else ""
+
+
+def _resolve_asta_user_uuid() -> tuple[str | None, tuple | None]:
+    """Map the authenticated Auth0 user to their Asta UUID for either integration."""
+    auth0_user_id = request.user.get("sub", "")
+    auth0_domain = os.environ.get("AUTH0_DOMAIN", "")
+    token = _access_token()
+
+    # Asta can match returning users by email. Fetch their real profile and retry
+    # transient failures rather than sending placeholder data that creates duplicates.
+    userinfo = None
+    if token and auth0_domain:
+        for attempt in range(2):
+            try:
+                info = requests.get(
+                    f"https://{auth0_domain}/userinfo",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=10,
+                )
+                info.raise_for_status()
+                userinfo = info.json()
+                break
+            except Exception as e:
+                current_app.logger.warning(
+                    "Auth0 userinfo fetch failed (attempt %d/2): %s", attempt + 1, e
+                )
+
+    if userinfo is None:
+        current_app.logger.error("Could not fetch Auth0 userinfo")
+        return None, (jsonify({"error": "Failed to fetch user profile from Auth0"}), 502)
+
+    email = userinfo.get("email", "")
+    try:
+        return client.login_or_create_user(
+            auth0_user_id=auth0_user_id,
+            email=email,
+            name=userinfo.get("name", email),
+            nickname=userinfo.get("nickname", email),
+        ), None
+    except Exception as e:
+        current_app.logger.error("Asta login failed: %s", e)
+        return None, (jsonify({"error": "Failed to authenticate with Asta"}), 502)
+
+
 def create() -> Blueprint:
-    """Create the Asta handoff blueprint.
+    """Create the Asta integration blueprint.
 
     Returns:
-        Flask Blueprint with the dig-deeper endpoint.
+        Flask Blueprint with dataset import and dig-deeper endpoints.
     """
     api = Blueprint("asta_api", __name__)
+
+    @api.route("/<runid>/import-context-artifact", methods=["POST"])
+    @requires_auth(check_permissions=[PermissionType.HIGHER_UPLOAD_LIMIT])
+    def import_context_artifact(runid: str):  # pyright: ignore reportUnusedFunction
+        """Copy one of the caller's Asta context-service artifacts into the run's data.
+
+        An alternative to uploading: the file lands at the same data key an upload
+        would, so metadata and the job runner treat it exactly like an uploaded file.
+        Only available when the Asta integration is configured.
+        """
+        if not is_enabled():
+            return jsonify({"error": "Asta integration is not configured"}), 404
+
+        userid = request.user.get("sub")
+        if not userid:
+            return jsonify({"error": "User ID not found in token"}), 401
+
+        try:
+            req = ImportContextArtifactRequestModel(**(request.get_json(silent=True) or {}))
+        except Exception as e:
+            raise BadRequest(f"Invalid request: {e}") from e
+
+        manager = JobManager(JobConfig.from_env())
+        if not manager.job_exists(userid, runid):
+            return jsonify({"error": f"Run {runid} not found"}), 404
+
+        user_uuid, err = _resolve_asta_user_uuid()
+        if err:
+            return err
+
+        try:
+            artifact = context_client.find_owned_artifact(user_uuid, req.artifact_id)
+        except Exception as e:
+            current_app.logger.error("Context-service artifact lookup failed: %s", e)
+            return jsonify({"error": "Failed to look up Asta artifact"}), 502
+        if artifact is None:
+            return jsonify({"error": f"Artifact {req.artifact_id} not found"}), 404
+
+        filename = req.filename or artifact.get("path", "").rsplit("/", 1)[-1]
+        if not is_valid_dataset_filename(filename):
+            raise BadRequest("Invalid filename")
+
+        has_higher_limit = getattr(request, PermissionType.HIGHER_UPLOAD_LIMIT.value, False)
+        max_file_size = (
+            UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES
+            if has_higher_limit
+            else UPLOAD_MAX_FILE_SIZE_BYTES
+        )
+        stream = None
+        try:
+            download_url = context_client.get_download_url(req.artifact_id)
+            with requests.get(download_url, stream=True, timeout=(10, 300)) as src:
+                src.raise_for_status()
+                try:
+                    size = int(src.headers.get("Content-Length", ""))
+                except (ValueError, TypeError):
+                    size = 0
+                if size > max_file_size:
+                    return jsonify({"error": "File too large."}), 413
+                src.raw.decode_content = True
+                stream = LimitedDatasetReader(src.raw, max_file_size)
+                key = dataset_key(userid, runid, filename)
+                store = get_store(manager.config)
+                # Both stores commit atomically; a failed read preserves the old object.
+                store.write_stream(
+                    key,
+                    cast(BinaryIO, stream),
+                    content_type=src.headers.get("Content-Type"),
+                )
+        except Exception as e:
+            if stream is not None and stream.limit_exceeded:
+                return jsonify({"error": "File too large."}), 413
+            current_app.logger.error("Failed to import context artifact: %s", e)
+            return jsonify({"error": "Failed to import Asta artifact"}), 502
+
+        resp = UploadDatasetResponseModel(
+            path=store.uri(key),
+            filename=filename,
+            message="Dataset imported from Asta",
+        )
+        return jsonify(resp.model_dump()), 200
 
     @api.route("/<userid>/<runid>/experiments/<experiment_id>/dig-deeper", methods=["POST"])
     @requires_auth()
@@ -109,51 +246,10 @@ def create() -> Blueprint:
             autodiscovery_context=context,
         )
 
-        # Fetch full user profile from Auth0 for the Asta login call.
-        # Asta's login falls back to matching by email when auth0_user_id doesn't
-        # match an existing record (e.g. the user authenticated via a different
-        # Auth0 connection than before), so a missing/bad email here can cause
-        # Asta to create a duplicate account instead of recognizing a returning
-        # user. Retry once on transient failures rather than sending fake data.
-        auth0_user_id = request.user.get("sub", "")
-        auth0_domain = os.environ.get("AUTH0_DOMAIN", "")
-        token = (request.headers.get("Authorization", "") or "").split()[-1]
-
-        userinfo = None
-        if token and auth0_domain:
-            for attempt in range(2):
-                try:
-                    info = requests.get(
-                        f"https://{auth0_domain}/userinfo",
-                        headers={"Authorization": f"Bearer {token}"},
-                        timeout=10,
-                    )
-                    info.raise_for_status()
-                    userinfo = info.json()
-                    break
-                except Exception as e:
-                    current_app.logger.warning(
-                        "Auth0 userinfo fetch failed (attempt %d/2): %s", attempt + 1, e
-                    )
-
-        if userinfo is None:
-            current_app.logger.error("Could not fetch Auth0 userinfo for user %s", auth0_user_id)
-            return jsonify({"error": "Failed to fetch user profile from Auth0"}), 502
-
-        email = userinfo.get("email", "")
-        name = userinfo.get("name", email)
-        nickname = userinfo.get("nickname", email)
-
-        try:
-            user_uuid = client.login_or_create_user(
-                auth0_user_id=auth0_user_id,
-                email=email,
-                name=name,
-                nickname=nickname,
-            )
-        except Exception as e:
-            current_app.logger.error("Asta login failed: %s", e)
-            return jsonify({"error": "Failed to authenticate with Asta"}), 502
+        user_uuid, err = _resolve_asta_user_uuid()
+        if err:
+            return err
+        token = _access_token()
 
         autodiscovery_link = (
             f"{AUTODISCOVERY_BASE_URL}/runs/{runid}?exp={target_node.creation_idx - 1}"

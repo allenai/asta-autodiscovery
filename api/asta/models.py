@@ -44,3 +44,12 @@ class DigDeeperResponseModel(BaseModel):
 
     asta_url: str = Field(..., description="Asta chat URL for the created thread")
     manifest_gcs_uri: str = Field(..., description="GCS URI where manifest.json was saved")
+
+
+class ImportContextArtifactRequestModel(BaseModel):
+    """Model for the request to import an Asta context-service artifact as a dataset"""
+
+    artifact_id: str = Field(..., description="Context-service artifact ID to import")
+    filename: str | None = Field(
+        None, description="Name to store the dataset under; defaults to the artifact's filename"
+    )

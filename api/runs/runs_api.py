@@ -25,6 +25,12 @@ from utils.credits import (
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
+from runs.datasets import (
+    UPLOAD_MAX_FILE_SIZE_BYTES,
+    UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES,
+    UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR,
+    is_valid_dataset_filename,
+)
 from runs.models import (
     BookmarkExperimentRequestModel,
     BookmarkExperimentResponseModel,
@@ -91,13 +97,6 @@ try:
     JOBS_AVAILABLE = True
 except ImportError:
     JOBS_AVAILABLE = False
-
-# Max size of files that can be uploaded
-UPLOAD_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 * 1024  # 50GB default
-UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_BYTES = (
-    100 * 1024 * 1024 * 1024
-)  # 100GB for users with higher upload limit permission
-UPLOAD_MAX_FILE_SIZE_HIGHER_LIMIT_STR = "100GB"
 
 # Expiration time for presigned upload URLs
 UPLOAD_URL_EXPIRATION_SECONDS = 3600  # 1 hour
@@ -709,7 +708,7 @@ def create() -> Blueprint:
         # two. So reject anything that could point outside the run's data prefix
         # rather than rewriting it. (The filesystem store also refuses to escape its
         # root, but that would surface as a 500.)
-        if "/" in file.filename or "\\" in file.filename or file.filename in (".", ".."):
+        if not is_valid_dataset_filename(file.filename):
             raise BadRequest("Invalid filename")
 
         # Enforce the size cap where the bytes actually arrive. The check in

@@ -60,6 +60,15 @@ asta-code-execution = { workspace = true }
 # Local dev: path override for asta-sandbox (comment out to use PyPI)
 #asta-sandbox = { path = "../dv-core-asta-integration/packages/sandbox", editable = true }
 
+[tool.uv]
+# google-adk caps opentelemetry at <=1.44, but the fix for GHSA-xcq7-p3pf-p88h
+# (unbounded tracestate parsing) first ships in 1.45.1. Drop this once
+# google-adk allows it.
+override-dependencies = [
+    "opentelemetry-api>=1.45.1",
+    "opentelemetry-sdk>=1.45.1",
+]
+
 [tool.coverage.run]
 omit = [
     "packages/**/tests/**",

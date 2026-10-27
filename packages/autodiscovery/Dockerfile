@@ -1,6 +1,6 @@
 # The HTML report every run writes is the web UI's run view, built from ui/ into
 # package data (see ui/vite.report.config.ts and autodiscovery/report.py).
-FROM node:24-slim AS report-viewer
+FROM node:24.22.1-slim AS report-viewer
 
 WORKDIR /repo/ui
 

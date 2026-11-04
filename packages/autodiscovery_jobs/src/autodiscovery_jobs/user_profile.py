@@ -34,12 +34,15 @@ class UserProfile:
             ``api/scripts/grant_credits.py`` so re-running it cannot credit
             anyone twice. Carried so a save through this class keeps it;
             internal bookkeeping, not for API responses.
+        asta_user_uuid: The user's Asta user UUID, when known (recorded from
+            requests relayed by the Asta API gateway)
     """
 
     granted_credits: int | None = None
     created_at: str = ""
     updated_at: str = ""
     grants: list[dict[str, Any]] = field(default_factory=list)
+    asta_user_uuid: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -48,6 +51,7 @@ class UserProfile:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "grants": self.grants,
+            "asta_user_uuid": self.asta_user_uuid,
         }
 
     @classmethod
@@ -58,6 +62,7 @@ class UserProfile:
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at", ""),
             grants=data.get("grants") or [],
+            asta_user_uuid=data.get("asta_user_uuid"),
         )
 
     @classmethod

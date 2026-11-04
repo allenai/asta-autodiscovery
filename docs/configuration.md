@@ -40,13 +40,14 @@ each provider; the table below is the variable reference.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTH_PROVIDER` | No | `none` | Active auth backend: `none` (zero-config, unauthenticated local user), `auth0`, or `password_file`. Set explicitly for any real deployment. |
+| `AUTH_PROVIDER` | No | `none` | Active auth backend: `none` (zero-config, unauthenticated local user), `auth0`, or `password_file`, optionally preceded by `gateway` (e.g. `gateway,auth0`). Set explicitly for any real deployment. |
 | `AUTH0_DOMAIN` | auth0 | *(none)* | Auth0 tenant domain used to validate tokens and look up user info. Compose default: `auth0.allenai.org`. |
 | `AUTH0_AUDIENCE` | auth0 | *(none)* | Expected audience (API identifier) for incoming access tokens. Compose default: `https://asta-core.allen.ai`. |
 | `AUTH0_CLIENT_ID` | No | *(none)* | Public SPA client id, served to the UI via `/api/auth/config`. |
 | `AUTH_PASSWORD_DIR` | password_file | *(none)* | Directory holding the user store (fixed filename `passwddb.json`), managed with `api/scripts/auth_admin.py`. Mounted as a directory so edits are picked up live. |
 | `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
 | `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
+| `ASTA_GATEWAY_SERVICE_KEY` | gateway | *(none)* | The Asta API gateway's service key. Requests bearing it are authenticated as the user the gateway names in headers. See [Authentication](authentication.md#requests-from-the-asta-api-gateway). |
 
 ## Experiment credits
 

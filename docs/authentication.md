@@ -83,3 +83,34 @@ a shared or production deployment**, as it grants everyone full access.
 ```bash
 AUTH_PROVIDER=none            # the default; no other configuration
 ```
+
+## Requests from the Asta API gateway
+
+The asta CLI reaches AutoDiscovery through the Asta API gateway, which authenticates its
+own callers and relays their requests with its service key. To accept them, add the
+`gateway` provider ahead of the provider your users sign in with, and set the key:
+
+```bash
+AUTH_PROVIDER=gateway,auth0
+ASTA_GATEWAY_SERVICE_KEY=<the key the gateway sends as its bearer>
+```
+
+`AUTH_PROVIDER` may list several providers, separated by commas. Each request goes to
+the first that recognizes its credentials; `gateway` recognizes only requests bearing its
+key, so it goes first. The UI's login is the first provider people sign in with (here
+`auth0`).
+
+A request bearing the key is authenticated as the caller the gateway names in headers.
+The gateway strips any copy of these headers its own caller sends.
+
+| Header | Meaning | Becomes |
+| --- | --- | --- |
+| `x-asta-auth0-sub` | the user's Auth0 subject | the user id, as the `auth0` provider would give it |
+| `x-asta-user-uuid` | the same user's Asta user UUID | recorded in the user's profile |
+| `x-asta-static-key` | the name of a gateway static key (a service caller) | the user id `static-key:<name>` |
+
+Gateway callers hold no permissions: they get the default upload limit and no admin
+access.
+
+Any `<userid>` in an API path may be `me`, meaning the caller, so a client never needs to
+know which id it is keyed on.

@@ -229,7 +229,7 @@ and runs **offline**, not in the request path. Out of scope for swapping; left a
 
 | Var | Provider | Notes |
 |---|---|---|
-| `AUTH_PROVIDER` | all | `none` (default) \| `auth0` \| `password_file` |
+| `AUTH_PROVIDER` | all | `none` (default) \| `auth0` \| `password_file`, optionally preceded by `gateway` (e.g. `gateway,auth0`) |
 | `AUTH_PASSWORD_DIR` | password_file | dir holding the store (fixed `passwddb.json`); mounted as a directory |
 | `AUTH_SESSION_SECRET` | password_file | HS256 signing secret |
 | `AUTH_SESSION_TTL` | password_file | token lifetime (default e.g. 12h) |

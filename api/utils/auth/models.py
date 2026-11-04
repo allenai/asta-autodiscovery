@@ -10,6 +10,11 @@ class AuthenticatedUser:
         - auth0:         "auth0|...", "google-oauth2|..."
         - password_file: "file|<username>"
         - none:          "local"
+        - gateway:       the user's Auth0 subject, or "static-key:<name>"
+
+    `asta_user_uuid` is the Asta user UUID, when the caller came through the
+    gateway and it knew one. `provider` names the provider that
+    authenticated the user when several are configured.
     """
 
     sub: str
@@ -18,6 +23,8 @@ class AuthenticatedUser:
     name: str | None = None
     picture: str | None = None
     email_verified: bool | None = None
+    asta_user_uuid: str | None = None
+    provider: str | None = None
 
     def to_request_user(self) -> dict:
         """Back-compat dict shape that handlers read via request.user.get(...)."""
@@ -28,4 +35,5 @@ class AuthenticatedUser:
             "name": self.name,
             "picture": self.picture,
             "email_verified": self.email_verified,
+            "asta_user_uuid": self.asta_user_uuid,
         }

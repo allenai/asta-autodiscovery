@@ -10,6 +10,7 @@ class AuthenticatedUser:
         - auth0:         "auth0|...", "google-oauth2|..."
         - password_file: "file|<username>"
         - none:          "local"
+        - trusted_header: the id the upstream names, after any configured prefix
 
     `provider` names the provider that authenticated the user when several are
     configured.

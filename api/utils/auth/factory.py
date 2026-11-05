@@ -4,7 +4,7 @@ from .base import AuthConfigError, AuthProvider
 
 _PROVIDER_CACHE: AuthProvider | None = None
 
-_KNOWN = ("auth0", "password_file", "none")
+_KNOWN = ("auth0", "password_file", "trusted_header", "none")
 
 
 def _build_one(kind: str) -> AuthProvider:
@@ -18,6 +18,10 @@ def _build_one(kind: str) -> AuthProvider:
         from .providers.password_file import PasswordFileProvider
 
         return PasswordFileProvider.from_env()
+    if kind == "trusted_header":
+        from .providers.trusted_header import TrustedHeaderProvider
+
+        return TrustedHeaderProvider.from_env()
     if kind == "none":
         from .providers.none import NoneProvider
 

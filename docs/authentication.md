@@ -15,6 +15,7 @@ architecture see the [design doc](design/auth-providers.md).
 | `none` (default) | Local runs / single-user dev — zero config. | None — always signed in. | Nothing. |
 | `auth0` | Hosted, multi-user deployments (SSO). | Redirect to Auth0. | An Auth0 tenant + application. |
 | `password_file` | Self-hosted / small teams without Auth0. | Username + password form. | A mounted store dir + a session secret. |
+| `trusted_header` | Behind an authenticating proxy or API gateway, alongside one of the above. | None — the upstream signs users in. | A secret shared with the upstream. |
 
 The default is **`none`** so the app runs out of the box with no auth configuration.
 **Any real or multi-user deployment must set `AUTH_PROVIDER` explicitly** to `auth0` or
@@ -74,6 +75,34 @@ uv run api/scripts/auth_admin.py list
 In a deployed environment, `kubectl exec` into the API container (which has the store
 mounted) and run the same command.
 
+## `trusted_header`
+
+Accepts requests relayed by an upstream you trust (an authenticating proxy or an API
+gateway) that has already signed the user in. The upstream sends a shared secret as its
+bearer token and names the user in a header:
+
+```bash
+AUTH_PROVIDER=trusted_header,auth0          # ahead of the provider people sign in with
+AUTH_TRUSTED_HEADER_SECRET=<the bearer the upstream sends>
+# AUTH_TRUSTED_HEADER_USER=X-Forwarded-User  # the default
+```
+
+The header is trusted only on a request bearing the secret, so the upstream must drop
+any copy of it that its own callers send. The value becomes the user id; to share runs
+with users who also sign in directly, the upstream names them by the same id the other
+provider gives them (for `auth0`, the Auth0 subject).
+
+`AUTH_TRUSTED_HEADER_USER` may list several headers, each optionally `header=prefix`, for
+an upstream that names different kinds of caller in different headers. A request must
+carry exactly one of them, and the prefix keeps the kinds apart:
+
+```bash
+AUTH_TRUSTED_HEADER_USER=X-Forwarded-User,X-Forwarded-Service=service:
+```
+
+Callers authenticated this way hold no permissions: they get the default upload limit and
+no admin access.
+
 ## `none` (desktop mode) — default
 
 The default provider. Every request is a fixed `local` user with all permissions; there
@@ -89,7 +118,7 @@ AUTH_PROVIDER=none            # the default; no other configuration
 `AUTH_PROVIDER` may list several providers, separated by commas. Each request goes to the
 first provider, in order, that recognizes its credentials. A provider that accepts every
 request (`auth0`, `password_file`, `none`) recognizes them all, so it must come last; one
-that recognizes only its own kind of credential goes before it. The UI's login is the
+that recognizes only its own kind of credential (`trusted_header`) goes before it. The UI's login is the
 first provider people sign in with.
 
 A single name behaves exactly as before.

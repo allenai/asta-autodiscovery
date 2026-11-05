@@ -83,3 +83,19 @@ a shared or production deployment**, as it grants everyone full access.
 ```bash
 AUTH_PROVIDER=none            # the default; no other configuration
 ```
+
+## Several providers
+
+`AUTH_PROVIDER` may list several providers, separated by commas. Each request goes to the
+first provider, in order, that recognizes its credentials. A provider that accepts every
+request (`auth0`, `password_file`, `none`) recognizes them all, so it must come last; one
+that recognizes only its own kind of credential goes before it. The UI's login is the
+first provider people sign in with.
+
+A single name behaves exactly as before.
+
+## Referring to yourself as `me`
+
+Any `<userid>` in an API path may be `me`, meaning the signed-in caller, so a client
+needn't know which id the API keys it on (`GET /api/runs/me/list`). An anonymous request
+that uses `me` gets a 401.

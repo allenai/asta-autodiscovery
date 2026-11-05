@@ -10,6 +10,15 @@ from .factory import get_auth_provider
 from .models import AuthenticatedUser
 from .permissions import PermissionType
 
+#: A `<userid>` path segment naming the caller, so a client needn't know which
+#: id this API keys them on.
+ME = "me"
+
+
+def _resolve_me(kwargs: dict, request_user: dict) -> None:
+    if kwargs.get("userid") == ME:
+        kwargs["userid"] = request_user.get("sub")
+
 
 def _establish_user(user: AuthenticatedUser) -> dict:
     """Set request.user (back-compat dict) and the logging context."""
@@ -27,7 +36,7 @@ def requires_auth(
     """Require authentication and optionally check specific permissions.
 
     `required_permission` is a permission string, or a list of them any one of
-    which grants access.
+    which grants access. A `userid` path argument of "me" becomes the caller's id.
     """
     if isinstance(required_permission, str):
         required_permission = [required_permission]
@@ -43,6 +52,7 @@ def requires_auth(
                 return jsonify({"error": str(e)}), 401
 
             request_user = _establish_user(user)
+            _resolve_me(kwargs, request_user)
             permissions = request_user.get("permissions", [])
             if not isinstance(permissions, list):
                 permissions = [permissions]
@@ -65,9 +75,10 @@ def requires_auth(
 def optional_enrollment(f):
     """Authenticate if credentials are present, else continue anonymously.
 
-    On valid credentials, behaves like requires_auth (sets request.user). On
-    missing or invalid credentials, sets request.user to {} and continues, so
-    endpoints can serve both authenticated and anonymous users (e.g. shared runs).
+    On valid credentials, behaves like requires_auth (sets request.user, and
+    resolves a `userid` of "me"). On missing or invalid credentials, sets
+    request.user to {} and continues, so endpoints can serve both authenticated
+    and anonymous users (e.g. shared runs); "me" then gets a 401.
     """
 
     @wraps(f)
@@ -77,10 +88,12 @@ def optional_enrollment(f):
         except AuthConfigError as e:
             return jsonify({"error": str(e)}), 500
         except (NoCredentialsError, InvalidCredentialsError):
+            if kwargs.get("userid") == ME:
+                return jsonify({"error": "Sign in to refer to yourself as 'me'"}), 401
             request.user = {}
             return f(*args, **kwargs)
 
-        _establish_user(user)
+        _resolve_me(kwargs, _establish_user(user))
         return f(*args, **kwargs)
 
     return decorated

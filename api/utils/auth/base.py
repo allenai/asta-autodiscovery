@@ -32,6 +32,10 @@ class AuthProvider(ABC):
     #: Stable identifier reported to the UI via /api/auth/config.
     name: str
 
+    #: Whether people sign in through this provider in the UI. A provider that
+    #: only authenticates other services is not, so its config isn't served.
+    interactive: bool = True
+
     @classmethod
     @abstractmethod
     def from_env(cls) -> AuthProvider:
@@ -44,6 +48,14 @@ class AuthProvider(ABC):
         Raise NoCredentialsError if none are present, InvalidCredentialsError if
         present-but-invalid. Otherwise return the authenticated user.
         """
+
+    def recognizes(self, request) -> bool:
+        """Whether the request's credentials are this provider's kind.
+
+        When several providers are configured, a request goes to the first that
+        recognizes it. The default claims every request.
+        """
+        return True
 
     def user_profile(self, request, user: AuthenticatedUser) -> dict:
         """Full profile for GET /api/user/me. Defaults to the normalized identity."""

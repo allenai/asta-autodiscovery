@@ -10,6 +10,9 @@ class AuthenticatedUser:
         - auth0:         "auth0|...", "google-oauth2|..."
         - password_file: "file|<username>"
         - none:          "local"
+
+    `provider` names the provider that authenticated the user when several are
+    configured.
     """
 
     sub: str
@@ -18,6 +21,7 @@ class AuthenticatedUser:
     name: str | None = None
     picture: str | None = None
     email_verified: bool | None = None
+    provider: str | None = None
 
     def to_request_user(self) -> dict:
         """Back-compat dict shape that handlers read via request.user.get(...)."""

@@ -63,6 +63,7 @@ from runs.models import (
     SubmitRunResponseModel,
     UploadDatasetResponseModel,
 )
+from runs.preloaded_datasets import PRELOADED_DATASET_URLS
 
 # Import autodiscovery_jobs when available
 try:
@@ -969,10 +970,6 @@ def create() -> Blueprint:
         if not runid_data:
             raise BadRequest("runid is required")
 
-        # Check if user has AI1_DATASETS permission for dataset access in the UI
-        permissions = request.user.get("permissions", [])
-        has_ai1_permission = PermissionType.AI1_DATASETS.value in permissions
-
         req = SubmitRunRequestModel(runid=runid_data, userid=userid)
 
         try:
@@ -985,10 +982,13 @@ def create() -> Blueprint:
 
             datasets = metadata.get("datasets", [])
             for ds in datasets:
-                # If the dataset has a URL, it's an S3 preloaded file
+                # A dataset with a gs:// URL is a preloaded one, copied in by
+                # this service's account: only the published ones may be.
                 if ds.get("url") and ds.get("url").startswith("gs://"):
-                    if not has_ai1_permission:
-                        return jsonify({"error": "Permission denied for preloaded datasets"}), 403
+                    if ds["url"] not in PRELOADED_DATASET_URLS:
+                        return jsonify(
+                            {"error": f"{ds['url']} is not one of the preloaded datasets"}
+                        ), 403
                     filename = ds.get("name")
                     source_url = ds.get("url")
 

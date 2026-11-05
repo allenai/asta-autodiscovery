@@ -12,8 +12,7 @@ class AuthenticatedUser:
         - none:          "local"
         - trusted_header: the id the upstream names, after any configured prefix
 
-    `provider` names the provider that authenticated the user when several are
-    configured.
+    `provider` is set by a ProviderChain to the provider that authenticated.
     """
 
     sub: str

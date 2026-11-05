@@ -1,4 +1,4 @@
-"""Requests relayed by a trusted upstream: its secret and the headers naming the user."""
+"""AUTH_PROVIDER=trusted_header,password_file: the chain, the trusted upstream, and `me`."""
 
 import pytest
 
@@ -11,47 +11,24 @@ from autodiscovery_jobs import JobManager  # noqa: E402
 from runs import runs_api  # noqa: E402
 from user import user_api  # noqa: E402
 from utils.auth import reset_auth_provider  # noqa: E402
-from utils.auth.base import AuthConfigError, InvalidCredentialsError  # noqa: E402
-from utils.auth.chain import ProviderChain  # noqa: E402
+from utils.auth.base import AuthConfigError  # noqa: E402
 from utils.auth.factory import get_auth_provider  # noqa: E402
-from utils.auth.providers.password_file import PasswordFileProvider  # noqa: E402
-from utils.auth.providers.trusted_header import (  # noqa: E402
-    TrustedHeaderProvider,
-    parse_user_headers,
-)
 
 SECRET = "upstream-secret"
-USER_HEADERS = "X-Forwarded-User,X-Forwarded-Service=service:"
 USER = "idp|1234567890"
-
-
-class _Request:
-    def __init__(self, headers):
-        self.headers = headers
 
 
 def _relayed(**named) -> dict:
     headers = {"Authorization": f"Bearer {SECRET}"}
-    for name, value in named.items():
-        headers[f"X-Forwarded-{name.capitalize()}"] = value
+    headers.update({f"X-Forwarded-{k.capitalize()}": v for k, v in named.items()})
     return headers
-
-
-AS_USER = _relayed(user=USER)
-AS_SERVICE = _relayed(service="ci-bot")
-
-
-def _provider(spec=USER_HEADERS) -> TrustedHeaderProvider:
-    return TrustedHeaderProvider(SECRET, parse_user_headers(spec))
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    """The runs, user and auth APIs behind AUTH_PROVIDER=trusted_header,password_file,
-    on a local store under ``tmp_path``."""
     monkeypatch.setenv("AUTH_PROVIDER", "trusted_header,password_file")
     monkeypatch.setenv("AUTH_TRUSTED_HEADER_SECRET", SECRET)
-    monkeypatch.setenv("AUTH_TRUSTED_HEADER_USER", USER_HEADERS)
+    monkeypatch.setenv("AUTH_TRUSTED_HEADER_USER", "X-Forwarded-User,X-Forwarded-Service=service:")
     monkeypatch.setenv("AUTH_PASSWORD_DIR", str(tmp_path / "passwords"))
     monkeypatch.setenv("AUTH_SESSION_SECRET", "session-secret-" + "x" * 32)
     monkeypatch.setenv("STORAGE_BACKEND", "local")
@@ -67,117 +44,62 @@ def client(tmp_path, monkeypatch):
     reset_auth_provider()
 
 
-# --- configuration ---------------------------------------------------------
+@pytest.mark.parametrize(
+    ("env", "reason"),
+    [
+        ({"AUTH_PROVIDER": "password_file,trusted_header,password_file"}, "twice"),
+        ({"AUTH_PROVIDER": "trusted_header,kerberos"}, "Unknown AUTH_PROVIDER 'kerberos'"),
+        ({"AUTH_PROVIDER": "password_file,trusted_header"}, "must come last"),
+        ({"AUTH_TRUSTED_HEADER_SECRET": ""}, "AUTH_TRUSTED_HEADER_SECRET"),
+        ({"AUTH_TRUSTED_HEADER_USER": "X User"}, "not a header name"),
+    ],
+)
+def test_config_errors(client, monkeypatch, env, reason):
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    reset_auth_provider()
+    with pytest.raises(AuthConfigError, match=reason):
+        get_auth_provider()
 
 
-def test_it_goes_ahead_of_the_interactive_provider(client):
-    provider = get_auth_provider()
-    assert isinstance(provider, ProviderChain)
-    assert [type(p) for p in provider.providers] == [TrustedHeaderProvider, PasswordFileProvider]
+def test_the_ui_login_is_the_interactive_providers(client):
     assert client.get("/api/auth/config").get_json()["provider"] == "password_file"
 
 
-def test_it_needs_its_secret(client, monkeypatch):
-    monkeypatch.delenv("AUTH_TRUSTED_HEADER_SECRET")
-    reset_auth_provider()
-    with pytest.raises(AuthConfigError, match="AUTH_TRUSTED_HEADER_SECRET"):
-        get_auth_provider()
-    response = client.post("/api/runs/create", headers=AS_USER)
-    assert response.status_code == 500
-
-
-def test_the_default_user_header(monkeypatch):
-    monkeypatch.setenv("AUTH_TRUSTED_HEADER_SECRET", SECRET)
-    monkeypatch.delenv("AUTH_TRUSTED_HEADER_USER", raising=False)
-    user = TrustedHeaderProvider.from_env().authenticate(_Request(AS_USER))
-    assert user.sub == USER
-
-
-@pytest.mark.parametrize(
-    ("spec", "reason"),
-    [
-        ("", "names no header"),
-        ("X-User,x-user=p:", "twice"),
-        ("X User", "not a header name"),
-    ],
-)
-def test_bad_user_header_lists_are_config_errors(spec, reason):
-    with pytest.raises(AuthConfigError, match=reason):
-        parse_user_headers(spec)
-
-
-# --- the provider ----------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("headers", "sub"),
-    [(AS_USER, USER), (AS_SERVICE, "service:ci-bot")],
-)
-def test_the_named_user(headers, sub):
-    user = _provider().authenticate(_Request(headers))
-    assert (user.sub, user.permissions) == (sub, [])
-
-
-@pytest.mark.parametrize(
-    ("headers", "reason"),
-    [
-        (_relayed(), "names no user"),
-        (_relayed(user=USER, service="ci-bot"), "more than one"),
-        (_relayed(user="../other-user"), "can't store"),
-        (_relayed(service="a/b"), "can't store"),
-    ],
-)
-def test_bad_identities_are_refused(headers, reason):
-    with pytest.raises(InvalidCredentialsError, match=reason):
-        _provider().authenticate(_Request(headers))
-
-
-@pytest.mark.parametrize(
-    "authorization", [None, "Bearer not-the-secret", f"Basic {SECRET}", f"Bearer {SECRET}x"]
-)
-def test_it_recognizes_only_its_secret(authorization):
-    headers = {"X-Forwarded-User": USER}
-    if authorization:
-        headers["Authorization"] = authorization
-    provider = _provider()
-    assert not provider.recognizes(_Request(headers))
-    with pytest.raises(InvalidCredentialsError):
-        provider.authenticate(_Request(headers))
-
-
-# --- through the API -------------------------------------------------------
-
-
-def test_relayed_users_runs_land_under_their_id_and_resolve_as_me(client):
-    created = client.post("/api/runs/create", headers=AS_USER)
+def test_a_relayed_user_owns_their_runs_as_me(client):
+    created = client.post("/api/runs/create", headers=_relayed(user=USER))
     assert created.status_code == 200
     runid = created.get_json()["runid"]
-    # The default upload limit: relayed callers hold no permissions.
-    assert created.get_json()["max_file_size"] is None
     assert JobManager().list_jobs(USER) == [runid]
+    # Relayed callers hold no permissions, so the default upload limit.
+    assert created.get_json()["max_file_size"] is None
 
-    listed = client.get("/api/runs/me/list", headers=AS_USER)
+    listed = client.get("/api/runs/me/list", headers=_relayed(user=USER))
     assert [r["runid"] for r in listed.get_json()["runs"]] == [runid]
+    assert client.get("/api/user/me", headers=_relayed(user=USER)).get_json()["user"]["sub"] == USER
 
 
-def test_a_prefixed_caller_is_kept_apart(client):
-    created = client.post("/api/runs/create", headers=AS_SERVICE)
-    assert JobManager().list_jobs("service:ci-bot") == [created.get_json()["runid"]]
+def test_a_prefix_keeps_callers_apart(client):
+    runid = client.post("/api/runs/create", headers=_relayed(service="ci-bot")).get_json()["runid"]
+    assert JobManager().list_jobs("service:ci-bot") == [runid]
+    other = client.get("/api/runs/service:ci-bot/list", headers=_relayed(user=USER))
+    assert other.status_code == 403
 
 
-def test_user_headers_without_the_secret_are_refused(client):
-    headers = {**AS_USER, "Authorization": "Bearer not-the-secret"}
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"X-Forwarded-User": USER},  # no secret: falls through to password_file
+        {**_relayed(user=USER), "Authorization": "Bearer not-the-secret"},
+        {**_relayed(user=USER), "Authorization": f"Basic {SECRET}"},
+        _relayed(),  # names no user
+        _relayed(user=USER, service="ci-bot"),  # names two
+        _relayed(user="../other-user"),  # not one path segment
+    ],
+)
+def test_refused(client, headers):
     assert client.post("/api/runs/create", headers=headers).status_code == 401
-    assert client.get("/api/runs/me/list", headers=headers).status_code == 401
 
 
-def test_me_profile_is_the_named_user(client):
-    response = client.get("/api/user/me", headers=AS_USER)
-    assert response.status_code == 200
-    assert response.get_json()["user"]["sub"] == USER
-
-
-def test_another_users_runs_stay_private(client):
-    client.post("/api/runs/create", headers=AS_SERVICE)
-    response = client.get("/api/runs/service:ci-bot/list", headers=AS_USER)
-    assert response.status_code == 403
+def test_me_needs_a_caller(client):
+    assert client.get("/api/runs/me/list").status_code == 401

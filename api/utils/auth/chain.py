@@ -1,4 +1,4 @@
-"""Several providers in one deployment: AUTH_PROVIDER lists them, separated by commas."""
+"""Several auth providers in one deployment (comma-separated AUTH_PROVIDER)."""
 
 from __future__ import annotations
 
@@ -10,16 +10,14 @@ from .models import AuthenticatedUser
 
 
 def _is_selective(provider: AuthProvider) -> bool:
-    """Whether the provider recognizes only some requests (overrides `recognizes`)."""
     return type(provider).recognizes is not AuthProvider.recognizes
 
 
 class ProviderChain(AuthProvider):
     """Authenticates each request with the first provider that recognizes it.
 
-    Order matters: a provider that recognizes only its own credentials goes
-    before one that takes every request, and only the last provider may take
-    every request. The UI's login is the first interactive provider's.
+    Only the last provider may recognize every request. The UI's login is the
+    first interactive provider's.
     """
 
     def __init__(self, providers: Sequence[AuthProvider]):

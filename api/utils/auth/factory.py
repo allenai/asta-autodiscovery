@@ -32,11 +32,7 @@ def _build_one(kind: str) -> AuthProvider:
 
 
 def _build_provider() -> AuthProvider:
-    """AUTH_PROVIDER names one provider, or several separated by commas.
-
-    With several, each request goes to the first, in order, that recognizes its
-    credentials (see ProviderChain).
-    """
+    """One provider, or a ProviderChain for a comma-separated AUTH_PROVIDER."""
     kinds = [k.strip().lower() for k in os.environ.get("AUTH_PROVIDER", "none").split(",")]
     kinds = [k for k in kinds if k] or ["none"]
     if len(set(kinds)) != len(kinds):

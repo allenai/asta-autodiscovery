@@ -32,8 +32,7 @@ class AuthProvider(ABC):
     #: Stable identifier reported to the UI via /api/auth/config.
     name: str
 
-    #: Whether people sign in through this provider in the UI. A provider that
-    #: only authenticates other services is not, so its config isn't served.
+    #: Whether users sign in through this provider in the UI.
     interactive: bool = True
 
     @classmethod
@@ -50,11 +49,7 @@ class AuthProvider(ABC):
         """
 
     def recognizes(self, request) -> bool:
-        """Whether the request's credentials are this provider's kind.
-
-        When several providers are configured, a request goes to the first that
-        recognizes it. The default claims every request.
-        """
+        """Whether this provider handles the request's credentials. Default: all."""
         return True
 
     def user_profile(self, request, user: AuthenticatedUser) -> dict:

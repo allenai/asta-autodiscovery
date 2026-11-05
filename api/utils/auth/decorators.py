@@ -10,8 +10,7 @@ from .factory import get_auth_provider
 from .models import AuthenticatedUser
 from .permissions import PermissionType
 
-#: A `<userid>` path segment naming the caller, so a client needn't know which
-#: id this API keys them on.
+#: A `<userid>` path value meaning the caller.
 ME = "me"
 
 
@@ -75,10 +74,10 @@ def requires_auth(
 def optional_enrollment(f):
     """Authenticate if credentials are present, else continue anonymously.
 
-    On valid credentials, behaves like requires_auth (sets request.user, and
-    resolves a `userid` of "me"). On missing or invalid credentials, sets
-    request.user to {} and continues, so endpoints can serve both authenticated
-    and anonymous users (e.g. shared runs); "me" then gets a 401.
+    On valid credentials, behaves like requires_auth (sets request.user). On
+    missing or invalid credentials, sets request.user to {} and continues, so
+    endpoints can serve both authenticated and anonymous users (e.g. shared runs).
+    A `userid` of "me" resolves to the caller, or is a 401 when anonymous.
     """
 
     @wraps(f)

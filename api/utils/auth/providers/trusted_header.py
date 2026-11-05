@@ -1,24 +1,9 @@
-"""Requests relayed by a trusted upstream that has already authenticated the user.
+"""Requests relayed by a trusted upstream (an authenticating proxy or gateway).
 
-An authenticating proxy or API gateway in front of this API signs its users in
-itself, then forwards their requests with a shared secret as the bearer and
-names the user in a header. Such headers are trusted only on a request that
-carries the secret; the upstream must drop any copy its own callers send.
-
-Configuration:
-
-    AUTH_TRUSTED_HEADER_SECRET   the bearer the upstream sends (required)
-    AUTH_TRUSTED_HEADER_USER     the header(s) naming the user, default
-                                 X-Forwarded-User
-
-``AUTH_TRUSTED_HEADER_USER`` may list several headers, separated by commas,
-each optionally ``header=prefix``. A request must carry exactly one of them;
-its value, after the prefix, is the user id. A prefix keeps kinds of caller
-apart, e.g. ``X-Forwarded-User,X-Forwarded-Service=service:``.
-
-Callers authenticated this way hold no permissions. The provider recognizes
-only requests bearing the secret, so it goes before a provider that takes
-every request: AUTH_PROVIDER=trusted_header,auth0.
+The upstream sends AUTH_TRUSTED_HEADER_SECRET as its bearer and names the user
+in a header from AUTH_TRUSTED_HEADER_USER (``header[=prefix],...``, default
+X-Forwarded-User). Those headers are trusted only alongside the secret. Callers
+hold no permissions. See docs/authentication.md.
 """
 
 from __future__ import annotations
@@ -33,8 +18,7 @@ from ..models import AuthenticatedUser
 
 DEFAULT_USER_HEADER = "X-Forwarded-User"
 
-# A user id becomes a storage prefix (users/{sub}/), so it must be one path
-# segment.
+# User ids become storage prefixes (users/{sub}/), so must be one path segment.
 _SAFE_ID = re.compile(r"^[A-Za-z0-9|_.@:+-]+$")
 _HEADER_NAME = re.compile(r"^[A-Za-z0-9-]+$")
 

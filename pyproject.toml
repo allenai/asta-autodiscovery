@@ -64,9 +64,15 @@ asta-code-execution = { workspace = true }
 # google-adk caps opentelemetry at <=1.44, but the fix for GHSA-xcq7-p3pf-p88h
 # (unbounded tracestate parsing) first ships in 1.45.1. Drop this once
 # google-adk allows it.
+#
+# litellm caps filelock at <4.0, but the fixes for GHSA-69hj-f68j-2879,
+# GHSA-v4x8-3wr5-3wq8 and related advisories first ship in 4.2.1. The 4.0
+# break only changes SoftReadWriteLock's on-disk protocol, which litellm and
+# huggingface-hub do not use. Drop this once litellm allows filelock 4.
 override-dependencies = [
     "opentelemetry-api>=1.45.1",
     "opentelemetry-sdk>=1.45.1",
+    "filelock>=4.2.1",
 ]
 
 [tool.coverage.run]

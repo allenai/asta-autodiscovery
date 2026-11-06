@@ -47,7 +47,7 @@ each provider; the table below is the variable reference.
 | `AUTH_PASSWORD_DIR` | password_file | *(none)* | Directory holding the user store (fixed filename `passwddb.json`), managed with `api/scripts/auth_admin.py`. Mounted as a directory so edits are picked up live. |
 | `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
 | `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
-| `AUTH_TRUSTED_HEADER_SECRET` | trusted_header | *(none)* | The bearer a trusted upstream sends. Requests bearing it are authenticated as the user it names in a header. See [Authentication](authentication.md#trusted_header). |
+| `AUTH_TRUSTED_HEADER_SECRET` | trusted_header | *(none)* | Bearer token from a trusted upstream caller. A request bearing it is accepted as authenticated as whichever user its header names, so anyone holding this secret can act as any user. See [Authentication](authentication.md#trusted_header). |
 | `AUTH_TRUSTED_HEADER_USER` | No | `X-Forwarded-User` | The header(s) naming the user: comma-separated, each optionally `header=prefix`; a request must carry exactly one. |
 
 ## Experiment credits

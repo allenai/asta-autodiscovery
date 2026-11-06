@@ -88,7 +88,8 @@ AUTH_TRUSTED_HEADER_SECRET=<the bearer the upstream sends>
 ```
 
 The header is trusted only on a request bearing the secret, so the upstream must drop
-any copy of it that its own callers send. The value becomes the user id; to share runs
+any copy of it that its own callers send. Anyone holding the secret can act as any user:
+guard it like a signing key. The value becomes the user id; to share runs
 with users who also sign in directly, the upstream names them by the same id the other
 provider gives them (for `auth0`, the Auth0 subject).
 

@@ -45,7 +45,6 @@ export interface RunMetadataFromApi {
     mcts_selection: string | null;
     surprisal_width: number | null;
     evidence_weight: number | null;
-    warmstart_experiments: string | null;
     n_warmstart: number | null;
     // Lineage
     parent_run_id?: string | null;
@@ -162,7 +161,6 @@ export interface MetadataFromApi {
     mcts_selection: string | null;
     surprisal_width: number | null;
     evidence_weight: number | null;
-    warmstart_experiments: string | null;
     n_warmstart: number | null;
     // Lineage
     parent_run_id?: string | null;

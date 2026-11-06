@@ -181,7 +181,6 @@ class MetadataModel(BaseModel):
     mcts_selection: str | None = Field(None, description="MCTS selection strategy")
     surprisal_width: float | None = Field(None, description="Surprisal threshold width")
     evidence_weight: float | None = Field(None, description="Weight for evidence in belief updates")
-    warmstart_experiments: str | None = Field(None, description="Path to warmstart experiments")
     n_warmstart: int | None = Field(None, description="Number of warmstart experiments")
 
     @staticmethod
@@ -221,7 +220,6 @@ class MetadataModel(BaseModel):
             mcts_selection=data.get("mcts_selection"),
             surprisal_width=data.get("surprisal_width"),
             evidence_weight=data.get("evidence_weight"),
-            warmstart_experiments=data.get("warmstart_experiments"),
             n_warmstart=data.get("n_warmstart"),
         )
 

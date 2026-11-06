@@ -1,4 +1,6 @@
-"""Error responses from the run-submit endpoint."""
+"""Responses from the run-submit endpoint, and what it hands the job."""
+
+from unittest.mock import patch
 
 import pytest
 
@@ -33,3 +35,32 @@ def test_submit_without_an_experiment_count_is_a_bad_request(client):
 
     assert response.status_code == 400
     assert "Number of Experiments" in response.get_json()["error"]
+
+
+def test_a_stored_warmstart_path_is_not_passed_to_the_job(client, tmp_path):
+    """warmstart_experiments names a path on the job's filesystem: the API never forwards it."""
+    manager = JobManager()
+    manager.create_job("local", "run-1")
+    (tmp_path / "data.csv").write_text("a\n1\n")
+    manager.upload_dataset("local", "run-1", str(tmp_path / "data.csv"))
+    manager.upload_metadata(
+        "local",
+        "run-1",
+        {
+            "name": "Seeded",
+            "datasets": [{"name": "data.csv"}],
+            "n_experiments": 4,
+            "warmstart_experiments": "/somewhere/seeds.json",
+            "n_warmstart": 2,
+        },
+    )
+
+    with (
+        patch.object(runs_api, "check_experiment_limits"),
+        patch.object(JobManager, "run_job", return_value="exec-1") as run_job,
+    ):
+        client.post("/api/runs/submit", json={"runid": "run-1"})
+
+    run_job.assert_called_once()
+    assert "warmstart_experiments" not in run_job.call_args.kwargs
+    assert run_job.call_args.kwargs["n_warmstart"] == 2

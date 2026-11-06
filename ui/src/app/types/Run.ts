@@ -134,7 +134,6 @@ export type Metadata = {
     mctsSelection?: string | null;
     surprisalWidth?: number | null;
     evidenceWeight?: number | null;
-    warmstartExperiments?: string | null;
     nWarmstart?: number | null;
     // Lineage
     parentRunId?: string | null;
@@ -243,7 +242,6 @@ export const getMetadataFromApi = (metadataFromApi?: MetadataFromApi): Metadata 
         mctsSelection: metadataFromApi.mcts_selection,
         surprisalWidth: metadataFromApi.surprisal_width,
         evidenceWeight: metadataFromApi.evidence_weight,
-        warmstartExperiments: metadataFromApi.warmstart_experiments,
         nWarmstart: metadataFromApi.n_warmstart,
         // Lineage
         parentRunId: metadataFromApi.parent_run_id ?? null,

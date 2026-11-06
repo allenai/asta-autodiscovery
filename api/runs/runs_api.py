@@ -1053,7 +1053,6 @@ def create() -> Blueprint:
                 "mcts_selection",
                 "surprisal_width",
                 "evidence_weight",
-                "warmstart_experiments",
                 "n_warmstart",
             ]
             for param in optional_params:

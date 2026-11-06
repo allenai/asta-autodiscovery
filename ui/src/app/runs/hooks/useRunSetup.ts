@@ -41,7 +41,6 @@ type Settings = {
     mctsSelection: string;
     surprisalWidth: number;
     evidenceWeight: number;
-    warmstartExperiments: string;
     nWarmstart: number;
 
     // Lineage (read-only, preserved across saves)
@@ -137,7 +136,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
         mctsSelection: MCTS_SELECTION.PROGRESSIVE_WIDENING.value,
         surprisalWidth: 0.2,
         evidenceWeight: 2,
-        warmstartExperiments: '',
         nWarmstart: 0,
         parentRunId: null,
         parentRunName: null,
@@ -180,8 +178,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                         mctsSelection: metadata.mctsSelection ?? prev.mctsSelection,
                         surprisalWidth: metadata.surprisalWidth ?? prev.surprisalWidth,
                         evidenceWeight: metadata.evidenceWeight ?? prev.evidenceWeight,
-                        warmstartExperiments:
-                            metadata.warmstartExperiments ?? prev.warmstartExperiments,
                         nWarmstart: metadata.nWarmstart ?? prev.nWarmstart,
                         parentRunId: metadata.parentRunId ?? null,
                         parentRunName: metadata.parentRunName ?? null,
@@ -383,7 +379,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 mcts_selection: currentSettings.mctsSelection,
                 surprisal_width: currentSettings.surprisalWidth,
                 evidence_weight: currentSettings.evidenceWeight,
-                warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
                 // Lineage
                 lineage: {
@@ -625,7 +620,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 mcts_selection: currentSettings.mctsSelection,
                 surprisal_width: currentSettings.surprisalWidth,
                 evidence_weight: currentSettings.evidenceWeight,
-                warmstart_experiments: currentSettings.warmstartExperiments,
                 n_warmstart: currentSettings.nWarmstart,
                 // Lineage
                 lineage: {

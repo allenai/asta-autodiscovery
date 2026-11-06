@@ -2,7 +2,8 @@
 
 Public API preserved from the original ``utils.auth`` module so existing call
 sites (``from utils.auth import requires_auth, optional_enrollment, ...``) keep
-working. The active provider is selected by the AUTH_PROVIDER env var.
+working. The active provider is selected by the AUTH_PROVIDER env var, which
+may list several, separated by commas.
 
 The re-exports are resolved lazily (PEP 562) so that importing a lightweight
 submodule such as ``utils.auth.password_store`` (used by the admin CLI) does not

@@ -40,13 +40,15 @@ each provider; the table below is the variable reference.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTH_PROVIDER` | No | `none` | Active auth backend: `none` (zero-config, unauthenticated local user), `auth0`, or `password_file`. Set explicitly for any real deployment. |
+| `AUTH_PROVIDER` | No | `none` | Active auth backend: `none` (zero-config, unauthenticated local user), `auth0`, `password_file`, or `trusted_header`. May list several, separated by commas; see [Several providers](authentication.md#several-providers). Set explicitly for any real deployment. |
 | `AUTH0_DOMAIN` | auth0 | *(none)* | Auth0 tenant domain used to validate tokens and look up user info. Compose default: `auth0.allenai.org`. |
 | `AUTH0_AUDIENCE` | auth0 | *(none)* | Expected audience (API identifier) for incoming access tokens. Compose default: `https://asta-core.allen.ai`. |
 | `AUTH0_CLIENT_ID` | No | *(none)* | Public SPA client id, served to the UI via `/api/auth/config`. |
 | `AUTH_PASSWORD_DIR` | password_file | *(none)* | Directory holding the user store (fixed filename `passwddb.json`), managed with `api/scripts/auth_admin.py`. Mounted as a directory so edits are picked up live. |
 | `AUTH_SESSION_SECRET` | password_file | *(none)* | Secret used to sign HS256 session tokens (use ≥ 32 random bytes). |
 | `AUTH_SESSION_TTL` | No | `43200` | `password_file` session lifetime in seconds (default 12h). |
+| `AUTH_TRUSTED_HEADER_SECRET` | trusted_header | *(none)* | Bearer token from a trusted upstream caller. A request bearing it is accepted as authenticated as whichever user its header names, so anyone holding this secret can act as any user. See [Authentication](authentication.md#trusted_header). |
+| `AUTH_TRUSTED_HEADER_USER` | No | `X-Forwarded-User` | The header(s) naming the user: comma-separated, each optionally `header=prefix`; a request must carry exactly one. |
 
 ## Experiment credits
 

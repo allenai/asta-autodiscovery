@@ -344,7 +344,7 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             description: ds.description,
             content_type: 'application/octet-stream',
             file_size_bytes: 0,
-            url: ds.url,
+            preloaded_id: ds.id,
             is_preloaded: true,
         }));
 

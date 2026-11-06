@@ -25,6 +25,7 @@ from utils.credits import (
 from utils.experiments import ExperimentTree
 from werkzeug.exceptions import BadRequest
 
+from runs import preloaded_datasets
 from runs.models import (
     BookmarkExperimentRequestModel,
     BookmarkExperimentResponseModel,
@@ -881,6 +882,13 @@ def create() -> Blueprint:
             raise BadRequest("metadata is required")
 
         try:
+            # Spell out any preloaded dataset an entry names, from the registry.
+            metadata_data = {
+                **metadata_data,
+                "datasets": [
+                    preloaded_datasets.normalize(ds) for ds in metadata_data.get("datasets") or []
+                ],
+            }
             req = SaveMetadataRequestModel(
                 runid=runid,
                 userid=userid,
@@ -969,10 +977,6 @@ def create() -> Blueprint:
         if not runid_data:
             raise BadRequest("runid is required")
 
-        # Check if user has AI1_DATASETS permission for dataset access in the UI
-        permissions = request.user.get("permissions", [])
-        has_ai1_permission = PermissionType.AI1_DATASETS.value in permissions
-
         req = SubmitRunRequestModel(runid=runid_data, userid=userid)
 
         try:
@@ -984,27 +988,24 @@ def create() -> Blueprint:
                 raise BadRequest("Run metadata not found. Please save run configuration first.")
 
             datasets = metadata.get("datasets", [])
-            for ds in datasets:
-                # If the dataset has a URL, it's an S3 preloaded file
-                if ds.get("url") and ds.get("url").startswith("gs://"):
-                    if not has_ai1_permission:
-                        return jsonify({"error": "Permission denied for preloaded datasets"}), 403
-                    filename = ds.get("name")
-                    source_url = ds.get("url")
-
-                    try:
-                        sync_preloaded_dataset(
-                            source_gs_url=source_url,
-                            config=manager.config,
-                            dest_key=dataset_key(req.userid, req.runid, filename),
-                        )
-                    except Exception as e:
-                        current_app.logger.error(
-                            f"Failed to sync preloaded dataset {filename}: {e}"
-                        )
-                        return jsonify(
-                            {"error": f"Failed to prepare preloaded dataset: {str(e)}"}
-                        ), 500
+            # Preloaded datasets are copied in with this service's credentials, so
+            # what is copied, and where it lands, comes from the registry only.
+            try:
+                preloaded = [p for p in map(preloaded_datasets.resolve, datasets) if p]
+            except preloaded_datasets.UnknownPreloadedDatasetError as e:
+                raise BadRequest(str(e)) from e
+            for dataset in preloaded:
+                try:
+                    sync_preloaded_dataset(
+                        source_gs_url=dataset.source,
+                        config=manager.config,
+                        dest_key=dataset_key(req.userid, req.runid, dataset.filename),
+                    )
+                except Exception as e:
+                    current_app.logger.error(
+                        f"Failed to sync preloaded dataset {dataset.filename}: {e}"
+                    )
+                    return jsonify({"error": f"Failed to prepare preloaded dataset: {str(e)}"}), 500
 
             intent = metadata.get("intent", "")
             n_experiments = metadata.get("n_experiments")

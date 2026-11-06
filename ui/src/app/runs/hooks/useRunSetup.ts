@@ -336,7 +336,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
                 content_type: upload.file.type || 'application/octet-stream',
                 file_size_bytes: upload.totalBytes || upload.file.size,
                 url: null,
-                is_preloaded: false,
             }));
 
         const preloaded = selectedPreloadedRef.current.map((ds) => ({
@@ -345,7 +344,6 @@ export function useRunSetup({ runid, onSubmitSuccess, debounceSaveMs = 3000 }: U
             content_type: 'application/octet-stream',
             file_size_bytes: 0,
             preloaded_id: ds.id,
-            is_preloaded: true,
         }));
 
         return [...uploads, ...preloaded];

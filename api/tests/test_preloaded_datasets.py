@@ -83,7 +83,7 @@ def _assert_copied(sync, runid):
     "dataset",
     [
         {"preloaded_id": HEART.id},
-        {"name": HEART.filename, "url": HEART.source},  # saved before ids
+        {"name": HEART.filename, "url": HEART.source, "is_preloaded": True},  # saved before ids
     ],
     ids=["by-id", "by-legacy-url"],
 )
@@ -134,7 +134,6 @@ def test_saving_metadata_spells_out_a_preloaded_dataset(client, alice):
     assert saved["preloaded_id"] == HEART.id
     assert saved["name"] == HEART.filename
     assert saved["url"] == HEART.source
-    assert saved["is_preloaded"] is True
 
 
 def test_saving_metadata_refuses_an_unknown_preloaded_dataset(client, alice):

@@ -73,5 +73,4 @@ def normalize(dataset: dict) -> dict:
         "preloaded_id": preloaded.id,
         "name": preloaded.filename,
         "url": preloaded.source,
-        "is_preloaded": True,
     }

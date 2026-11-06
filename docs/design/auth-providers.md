@@ -229,10 +229,12 @@ and runs **offline**, not in the request path. Out of scope for swapping; left a
 
 | Var | Provider | Notes |
 |---|---|---|
-| `AUTH_PROVIDER` | all | `none` (default) \| `auth0` \| `password_file` |
+| `AUTH_PROVIDER` | all | `none` (default) \| `auth0` \| `password_file`, or a comma-separated list of providers |
 | `AUTH_PASSWORD_DIR` | password_file | dir holding the store (fixed `passwddb.json`); mounted as a directory |
 | `AUTH_SESSION_SECRET` | password_file | HS256 signing secret |
 | `AUTH_SESSION_TTL` | password_file | token lifetime (default e.g. 12h) |
+| `AUTH_TRUSTED_HEADER_SECRET` | trusted_header | the bearer a trusted upstream sends |
+| `AUTH_TRUSTED_HEADER_USER` | trusted_header | header(s) naming the user (default `X-Forwarded-User`) |
 | `AUTH0_*` | auth0 | unchanged |
 
 (The `none` provider needs no configuration — its `local` identity is hardcoded.)

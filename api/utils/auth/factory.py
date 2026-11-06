@@ -4,12 +4,12 @@ from .base import AuthConfigError, AuthProvider
 
 _PROVIDER_CACHE: AuthProvider | None = None
 
+_KNOWN = ("auth0", "password_file", "trusted_header", "none")
 
-def _build_provider() -> AuthProvider:
-    kind = os.environ.get("AUTH_PROVIDER", "none").strip().lower()
 
+def _build_one(kind: str) -> AuthProvider:
     # Imported lazily so a deployment only needs the dependencies of the
-    # provider it actually uses.
+    # providers it actually uses.
     if kind == "auth0":
         from .providers.auth0 import Auth0Provider
 
@@ -18,14 +18,32 @@ def _build_provider() -> AuthProvider:
         from .providers.password_file import PasswordFileProvider
 
         return PasswordFileProvider.from_env()
+    if kind == "trusted_header":
+        from .providers.trusted_header import TrustedHeaderProvider
+
+        return TrustedHeaderProvider.from_env()
     if kind == "none":
         from .providers.none import NoneProvider
 
         return NoneProvider.from_env()
 
-    raise AuthConfigError(
-        f"Unknown AUTH_PROVIDER '{kind}'. Expected 'auth0', 'password_file', or 'none'."
-    )
+    expected = ", ".join(f"'{k}'" for k in _KNOWN)
+    raise AuthConfigError(f"Unknown AUTH_PROVIDER '{kind}'. Expected {expected}.")
+
+
+def _build_provider() -> AuthProvider:
+    """One provider, or a ProviderChain for a comma-separated AUTH_PROVIDER."""
+    kinds = [k.strip().lower() for k in os.environ.get("AUTH_PROVIDER", "none").split(",")]
+    kinds = [k for k in kinds if k] or ["none"]
+    if len(set(kinds)) != len(kinds):
+        raise AuthConfigError(f"AUTH_PROVIDER names a provider twice: {','.join(kinds)}")
+    providers = [_build_one(k) for k in kinds]
+    if len(providers) == 1:
+        return providers[0]
+
+    from .chain import ProviderChain
+
+    return ProviderChain(providers)
 
 
 def get_auth_provider() -> AuthProvider:

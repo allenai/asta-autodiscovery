@@ -104,7 +104,9 @@ class MetadataDatasetModel(BaseModel):
     content_type: str | None = Field(None, description="MIME type of the dataset file")
     file_size_bytes: int | None = Field(None, description="Size of the file in bytes")
     url: str | None = None
-    is_preloaded: bool = Field(False, description="Whether this is a preloaded dataset")
+    preloaded_id: str | None = Field(
+        None, description="Id of the preloaded dataset this is, for a preloaded dataset"
+    )
 
 
 class RunArgsModel(BaseModel):
@@ -194,7 +196,7 @@ class MetadataModel(BaseModel):
                 content_type=ds.get("content_type"),
                 file_size_bytes=ds.get("file_size_bytes"),
                 url=ds.get("url", None),
-                is_preloaded=ds.get("is_preloaded", False),
+                preloaded_id=ds.get("preloaded_id"),
             )
             for ds in datasets_data
         ]

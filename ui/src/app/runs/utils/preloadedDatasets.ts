@@ -1,5 +1,5 @@
 export interface PreloadedDataset {
-    /** Unique identifier for this dataset */
+    /** Id the API publishes this dataset under (api/runs/preloaded_datasets.py) */
     id: string;
     /** Display name shown in the UI */
     label: string;
@@ -7,8 +7,6 @@ export interface PreloadedDataset {
     filename: string;
     /** Pre-filled dataset schema description */
     description: string;
-    /** S3 URL where the dataset is hosted */
-    url: string;
 }
 const datasetDescription =
     '## Data Structure (h5ad Format)\n' +
@@ -53,20 +51,17 @@ export const PRELOADED_DATASETS: PreloadedDataset[] = [
         label: 'Tabula Sapiens - Heart',
         filename: 'heart.h5ad',
         description: datasetDescription,
-        url: 'gs://ai2-autodiscovery/public/CELLxGENE/heart.h5ad',
     },
     {
         id: 'tabula-sapiens-kidney',
         label: 'Tabula Sapiens - Kidney',
         filename: 'kidney.h5ad',
         description: datasetDescription,
-        url: 'gs://ai2-autodiscovery/public/CELLxGENE/kidney.h5ad',
     },
     {
         id: 'tabula-sapiens-lung',
         label: 'Tabula Sapiens - Lung',
         filename: 'lung.h5ad',
         description: datasetDescription,
-        url: 'gs://ai2-autodiscovery/public/CELLxGENE/lung.h5ad',
     },
 ];

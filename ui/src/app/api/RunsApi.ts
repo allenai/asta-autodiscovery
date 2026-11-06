@@ -28,7 +28,7 @@ export interface RunMetadataFromApi {
         content_type: string | null;
         file_size_bytes: number | null;
         url?: string | null;
-        is_preloaded?: boolean;
+        preloaded_id?: string | null;
     }[];
     /** Names of the user's own data library directories mounted read-only into the run */
     datalib_dirs?: string[] | null;
@@ -138,7 +138,7 @@ export interface MetadataDatasetFromApi {
     content_type: string | null;
     file_size_bytes: number | null;
     url?: string | null;
-    is_preloaded?: boolean;
+    preloaded_id?: string | null;
 }
 
 export interface MetadataFromApi {

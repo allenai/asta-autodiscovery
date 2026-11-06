@@ -437,7 +437,7 @@ PARENT_METADATA = {
     "mcts_selection": "ucb1",
     "surprisal_width": 2.0,
     "evidence_weight": 0.3,
-    "warmstart_experiments": True,
+    "warmstart_experiments": "/path/to/seeds.json",
     "n_warmstart": 3,
     "is_bookmarked": True,
     "bookmarked_experiment_ids": ["exp-1", "exp-2"],
@@ -579,7 +579,7 @@ def test_build_fork_metadata():
     assert result["mcts_selection"] == "ucb1"
     assert result["surprisal_width"] == 2.0
     assert result["evidence_weight"] == 0.3
-    assert result["warmstart_experiments"] is True
+    assert "warmstart_experiments" not in result
     assert result["n_warmstart"] == 3
 
     # Lineage set

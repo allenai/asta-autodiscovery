@@ -363,7 +363,6 @@ class JobManager:
             "mcts_selection": parent_metadata.get("mcts_selection"),
             "surprisal_width": parent_metadata.get("surprisal_width"),
             "evidence_weight": parent_metadata.get("evidence_weight"),
-            "warmstart_experiments": parent_metadata.get("warmstart_experiments"),
             "n_warmstart": parent_metadata.get("n_warmstart"),
             # Lineage
             "lineage": {

@@ -1063,7 +1063,7 @@ def create() -> Blueprint:
 
             execution_id = manager.run_job(req.userid, req.runid, **job_params)
 
-            # Capture origin URL for email links (e.g., localhost vs production)
+            # Record the origin the run was submitted from (e.g., localhost vs production)
             origin_url = request.headers.get("Origin")
 
             # Update run_details.json with execution_id and status

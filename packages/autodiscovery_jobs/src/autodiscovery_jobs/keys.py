@@ -7,7 +7,6 @@ so a bucket and a data directory hold identical trees::
     users/<userid>/user.json                            # user profile
     users/<userid>/jobs/<jobid>/metadata.json           # run configuration
     users/<userid>/jobs/<jobid>/run_details.json        # execution state
-    users/<userid>/jobs/<jobid>/email_state.json        # notification state
     users/<userid>/jobs/<jobid>/data/<filename>         # uploaded datasets
     users/<userid>/jobs/<jobid>/output/args.json        # resolved job args
     users/<userid>/jobs/<jobid>/output/mcts_node_*.json # experiment results

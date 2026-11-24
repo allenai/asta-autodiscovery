@@ -361,20 +361,18 @@ Controls the client-side retry behavior when LLM calls fail.
 | `LLM_RETRY_INITIAL_DELAY_SECONDS` | No | `1.0` | Initial backoff delay before the first retry. |
 | `LLM_RETRY_MAX_DELAY_SECONDS` | No | `20.0` | Maximum backoff delay between retries. |
 
-## Maintenance jobs (email & user lookup)
+## Maintenance scripts (user lookup)
 
-Used by the completion-email maintenance job to notify users when runs finish.
+Used by maintenance scripts that look up a user's email address by id, such as
+`api/scripts/export_users_csv.py`.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `SMTP_SERVER` | Yes* | *(none)* | Mail server hostname. Required to send completion emails. |
-| `SENDER_EMAIL` | Yes* | *(none)* | From-address for outgoing email. Required to send completion emails. |
-| `SMTP_PORT` | No | `25` | Mail server port. |
 | `AUTH0_MGMT_DOMAIN` | Yes* | *(none)* | Auth0 tenant domain for the Management API, used to look up user email addresses. |
 | `AUTH0_MGMT_CLIENT_ID` | Yes* | *(none)* | Auth0 Management API client id. |
 | `AUTH0_MGMT_CLIENT_SECRET` | Yes* | *(none)* | Auth0 Management API client secret. |
 
-<small>\* Required only for the email maintenance job; not needed to run the API or jobs.</small>
+<small>\* Required only for those scripts; not needed to run the API or jobs.</small>
 
 ## Asta integration
 

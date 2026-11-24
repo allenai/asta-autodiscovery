@@ -39,20 +39,6 @@ from .cloudrun import (
     run_job,
 )
 from .config import DATASET_EXPIRY_DAYS, JobConfig
-
-# Email sending
-from .email import (
-    EmailError,
-    send_email,
-)
-
-# Email state management
-from .email_state import (
-    get_email_state,
-    get_email_state_path,
-    record_email_sent,
-    was_email_sent,
-)
 from .exceptions import (
     AutodiscoveryJobError,
     CloudRunError,
@@ -186,11 +172,6 @@ __all__ = [
     "get_run_details",
     "refresh_run_status",
     "update_run_details",
-    # Email state functions
-    "get_email_state_path",
-    "get_email_state",
-    "record_email_sent",
-    "was_email_sent",
     # User profile functions
     "UserProfile",
     "get_user_profile_path",
@@ -200,7 +181,4 @@ __all__ = [
     "get_user_granted_credits",
     # Auth0 functions
     "get_user",
-    # Email functions
-    "EmailError",
-    "send_email",
 ]

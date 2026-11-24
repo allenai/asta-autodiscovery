@@ -3,33 +3,6 @@
 This directory contains scripts that run as scheduled Cloud Run Jobs, plus
 `purge_user_data.py`, which is run by hand by a system maintainer.
 
-## send_completion_emails.py
-
-Sends email notifications when AutoDiscovery runs complete successfully. Failed and cancelled runs do not trigger notifications. Tracks sent emails in GCS to avoid duplicates.
-
-**Features:**
-- Scans for successful runs completed within the last 24 hours (configurable)
-- Only sends notifications for SUCCEEDED status (not FAILED or CANCELLED)
-- Looks up user emails from Auth0
-- Uses GCS-based distributed lock to prevent concurrent executions
-- Supports dry-run mode for testing
-
-### Local Usage
-
-```bash
-# Dry run (no emails sent)
-uv run python scripts/send_completion_emails.py --dry-run
-
-# Test with specific user
-uv run python scripts/send_completion_emails.py --userid "google-oauth2|123" --dry-run
-```
-
-### Cloud Run Setup
-
-See [INFRASTRUCTURE.md](../INFRASTRUCTURE.md) for Cloud Run job and scheduler creation commands.
-
----
-
 ## cleanup_old_datasets.py
 
 Deletes user-uploaded dataset files older than 7 days from GCS to comply with data retention policies.

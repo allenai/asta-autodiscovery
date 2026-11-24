@@ -12,7 +12,9 @@ on:
 jobs:
   e2e-public:
     name: E2E @public (${{ matrix.provider }})
-    runs-on: ubuntu-latest
+    # Playwright 1.60 supports Ubuntu 24.04; ubuntu-latest is now 26.04, where
+    # `playwright install chromium` fails.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false

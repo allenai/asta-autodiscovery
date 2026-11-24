@@ -37,7 +37,7 @@ discovers the active provider at runtime so a single build serves all three mode
   `enroll:ai1_datasets`, `enroll:asta_integration`.
 - `/api/user/me` fetches the full profile from Auth0 `/userinfo`.
 - `packages/autodiscovery_jobs/src/.../auth0.py` does Management-API lookups (email by id)
-  for offline scripts (`send_completion_emails.py`, `export_users_csv.py`).
+  for offline scripts (`export_users_csv.py`).
 - Config is plain `os.environ.get(...)`: `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`,
   `AUTH0_REQUIRED_PERMISSION`, `AUTH0_MGMT_*`, `DEV_MASQUERADE_USER`.
 
@@ -220,9 +220,9 @@ CLI changes are live immediately. The CLI ships in the same image so an operator
 
 ### 6. Auth0 Management-API usage in offline scripts
 
-`packages/.../auth0.py` (email-by-id for completion emails / CSV export) is Auth0-specific
+`packages/.../auth0.py` (email-by-id for the CSV export) is Auth0-specific
 and runs **offline**, not in the request path. Out of scope for swapping; left as-is. If a
-`password_file` deployment needs those scripts, they can read the same file via
+`password_file` deployment needs that script, they can read the same file via
 `password_store`. Noted, not built now.
 
 ### 7. New / changed env

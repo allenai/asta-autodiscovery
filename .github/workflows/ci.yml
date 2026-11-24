@@ -79,7 +79,9 @@ jobs:
   # must render offline from the data report.py writes. Needs no stack or secrets.
   report-viewer:
     name: Report viewer
-    runs-on: ubuntu-latest
+    # Playwright 1.60 supports Ubuntu 24.04; ubuntu-latest is now 26.04, where
+    # `playwright install chromium` fails.
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code

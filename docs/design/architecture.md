@@ -87,7 +87,7 @@ copied one to the other. See [the layout](#object-store-layout) below.
   shared, multi-user deployments. See the safety matrix in
   [Configuration](../configuration.md#choosing-a-safe-combination).
 
-> A small set of optional **maintenance jobs** (e.g. a completion-email notifier) run
+> A small set of optional **maintenance jobs** (e.g. expiring uploaded datasets) run
 > out-of-band on a schedule and read run state from the object store. They are peripheral
 > to the core flow and omitted from the diagrams below.
 
